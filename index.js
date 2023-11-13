@@ -1,3 +1,4 @@
+// left on at having to account for leaving vc with role to a vc that doesnt even have the role
 require('dotenv').config();
 
 const { Client, GatewayIntentBits } = require('discord.js');
@@ -41,22 +42,7 @@ client.on('ready', () => {
 client.on('voiceStateUpdate', async (oldState, newState) => {
 	console.log('Voice State Updated');
 
-	//Log the old and new states
-	console.log(
-		'Old State Channel:',
-		oldState.channel ? oldState.channel.name : 'None'
-	);
-	console.log(
-		'New State Channel:',
-		newState.channel ? newState.channel.name : 'None'
-	);
-
-	//Additional detailed logging
-	// console.log('Old Voice State:', oldState);
-	// console.log('New Voice State:', newState);
-
 	const categoryIDs = Object.keys(categoryRoles);
-	console.log(categoryIDs);
 
 	// Check if the voice state update is within our categories of interest
 	if (
@@ -67,7 +53,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 	}
 
 	const guild = newState.guild;
-	//console.log(guild);
+
 	if (!guild) return; // Exit if guild is not available
 
 	// Ensure guild data is available
@@ -75,17 +61,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 		console.log('Guild is not available');
 		return;
 	}
-
-	// Fetch the bot's member object in the guild
-	const botMember = await guild.members.fetch(client.user.id);
-	console.log('Bot member: ' + botMember);
-	if (!botMember) {
-		console.log('Bot member not found in the guild');
-		return;
-	}
-
-	console.log("Bot's highest role:", botMember.roles.highest.name);
-	console.log("Bot's permissions:", botMember.permissions.toArray());
 
 	// When someone joins a voice channel in the categories of interest
 	if (!oldState.channel && newState.channel) {
