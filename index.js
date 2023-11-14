@@ -123,10 +123,11 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 			const activeRole = guild.roles.cache.find(
 				(role) => role.name === roleName
 			);
+			oldState.member.roles.remove(activeRole).catch(console.error);
 
 			if (categoryVCs[categoryID].has(oldState.member.id) && activeRole) {
 				//remove role and delete from cat vc
-				oldState.member.roles.remove(activeRole).catch(console.error);
+
 				categoryVCs[categoryID].delete(oldState.member.id);
 
 				// Attempt to assign the role to another user if someone leaves
@@ -144,26 +145,29 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 			}
 
 			const categoryID2 = newState.channel.parentId;
-			const roleName2 = categoryRoles[categoryID2].role;
-			const activeRole2 = guild.roles.cache.find(
-				(role) => role.name === roleName2
-			);
+			if (categoryRoles[categoryID2]) {
+				const roleName2 = categoryRoles[categoryID2].role;
+				const activeRole2 = guild.roles.cache.find(
+					(role) => role.name === roleName2
+				);
 
-			if (!categoryVCs[categoryID2]) {
-				categoryVCs[categoryID2] = new Set();
-			}
+				if (!categoryVCs[categoryID2]) {
+					categoryVCs[categoryID2] = new Set();
+				}
 
-			if (
-				categoryVCs[categoryID2].size >= categoryRoles[categoryID2].maxUsers &&
-				activeRole2
-			) {
-				categoryRoles[categoryID2].queue.push(newState.member.id);
-			} else if (
-				categoryVCs[categoryID2].size < categoryRoles[categoryID2].maxUsers &&
-				activeRole2
-			) {
-				newState.member.roles.add(activeRole2).catch(console.error);
-				categoryVCs[categoryID2].add(newState.member.id);
+				if (
+					categoryVCs[categoryID2].size >=
+						categoryRoles[categoryID2].maxUsers &&
+					activeRole2
+				) {
+					categoryRoles[categoryID2].queue.push(newState.member.id);
+				} else if (
+					categoryVCs[categoryID2].size < categoryRoles[categoryID2].maxUsers &&
+					activeRole2
+				) {
+					newState.member.roles.add(activeRole2).catch(console.error);
+					categoryVCs[categoryID2].add(newState.member.id);
+				}
 			}
 		}
 	}
