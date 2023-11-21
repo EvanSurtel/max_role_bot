@@ -1,3 +1,17 @@
+const paypalFunctions = require('./path_to_your_paypal_file');
+
+// Example usage of createPayment
+paypalFunctions.createPayment(10).then((link) => {
+	console.log('Payment link: ' + link);
+	// Do something with the payment link
+});
+
+// Example usage of processWithdrawal
+paypalFunctions.processWithdrawal('someUserId', 5).then((result) => {
+	console.log('Withdrawal result: ', result);
+	// Handle the withdrawal result
+});
+
 // left on at having to account for leaving vc with role to a vc that doesnt even have the role
 require('dotenv').config();
 
@@ -170,6 +184,36 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 				}
 			}
 		}
+	}
+});
+
+client.on('messageCreate', async (message) => {
+	if (
+		!message.content.startsWith('!deposit') ||
+		!message.content.startsWith('!withdraw') ||
+		message.author.bot
+	)
+		return;
+
+	// Extract the amount from the message
+	const args = message.content.split(' ');
+	const amount = args[1];
+
+	// Validate the amount
+	if (!amount || isNaN(amount) || amount <= 0) {
+		message.reply('Please enter a valid amount.');
+		return;
+	}
+
+	// Call the function to create a PayPal payment link
+	try {
+		const paymentLink = await createPayment(amount);
+		message.reply(
+			`To deposit ${amount} USD, please use this link: ${paymentLink}`
+		);
+	} catch (error) {
+		console.error(error);
+		message.reply('Sorry, there was an error processing your request.');
 	}
 });
 
