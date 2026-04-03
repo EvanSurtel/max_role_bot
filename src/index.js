@@ -64,7 +64,10 @@ client.once('ready', async () => {
       });
     }, 24 * 60 * 60 * 1000);
 
-    // Post lobby panel in the wager channel
+    // Post panels in their channels
+    const { postWelcomePanel } = require('./panels/welcomePanel');
+    await postWelcomePanel(client);
+
     const { postLobbyPanel } = require('./panels/lobbyPanel');
     await postLobbyPanel(client);
 

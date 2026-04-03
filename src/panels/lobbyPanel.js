@@ -45,10 +45,6 @@ function buildLobbyPanel() {
 
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId('panel_register')
-      .setLabel('Register')
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
       .setCustomId('panel_leaderboard')
       .setLabel('Leaderboard')
       .setStyle(ButtonStyle.Secondary),

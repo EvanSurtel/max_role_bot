@@ -6,6 +6,7 @@ const channelService = require('../services/channelService');
 
 /**
  * Handle button interactions for the onboarding TOS flow.
+ * Buttons live on the static welcome panel in WELCOME_CHANNEL_ID.
  */
 async function handleButton(interaction) {
   const id = interaction.customId;
@@ -22,14 +23,16 @@ async function handleButton(interaction) {
       }
 
       if (user.accepted_tos === 1) {
-        await interaction.editReply({
-          content: 'You are already onboarded! Check your wallet channel.',
-        });
-        return;
+        const walletChannelId = user.wallet_channel_id;
+        const msg = walletChannelId
+          ? `You're already registered! Check your wallet: <#${walletChannelId}>`
+          : 'You\'re already registered!';
+        return interaction.editReply({ content: msg });
       }
 
       userRepo.acceptTos(user.id);
 
+      // Generate Solana wallet
       let wallet = walletRepo.findByUserId(user.id);
       if (!wallet) {
         const { address, encryptedPrivateKey, iv, tag, salt } = walletManager.generateWallet();
@@ -43,7 +46,7 @@ async function handleButton(interaction) {
         });
       }
 
-      // Create the user's permanent wallet channel
+      // Create permanent wallet channel for this user
       const guild = interaction.guild;
       const walletChannel = await channelService.createPrivateChannel(
         guild,
@@ -51,52 +54,38 @@ async function handleButton(interaction) {
         [discordId],
       );
 
-      // Store the wallet channel ID on the user record
+      // Store wallet channel ID
       const db = require('../database/db');
       db.prepare('UPDATE users SET wallet_channel_id = ? WHERE id = ?').run(walletChannel.id, user.id);
 
-      // Send the wallet panel in the new channel
+      // Send wallet panel in the new channel
       await sendWalletPanel(walletChannel, wallet, interaction.user);
 
       await interaction.editReply({
         content: [
-          '**Welcome! You have accepted the Terms of Service.**',
+          '**Welcome! You are now registered.**',
           '',
-          `Your wallet channel has been created: <#${walletChannel.id}>`,
-          '',
-          'Head there to see your balance, deposit address, and withdraw.',
+          `Your wallet channel: <#${walletChannel.id}>`,
+          'Head there to see your deposit address, balance, and withdraw.',
         ].join('\n'),
       });
-
-      // Delete the onboarding channel after a short delay
-      setTimeout(async () => {
-        try {
-          await interaction.channel.delete();
-        } catch { /* */ }
-      }, 15000);
 
     } catch (err) {
       console.error('[Onboarding] Error accepting TOS:', err);
       await interaction.editReply({
-        content: 'Something went wrong during onboarding. Please contact an administrator.',
+        content: 'Something went wrong during registration. Please contact an administrator.',
       });
     }
   }
 
   if (id === 'tos_decline') {
-    await interaction.reply({
-      content: 'You have declined the Terms of Service. You will not be able to participate in wagers. This channel will be deleted.',
+    return interaction.reply({
+      content: 'You have declined the Terms of Service. You will not be able to participate in wagers.',
       ephemeral: true,
     });
-
-    setTimeout(async () => {
-      try {
-        await interaction.channel.delete();
-      } catch { /* */ }
-    }, 5000);
   }
 
-  // Wallet channel buttons
+  // Wallet channel refresh button
   if (id === 'wallet_refresh') {
     return handleWalletRefresh(interaction);
   }
@@ -111,7 +100,7 @@ async function sendWalletPanel(channel, wallet, discordUser) {
     .setColor(0x2ecc71)
     .setDescription(
       [
-        `**Deposit Address:**`,
+        '**Deposit Address:**',
         `\`\`\`${wallet.solana_address}\`\`\``,
         '',
         '**To fund your wallet:**',
@@ -151,7 +140,7 @@ async function sendWalletPanel(channel, wallet, discordUser) {
 }
 
 /**
- * Handle the refresh button in a wallet channel — update the balance embed.
+ * Handle the refresh button in a wallet channel.
  */
 async function handleWalletRefresh(interaction) {
   const discordId = interaction.user.id;
@@ -179,7 +168,7 @@ async function handleWalletRefresh(interaction) {
     .setColor(0x2ecc71)
     .setDescription(
       [
-        `**Deposit Address:**`,
+        '**Deposit Address:**',
         `\`\`\`${wallet.solana_address}\`\`\``,
         '',
         '**To fund your wallet:**',
