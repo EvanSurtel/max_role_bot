@@ -1,11 +1,8 @@
 module.exports = {
   name: 'guildMemberAdd',
   async execute(member) {
-    const onboardingService = require('../services/onboardingService');
-    try {
-      await onboardingService.startOnboarding(member);
-    } catch (err) {
-      console.error(`[GuildMemberAdd] Failed to start onboarding for ${member.user.tag}:`, err);
-    }
+    // No dynamic welcome channel — TOS panel lives in the static WELCOME_CHANNEL_ID
+    // New members see it because @everyone has view access to that channel
+    console.log(`[GuildMemberAdd] ${member.user.tag} joined the server`);
   },
 };

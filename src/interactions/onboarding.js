@@ -99,18 +99,10 @@ async function handleButton(interaction) {
   }
 
   if (id === 'tos_decline') {
-    await interaction.reply({
-      content: 'You must accept the Terms of Service and verify your eligibility to access this server.\n\nIf you change your mind, you can rejoin the server and try again.\n\nThis channel will be deleted in 10 seconds.',
-      ephemeral: false,
+    return interaction.reply({
+      content: 'You must accept the Terms of Service to access this server. Click Accept when you\'re ready.',
+      ephemeral: true,
     });
-
-    setTimeout(async () => {
-      try {
-        await interaction.channel.delete('User declined TOS');
-      } catch { /* */ }
-    }, 10000);
-
-    return;
   }
 
   // Wallet channel buttons
@@ -214,12 +206,14 @@ async function handleRegistrationModal(interaction) {
       }
     }
 
-    // Create permanent wallet channel
+    // Create permanent wallet channel under the wallets category
     const walletChannelName = `wallet-${displayName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+    const walletCategoryId = process.env.WALLET_CATEGORY_ID || null;
     const walletChannel = await channelService.createPrivateChannel(
       guild,
       walletChannelName,
       [discordId],
+      walletCategoryId,
     );
 
     db.prepare('UPDATE users SET wallet_channel_id = ? WHERE id = ?').run(walletChannel.id, user.id);
@@ -253,16 +247,6 @@ async function handleRegistrationModal(interaction) {
       ].join('\n'));
 
     await interaction.editReply({ embeds: [completeEmbed] });
-
-    // Delete the welcome channel after a delay so they can read the confirmation
-    const welcomeChannel = interaction.channel;
-    setTimeout(async () => {
-      try {
-        if (welcomeChannel && welcomeChannel.deletable) {
-          await welcomeChannel.delete('Registration complete');
-        }
-      } catch { /* */ }
-    }, 30000);
 
     console.log(`[Onboarding] ${displayName} (${discordId}) registered: IGN=${codIgn}, UID=${codUid}, region=${region}`);
 
