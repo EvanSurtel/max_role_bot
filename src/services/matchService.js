@@ -231,9 +231,15 @@ async function startMatch(client, challengeId) {
     throw new Error(`Challenge ${challengeId} not found`);
   }
 
+  // Verify all players have accepted before starting
+  const allPlayers = challengePlayerRepo.findByChallengeId(challengeId);
+  const pendingPlayers = allPlayers.filter(p => p.status !== 'accepted');
+  if (pendingPlayers.length > 0) {
+    throw new Error(`Cannot start match: ${pendingPlayers.length} player(s) have not accepted`);
+  }
+
   // Transfer all held funds to escrow for each player (wager challenges only)
   if (challenge.type === CHALLENGE_TYPE.WAGER && Number(challenge.entry_amount_usdc) > 0) {
-    const allPlayers = challengePlayerRepo.findByChallengeId(challengeId);
     for (const player of allPlayers) {
       if (player.funds_held) {
         try {

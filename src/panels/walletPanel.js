@@ -218,12 +218,25 @@ async function handleWithdrawModal(interaction) {
 
   await interaction.deferReply({ ephemeral: true });
 
+  // Acquire wallet lock to prevent concurrent operations
+  if (!walletRepo.acquireLock(user.id)) {
+    return interaction.editReply({ content: 'Please wait, another transaction is in progress.' });
+  }
+
   try {
+    // Re-fetch wallet inside lock to get fresh balance
+    const freshWallet = walletRepo.findByUserId(user.id);
+    const freshAvailable = Number(freshWallet.balance_available);
+    if (amountSmallest > freshAvailable) {
+      walletRepo.releaseLock(user.id);
+      return interaction.editReply({ content: 'Insufficient balance.' });
+    }
+
     const senderKeypair = walletManager.getKeypairFromEncrypted(
-      wallet.encrypted_private_key,
-      wallet.encryption_iv,
-      wallet.encryption_tag,
-      wallet.encryption_salt,
+      freshWallet.encrypted_private_key,
+      freshWallet.encryption_iv,
+      freshWallet.encryption_tag,
+      freshWallet.encryption_salt,
     );
 
     const { signature } = await transactionService.transferUsdc(
@@ -232,10 +245,10 @@ async function handleWithdrawModal(interaction) {
       amountSmallest.toString(),
     );
 
-    const newAvailable = (availableSmallest - amountSmallest).toString();
+    const newAvailable = (freshAvailable - amountSmallest).toString();
     walletRepo.updateBalance(user.id, {
       balanceAvailable: newAvailable,
-      balanceHeld: wallet.balance_held,
+      balanceHeld: freshWallet.balance_held,
     });
 
     transactionRepo.create({
@@ -243,16 +256,18 @@ async function handleWithdrawModal(interaction) {
       userId: user.id,
       amountUsdc: amountSmallest.toString(),
       solanaTxSignature: signature,
-      fromAddress: wallet.solana_address,
+      fromAddress: freshWallet.solana_address,
       toAddress: address,
       status: 'completed',
       memo: `Withdrawal of $${amountUsdc} USDC`,
     });
 
+    walletRepo.releaseLock(user.id);
     return interaction.editReply({
       content: `**Withdrawal successful!**\n\nSent **$${amountUsdc.toFixed(2)} USDC** to \`${address}\`\nSignature: \`${signature}\``,
     });
   } catch (err) {
+    walletRepo.releaseLock(user.id);
     console.error('[Wallet] Withdrawal error:', err);
     return interaction.editReply({ content: 'Withdrawal failed. Please try again later.' });
   }

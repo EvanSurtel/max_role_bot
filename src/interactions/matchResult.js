@@ -379,6 +379,12 @@ async function triggerDispute(client, matchId) {
   const challenge = challengeRepo.findById(match.challenge_id);
   if (!challenge) return;
 
+  // Prevent duplicate dispute channel creation
+  if (match.status === MATCH_STATUS.DISPUTED) {
+    console.log(`[MatchResult] Match #${matchId} already disputed, skipping`);
+    return;
+  }
+
   matchRepo.updateStatus(matchId, MATCH_STATUS.DISPUTED);
   challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.DISPUTED);
 

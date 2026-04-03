@@ -55,11 +55,22 @@ async function handleButton(interaction) {
   const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
   const entryUsdc = challenge.entry_amount_usdc;
 
+  // Prevent accepting own challenge
+  if (challenge.creator_user_id === user.id) {
+    return interaction.reply({ content: 'You cannot accept your own challenge.', ephemeral: true });
+  }
+
   // 1v1 challenges — immediate acceptance
   if (challenge.team_size === 1) {
     await interaction.deferReply({ ephemeral: true });
 
     try {
+      // Atomically claim the challenge — prevents double-accept race condition
+      const claimed = challengeRepo.atomicStatusTransition(challengeId, CHALLENGE_STATUS.OPEN, CHALLENGE_STATUS.IN_PROGRESS);
+      if (!claimed) {
+        return interaction.editReply({ content: 'This challenge has already been accepted by someone else.' });
+      }
+
       // Check balance and hold funds (if wager)
       if (isWager && Number(entryUsdc) > 0) {
         if (!escrowManager.canAfford(user.id, entryUsdc)) {
@@ -89,9 +100,6 @@ async function handleButton(interaction) {
       // Set challenge acceptor
       challengeRepo.setAcceptor(challengeId, user.id);
 
-      // Update status to in_progress
-      challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.IN_PROGRESS);
-
       // Transfer ALL players' held funds to escrow
       if (isWager && Number(entryUsdc) > 0) {
         const allPlayers = challengePlayerRepo.findByChallengeId(challengeId);
@@ -117,8 +125,11 @@ async function handleButton(interaction) {
       });
     } catch (err) {
       console.error(`[ChallengeAccept] Error accepting 1v1 challenge #${challengeId}:`, err);
+      // Refund all held funds on failure
+      try { escrowManager.refundAll(challengeId); } catch { /* */ }
+      challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.OPEN);
       return interaction.editReply({
-        content: 'Something went wrong accepting the challenge. Please try again.',
+        content: 'Something went wrong accepting the challenge. Your funds have been refunded. Please try again.',
       });
     }
   }

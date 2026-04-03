@@ -20,6 +20,8 @@ const channelService = require('../services/channelService');
 // Track each user's in-progress challenge creation state
 // discordUserId -> { type, teamSize, teammates, gameMode, series, anonymous, channelId }
 const activeFlows = new Map();
+// Prevent double-submit on finalize
+const finalizingUsers = new Set();
 
 /**
  * Handle button interactions for challenge creation flow.
@@ -293,6 +295,12 @@ async function showGameModes(interaction, flow) {
 async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
   const userId = interaction.user.id;
 
+  // Prevent double-submit
+  if (finalizingUsers.has(userId)) {
+    return interaction.reply ? interaction.reply({ content: 'Already processing your challenge...', ephemeral: true }) : null;
+  }
+  finalizingUsers.add(userId);
+
   // Defer the response
   if (interaction.isModalSubmit()) {
     await interaction.deferReply();
@@ -413,11 +421,13 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
     ].join('\n');
 
     await sendFlowReply(interaction, summary);
+    finalizingUsers.delete(userId);
 
     // Delete the setup channel after a short delay
     await cleanupFlowChannel(interaction.client, flow, userId, 10000);
   } catch (err) {
     console.error('[ChallengeCreate] Error finalizing challenge:', err);
+    finalizingUsers.delete(userId);
     await cleanupFlowChannel(interaction.client, activeFlows.get(userId), userId);
     return sendFlowReply(interaction, 'Something went wrong creating your challenge. Please try again.');
   }

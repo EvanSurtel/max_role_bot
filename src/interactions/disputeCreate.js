@@ -90,6 +90,17 @@ async function handleDisputeSelect(interaction) {
     return interaction.reply({ content: 'This match is already being disputed.', ephemeral: true });
   }
 
+  // Verify user is a player in this match
+  const discordId = interaction.user.id;
+  const user = userRepo.findByDiscordId(discordId);
+  if (!user) {
+    return interaction.reply({ content: 'You must be registered.', ephemeral: true });
+  }
+  const playerRecord = challengePlayerRepo.findByChallengeAndUser(match.challenge_id, user.id);
+  if (!playerRecord) {
+    return interaction.reply({ content: 'You are not a player in this match.', ephemeral: true });
+  }
+
   await interaction.deferUpdate();
 
   try {
