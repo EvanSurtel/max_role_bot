@@ -394,6 +394,59 @@ async function resolveMatch(client, matchId, winningTeam) {
     }
   }
 
+  // Post result to the results channel
+  const resultsChannelId = process.env.RESULTS_CHANNEL_ID;
+  if (resultsChannelId) {
+    try {
+      const resultsChannel = client.channels.cache.get(resultsChannelId);
+      if (resultsChannel) {
+        const { EmbedBuilder } = require('discord.js');
+        const { GAME_MODES } = require('../config/constants');
+
+        const winnerLines = [];
+        const loserLines = [];
+        for (const p of winningPlayers) {
+          const u = userRepo.findById(p.user_id);
+          if (u) winnerLines.push(`<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''}`);
+        }
+        for (const p of losingPlayers) {
+          const u = userRepo.findById(p.user_id);
+          if (u) loserLines.push(`<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''}`);
+        }
+
+        const modeInfo = GAME_MODES[challenge.game_modes];
+        const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
+        const totalPot = Number(challenge.total_pot_usdc);
+        const entryAmount = Number(challenge.entry_amount_usdc);
+        const perPlayerPayout = totalPot > 0 ? totalPot / winningPlayers.length : 0;
+
+        const resultEmbed = new EmbedBuilder()
+          .setTitle(`Match #${matchId} — Result`)
+          .setColor(0x2ecc71)
+          .setDescription(`**Team ${winningTeam} wins!**`)
+          .addFields(
+            { name: 'Winners (+350 XP)', value: winnerLines.join('\n') || 'N/A' },
+            { name: 'Losers', value: loserLines.join('\n') || 'N/A' },
+            { name: 'Match Details', value: [
+              `**Mode:** ${modeLabel}`,
+              `**Series:** Best of ${challenge.series_length}`,
+              `**Team Size:** ${challenge.team_size}v${challenge.team_size}`,
+            ].join('\n'), inline: true },
+            { name: 'Wager Details', value: totalPot > 0 ? [
+              `**Entry:** ${formatUsdc(entryAmount)} USDC per player`,
+              `**Total Pot:** ${formatUsdc(totalPot)} USDC`,
+              `**Payout:** ${formatUsdc(perPlayerPayout)} USDC per winner`,
+            ].join('\n') : 'No wager', inline: true },
+          )
+          .setTimestamp();
+
+        await resultsChannel.send({ embeds: [resultEmbed] });
+      }
+    } catch (err) {
+      console.error(`[MatchService] Failed to post result for match #${matchId}:`, err.message);
+    }
+  }
+
   // Schedule channel cleanup after 5 minutes
   setTimeout(() => {
     cleanupChannels(client, matchId).catch(err => {
