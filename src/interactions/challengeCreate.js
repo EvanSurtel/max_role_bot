@@ -15,9 +15,11 @@ const {
   TIMERS,
   USDC_PER_UNIT,
 } = require('../config/constants');
+const channelService = require('../services/channelService');
 
 // Track each user's in-progress challenge creation state
-const activeFlows = new Map(); // discordUserId -> { type, teamSize, teammates, gameMode, series, anonymous }
+// discordUserId -> { type, teamSize, teammates, gameMode, series, anonymous, channelId }
+const activeFlows = new Map();
 
 /**
  * Handle button interactions for challenge creation flow.
@@ -26,12 +28,41 @@ async function handleButton(interaction) {
   const id = interaction.customId;
   const userId = interaction.user.id;
 
-  // Step 1: Match type selection
+  // Step 1: Match type selection — create a private channel for this user
   if (id === 'wager_type_wager' || id === 'wager_type_xp') {
-    const type = id === 'wager_type_wager' ? CHALLENGE_TYPE.WAGER : CHALLENGE_TYPE.XP;
-    activeFlows.set(userId, { type, teamSize: null, teammates: [], gameMode: null, series: null, anonymous: null });
+    // Check if user already has an active flow
+    const existing = activeFlows.get(userId);
+    if (existing && existing.channelId) {
+      return interaction.reply({
+        content: `You already have a wager setup in progress. Check <#${existing.channelId}>.`,
+        ephemeral: true,
+      });
+    }
 
-    // Show team size buttons
+    await interaction.deferReply({ ephemeral: true });
+
+    const type = id === 'wager_type_wager' ? CHALLENGE_TYPE.WAGER : CHALLENGE_TYPE.XP;
+
+    // Create a private channel for this user's wager setup
+    const guild = interaction.guild;
+    let username = interaction.user.username;
+    const channel = await channelService.createPrivateChannel(
+      guild,
+      `wager-${username}`,
+      [userId],
+    );
+
+    activeFlows.set(userId, {
+      type,
+      teamSize: null,
+      teammates: [],
+      gameMode: null,
+      series: null,
+      anonymous: null,
+      channelId: channel.id,
+    });
+
+    // Send team size buttons in the private channel
     const row = new ActionRowBuilder().addComponents(
       ...TEAM_SIZES.map(size =>
         new ButtonBuilder()
@@ -41,9 +72,14 @@ async function handleButton(interaction) {
       ),
     );
 
-    return interaction.update({
-      content: `**Select team size:**\n\nYou chose: **${type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match'}**`,
+    const typeLabel = type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match';
+    await channel.send({
+      content: `<@${userId}> **Setting up ${typeLabel}**\n\n**Select team size:**`,
       components: [row],
+    });
+
+    return interaction.editReply({
+      content: `Your wager setup channel has been created: <#${channel.id}>`,
     });
   }
 
@@ -206,7 +242,7 @@ async function handleUserSelect(interaction) {
   }
 
   if (interaction.customId === 'select_teammates') {
-    const selectedUsers = interaction.values; // Array of user IDs
+    const selectedUsers = interaction.values;
     flow.teammates = selectedUsers;
 
     // Proceed to game mode selection
@@ -247,13 +283,14 @@ async function showGameModes(interaction, flow) {
 
 /**
  * Finalize challenge creation — validate, hold funds, create in DB, post to board.
+ * Then delete the setup channel.
  */
-async function finalizeChallengeCreation(interaction, flow, amountXrp) {
+async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
   const userId = interaction.user.id;
 
-  // Defer the response (either from modal submit or button interaction)
+  // Defer the response
   if (interaction.isModalSubmit()) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply();
   } else {
     await interaction.deferUpdate();
   }
@@ -270,18 +307,15 @@ async function finalizeChallengeCreation(interaction, flow, amountXrp) {
       return sendFlowReply(interaction, 'You need to complete onboarding first.');
     }
 
-    const entryUsdc = Math.floor(amountXrp * USDC_PER_UNIT);
-    const totalPotUsdc = entryUsdc * flow.teamSize * 2; // Both teams contribute
+    const entryUsdc = Math.floor(amountUsdc * USDC_PER_UNIT);
+    const totalPotUsdc = entryUsdc * flow.teamSize * 2;
 
-    // Calculate expiry
     const expiresAt = new Date(Date.now() + TIMERS.CHALLENGE_EXPIRY).toISOString();
 
-    // Determine initial status
     const initialStatus = flow.teammates.length > 0
       ? CHALLENGE_STATUS.PENDING_TEAMMATES
       : CHALLENGE_STATUS.OPEN;
 
-    // Create challenge in DB
     const challenge = challengeRepo.create({
       type: flow.type,
       creatorUserId: user.id,
@@ -298,12 +332,14 @@ async function finalizeChallengeCreation(interaction, flow, amountXrp) {
     if (flow.type === CHALLENGE_TYPE.WAGER && entryUsdc > 0) {
       if (!escrowManager.canAfford(user.id, entryUsdc.toString())) {
         challengeRepo.updateStatus(challenge.id, CHALLENGE_STATUS.CANCELLED);
-        return sendFlowReply(interaction, `Insufficient balance. You need **$${amountXrp} USDC** to create this wager.`);
+        await cleanupFlowChannel(interaction.client, flow, userId);
+        return sendFlowReply(interaction, `Insufficient balance. You need **$${amountUsdc} USDC** to create this wager.`);
       }
 
       const held = escrowManager.holdFunds(user.id, entryUsdc.toString(), challenge.id);
       if (!held) {
         challengeRepo.updateStatus(challenge.id, CHALLENGE_STATUS.CANCELLED);
+        await cleanupFlowChannel(interaction.client, flow, userId);
         return sendFlowReply(interaction, 'Failed to hold funds. Please try again.');
       }
     }
@@ -332,7 +368,6 @@ async function finalizeChallengeCreation(interaction, flow, amountXrp) {
       }
     }
 
-    // Update challenge status if no teammates needed
     if (initialStatus === CHALLENGE_STATUS.OPEN) {
       challengeRepo.updateStatus(challenge.id, CHALLENGE_STATUS.OPEN);
     }
@@ -340,24 +375,19 @@ async function finalizeChallengeCreation(interaction, flow, amountXrp) {
     // Trigger teammate notifications or post to board
     const challengeService = require('../services/challengeService');
     if (flow.teammates.length > 0) {
-      // Teammates need to accept before the challenge goes live
       challengeService.notifyTeammates(interaction.guild, challenge).catch(err => {
         console.error('[ChallengeCreate] Error notifying teammates:', err);
       });
     } else {
-      // 1v1 — no teammates needed, post directly to the board
       challengeService.postToBoard(interaction.client, challenge).catch(err => {
         console.error('[ChallengeCreate] Error posting to board:', err);
       });
     }
 
-    // Clean up flow state
-    activeFlows.delete(userId);
-
     // Build summary
     const modeLabel = GAME_MODES[flow.gameMode]?.label || flow.gameMode;
     const entryText = flow.type === CHALLENGE_TYPE.WAGER
-      ? `\nEntry: **$${amountXrp} USDC** per player`
+      ? `\nEntry: **$${amountUsdc} USDC** per player`
       : '\nType: **XP Match** (no wager)';
 
     const summary = [
@@ -373,13 +403,44 @@ async function finalizeChallengeCreation(interaction, flow, amountXrp) {
       flow.teammates.length > 0
         ? 'Your teammates have been notified. Waiting for them to accept.'
         : 'Your challenge is live on the board! Waiting for an opponent.',
+      '',
+      'This channel will be deleted in 10 seconds.',
     ].join('\n');
 
-    return sendFlowReply(interaction, summary);
+    await sendFlowReply(interaction, summary);
+
+    // Delete the setup channel after a short delay
+    await cleanupFlowChannel(interaction.client, flow, userId, 10000);
   } catch (err) {
     console.error('[ChallengeCreate] Error finalizing challenge:', err);
-    activeFlows.delete(userId);
+    await cleanupFlowChannel(interaction.client, activeFlows.get(userId), userId);
     return sendFlowReply(interaction, 'Something went wrong creating your challenge. Please try again.');
+  }
+}
+
+/**
+ * Clean up the private setup channel and remove the flow from activeFlows.
+ */
+async function cleanupFlowChannel(client, flow, userId, delayMs = 5000) {
+  if (!flow) {
+    activeFlows.delete(userId);
+    return;
+  }
+
+  const channelId = flow.channelId;
+  activeFlows.delete(userId);
+
+  if (channelId) {
+    setTimeout(async () => {
+      try {
+        const channel = client.channels.cache.get(channelId);
+        if (channel && channel.deletable) {
+          await channel.delete('Wager setup complete');
+        }
+      } catch {
+        // Channel may already be deleted
+      }
+    }, delayMs);
   }
 }
 
@@ -390,7 +451,7 @@ async function sendFlowReply(interaction, content) {
   if (interaction.deferred || interaction.replied) {
     return interaction.editReply({ content, components: [] });
   }
-  return interaction.reply({ content, ephemeral: true });
+  return interaction.reply({ content });
 }
 
 module.exports = { handleButton, handleModal, handleUserSelect };

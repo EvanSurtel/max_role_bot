@@ -170,10 +170,7 @@ async function disburseWinnings(challengeId, winningPlayerIds, totalPotUsdc) {
 
   const escrowKeypair = getEscrowKeypair();
   const totalPot = BigInt(totalPotUsdc);
-  const feePercent = parseFloat(process.env.PLATFORM_FEE_PERCENT || '5');
-  const feeAmount = totalPot * BigInt(Math.round(feePercent * 100)) / 10000n;
-  const distributableAmount = totalPot - feeAmount;
-  const perPlayerShare = distributableAmount / BigInt(winningPlayerIds.length);
+  const perPlayerShare = totalPot / BigInt(winningPlayerIds.length);
 
   const disbursements = [];
 
@@ -218,24 +215,7 @@ async function disburseWinnings(challengeId, winningPlayerIds, totalPotUsdc) {
     }
   }
 
-  // Log the platform fee transaction (fee stays in escrow wallet)
-  if (feeAmount > 0n) {
-    transactionRepo.create({
-      type: TRANSACTION_TYPE.FEE,
-      userId: null,
-      challengeId,
-      amountUsdc: feeAmount.toString(),
-      solanaTxSignature: null,
-      fromAddress: escrowKeypair.publicKey.toBase58(),
-      toAddress: escrowKeypair.publicKey.toBase58(),
-      status: 'completed',
-      memo: `Platform fee (${feePercent}%) for challenge #${challengeId}`,
-    });
-
-    console.log(`[Escrow] Platform fee: ${feeAmount} USDC units for challenge ${challengeId}`);
-  }
-
-  return { disbursements, feeAmount: feeAmount.toString() };
+  return { disbursements };
 }
 
 /**

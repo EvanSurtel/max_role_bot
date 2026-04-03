@@ -122,7 +122,6 @@ const TRANSACTION_TYPE = {
   RELEASE: 'release',
   ESCROW_IN: 'escrow_in',
   DISBURSEMENT: 'disbursement',
-  FEE: 'fee',
 };
 
 module.exports = {

@@ -8,11 +8,9 @@ pub mod wager_escrow {
     use super::*;
 
     /// One-time program initialization. Sets the authority and fee configuration.
-    pub fn initialize(ctx: Context<Initialize>, fee_basis_points: u16) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let state = &mut ctx.accounts.program_state;
         state.authority = ctx.accounts.authority.key();
-        state.fee_basis_points = fee_basis_points;
-        state.fee_wallet = ctx.accounts.fee_wallet.key();
         state.bump = ctx.bumps.program_state;
         Ok(())
     }
@@ -83,13 +81,12 @@ pub mod wager_escrow {
         Ok(())
     }
 
-    /// Resolve a match — distribute USDC to winners and collect platform fee.
+    /// Resolve a match — distribute full pot USDC to winners.
     /// Winner token accounts are passed via remaining_accounts.
     pub fn resolve_match(
         ctx: Context<ResolveMatch>,
         match_id: u64,
         winner_amounts: Vec<u64>,
-        fee_amount: u64,
     ) -> Result<()> {
         let escrow = &ctx.accounts.match_escrow;
 
@@ -105,8 +102,7 @@ pub mod wager_escrow {
             .iter()
             .try_fold(0u64, |acc, &x| acc.checked_add(x))
             .ok_or(WagerError::Overflow)?;
-        let total_out = total_payouts.checked_add(fee_amount).ok_or(WagerError::Overflow)?;
-        require!(total_out <= escrow.total_deposited, WagerError::InsufficientEscrow);
+        require!(total_payouts <= escrow.total_deposited, WagerError::InsufficientEscrow);
 
         // Validate remaining accounts match winner count
         let remaining = &ctx.remaining_accounts;
@@ -139,27 +135,11 @@ pub mod wager_escrow {
             )?;
         }
 
-        // Transfer fee to fee wallet
-        if fee_amount > 0 {
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    Transfer {
-                        from: ctx.accounts.escrow_token_account.to_account_info(),
-                        to: ctx.accounts.fee_token_account.to_account_info(),
-                        authority: ctx.accounts.match_escrow.to_account_info(),
-                    },
-                    signer_seeds,
-                ),
-                fee_amount,
-            )?;
-        }
-
         // Mark as resolved
         let escrow = &mut ctx.accounts.match_escrow;
         escrow.is_resolved = true;
 
-        msg!("Match {} resolved: {} winners, fee={}", match_id, winner_amounts.len(), fee_amount);
+        msg!("Match {} resolved: {} winners", match_id, winner_amounts.len());
         Ok(())
     }
 
@@ -223,17 +203,15 @@ pub mod wager_escrow {
 
 // ─── Account Structs ─────────────────────────────────────────────
 
-/// Global program state — stores authority and fee config.
+/// Global program state — stores authority.
 #[account]
 pub struct ProgramState {
     pub authority: Pubkey,
-    pub fee_basis_points: u16,
-    pub fee_wallet: Pubkey,
     pub bump: u8,
 }
 
 impl ProgramState {
-    pub const SIZE: usize = 8 + 32 + 2 + 32 + 1; // discriminator + fields
+    pub const SIZE: usize = 8 + 32 + 1; // discriminator + fields
 }
 
 /// Per-match escrow account.
@@ -268,9 +246,6 @@ pub struct Initialize<'info> {
 
     #[account(mut)]
     pub authority: Signer<'info>,
-
-    /// CHECK: Fee wallet address, validated by the caller.
-    pub fee_wallet: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
 }
@@ -336,10 +311,6 @@ pub struct ResolveMatch<'info> {
     /// The escrow's USDC token account.
     #[account(mut)]
     pub escrow_token_account: Account<'info, TokenAccount>,
-
-    /// The fee wallet's USDC token account.
-    #[account(mut)]
-    pub fee_token_account: Account<'info, TokenAccount>,
 
     /// Authority must match program_state.authority.
     pub authority: Signer<'info>,
