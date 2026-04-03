@@ -409,10 +409,11 @@ async function resolveMatch(client, matchId, winningTeam) {
         const entryAmount = Number(challenge.entry_amount_usdc);
         const perPlayerPayout = totalPot > 0 ? totalPot / winningPlayers.length : 0;
 
+        const perPlayerProfit = perPlayerPayout - entryAmount; // actual gain = payout - their entry
         const winnerLines = [];
         for (const p of winningPlayers) {
           const u = userRepo.findById(p.user_id);
-          if (u) winnerLines.push(`<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''} — **+${formatUsdc(perPlayerPayout)} USDC** +350 XP`);
+          if (u) winnerLines.push(`<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''} — **+${formatUsdc(perPlayerProfit)} USDC** +350 XP`);
         }
         const loserLines = [];
         for (const p of losingPlayers) {
