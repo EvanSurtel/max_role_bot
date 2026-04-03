@@ -37,17 +37,28 @@ module.exports = {
             id.startsWith('admin_confirm_') || id.startsWith('admin_goback_')) {
           return await matchResult.handleButton(interaction);
         }
-        // Onboarding TOS buttons
-        if (id.startsWith('tos_')) {
+        // Onboarding TOS buttons + wallet refresh
+        if (id.startsWith('tos_') || id === 'wallet_refresh') {
           return await onboarding.handleButton(interaction);
         }
-        // Panel: My Wallet button
-        if (id === 'panel_wallet') {
-          return await walletPanel.handleWalletButton(interaction);
-        }
-        // Wallet sub-buttons (deposit, withdraw, history)
+        // Wallet action buttons (withdraw, history) — in wallet channel
         if (id.startsWith('wallet_')) {
           return await walletPanel.handleWalletSubButton(interaction);
+        }
+        // Register button — triggers onboarding for existing members
+        if (id === 'panel_register') {
+          const onboardingService = require('../services/onboardingService');
+          const userRepo = require('../database/repositories/userRepo');
+          const existingUser = userRepo.findByDiscordId(interaction.user.id);
+          if (existingUser && existingUser.accepted_tos === 1) {
+            const walletChannelId = existingUser.wallet_channel_id;
+            const msg = walletChannelId
+              ? `You're already registered! Check your wallet: <#${walletChannelId}>`
+              : 'You\'re already registered!';
+            return interaction.reply({ content: msg, ephemeral: true });
+          }
+          await onboardingService.startOnboarding(interaction.member);
+          return interaction.reply({ content: 'Check your new welcome channel to accept the Terms of Service.', ephemeral: true });
         }
         // Panel: Leaderboard button
         if (id === 'panel_leaderboard') {

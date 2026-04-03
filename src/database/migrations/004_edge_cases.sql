@@ -41,3 +41,6 @@ CREATE INDEX IF NOT EXISTS idx_pending_tx_status ON pending_transactions(status)
 -- Wallet lock + per-user encryption salt
 ALTER TABLE wallets ADD COLUMN locked_at TEXT;
 ALTER TABLE wallets ADD COLUMN encryption_salt TEXT;
+
+-- Permanent wallet channel per user
+ALTER TABLE users ADD COLUMN wallet_channel_id TEXT;

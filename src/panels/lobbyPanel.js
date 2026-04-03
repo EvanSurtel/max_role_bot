@@ -45,8 +45,8 @@ function buildLobbyPanel() {
 
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId('panel_wallet')
-      .setLabel('My Wallet')
+      .setCustomId('panel_register')
+      .setLabel('Register')
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('panel_leaderboard')
