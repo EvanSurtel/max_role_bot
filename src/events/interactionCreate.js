@@ -57,6 +57,9 @@ module.exports = {
       if (interaction.isModalSubmit()) {
         const id = interaction.customId;
 
+        if (id === 'registration_modal') {
+          return await onboarding.handleRegistrationModal(interaction);
+        }
         if (id === 'entry_amount') {
           return await challengeCreate.handleModal(interaction);
         }
