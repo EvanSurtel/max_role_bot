@@ -46,6 +46,10 @@ ALTER TABLE wallets ADD COLUMN encryption_salt TEXT;
 ALTER TABLE users ADD COLUMN wallet_channel_id TEXT;
 
 -- Player profile for registration and regional leaderboards
-ALTER TABLE users ADD COLUMN username TEXT;
-ALTER TABLE users ADD COLUMN flag TEXT;
+ALTER TABLE users ADD COLUMN server_username TEXT;
+ALTER TABLE users ADD COLUMN cod_ign TEXT;
+ALTER TABLE users ADD COLUMN cod_uid TEXT;
+ALTER TABLE users ADD COLUMN cod_server TEXT;
+ALTER TABLE users ADD COLUMN country_flag TEXT;
 ALTER TABLE users ADD COLUMN region TEXT;
+ALTER TABLE users ADD COLUMN tos_accepted_at TEXT;

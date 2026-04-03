@@ -36,9 +36,9 @@ async function handleButton(interaction) {
   // Find or create the user in DB
   const discordId = interaction.user.id;
   let user = userRepo.findByDiscordId(discordId);
-  if (!user) {
+  if (!user || !user.cod_uid) {
     return interaction.reply({
-      content: 'You need to complete onboarding first before accepting challenges.',
+      content: 'You must complete registration with your COD Mobile UID before accepting wagers.',
       ephemeral: true,
     });
   }

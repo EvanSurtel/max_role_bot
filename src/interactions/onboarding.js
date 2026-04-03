@@ -11,105 +11,109 @@ const userRepo = require('../database/repositories/userRepo');
 const walletRepo = require('../database/repositories/walletRepo');
 const walletManager = require('../solana/walletManager');
 const channelService = require('../services/channelService');
+const neatqueueService = require('../services/neatqueueService');
 
-// Map server names to leaderboard regions
+// Map server/region input to leaderboard region
 const SERVER_TO_REGION = {
-  'na': 'na',
-  'north america': 'na',
-  'us': 'na',
-  'us east': 'na',
-  'us west': 'na',
-  'canada': 'na',
-  'latam': 'latam',
-  'latin america': 'latam',
-  'brazil': 'latam',
-  'brasil': 'latam',
-  'mexico': 'latam',
-  'eu': 'eu',
-  'europe': 'eu',
-  'uk': 'eu',
-  'germany': 'eu',
-  'france': 'eu',
-  'asia': 'asia',
-  'japan': 'asia',
-  'korea': 'asia',
-  'india': 'asia',
-  'sea': 'asia',
-  'southeast asia': 'asia',
-  'middle east': 'asia',
-  'oceania': 'asia',
-  'australia': 'asia',
+  'global': 'na', 'na': 'na', 'north america': 'na', 'us': 'na',
+  'latam': 'latam', 'latin america': 'latam', 'brazil': 'latam', 'brasil': 'latam',
+  'eu': 'eu', 'europe': 'eu',
+  'garena': 'asia', 'asia': 'asia', 'sea': 'asia', 'korea': 'asia', 'japan': 'asia',
+  'vietnam': 'asia', 'india': 'asia', 'middle east': 'asia', 'oceania': 'asia',
 };
 
 /**
- * Handle button interactions for the onboarding TOS flow.
+ * Handle button interactions for onboarding.
  */
 async function handleButton(interaction) {
   const id = interaction.customId;
 
-  // Step 1: Accept TOS → show registration modal
   if (id === 'tos_accept') {
     const discordId = interaction.user.id;
 
     // Check if already registered
     const existingUser = userRepo.findByDiscordId(discordId);
     if (existingUser && existingUser.accepted_tos === 1) {
-      const walletChannelId = existingUser.wallet_channel_id;
-      const msg = walletChannelId
-        ? `You're already registered! Check your wallet: <#${walletChannelId}>`
-        : 'You\'re already registered!';
-      return interaction.reply({ content: msg, ephemeral: true });
+      return interaction.reply({ content: 'You\'re already registered!', ephemeral: true });
     }
 
     // Show registration modal
     const modal = new ModalBuilder()
       .setCustomId('registration_modal')
-      .setTitle('Register');
-
-    const usernameInput = new TextInputBuilder()
-      .setCustomId('reg_username')
-      .setLabel('In-game Username')
-      .setPlaceholder('Your CODM username')
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setMinLength(1)
-      .setMaxLength(30);
-
-    const flagInput = new TextInputBuilder()
-      .setCustomId('reg_flag')
-      .setLabel('Country Flag')
-      .setPlaceholder('e.g. 🇺🇸 or US')
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setMinLength(1)
-      .setMaxLength(10);
-
-    const serverInput = new TextInputBuilder()
-      .setCustomId('reg_server')
-      .setLabel('Server (NA, LATAM, EU, or Asia)')
-      .setPlaceholder('e.g. NA')
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setMinLength(1)
-      .setMaxLength(20);
+      .setTitle('Complete Your Registration');
 
     modal.addComponents(
-      new ActionRowBuilder().addComponents(usernameInput),
-      new ActionRowBuilder().addComponents(flagInput),
-      new ActionRowBuilder().addComponents(serverInput),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('reg_display_name')
+          .setLabel('Server Display Name')
+          .setPlaceholder('How you want to be known in this server')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMinLength(1)
+          .setMaxLength(30),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('reg_cod_ign')
+          .setLabel('COD Mobile In-Game Name')
+          .setPlaceholder('Your exact in-game name')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMinLength(1)
+          .setMaxLength(30),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('reg_cod_uid')
+          .setLabel('COD Mobile UID')
+          .setPlaceholder('Numeric player ID from your CODM profile')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMinLength(5)
+          .setMaxLength(20),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('reg_server')
+          .setLabel('Server/Region (Global, Garena, NA, EU, etc.)')
+          .setPlaceholder('e.g. Global')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMinLength(1)
+          .setMaxLength(20),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('reg_country')
+          .setLabel('Country (for flag display)')
+          .setPlaceholder('e.g. US, BR, DE, PH or flag emoji')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMinLength(1)
+          .setMaxLength(10),
+      ),
     );
 
     return interaction.showModal(modal);
   }
 
   if (id === 'tos_decline') {
-    return interaction.reply({
-      content: 'You have declined the Terms of Service. You will not be able to participate in wagers.',
-      ephemeral: true,
+    await interaction.reply({
+      content: 'You must accept the Terms of Service and verify your eligibility to access this server.\n\nIf you change your mind, you can rejoin the server and try again.\n\nThis channel will be deleted in 10 seconds.',
+      ephemeral: false,
     });
+
+    setTimeout(async () => {
+      try {
+        await interaction.channel.delete('User declined TOS');
+      } catch { /* */ }
+    }, 10000);
+
+    return;
   }
 
-  // Wallet channel refresh button
+  // Wallet channel buttons
   if (id === 'wallet_refresh') {
     return handleWalletRefresh(interaction);
   }
@@ -121,23 +125,35 @@ async function handleButton(interaction) {
 async function handleRegistrationModal(interaction) {
   const discordId = interaction.user.id;
 
-  const username = interaction.fields.getTextInputValue('reg_username').trim();
-  const flag = interaction.fields.getTextInputValue('reg_flag').trim();
-  const serverInput = interaction.fields.getTextInputValue('reg_server').trim().toLowerCase();
+  const displayName = interaction.fields.getTextInputValue('reg_display_name').trim();
+  const codIgn = interaction.fields.getTextInputValue('reg_cod_ign').trim();
+  const codUid = interaction.fields.getTextInputValue('reg_cod_uid').trim();
+  const serverInput = interaction.fields.getTextInputValue('reg_server').trim();
+  const country = interaction.fields.getTextInputValue('reg_country').trim();
 
-  // Map server to region
-  const region = SERVER_TO_REGION[serverInput] || serverInput;
-  const validRegions = ['na', 'latam', 'eu', 'asia'];
-  if (!validRegions.includes(region)) {
+  // Validate UID is numeric
+  if (!/^\d+$/.test(codUid)) {
     return interaction.reply({
-      content: 'Invalid server. Please enter one of: **NA**, **LATAM**, **EU**, or **Asia**.',
+      content: 'Invalid COD Mobile UID. It must be a numeric value. Check your CODM profile for your UID.',
       ephemeral: true,
     });
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  // Map server to leaderboard region
+  const regionKey = serverInput.toLowerCase();
+  const region = SERVER_TO_REGION[regionKey] || null;
+  const validRegions = ['na', 'latam', 'eu', 'asia'];
+  if (!region || !validRegions.includes(region)) {
+    return interaction.reply({
+      content: 'Invalid server/region. Please enter one of: **Global**, **Garena**, **NA**, **LATAM**, **EU**, or **Asia**.',
+      ephemeral: true,
+    });
+  }
+
+  await interaction.deferReply();
 
   try {
+    // Create or get user
     let user = userRepo.findByDiscordId(discordId);
     if (!user) {
       user = userRepo.create(discordId);
@@ -147,12 +163,13 @@ async function handleRegistrationModal(interaction) {
       return interaction.editReply({ content: 'You\'re already registered!' });
     }
 
+    // Accept TOS and store profile
     userRepo.acceptTos(user.id);
-
-    // Store username, flag, and region
     const db = require('../database/db');
-    db.prepare('UPDATE users SET username = ?, flag = ?, region = ? WHERE id = ?')
-      .run(username, flag, region, user.id);
+    db.prepare(`
+      UPDATE users SET server_username = ?, cod_ign = ?, cod_uid = ?, cod_server = ?, country_flag = ?, region = ?, tos_accepted_at = datetime('now')
+      WHERE id = ?
+    `).run(displayName, codIgn, codUid, serverInput, country, region, user.id);
 
     // Generate Solana wallet
     let wallet = walletRepo.findByUserId(user.id);
@@ -168,7 +185,7 @@ async function handleRegistrationModal(interaction) {
       });
     }
 
-    // Assign member role
+    // Assign verified/member role
     const guild = interaction.guild;
     const memberRoleId = process.env.MEMBER_ROLE_ID;
     if (memberRoleId) {
@@ -176,41 +193,78 @@ async function handleRegistrationModal(interaction) {
         const member = await guild.members.fetch(discordId);
         await member.roles.add(memberRoleId);
       } catch (err) {
-        console.error(`[Onboarding] Failed to assign member role to ${discordId}:`, err.message);
+        console.error(`[Onboarding] Failed to assign member role:`, err.message);
       }
     }
 
-    // Set nickname to "flag username" (e.g. "🇺🇸 PlayerOne")
+    // Set nickname to display name
     try {
       const member = await guild.members.fetch(discordId);
-      await member.setNickname(`${flag} ${username}`);
+      await member.setNickname(displayName);
     } catch (err) {
-      // May fail if bot doesn't have permission or user is server owner
-      console.warn(`[Onboarding] Could not set nickname for ${discordId}:`, err.message);
+      console.warn(`[Onboarding] Could not set nickname:`, err.message);
+    }
+
+    // Register IGN with NeatQueue
+    if (neatqueueService.isConfigured()) {
+      try {
+        await syncIgnToNeatQueue(discordId, codIgn);
+      } catch (err) {
+        console.error(`[Onboarding] NeatQueue IGN sync failed:`, err.message);
+      }
     }
 
     // Create permanent wallet channel
+    const walletChannelName = `wallet-${displayName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
     const walletChannel = await channelService.createPrivateChannel(
       guild,
-      `wallet-${username.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+      walletChannelName,
       [discordId],
     );
 
     db.prepare('UPDATE users SET wallet_channel_id = ? WHERE id = ?').run(walletChannel.id, user.id);
 
-    // Send wallet panel
-    await sendWalletPanel(walletChannel, wallet, interaction.user);
+    // Send wallet panel in the wallet channel
+    await sendWalletPanel(walletChannel, wallet);
 
-    await interaction.editReply({
-      content: [
-        `**Welcome, ${flag} ${username}!**`,
+    // Send registration complete embed
+    const completeEmbed = new EmbedBuilder()
+      .setTitle('Registration Complete!')
+      .setColor(0x2ecc71)
+      .setDescription([
+        `Welcome, **${displayName}**!`,
         '',
-        `Region: **${region.toUpperCase()}**`,
-        `Your wallet channel: <#${walletChannel.id}>`,
+        'Your account has been set up:',
         '',
-        'Head there to see your deposit address and fund your wallet.',
-      ].join('\n'),
-    });
+        `**Display Name:** ${displayName}`,
+        `**COD Mobile IGN:** ${codIgn}`,
+        `**COD Mobile UID:** ${codUid}`,
+        `**Region:** ${serverInput}`,
+        '',
+        '**Your Wallet**',
+        `A USDC wallet has been created for you. Check <#${walletChannel.id}> to view your deposit address and manage funds.`,
+        '',
+        '**Getting Started**',
+        '1. Deposit USDC to your wallet address',
+        '2. Head to the wager lobby channel',
+        '3. Click **Create Wager** to challenge others or browse open challenges',
+        '',
+        'Good luck and have fun!',
+      ].join('\n'));
+
+    await interaction.editReply({ embeds: [completeEmbed] });
+
+    // Delete the welcome channel after a delay so they can read the confirmation
+    const welcomeChannel = interaction.channel;
+    setTimeout(async () => {
+      try {
+        if (welcomeChannel && welcomeChannel.deletable) {
+          await welcomeChannel.delete('Registration complete');
+        }
+      } catch { /* */ }
+    }, 30000);
+
+    console.log(`[Onboarding] ${displayName} (${discordId}) registered: IGN=${codIgn}, UID=${codUid}, region=${region}`);
 
   } catch (err) {
     console.error('[Onboarding] Error during registration:', err);
@@ -221,59 +275,75 @@ async function handleRegistrationModal(interaction) {
 }
 
 /**
- * Send the wallet panel embed + buttons in a wallet channel.
+ * Sync IGN to NeatQueue via their API.
  */
-async function sendWalletPanel(channel, wallet, discordUser) {
+async function syncIgnToNeatQueue(discordUserId, ign) {
+  const token = process.env.NEATQUEUE_API_TOKEN;
+  if (!token) return;
+
+  const channelId = process.env.NEATQUEUE_CHANNEL_ID;
+  if (!channelId) return;
+
+  const res = await fetch('https://api.neatqueue.com/api/v2/ign', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      channel_id: parseInt(channelId),
+      user_id: parseInt(discordUserId),
+      ign: ign,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error(`[NeatQueue] IGN sync failed (${res.status}): ${body}`);
+  } else {
+    console.log(`[NeatQueue] IGN synced for ${discordUserId}: ${ign}`);
+  }
+}
+
+/**
+ * Send the wallet panel in a wallet channel.
+ */
+async function sendWalletPanel(channel, wallet) {
   const embed = new EmbedBuilder()
     .setTitle('Your Wallet')
     .setColor(0x2ecc71)
-    .setDescription(
-      [
-        '**Deposit Address:**',
-        `\`\`\`${wallet.solana_address}\`\`\``,
-        '',
-        '**To fund your wallet:**',
-        '1. Send **USDC** (SPL token on Solana) to the address above for wagers',
-        '2. Send a small amount of **SOL** (~$1) to the same address for transaction fees',
-        '',
-        'Deposits are detected automatically. Click **Refresh** to update your balance.',
-      ].join('\n'),
-    )
+    .setDescription([
+      '**Deposit Address:**',
+      `\`\`\`${wallet.solana_address}\`\`\``,
+      '',
+      '**To fund your wallet:**',
+      '1. Send **USDC** (SPL token on Solana) to the address above for wagers',
+      '2. Send a small amount of **SOL** (~$1) to the same address for transaction fees',
+      '',
+      'Deposits are detected automatically. Click **Refresh** to update your balance.',
+    ].join('\n'))
     .addFields(
-      { name: 'USDC Balance', value: formatBalance(wallet.balance_available), inline: true },
-      { name: 'Held in Wagers', value: formatBalance(wallet.balance_held), inline: true },
+      { name: 'USDC Balance', value: '$0.00 USDC', inline: true },
+      { name: 'Held in Wagers', value: '$0.00 USDC', inline: true },
       { name: 'SOL (gas)', value: 'Click Refresh', inline: true },
     )
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('wallet_refresh')
-      .setLabel('Refresh Balance')
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId('wallet_withdraw')
-      .setLabel('Withdraw USDC')
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId('wallet_withdraw_sol')
-      .setLabel('Withdraw SOL')
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId('wallet_history')
-      .setLabel('History')
-      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('wallet_refresh').setLabel('Refresh Balance').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('wallet_withdraw').setLabel('Withdraw USDC').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('wallet_withdraw_sol').setLabel('Withdraw SOL').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('wallet_history').setLabel('History').setStyle(ButtonStyle.Secondary),
   );
 
   await channel.send({ embeds: [embed], components: [row] });
 }
 
 /**
- * Handle the refresh button in a wallet channel.
+ * Handle wallet refresh button.
  */
 async function handleWalletRefresh(interaction) {
-  const discordId = interaction.user.id;
-  const user = userRepo.findByDiscordId(discordId);
+  const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) return interaction.reply({ content: 'User not found.', ephemeral: true });
 
   const wallet = walletRepo.findByUserId(user.id);
@@ -282,60 +352,39 @@ async function handleWalletRefresh(interaction) {
   await interaction.deferUpdate();
 
   let solBalance = '0';
-  try {
-    solBalance = await walletManager.getSolBalance(wallet.solana_address);
-  } catch { /* */ }
-
+  try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
   const solFormatted = (Number(solBalance) / 1_000_000_000).toFixed(4);
+  const available = Number(wallet.balance_available);
+  const held = Number(wallet.balance_held);
 
   const embed = new EmbedBuilder()
     .setTitle('Your Wallet')
     .setColor(0x2ecc71)
-    .setDescription(
-      [
-        '**Deposit Address:**',
-        `\`\`\`${wallet.solana_address}\`\`\``,
-        '',
-        '**To fund your wallet:**',
-        '1. Send **USDC** (SPL token on Solana) to the address above for wagers',
-        '2. Send a small amount of **SOL** (~$1) to the same address for transaction fees',
-        '',
-        'Deposits are detected automatically. Click **Refresh** to update your balance.',
-      ].join('\n'),
-    )
+    .setDescription([
+      '**Deposit Address:**',
+      `\`\`\`${wallet.solana_address}\`\`\``,
+      '',
+      '**To fund your wallet:**',
+      '1. Send **USDC** (SPL token on Solana) to the address above for wagers',
+      '2. Send a small amount of **SOL** (~$1) to the same address for transaction fees',
+      '',
+      'Deposits are detected automatically. Click **Refresh** to update your balance.',
+    ].join('\n'))
     .addFields(
-      { name: 'USDC Balance', value: formatBalance(wallet.balance_available), inline: true },
-      { name: 'Held in Wagers', value: formatBalance(wallet.balance_held), inline: true },
+      { name: 'USDC Balance', value: `$${(available / 1_000_000).toFixed(2)} USDC`, inline: true },
+      { name: 'Held in Wagers', value: `$${(held / 1_000_000).toFixed(2)} USDC`, inline: true },
       { name: 'SOL (gas)', value: `${solFormatted} SOL`, inline: true },
     )
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('wallet_refresh')
-      .setLabel('Refresh Balance')
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId('wallet_withdraw')
-      .setLabel('Withdraw USDC')
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId('wallet_withdraw_sol')
-      .setLabel('Withdraw SOL')
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId('wallet_history')
-      .setLabel('History')
-      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('wallet_refresh').setLabel('Refresh Balance').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('wallet_withdraw').setLabel('Withdraw USDC').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('wallet_withdraw_sol').setLabel('Withdraw SOL').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('wallet_history').setLabel('History').setStyle(ButtonStyle.Secondary),
   );
 
   await interaction.editReply({ embeds: [embed], components: [row] });
-}
-
-function formatBalance(amount) {
-  const num = Number(amount);
-  if (num === 0) return '$0.00 USDC';
-  return `$${(num / 1_000_000).toFixed(2)} USDC`;
 }
 
 module.exports = { handleButton, handleRegistrationModal, sendWalletPanel };

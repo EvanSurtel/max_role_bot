@@ -30,6 +30,16 @@ async function handleButton(interaction) {
 
   // Step 1: Create Wager — create a private channel for this user
   if (id === 'wager_type_wager') {
+    // Check if user is registered with a COD UID
+    const userRepo = require('../database/repositories/userRepo');
+    const dbUser = userRepo.findByDiscordId(userId);
+    if (!dbUser || !dbUser.cod_uid) {
+      return interaction.reply({
+        content: 'You must complete registration with your COD Mobile UID before creating wagers.',
+        ephemeral: true,
+      });
+    }
+
     // Check if user already has an active flow
     const existing = activeFlows.get(userId);
     if (existing && existing.channelId) {
