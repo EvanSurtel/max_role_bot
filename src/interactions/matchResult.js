@@ -640,6 +640,14 @@ async function handleAdminConfirm(interaction) {
 
   try {
     await matchService.resolveMatch(interaction.client, matchId, winningTeam);
+
+    // Clean up dispute channels after a delay
+    const { cleanupDisputeChannels } = require('./disputeCreate');
+    setTimeout(() => {
+      cleanupDisputeChannels(interaction.client, matchId).catch(err => {
+        console.error(`[MatchResult] Failed to clean up dispute channels:`, err.message);
+      });
+    }, 30000); // 30 seconds to read the result
   } catch (err) {
     console.error(`[MatchResult] Admin resolve failed for match #${matchId}:`, err);
   }

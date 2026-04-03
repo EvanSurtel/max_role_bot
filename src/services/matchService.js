@@ -412,12 +412,12 @@ async function resolveMatch(client, matchId, winningTeam) {
         const winnerLines = [];
         for (const p of winningPlayers) {
           const u = userRepo.findById(p.user_id);
-          if (u) winnerLines.push(`<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''} — **${formatUsdc(perPlayerPayout)} USDC** +350 XP`);
+          if (u) winnerLines.push(`<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''} — **+${formatUsdc(perPlayerPayout)} USDC** +350 XP`);
         }
         const loserLines = [];
         for (const p of losingPlayers) {
           const u = userRepo.findById(p.user_id);
-          if (u) loserLines.push(`<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''}`);
+          if (u) loserLines.push(`<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''} — **-${formatUsdc(entryAmount)} USDC**`);
         }
 
         const resultEmbed = new EmbedBuilder()

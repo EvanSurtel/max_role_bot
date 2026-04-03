@@ -3,6 +3,7 @@ const challengeAccept = require('../interactions/challengeAccept');
 const challengeCancel = require('../interactions/challengeCancel');
 const teammateResponse = require('../interactions/teammateResponse');
 const matchResult = require('../interactions/matchResult');
+const disputeCreate = require('../interactions/disputeCreate');
 const onboarding = require('../interactions/onboarding');
 const walletPanel = require('../panels/walletPanel');
 const leaderboardPanel = require('../panels/leaderboardPanel');
@@ -36,6 +37,14 @@ module.exports = {
             id.startsWith('submit_evidence_') || id.startsWith('admin_resolve_') ||
             id.startsWith('admin_confirm_') || id.startsWith('admin_goback_')) {
           return await matchResult.handleButton(interaction);
+        }
+        // Create Dispute button from lobby
+        if (id === 'create_dispute') {
+          return await disputeCreate.handleCreateDispute(interaction);
+        }
+        // Dispute match selection
+        if (id.startsWith('dispute_select_')) {
+          return await disputeCreate.handleDisputeSelect(interaction);
         }
         // Onboarding TOS buttons + wallet refresh
         if (id.startsWith('tos_') || id === 'wallet_refresh') {

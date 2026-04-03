@@ -42,6 +42,9 @@ CREATE INDEX IF NOT EXISTS idx_pending_tx_status ON pending_transactions(status)
 ALTER TABLE wallets ADD COLUMN locked_at TEXT;
 ALTER TABLE wallets ADD COLUMN encryption_salt TEXT;
 
+-- Dispute category tracking
+ALTER TABLE matches ADD COLUMN dispute_category_id TEXT;
+
 -- Permanent wallet channel per user
 ALTER TABLE users ADD COLUMN wallet_channel_id TEXT;
 

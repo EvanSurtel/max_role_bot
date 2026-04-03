@@ -21,6 +21,10 @@ function buildLobbyPanel() {
       .setCustomId('wager_type_wager')
       .setLabel('Create Wager')
       .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('create_dispute')
+      .setLabel('Create Dispute')
+      .setStyle(ButtonStyle.Danger),
   );
 
   return { embeds: [embed], components: [row] };
