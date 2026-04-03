@@ -129,11 +129,26 @@ async function transferToEscrow(userId, amountUsdc, challengeId) {
 
   const escrowKeypair = getEscrowKeypair();
 
+  // Transfer USDC to escrow
   const { signature } = await transactionService.transferUsdc(
     userKeypair,
     escrowKeypair.publicKey.toBase58(),
     amountUsdc,
   );
+
+  // Transfer a small SOL amount to escrow to cover payout gas fees
+  // ~10000 lamports per player covers their share of the resolve transaction
+  const GAS_CONTRIBUTION = 10_000; // 0.00001 SOL (~$0.002)
+  try {
+    await transactionService.transferSol(
+      userKeypair,
+      escrowKeypair.publicKey.toBase58(),
+      GAS_CONTRIBUTION,
+    );
+  } catch (err) {
+    // Non-critical — escrow may already have enough SOL
+    console.warn(`[Escrow] Gas contribution from user ${userId} failed (non-critical):`, err.message);
+  }
 
   // Reduce the held balance now that funds are on-chain in escrow
   walletRepo.releaseFunds(userId, amountUsdc);
@@ -150,7 +165,7 @@ async function transferToEscrow(userId, amountUsdc, challengeId) {
     memo: `Escrow transfer for challenge #${challengeId}`,
   });
 
-  console.log(`[Escrow] Transferred ${amountUsdc} USDC from user ${userId} to escrow. TX: ${signature}`);
+  console.log(`[Escrow] Transferred ${amountUsdc} USDC + gas SOL from user ${userId} to escrow. TX: ${signature}`);
   return { signature };
 }
 
