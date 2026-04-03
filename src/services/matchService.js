@@ -6,7 +6,7 @@ const userRepo = require('../database/repositories/userRepo');
 const escrowManager = require('../solana/escrowManager');
 const { privateTextOverwrites, privateVoiceOverwrites, votingChannelOverwrites, sharedOverwrites } = require('../utils/permissions');
 const { formatUsdc } = require('../utils/embeds');
-const { MATCH_STATUS, CHALLENGE_STATUS, CHALLENGE_TYPE, XP_WIN, XP_LOSS } = require('../config/constants');
+const { MATCH_STATUS, CHALLENGE_STATUS, CHALLENGE_TYPE, XP_WAGER_WIN, XP_WAGER_LOSS } = require('../config/constants');
 const neatqueueService = require('./neatqueueService');
 
 /**
@@ -326,7 +326,7 @@ async function resolveMatch(client, matchId, winningTeam) {
   // Winners
   for (const player of winningPlayers) {
     try {
-      userRepo.addXp(player.user_id, XP_WIN);
+      userRepo.addXp(player.user_id, XP_WAGER_WIN);
       userRepo.addWin(player.user_id);
       if (isWagerMatch) {
         userRepo.addEarnings(player.user_id, perPlayerEarnings);
@@ -340,7 +340,7 @@ async function resolveMatch(client, matchId, winningTeam) {
     if (neatqueueService.isConfigured()) {
       const winUser = userRepo.findById(player.user_id);
       if (winUser) {
-        neatqueueService.addPoints(winUser.discord_id, XP_WIN).catch(err => {
+        neatqueueService.addPoints(winUser.discord_id, XP_WAGER_WIN).catch(err => {
           console.error(`[MatchService] NeatQueue addPoints failed for winner ${winUser.discord_id}:`, err.message);
         });
       }
@@ -350,7 +350,7 @@ async function resolveMatch(client, matchId, winningTeam) {
   // Losers
   for (const player of losingPlayers) {
     try {
-      userRepo.addXp(player.user_id, XP_LOSS);
+      userRepo.addXp(player.user_id, XP_WAGER_LOSS);
       userRepo.addLoss(player.user_id);
       if (isWagerMatch) {
         userRepo.addWagered(player.user_id, challenge.entry_amount_usdc);
@@ -363,7 +363,7 @@ async function resolveMatch(client, matchId, winningTeam) {
     if (neatqueueService.isConfigured()) {
       const loseUser = userRepo.findById(player.user_id);
       if (loseUser) {
-        neatqueueService.addPoints(loseUser.discord_id, XP_LOSS).catch(err => {
+        neatqueueService.addPoints(loseUser.discord_id, XP_WAGER_LOSS).catch(err => {
           console.error(`[MatchService] NeatQueue addPoints failed for loser ${loseUser.discord_id}:`, err.message);
         });
       }

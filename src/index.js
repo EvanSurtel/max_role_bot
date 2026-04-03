@@ -71,6 +71,9 @@ client.once('ready', async () => {
     const { postLobbyPanel } = require('./panels/lobbyPanel');
     await postLobbyPanel(client);
 
+    const { postLeaderboardPanel } = require('./panels/leaderboardPanel');
+    await postLeaderboardPanel(client);
+
     console.log('[Boot] All systems ready');
   } catch (err) {
     console.error('[Boot] Startup error:', err);

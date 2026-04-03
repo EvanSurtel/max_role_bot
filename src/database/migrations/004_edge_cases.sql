@@ -44,3 +44,6 @@ ALTER TABLE wallets ADD COLUMN encryption_salt TEXT;
 
 -- Permanent wallet channel per user
 ALTER TABLE users ADD COLUMN wallet_channel_id TEXT;
+
+-- Player region for regional leaderboards
+ALTER TABLE users ADD COLUMN region TEXT;

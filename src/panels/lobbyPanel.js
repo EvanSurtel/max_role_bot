@@ -1,11 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 /**
- * Build the main lobby panel embed and buttons.
- * This is posted in the wager channel on bot startup.
- * Users click buttons to create matches, manage wallets, and view leaderboards.
- *
- * @returns {{ embeds: EmbedBuilder[], components: ActionRowBuilder[] }}
+ * Build the main lobby panel — wager creation only.
  */
 function buildLobbyPanel() {
   const embed = new EmbedBuilder()
@@ -13,49 +9,25 @@ function buildLobbyPanel() {
     .setColor(0xf1c40f)
     .setDescription(
       [
-        'Create matches and wager **USDC** against other players.',
+        'Wager **USDC** on Call of Duty matches against other players.',
         '',
-        'Click a button below to get started.',
+        'Click the button below to create a wager.',
       ].join('\n'),
-    )
-    .addFields(
-      {
-        name: 'Create Wager',
-        value: 'Wager USDC on a match against an opponent.',
-        inline: true,
-      },
-      {
-        name: 'Create XP Match',
-        value: 'Play for XP rankings — no money involved.',
-        inline: true,
-      },
     )
     .setFooter({ text: 'Powered by Solana' });
 
-  const row1 = new ActionRowBuilder().addComponents(
+  const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('wager_type_wager')
       .setLabel('Create Wager')
       .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId('wager_type_xp')
-      .setLabel('Create XP Match')
-      .setStyle(ButtonStyle.Primary),
   );
 
-  const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('panel_leaderboard')
-      .setLabel('Leaderboard')
-      .setStyle(ButtonStyle.Secondary),
-  );
-
-  return { embeds: [embed], components: [row1, row2] };
+  return { embeds: [embed], components: [row] };
 }
 
 /**
  * Post (or refresh) the lobby panel in the configured wager channel.
- * @param {import('discord.js').Client} client
  */
 async function postLobbyPanel(client) {
   const channelId = process.env.WAGER_CHANNEL_ID;
@@ -70,7 +42,6 @@ async function postLobbyPanel(client) {
     return;
   }
 
-  // Check if we already have a panel message (look for our bot's messages)
   try {
     const messages = await channel.messages.fetch({ limit: 10 });
     const existingPanel = messages.find(

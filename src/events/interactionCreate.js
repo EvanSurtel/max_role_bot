@@ -45,13 +45,9 @@ module.exports = {
         if (id.startsWith('wallet_')) {
           return await walletPanel.handleWalletSubButton(interaction);
         }
-        // Panel: Leaderboard button
-        if (id === 'panel_leaderboard') {
-          return await leaderboardPanel.handleLeaderboardButton(interaction);
-        }
-        // Leaderboard sub-buttons (xp, earnings, wins)
+        // Leaderboard region buttons (from leaderboard channel)
         if (id.startsWith('lb_')) {
-          return await leaderboardPanel.handleLeaderboardSubButton(interaction);
+          return await leaderboardPanel.handleLeaderboardButton(interaction);
         }
         console.warn(`[Interaction] Unhandled button customId: ${id}`);
         return;

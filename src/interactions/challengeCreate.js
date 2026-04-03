@@ -28,8 +28,8 @@ async function handleButton(interaction) {
   const id = interaction.customId;
   const userId = interaction.user.id;
 
-  // Step 1: Match type selection — create a private channel for this user
-  if (id === 'wager_type_wager' || id === 'wager_type_xp') {
+  // Step 1: Create Wager — create a private channel for this user
+  if (id === 'wager_type_wager') {
     // Check if user already has an active flow
     const existing = activeFlows.get(userId);
     if (existing && existing.channelId) {
@@ -41,7 +41,7 @@ async function handleButton(interaction) {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const type = id === 'wager_type_wager' ? CHALLENGE_TYPE.WAGER : CHALLENGE_TYPE.XP;
+    const type = CHALLENGE_TYPE.WAGER;
 
     // Create a private channel for this user's wager setup
     const guild = interaction.guild;
@@ -177,29 +177,24 @@ async function handleButton(interaction) {
 
     flow.anonymous = id === 'wager_vis_anon';
 
-    // For wager type: show entry amount modal
-    if (flow.type === CHALLENGE_TYPE.WAGER) {
-      const modal = new ModalBuilder()
-        .setCustomId('entry_amount')
-        .setTitle('Set Wager Amount');
+    // Show entry amount modal
+    const modal = new ModalBuilder()
+      .setCustomId('entry_amount')
+      .setTitle('Set Wager Amount');
 
-      const amountInput = new TextInputBuilder()
-        .setCustomId('amount_input')
-        .setLabel('Entry amount per player (in USDC)')
-        .setPlaceholder('e.g. 10')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
-        .setMinLength(1)
-        .setMaxLength(10);
+    const amountInput = new TextInputBuilder()
+      .setCustomId('amount_input')
+      .setLabel('Entry amount per player (in USDC)')
+      .setPlaceholder('e.g. 10')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMinLength(1)
+      .setMaxLength(10);
 
-      const row = new ActionRowBuilder().addComponents(amountInput);
-      modal.addComponents(row);
+    const amountRow = new ActionRowBuilder().addComponents(amountInput);
+    modal.addComponents(amountRow);
 
-      return interaction.showModal(modal);
-    }
-
-    // For XP type: create challenge directly (no entry amount)
-    return finalizeChallengeCreation(interaction, flow, 0);
+    return interaction.showModal(modal);
   }
 }
 

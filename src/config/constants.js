@@ -110,9 +110,9 @@ const PLAYER_STATUS = {
   DECLINED: 'declined',
 };
 
-// XP rewards
-const XP_WIN = 100;
-const XP_LOSS = -60;
+// XP rewards (wager matches only)
+const XP_WAGER_WIN = 350;
+const XP_WAGER_LOSS = 0; // No penalty for wager losses
 
 // Transaction types
 const TRANSACTION_TYPE = {
@@ -144,7 +144,7 @@ module.exports = {
   CHALLENGE_TYPE,
   PLAYER_ROLE,
   PLAYER_STATUS,
-  XP_WIN,
-  XP_LOSS,
+  XP_WAGER_WIN,
+  XP_WAGER_LOSS,
   TRANSACTION_TYPE,
 };
