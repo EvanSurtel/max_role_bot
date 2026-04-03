@@ -46,8 +46,17 @@ async function handleButton(interaction) {
         });
       }
 
-      // Create permanent wallet channel for this user
+      // Assign member role so they can see the rest of the server
       const guild = interaction.guild;
+      const memberRoleId = process.env.MEMBER_ROLE_ID;
+      if (memberRoleId) {
+        try {
+          const member = await guild.members.fetch(discordId);
+          await member.roles.add(memberRoleId);
+        } catch (err) {
+          console.error(`[Onboarding] Failed to assign member role to ${discordId}:`, err.message);
+        }
+      }
       const walletChannel = await channelService.createPrivateChannel(
         guild,
         `wallet-${interaction.user.username}`,
