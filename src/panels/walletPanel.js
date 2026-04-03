@@ -87,7 +87,7 @@ async function handleWalletSubButton(interaction) {
         '',
         '**To fund your wager wallet:**',
         '1. Send **USDC** (SPL token) to this address for wagers',
-        '2. Send a small amount of **SOL** (~$1) for transaction fees',
+        '2. Send a small amount of **SOL** (~$0.50) for transaction fees',
         '',
         'Deposits are detected automatically every 30 seconds.',
       ].join('\n'),

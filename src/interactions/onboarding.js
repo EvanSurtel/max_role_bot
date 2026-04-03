@@ -239,9 +239,10 @@ async function handleRegistrationModal(interaction) {
         `A USDC wallet has been created for you. Check <#${walletChannel.id}> to view your deposit address and manage funds.`,
         '',
         '**Getting Started**',
-        '1. Deposit USDC to your wallet address',
-        '2. Head to the wager lobby channel',
-        '3. Click **Create Wager** to challenge others or browse open challenges',
+        '1. Deposit **USDC** to your wallet address for wagers',
+        '2. Deposit a tiny amount of **SOL** (~$0.50) for transaction fees',
+        '3. Head to the wager lobby channel',
+        '4. Click **Create Wager** to challenge others or browse open challenges',
         '',
         'Good luck and have fun!',
       ].join('\n'));
@@ -302,7 +303,7 @@ async function sendWalletPanel(channel, wallet) {
       '',
       '**To fund your wallet:**',
       '1. Send **USDC** (SPL token on Solana) to the address above for wagers',
-      '2. Send a small amount of **SOL** (~$1) to the same address for transaction fees',
+      '2. Send a small amount of **SOL** (~$0.50) to the same address for transaction fees',
       '',
       'Deposits are detected automatically. Click **Refresh** to update your balance.',
     ].join('\n'))
@@ -350,7 +351,7 @@ async function handleWalletRefresh(interaction) {
       '',
       '**To fund your wallet:**',
       '1. Send **USDC** (SPL token on Solana) to the address above for wagers',
-      '2. Send a small amount of **SOL** (~$1) to the same address for transaction fees',
+      '2. Send a small amount of **SOL** (~$0.50) to the same address for transaction fees',
       '',
       'Deposits are detected automatically. Click **Refresh** to update your balance.',
     ].join('\n'))

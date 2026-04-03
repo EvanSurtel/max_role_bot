@@ -98,7 +98,7 @@ function onboardingEmbed() {
       {
         name: 'What happens next?',
         value:
-          'When you accept, a Solana wallet will be created for you. Deposit USDC to participate in wager matches, or play XP matches for free. You will also need a tiny amount of SOL (~$1) for transaction fees.',
+          'When you accept, a Solana wallet will be created for you. Deposit USDC to participate in wager matches. You will also need a tiny amount of SOL (~$0.50) for transaction fees.',
       },
     )
     .setFooter({ text: 'Click Accept to proceed or Decline to opt out.' });
