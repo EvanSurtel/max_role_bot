@@ -258,18 +258,23 @@ async function handleUserSelect(interaction) {
       });
     }
 
-    // Validate: none of the selected teammates are already in the challenge
+    // Validate: none of the selected teammates are already in the challenge or busy
+    const { isPlayerBusy } = require('../utils/playerStatus');
     for (const teammateDiscordId of selectedDiscordIds) {
       const teammateUser = userRepo.findByDiscordId(teammateDiscordId);
-      if (teammateUser) {
-        const existing = challengePlayerRepo.findByChallengeAndUser(challengeId, teammateUser.id);
-        if (existing) {
-          acceptFlows.delete(discordId);
-          return interaction.editReply({
-            content: `<@${teammateDiscordId}> is already part of this challenge. Please try again with different teammates.`,
-            components: [],
-          });
-        }
+      if (!teammateUser || !teammateUser.cod_uid) {
+        acceptFlows.delete(discordId);
+        return interaction.editReply({ content: `<@${teammateDiscordId}> is not registered.`, components: [] });
+      }
+      const existing = challengePlayerRepo.findByChallengeAndUser(challengeId, teammateUser.id);
+      if (existing) {
+        acceptFlows.delete(discordId);
+        return interaction.editReply({ content: `<@${teammateDiscordId}> is already part of this challenge.`, components: [] });
+      }
+      const busy = isPlayerBusy(teammateUser.id);
+      if (busy.busy) {
+        acceptFlows.delete(discordId);
+        return interaction.editReply({ content: `<@${teammateDiscordId}> is currently busy: ${busy.reason}`, components: [] });
       }
     }
 

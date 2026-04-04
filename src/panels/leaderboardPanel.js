@@ -1,6 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const userRepo = require('../database/repositories/userRepo');
-const neatqueueService = require('../services/neatqueueService');
 const { USDC_PER_UNIT } = require('../config/constants');
 
 // Season stored in DB so it can be changed from Discord without restarting
@@ -54,7 +53,20 @@ async function getNeatQueueData() {
 
 // ─── Build Leaderboard Embeds ────────────────────────────────────
 
-async function buildXpLeaderboardEmbed(region, view = 'alltime') {
+/**
+ * Get all seasons that have xp_history entries.
+ */
+function getAvailableSeasons() {
+  const db = require('../database/db');
+  try {
+    const rows = db.prepare('SELECT DISTINCT season FROM xp_history ORDER BY season DESC').all();
+    return rows.map(r => r.season);
+  } catch {
+    return [];
+  }
+}
+
+async function buildXpLeaderboardEmbed(region, view = 'alltime', seasonOverride = null) {
   if (!REGIONS.includes(region)) region = 'global';
   const db = require('../database/db');
   const regionFilter = region === 'global' ? '' : ' AND u.region = ?';
@@ -62,11 +74,13 @@ async function buildXpLeaderboardEmbed(region, view = 'alltime') {
 
   let entries = [];
   let title, footerText;
+  const currentSeason = getCurrentSeason();
+  const viewSeason = seasonOverride || currentSeason;
 
   if (view === 'season') {
-    // Season view — sum xp_history for current season
-    title = `${REGION_LABELS[region]} XP — Season ${getCurrentSeason()}`;
-    footerText = `Season ${getCurrentSeason()}`;
+    const isCurrent = viewSeason === currentSeason;
+    title = `${REGION_LABELS[region]} XP — ${viewSeason}${isCurrent ? ' (Current)' : ''}`;
+    footerText = `${viewSeason}${isCurrent ? ' (Current Season)' : ''}`;
 
     const rows = db.prepare(`
       SELECT u.discord_id, u.cod_ign, u.total_wins, u.total_losses,
@@ -78,7 +92,7 @@ async function buildXpLeaderboardEmbed(region, view = 'alltime') {
       HAVING season_xp > 0
       ORDER BY season_xp DESC
       LIMIT 10
-    `).all(getCurrentSeason(), ...regionParams);
+    `).all(viewSeason, ...regionParams);
 
     entries = rows.map(r => ({
       discord_id: r.discord_id,
@@ -88,7 +102,6 @@ async function buildXpLeaderboardEmbed(region, view = 'alltime') {
       losses: r.total_losses,
     }));
   } else {
-    // All-time view — use accumulated xp_points from users table
     title = `${REGION_LABELS[region]} XP — All-Time`;
     footerText = 'All-Time';
 
@@ -121,16 +134,30 @@ async function buildXpLeaderboardEmbed(region, view = 'alltime') {
     .setFooter({ text: footerText })
     .setTimestamp();
 
-  const row1 = new ActionRowBuilder().addComponents(
+  // Build buttons — All-Time + Current Season + Past Seasons (if any)
+  const row1Buttons = [
     new ButtonBuilder()
       .setCustomId(`xplb_alltime_${region}`)
       .setLabel('All-Time')
       .setStyle(view === 'alltime' ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder()
-      .setCustomId(`xplb_season_${region}`)
-      .setLabel(`Season ${getCurrentSeason()}`)
-      .setStyle(view === 'season' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-  );
+      .setCustomId(`xplb_season_${region}_${currentSeason}`)
+      .setLabel(`${currentSeason} (Current)`)
+      .setStyle(view === 'season' && viewSeason === currentSeason ? ButtonStyle.Primary : ButtonStyle.Secondary),
+  ];
+
+  // Add past season buttons (max 3 to fit in row)
+  const pastSeasons = getAvailableSeasons().filter(s => s !== currentSeason).slice(0, 3);
+  for (const s of pastSeasons) {
+    row1Buttons.push(
+      new ButtonBuilder()
+        .setCustomId(`xplb_season_${region}_${s}`)
+        .setLabel(s)
+        .setStyle(view === 'season' && viewSeason === s ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    );
+  }
+
+  const row1 = new ActionRowBuilder().addComponents(...row1Buttons);
 
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('lb_admin_adjust_xp').setLabel('Adjust XP').setStyle(ButtonStyle.Danger),
@@ -265,10 +292,13 @@ async function handleLeaderboardButton(interaction) {
     return interaction.update(panel);
   }
 
-  // XP leaderboard — Current Season
+  // XP leaderboard — Season (current or past)
+  // Format: xplb_season_{region}_{seasonName}
   if (id.startsWith('xplb_season_')) {
-    const region = id.replace('xplb_season_', '');
-    const panel = await buildXpLeaderboardEmbed(region, 'season');
+    const parts = id.replace('xplb_season_', '').split('_');
+    const region = parts[0];
+    const season = parts.slice(1).join('_'); // season name may have underscores
+    const panel = await buildXpLeaderboardEmbed(region, 'season', season || null);
     return interaction.update(panel);
   }
 

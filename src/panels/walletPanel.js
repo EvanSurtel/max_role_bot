@@ -157,25 +157,52 @@ async function handleWalletSubButton(interaction) {
     return interaction.showModal(modal);
   }
 
-  if (id === 'wallet_history') {
-    const transactions = transactionRepo.findByUserId(user.id);
-    const recent = transactions.slice(-10).reverse();
+  if (id === 'wallet_history' || id.startsWith('wallet_history_page_')) {
+    const transactions = transactionRepo.findByUserId(user.id).reverse(); // newest first
+    const pageSize = 10;
+    const totalPages = Math.max(1, Math.ceil(transactions.length / pageSize));
 
-    if (recent.length === 0) {
+    let page = 0;
+    if (id.startsWith('wallet_history_page_')) {
+      page = parseInt(id.replace('wallet_history_page_', ''), 10) || 0;
+    }
+    if (page < 0) page = 0;
+    if (page >= totalPages) page = totalPages - 1;
+
+    if (transactions.length === 0) {
       return interaction.reply({ content: 'No transactions found.', ephemeral: true });
     }
 
-    const lines = recent.map((tx, i) => {
+    const pageItems = transactions.slice(page * pageSize, (page + 1) * pageSize);
+    const lines = pageItems.map((tx, i) => {
+      const num = page * pageSize + i + 1;
       const amountUsdc = (Number(tx.amount_usdc) / USDC_PER_UNIT).toFixed(2);
       const date = tx.created_at ? tx.created_at.slice(0, 10) : 'N/A';
       const icon = tx.type === 'deposit' ? '📥' : tx.type === 'withdrawal' ? '📤' : '🔄';
-      return `${i + 1}. ${icon} **${tx.type}** — $${amountUsdc} USDC — ${tx.status} — ${date}`;
+      return `${num}. ${icon} **${tx.type}** — $${amountUsdc} USDC — ${tx.status} — ${date}`;
     });
 
-    return interaction.reply({
-      content: `**Recent Transactions:**\n\n${lines.join('\n')}`,
-      ephemeral: true,
-    });
+    const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+    const navRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`wallet_history_page_${page - 1}`)
+        .setLabel('Previous')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page === 0),
+      new ButtonBuilder()
+        .setCustomId(`wallet_history_page_${page + 1}`)
+        .setLabel('Next')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page >= totalPages - 1),
+    );
+
+    const content = `**Transactions (Page ${page + 1}/${totalPages} — ${transactions.length} total)**\n\n${lines.join('\n')}`;
+
+    if (id === 'wallet_history') {
+      return interaction.reply({ content, components: [navRow], ephemeral: true });
+    } else {
+      return interaction.update({ content, components: [navRow] });
+    }
   }
 }
 

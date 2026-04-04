@@ -279,9 +279,22 @@ async function handleUserSelect(interaction) {
 
   if (interaction.customId === 'select_teammates') {
     const selectedUsers = interaction.values;
-    flow.teammates = selectedUsers;
 
-    // Proceed to game mode selection
+    // Check each teammate is registered and not busy
+    const userRepo = require('../database/repositories/userRepo');
+    const { isPlayerBusy } = require('../utils/playerStatus');
+    for (const teammateDiscordId of selectedUsers) {
+      const tmUser = userRepo.findByDiscordId(teammateDiscordId);
+      if (!tmUser || !tmUser.cod_uid) {
+        return interaction.reply({ content: `<@${teammateDiscordId}> is not registered. They must register before joining a challenge.`, ephemeral: true });
+      }
+      const busy = isPlayerBusy(tmUser.id);
+      if (busy.busy) {
+        return interaction.reply({ content: `<@${teammateDiscordId}> is currently busy: ${busy.reason}`, ephemeral: true });
+      }
+    }
+
+    flow.teammates = selectedUsers;
     return showGameModes(interaction, flow);
   }
 }
