@@ -377,12 +377,15 @@ async function resolveMatch(client, matchId, winningTeam) {
       console.error(`[MatchService] Failed to update stats for winner ${player.user_id}:`, err.message);
     }
 
-    // Sync XP to NeatQueue
+    // Sync to NeatQueue: points + win
     if (neatqueueService.isConfigured()) {
       const winUser = userRepo.findById(player.user_id);
       if (winUser) {
         neatqueueService.addPoints(winUser.discord_id, winXp).catch(err => {
-          console.error(`[MatchService] NeatQueue failed for winner ${winUser.discord_id}:`, err.message);
+          console.error(`[MatchService] NeatQueue points failed for winner ${winUser.discord_id}:`, err.message);
+        });
+        neatqueueService.addWin(winUser.discord_id).catch(err => {
+          console.error(`[MatchService] NeatQueue win failed for ${winUser.discord_id}:`, err.message);
         });
       }
     }
@@ -403,12 +406,19 @@ async function resolveMatch(client, matchId, winningTeam) {
       console.error(`[MatchService] Failed to update stats for loser ${player.user_id}:`, err.message);
     }
 
-    // Sync XP to NeatQueue
-    if (neatqueueService.isConfigured() && loseXp > 0) {
+    // Sync to NeatQueue: points (if any) + loss
+    if (neatqueueService.isConfigured()) {
       const loseUser = userRepo.findById(player.user_id);
       if (loseUser) {
-        neatqueueService.addPoints(loseUser.discord_id, -loseXp).catch(err => {
-          console.error(`[MatchService] NeatQueue failed for loser ${loseUser.discord_id}:`, err.message);
+        // For wagers: 0 XP loss (no point change), but still record the loss
+        // For XP matches: subtract the ELO-calculated points
+        if (loseXp > 0) {
+          neatqueueService.addPoints(loseUser.discord_id, -loseXp).catch(err => {
+            console.error(`[MatchService] NeatQueue points failed for loser ${loseUser.discord_id}:`, err.message);
+          });
+        }
+        neatqueueService.addLoss(loseUser.discord_id).catch(err => {
+          console.error(`[MatchService] NeatQueue loss failed for ${loseUser.discord_id}:`, err.message);
         });
       }
     }
