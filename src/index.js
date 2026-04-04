@@ -74,8 +74,9 @@ client.once('ready', async () => {
     const { postXpMatchPanel } = require('./panels/xpMatchPanel');
     await postXpMatchPanel(client);
 
-    const { postLeaderboardPanel } = require('./panels/leaderboardPanel');
-    await postLeaderboardPanel(client);
+    const { postXpLeaderboardPanel, postEarningsLeaderboardPanel } = require('./panels/leaderboardPanel');
+    await postXpLeaderboardPanel(client);
+    await postEarningsLeaderboardPanel(client);
 
     console.log('[Boot] All systems ready');
   } catch (err) {

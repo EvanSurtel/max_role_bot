@@ -102,4 +102,15 @@ async function getPlayerStats(discordUserId) {
   return neatqueueFetch(`/api/v1/playerstats/${guildId}/${discordUserId}`);
 }
 
-module.exports = { addPoints, addWin, addLoss, getPlayerStats, isConfigured };
+/**
+ * Get the full leaderboard/stats for all players in the queue channel.
+ * Returns array of player stats sorted by points.
+ */
+async function getChannelLeaderboard() {
+  if (!isConfigured()) return null;
+  const guildId = getGuildId();
+  const channelId = getChannelId();
+  return neatqueueFetch(`/api/v1/leaderboard/${guildId}/${channelId}`);
+}
+
+module.exports = { addPoints, addWin, addLoss, getPlayerStats, getChannelLeaderboard, isConfigured };
