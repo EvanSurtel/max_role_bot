@@ -63,8 +63,8 @@ module.exports = {
         if (id.startsWith('wallet_')) {
           return await walletPanel.handleWalletSubButton(interaction);
         }
-        // Leaderboard buttons (XP + earnings, from their channels)
-        if (id.startsWith('xplb_') || id.startsWith('earnlb_')) {
+        // Leaderboard refresh buttons
+        if (id.startsWith('xplb_refresh_') || id.startsWith('earnlb_refresh_')) {
           return await leaderboardPanel.handleLeaderboardButton(interaction);
         }
         console.warn(`[Interaction] Unhandled button customId: ${id}`);
