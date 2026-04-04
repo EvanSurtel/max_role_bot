@@ -1,7 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const userRepo = require('../database/repositories/userRepo');
 const neatqueueService = require('../services/neatqueueService');
-const { USDC_PER_UNIT } = require('../config/constants');
+const { USDC_PER_UNIT, CURRENT_SEASON } = require('../config/constants');
 
 const REGIONS = ['global', 'na', 'latam', 'eu', 'asia'];
 const REGION_LABELS = { global: 'Global', na: 'NA', latam: 'LATAM', eu: 'EU', asia: 'Asia' };
@@ -25,33 +25,49 @@ async function getNeatQueueData() {
 
 // ─── Build Leaderboard Embeds ────────────────────────────────────
 
-async function buildXpLeaderboardEmbed(region) {
+async function buildXpLeaderboardEmbed(region, view = 'alltime') {
   const db = require('../database/db');
-  const nqData = await getNeatQueueData();
+  const regionFilter = region === 'global' ? '' : ' AND u.region = ?';
+  const regionParams = region === 'global' ? [] : [region];
 
   let entries = [];
+  let title, footerText;
 
-  if (nqData && Array.isArray(nqData)) {
-    for (const entry of nqData) {
-      const discordId = String(entry.user_id || entry.discord_id);
-      const user = userRepo.findByDiscordId(discordId);
-      if (region !== 'global' && (!user || user.region !== region)) continue;
-      entries.push({
-        discord_id: discordId,
-        cod_ign: user?.cod_ign || null,
-        points: entry.points || entry.xp || 0,
-        wins: entry.wins || 0,
-        losses: entry.losses || 0,
-      });
-    }
-    entries.sort((a, b) => b.points - a.points);
+  if (view === 'season') {
+    // Season view — sum xp_history for current season
+    title = `${REGION_LABELS[region]} XP — Season ${CURRENT_SEASON}`;
+    footerText = `Season ${CURRENT_SEASON}`;
+
+    const rows = db.prepare(`
+      SELECT u.discord_id, u.cod_ign, u.total_wins, u.total_losses,
+             COALESCE(SUM(xh.xp_amount), 0) as season_xp
+      FROM users u
+      LEFT JOIN xp_history xh ON xh.user_id = u.id AND xh.season = ?
+      WHERE u.accepted_tos = 1${regionFilter}
+      GROUP BY u.id
+      HAVING season_xp > 0
+      ORDER BY season_xp DESC
+      LIMIT 10
+    `).all(CURRENT_SEASON, ...regionParams);
+
+    entries = rows.map(r => ({
+      discord_id: r.discord_id,
+      cod_ign: r.cod_ign,
+      points: r.season_xp,
+      wins: r.total_wins,
+      losses: r.total_losses,
+    }));
   } else {
-    // Fallback to our DB
-    const regionFilter = region === 'global' ? '' : ' AND region = ?';
-    const regionParams = region === 'global' ? [] : [region];
-    const rows = db.prepare(
-      `SELECT * FROM users WHERE accepted_tos = 1 AND xp_points > 0${regionFilter} ORDER BY xp_points DESC LIMIT 10`
-    ).all(...regionParams);
+    // All-time view — use accumulated xp_points from users table
+    title = `${REGION_LABELS[region]} XP — All-Time`;
+    footerText = 'All-Time';
+
+    const rows = db.prepare(`
+      SELECT * FROM users
+      WHERE accepted_tos = 1 AND xp_points > 0${regionFilter.replace('u.', '')}
+      ORDER BY xp_points DESC LIMIT 10
+    `).all(...regionParams);
+
     entries = rows.map(r => ({
       discord_id: r.discord_id,
       cod_ign: r.cod_ign,
@@ -61,26 +77,29 @@ async function buildXpLeaderboardEmbed(region) {
     }));
   }
 
-  const top10 = entries.slice(0, 10);
-
-  const lines = top10.length > 0
-    ? top10.map((e, i) => {
+  const lines = entries.length > 0
+    ? entries.map((e, i) => {
         const ign = e.cod_ign ? ` (${e.cod_ign})` : '';
         return `**#${i + 1}.** <@${e.discord_id}>${ign} — ${e.points.toLocaleString()} XP | ${e.wins}W-${e.losses}L`;
       })
     : ['No players on this leaderboard yet.'];
 
   const embed = new EmbedBuilder()
-    .setTitle(`${REGION_LABELS[region]} XP Leaderboard`)
+    .setTitle(title)
     .setDescription(lines.join('\n'))
-    .setColor(0x5865F2)
+    .setColor(view === 'season' ? 0xe67e22 : 0x5865F2)
+    .setFooter({ text: footerText })
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`xplb_refresh_${region}`)
-      .setLabel('Refresh')
-      .setStyle(ButtonStyle.Primary),
+      .setCustomId(`xplb_alltime_${region}`)
+      .setLabel('All-Time')
+      .setStyle(view === 'alltime' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`xplb_season_${region}`)
+      .setLabel(`Season ${CURRENT_SEASON}`)
+      .setStyle(view === 'season' ? ButtonStyle.Primary : ButtonStyle.Secondary),
   );
 
   return { embeds: [embed], components: [row] };
@@ -145,9 +164,9 @@ async function postAllLeaderboardPanels(client) {
       try {
         const ch = client.channels.cache.get(xpChannelId);
         if (ch) {
-          const panel = await buildXpLeaderboardEmbed(region);
+          const panel = await buildXpLeaderboardEmbed(region, 'alltime');
           const messages = await ch.messages.fetch({ limit: 5 });
-          const existing = messages.find(m => m.author.id === client.user.id && m.embeds[0]?.title?.includes('XP Leaderboard'));
+          const existing = messages.find(m => m.author.id === client.user.id && m.embeds[0]?.title?.includes('XP'));
           if (existing) {
             await existing.edit(panel);
           } else {
@@ -188,12 +207,21 @@ async function postAllLeaderboardPanels(client) {
 async function handleLeaderboardButton(interaction) {
   const id = interaction.customId;
 
-  if (id.startsWith('xplb_refresh_')) {
-    const region = id.replace('xplb_refresh_', '');
-    const panel = await buildXpLeaderboardEmbed(region);
+  // XP leaderboard — All-Time
+  if (id.startsWith('xplb_alltime_')) {
+    const region = id.replace('xplb_alltime_', '');
+    const panel = await buildXpLeaderboardEmbed(region, 'alltime');
     return interaction.update(panel);
   }
 
+  // XP leaderboard — Current Season
+  if (id.startsWith('xplb_season_')) {
+    const region = id.replace('xplb_season_', '');
+    const panel = await buildXpLeaderboardEmbed(region, 'season');
+    return interaction.update(panel);
+  }
+
+  // Earnings leaderboard — Refresh
   if (id.startsWith('earnlb_refresh_')) {
     const region = id.replace('earnlb_refresh_', '');
     const panel = await buildEarningsLeaderboardEmbed(region);

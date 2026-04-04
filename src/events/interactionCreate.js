@@ -63,8 +63,8 @@ module.exports = {
         if (id.startsWith('wallet_')) {
           return await walletPanel.handleWalletSubButton(interaction);
         }
-        // Leaderboard refresh buttons
-        if (id.startsWith('xplb_refresh_') || id.startsWith('earnlb_refresh_')) {
+        // Leaderboard buttons (all-time, season, refresh)
+        if (id.startsWith('xplb_') || id.startsWith('earnlb_')) {
           return await leaderboardPanel.handleLeaderboardButton(interaction);
         }
         console.warn(`[Interaction] Unhandled button customId: ${id}`);
