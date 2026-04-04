@@ -55,6 +55,7 @@ async function getNeatQueueData() {
 // ─── Build Leaderboard Embeds ────────────────────────────────────
 
 async function buildXpLeaderboardEmbed(region, view = 'alltime') {
+  if (!REGIONS.includes(region)) region = 'global';
   const db = require('../database/db');
   const regionFilter = region === 'global' ? '' : ' AND u.region = ?';
   const regionParams = region === 'global' ? [] : [region];
@@ -141,6 +142,7 @@ async function buildXpLeaderboardEmbed(region, view = 'alltime') {
 }
 
 async function buildEarningsLeaderboardEmbed(region) {
+  if (!REGIONS.includes(region)) region = 'global';
   const db = require('../database/db');
   const regionFilter = region === 'global' ? '' : ' AND region = ?';
   const regionParams = region === 'global' ? [] : [region];

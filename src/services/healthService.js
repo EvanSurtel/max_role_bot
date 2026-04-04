@@ -39,7 +39,14 @@ async function checkEscrowHealth(client) {
   const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
   if (!secretKeyJson) return;
 
-  const escrowKeypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyJson)));
+  let escrowKeypair;
+  try {
+    escrowKeypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyJson)));
+  } catch (err) {
+    console.error('[Health] Invalid ESCROW_WALLET_SECRET:', err.message);
+    return;
+  }
+
   const address = escrowKeypair.publicKey.toBase58();
   const solBalance = BigInt(await getSolBalance(address));
   const alertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
