@@ -15,7 +15,7 @@ function formatUsdc(amount) {
 /**
  * Build an embed for the public challenge board.
  */
-function challengeEmbed(challenge, isAnonymous) {
+function challengeEmbed(challenge, isAnonymous, teamPlayers) {
   const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
   const modeInfo = GAME_MODES[challenge.game_modes];
   const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
@@ -39,7 +39,10 @@ function challengeEmbed(challenge, isAnonymous) {
     );
   }
 
-  if (!isAnonymous) {
+  if (!isAnonymous && teamPlayers && teamPlayers.length > 0) {
+    const playerList = teamPlayers.map(p => `<@${p.discord_id}>${p.cod_ign ? ` (${p.cod_ign})` : ''}`).join('\n');
+    embed.addFields({ name: 'Challenger', value: playerList });
+  } else if (!isAnonymous) {
     embed.setFooter({ text: `Created by user #${challenge.creator_user_id}` });
   } else {
     embed.setFooter({ text: 'Anonymous challenge' });

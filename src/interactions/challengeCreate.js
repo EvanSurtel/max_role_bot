@@ -175,7 +175,15 @@ async function handleButton(interaction) {
     );
 
     return interaction.update({
-      content: `**Challenge visibility:**\n\nSeries: **Best of ${series}**\n\nChoose whether to show your name on the challenge board or remain anonymous.`,
+      content: [
+        '**Challenge visibility:**',
+        '',
+        `Series: **Best of ${series}**`,
+        '',
+        '**Anonymous** — Your name and teammates will be hidden on the challenge board. Opponents won\'t know who they\'re facing until they accept.',
+        '',
+        '**Show Names** — Your name and teammates will be visible on the challenge board so opponents can see who\'s challenging.',
+      ].join('\n'),
       components: [row],
     });
   }

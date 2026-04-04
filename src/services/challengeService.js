@@ -163,8 +163,16 @@ async function postToBoard(client, challenge) {
     return;
   }
 
-  // Build the embed
-  const embed = challengeEmbed(challenge, !!challenge.is_anonymous);
+  // Build the embed — include team player names if not anonymous
+  let teamPlayers = null;
+  if (!challenge.is_anonymous) {
+    const players = challengePlayerRepo.findByChallengeAndTeam(challenge.id, 1);
+    teamPlayers = players.map(p => {
+      const u = userRepo.findById(p.user_id);
+      return u ? { discord_id: u.discord_id, cod_ign: u.cod_ign } : null;
+    }).filter(Boolean);
+  }
+  const embed = challengeEmbed(challenge, !!challenge.is_anonymous, teamPlayers);
 
   // Build the accept + cancel buttons
   const row = new ActionRowBuilder().addComponents(
