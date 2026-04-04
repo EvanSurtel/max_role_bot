@@ -77,6 +77,9 @@ client.once('ready', async () => {
     const { postAllLeaderboardPanels } = require('./panels/leaderboardPanel');
     await postAllLeaderboardPanels(client);
 
+    const { postSeasonPanel } = require('./panels/seasonPanel');
+    await postSeasonPanel(client);
+
     console.log('[Boot] All systems ready');
   } catch (err) {
     console.error('[Boot] Startup error:', err);

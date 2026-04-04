@@ -434,4 +434,4 @@ async function handleAdminModal(interaction) {
   }
 }
 
-module.exports = { postAllLeaderboardPanels, handleLeaderboardButton, handleAdminModal, getCurrentSeason };
+module.exports = { postAllLeaderboardPanels, handleLeaderboardButton, handleAdminModal, getCurrentSeason, setCurrentSeason };

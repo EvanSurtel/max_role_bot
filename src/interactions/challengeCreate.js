@@ -32,6 +32,15 @@ async function handleButton(interaction) {
 
   // Step 1: Create Wager or XP Match — create a private channel for this user
   if (id === 'wager_type_wager' || id === 'wager_type_xp') {
+    // Check if matches are paused (season transition)
+    const { isMatchesPaused } = require('../panels/seasonPanel');
+    if (isMatchesPaused()) {
+      return interaction.reply({
+        content: 'Match creation is currently paused for a season transition. Please wait for the new season to begin.',
+        ephemeral: true,
+      });
+    }
+
     // Check if user is registered with a COD UID
     const userRepo = require('../database/repositories/userRepo');
     const dbUser = userRepo.findByDiscordId(userId);

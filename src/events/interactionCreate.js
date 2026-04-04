@@ -7,6 +7,7 @@ const disputeCreate = require('../interactions/disputeCreate');
 const onboarding = require('../interactions/onboarding');
 const walletPanel = require('../panels/walletPanel');
 const leaderboardPanel = require('../panels/leaderboardPanel');
+const seasonPanel = require('../panels/seasonPanel');
 
 module.exports = {
   name: 'interactionCreate',
@@ -63,6 +64,10 @@ module.exports = {
         if (id.startsWith('wallet_')) {
           return await walletPanel.handleWalletSubButton(interaction);
         }
+        // Season management buttons
+        if (id.startsWith('season_')) {
+          return await seasonPanel.handleSeasonButton(interaction);
+        }
         // Leaderboard buttons (all-time, season, refresh, admin)
         if (id.startsWith('xplb_') || id.startsWith('earnlb_') || id.startsWith('lb_admin_')) {
           return await leaderboardPanel.handleLeaderboardButton(interaction);
@@ -92,6 +97,9 @@ module.exports = {
         }
         if (id.startsWith('lb_admin_')) {
           return await leaderboardPanel.handleAdminModal(interaction);
+        }
+        if (id === 'season_end_modal') {
+          return await seasonPanel.handleSeasonModal(interaction);
         }
 
         console.warn(`[Interaction] Unhandled modal customId: ${id}`);
