@@ -249,6 +249,34 @@ async function handleRegistrationModal(interaction) {
 
     await interaction.editReply({ embeds: [completeEmbed] });
 
+    // Notify admins in the admin alerts channel
+    const alertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
+    if (alertChannelId) {
+      try {
+        const alertChannel = interaction.client.channels.cache.get(alertChannelId);
+        if (alertChannel) {
+          const adminEmbed = new EmbedBuilder()
+            .setTitle('New Registration')
+            .setColor(0x3498db)
+            .setDescription([
+              `<@${discordId}> has registered.`,
+              '',
+              `**Display Name:** ${displayName}`,
+              `**COD IGN:** ${codIgn}`,
+              `**COD UID:** ${codUid}`,
+              `**Server:** ${serverInput}`,
+              `**Region:** ${region}`,
+              `**Country:** ${country}`,
+              `**Wallet:** \`${wallet.solana_address}\``,
+            ].join('\n'))
+            .setTimestamp();
+          await alertChannel.send({ embeds: [adminEmbed] });
+        }
+      } catch (err) {
+        console.error('[Onboarding] Failed to notify admins:', err.message);
+      }
+    }
+
     console.log(`[Onboarding] ${displayName} (${discordId}) registered: IGN=${codIgn}, UID=${codUid}, region=${region}`);
 
   } catch (err) {
