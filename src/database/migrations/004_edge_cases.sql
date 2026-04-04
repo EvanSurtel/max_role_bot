@@ -45,6 +45,21 @@ ALTER TABLE wallets ADD COLUMN encryption_salt TEXT;
 -- Dispute category tracking
 ALTER TABLE matches ADD COLUMN dispute_category_id TEXT;
 
+-- XP history for season leaderboards
+CREATE TABLE IF NOT EXISTS xp_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  match_id INTEGER REFERENCES matches(id),
+  match_type TEXT NOT NULL,
+  xp_amount INTEGER NOT NULL,
+  season TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_xp_history_user ON xp_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_xp_history_season ON xp_history(season);
+CREATE INDEX IF NOT EXISTS idx_xp_history_user_season ON xp_history(user_id, season);
+
 -- Permanent wallet channel per user
 ALTER TABLE users ADD COLUMN wallet_channel_id TEXT;
 

@@ -30,14 +30,14 @@ async function handleButton(interaction) {
   const id = interaction.customId;
   const userId = interaction.user.id;
 
-  // Step 1: Create Wager — create a private channel for this user
-  if (id === 'wager_type_wager') {
+  // Step 1: Create Wager or XP Match — create a private channel for this user
+  if (id === 'wager_type_wager' || id === 'wager_type_xp') {
     // Check if user is registered with a COD UID
     const userRepo = require('../database/repositories/userRepo');
     const dbUser = userRepo.findByDiscordId(userId);
     if (!dbUser || !dbUser.cod_uid) {
       return interaction.reply({
-        content: 'You must complete registration with your COD Mobile UID before creating wagers.',
+        content: 'You must complete registration with your COD Mobile UID before creating challenges.',
         ephemeral: true,
       });
     }
@@ -53,7 +53,7 @@ async function handleButton(interaction) {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const type = CHALLENGE_TYPE.WAGER;
+    const type = id === 'wager_type_wager' ? CHALLENGE_TYPE.WAGER : CHALLENGE_TYPE.XP;
 
     // Create a private channel for this user's wager setup
     const guild = interaction.guild;
@@ -189,24 +189,29 @@ async function handleButton(interaction) {
 
     flow.anonymous = id === 'wager_vis_anon';
 
-    // Show entry amount modal
-    const modal = new ModalBuilder()
-      .setCustomId('entry_amount')
-      .setTitle('Set Wager Amount');
+    if (flow.type === CHALLENGE_TYPE.WAGER) {
+      // Show entry amount modal for wagers
+      const modal = new ModalBuilder()
+        .setCustomId('entry_amount')
+        .setTitle('Set Wager Amount');
 
-    const amountInput = new TextInputBuilder()
-      .setCustomId('amount_input')
-      .setLabel('Entry amount per player (in USDC)')
-      .setPlaceholder('e.g. 10')
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setMinLength(1)
-      .setMaxLength(10);
+      const amountInput = new TextInputBuilder()
+        .setCustomId('amount_input')
+        .setLabel('Entry amount per player (in USDC)')
+        .setPlaceholder('e.g. 10')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMinLength(1)
+        .setMaxLength(10);
 
-    const amountRow = new ActionRowBuilder().addComponents(amountInput);
-    modal.addComponents(amountRow);
+      const amountRow = new ActionRowBuilder().addComponents(amountInput);
+      modal.addComponents(amountRow);
 
-    return interaction.showModal(modal);
+      return interaction.showModal(modal);
+    }
+
+    // XP match — no entry amount, create directly
+    return finalizeChallengeCreation(interaction, flow, 0);
   }
 }
 

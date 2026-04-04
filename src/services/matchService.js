@@ -6,7 +6,8 @@ const userRepo = require('../database/repositories/userRepo');
 const escrowManager = require('../solana/escrowManager');
 const { privateTextOverwrites, privateVoiceOverwrites, votingChannelOverwrites, sharedOverwrites } = require('../utils/permissions');
 const { formatUsdc } = require('../utils/embeds');
-const { MATCH_STATUS, CHALLENGE_STATUS, CHALLENGE_TYPE, XP_WAGER_WIN, XP_WAGER_LOSS } = require('../config/constants');
+const { MATCH_STATUS, CHALLENGE_STATUS, CHALLENGE_TYPE, CURRENT_SEASON } = require('../config/constants');
+const { calculateXpMatchRewards, calculateWagerXpRewards } = require('../utils/xpCalculator');
 const neatqueueService = require('./neatqueueService');
 
 /**
@@ -319,6 +320,33 @@ async function resolveMatch(client, matchId, winningTeam) {
   const losingPlayers = allPlayers.filter(p => p.team === losingTeam);
   const isWagerMatch = challenge.type === CHALLENGE_TYPE.WAGER && Number(challenge.total_pot_usdc) > 0;
 
+  // Calculate XP rewards based on match type
+  let winXp, loseXp;
+  if (isWagerMatch) {
+    const rewards = calculateWagerXpRewards(challenge.entry_amount_usdc);
+    winXp = rewards.winXp;
+    loseXp = rewards.loseXp;
+  } else {
+    // XP match — ELO-based calculation using team average XP
+    const winnerXpTotal = winningPlayers.reduce((sum, p) => {
+      const u = userRepo.findById(p.user_id);
+      return sum + (u ? u.xp_points : 0);
+    }, 0);
+    const loserXpTotal = losingPlayers.reduce((sum, p) => {
+      const u = userRepo.findById(p.user_id);
+      return sum + (u ? u.xp_points : 0);
+    }, 0);
+    const winnerAvg = winningPlayers.length > 0 ? winnerXpTotal / winningPlayers.length : 0;
+    const loserAvg = losingPlayers.length > 0 ? loserXpTotal / losingPlayers.length : 0;
+    const rewards = calculateXpMatchRewards(winnerAvg, loserAvg);
+    winXp = rewards.winXp;
+    loseXp = rewards.loseXp;
+  }
+
+  // Store XP amounts on the match for the results embed
+  match._winXp = winXp;
+  match._loseXp = loseXp;
+
   // Compute per-player net earnings for wager matches
   let perPlayerEarnings = '0';
   if (isWagerMatch) {
@@ -329,11 +357,18 @@ async function resolveMatch(client, matchId, winningTeam) {
     perPlayerEarnings = (share - entryAmount).toString();
   }
 
+  // Log XP to xp_history table
+  const db = require('../database/db');
+  const insertXpHistory = db.prepare(
+    'INSERT INTO xp_history (user_id, match_id, match_type, xp_amount, season) VALUES (?, ?, ?, ?, ?)'
+  );
+
   // Winners
   for (const player of winningPlayers) {
     try {
-      userRepo.addXp(player.user_id, XP_WAGER_WIN);
+      userRepo.addXp(player.user_id, winXp);
       userRepo.addWin(player.user_id);
+      insertXpHistory.run(player.user_id, matchId, challenge.type, winXp, CURRENT_SEASON);
       if (isWagerMatch) {
         userRepo.addEarnings(player.user_id, perPlayerEarnings);
         userRepo.addWagered(player.user_id, challenge.entry_amount_usdc);
@@ -342,12 +377,12 @@ async function resolveMatch(client, matchId, winningTeam) {
       console.error(`[MatchService] Failed to update stats for winner ${player.user_id}:`, err.message);
     }
 
-    // Sync XP to NeatQueue (fire and forget)
+    // Sync XP to NeatQueue
     if (neatqueueService.isConfigured()) {
       const winUser = userRepo.findById(player.user_id);
       if (winUser) {
-        neatqueueService.addPoints(winUser.discord_id, XP_WAGER_WIN).catch(err => {
-          console.error(`[MatchService] NeatQueue addPoints failed for winner ${winUser.discord_id}:`, err.message);
+        neatqueueService.addPoints(winUser.discord_id, winXp).catch(err => {
+          console.error(`[MatchService] NeatQueue failed for winner ${winUser.discord_id}:`, err.message);
         });
       }
     }
@@ -356,7 +391,10 @@ async function resolveMatch(client, matchId, winningTeam) {
   // Losers
   for (const player of losingPlayers) {
     try {
-      userRepo.addXp(player.user_id, XP_WAGER_LOSS);
+      if (loseXp > 0) {
+        userRepo.addXp(player.user_id, -loseXp);
+        insertXpHistory.run(player.user_id, matchId, challenge.type, -loseXp, CURRENT_SEASON);
+      }
       userRepo.addLoss(player.user_id);
       if (isWagerMatch) {
         userRepo.addWagered(player.user_id, challenge.entry_amount_usdc);
@@ -365,12 +403,12 @@ async function resolveMatch(client, matchId, winningTeam) {
       console.error(`[MatchService] Failed to update stats for loser ${player.user_id}:`, err.message);
     }
 
-    // Sync XP to NeatQueue (fire and forget)
-    if (neatqueueService.isConfigured()) {
+    // Sync XP to NeatQueue
+    if (neatqueueService.isConfigured() && loseXp > 0) {
       const loseUser = userRepo.findById(player.user_id);
       if (loseUser) {
-        neatqueueService.addPoints(loseUser.discord_id, XP_WAGER_LOSS).catch(err => {
-          console.error(`[MatchService] NeatQueue addPoints failed for loser ${loseUser.discord_id}:`, err.message);
+        neatqueueService.addPoints(loseUser.discord_id, -loseXp).catch(err => {
+          console.error(`[MatchService] NeatQueue failed for loser ${loseUser.discord_id}:`, err.message);
         });
       }
     }
@@ -416,15 +454,25 @@ async function resolveMatch(client, matchId, winningTeam) {
         const perPlayerPayout = totalPot > 0 ? totalPot / winningPlayers.length : 0;
 
         const perPlayerProfit = perPlayerPayout - entryAmount; // actual gain = payout - their entry
+        const displayWinXp = match._winXp || winXp;
+        const displayLoseXp = match._loseXp || loseXp;
+
         const winnerLines = [];
         for (const p of winningPlayers) {
           const u = userRepo.findById(p.user_id);
-          if (u) winnerLines.push(`<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''} — **+${formatUsdc(perPlayerProfit)} USDC** +350 XP`);
+          if (!u) continue;
+          const ign = u.cod_ign ? `(${u.cod_ign})` : '';
+          const moneyText = totalPot > 0 ? `**+${formatUsdc(perPlayerProfit)} USDC** ` : '';
+          winnerLines.push(`<@${u.discord_id}> ${ign} — ${moneyText}+${displayWinXp} XP`);
         }
         const loserLines = [];
         for (const p of losingPlayers) {
           const u = userRepo.findById(p.user_id);
-          if (u) loserLines.push(`<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''} — **-${formatUsdc(entryAmount)} USDC**`);
+          if (!u) continue;
+          const ign = u.cod_ign ? `(${u.cod_ign})` : '';
+          const moneyText = totalPot > 0 ? `**-${formatUsdc(entryAmount)} USDC** ` : '';
+          const xpText = displayLoseXp > 0 ? `-${displayLoseXp} XP` : '';
+          loserLines.push(`<@${u.discord_id}> ${ign} — ${moneyText}${xpText}`);
         }
 
         const resultEmbed = new EmbedBuilder()

@@ -9,9 +9,10 @@ function buildLobbyPanel() {
     .setColor(0xf1c40f)
     .setDescription(
       [
-        'Wager **USDC** on Call of Duty matches against other players.',
+        'Challenge other players in Call of Duty Mobile.',
         '',
-        'Click the button below to create a wager.',
+        '**Create Wager** — Bet USDC on your match. Win XP scaled to your wager.',
+        '**Create XP Match** — Play for XP only. ELO-based XP rewards.',
       ].join('\n'),
     )
     .setFooter({ text: 'Powered by Solana' });
@@ -21,6 +22,10 @@ function buildLobbyPanel() {
       .setCustomId('wager_type_wager')
       .setLabel('Create Wager')
       .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('wager_type_xp')
+      .setLabel('Create XP Match')
+      .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('create_dispute')
       .setLabel('Create Dispute')

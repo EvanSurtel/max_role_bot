@@ -1,35 +1,41 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const userRepo = require('../database/repositories/userRepo');
-const { USDC_PER_UNIT } = require('../config/constants');
+const { USDC_PER_UNIT, CURRENT_SEASON } = require('../config/constants');
 
 const REGIONS = ['global', 'na', 'latam', 'eu', 'asia'];
 const REGION_LABELS = {
   global: 'Global',
-  na: 'North America',
-  latam: 'Latin America',
-  eu: 'Europe',
+  na: 'NA',
+  latam: 'LATAM',
+  eu: 'EU',
   asia: 'Asia',
 };
 
 /**
- * Build the leaderboard panel — posted in the leaderboard channel on startup.
+ * Build the leaderboard panel.
  */
 function buildLeaderboardPanel() {
   const embed = new EmbedBuilder()
     .setTitle('Leaderboards')
     .setColor(0x5865F2)
-    .setDescription('Select a region to view the leaderboard.');
+    .setDescription('Select a leaderboard type, then a region.');
 
-  const row = new ActionRowBuilder().addComponents(
-    ...REGIONS.map(region =>
+  const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('lb_alltime').setLabel('All-Time XP').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('lb_season').setLabel(`Season (${CURRENT_SEASON})`).setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('lb_earnings').setLabel('Earnings').setStyle(ButtonStyle.Success),
+  );
+
+  const row2 = new ActionRowBuilder().addComponents(
+    ...REGIONS.map(r =>
       new ButtonBuilder()
-        .setCustomId(`lb_${region}`)
-        .setLabel(REGION_LABELS[region])
-        .setStyle(region === 'global' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+        .setCustomId(`lb_region_${r}`)
+        .setLabel(REGION_LABELS[r])
+        .setStyle(r === 'global' ? ButtonStyle.Secondary : ButtonStyle.Secondary),
     ),
   );
 
-  return { embeds: [embed], components: [row] };
+  return { embeds: [embed], components: [row1, row2] };
 }
 
 /**
@@ -44,7 +50,7 @@ async function postLeaderboardPanel(client) {
 
   const channel = client.channels.cache.get(channelId);
   if (!channel) {
-    console.warn(`[Panel] Leaderboard channel ${channelId} not found in cache`);
+    console.warn(`[Panel] Leaderboard channel ${channelId} not found`);
     return;
   }
 
@@ -68,73 +74,100 @@ async function postLeaderboardPanel(client) {
   }
 }
 
+// Track selected region per user (default: global)
+const userRegionSelection = new Map();
+
 /**
- * Handle leaderboard region button clicks.
+ * Handle leaderboard button clicks.
  */
 async function handleLeaderboardButton(interaction) {
   const id = interaction.customId;
-  if (!id.startsWith('lb_')) return;
-
-  const region = id.replace('lb_', '');
-  if (!REGIONS.includes(region)) return;
-
   const callerId = interaction.user.id;
   const db = require('../database/db');
 
-  // Query users filtered by region (global = all)
-  let rows;
-  if (region === 'global') {
-    rows = db.prepare(
-      'SELECT * FROM users WHERE accepted_tos = 1 AND xp_points > 0 ORDER BY xp_points DESC LIMIT 10'
-    ).all();
-  } else {
-    rows = db.prepare(
-      'SELECT * FROM users WHERE accepted_tos = 1 AND region = ? AND xp_points > 0 ORDER BY xp_points DESC LIMIT 10'
-    ).all(region);
-  }
-
-  if (rows.length === 0) {
+  // Region selection — store and show instruction
+  if (id.startsWith('lb_region_')) {
+    const region = id.replace('lb_region_', '');
+    userRegionSelection.set(callerId, region);
     return interaction.reply({
-      content: `No players on the ${REGION_LABELS[region]} leaderboard yet.`,
+      content: `Region set to **${REGION_LABELS[region]}**. Now click a leaderboard type above.`,
       ephemeral: true,
     });
   }
 
+  const region = userRegionSelection.get(callerId) || 'global';
+  const regionFilter = region === 'global' ? '' : ' AND region = ?';
+  const regionParams = region === 'global' ? [] : [region];
+
+  if (id === 'lb_alltime') {
+    const rows = db.prepare(
+      `SELECT * FROM users WHERE accepted_tos = 1 AND xp_points > 0${regionFilter} ORDER BY xp_points DESC LIMIT 10`
+    ).all(...regionParams);
+
+    return showLeaderboard(interaction, `${REGION_LABELS[region]} — All-Time XP`, rows, callerId, (row) => {
+      const record = `${row.total_wins || 0}W-${row.total_losses || 0}L`;
+      return `${row.xp_points.toLocaleString()} XP | ${record}`;
+    }, 0x5865F2);
+  }
+
+  if (id === 'lb_season') {
+    // Sum XP from xp_history for current season
+    const rows = db.prepare(`
+      SELECT u.*, COALESCE(SUM(xh.xp_amount), 0) as season_xp
+      FROM users u
+      LEFT JOIN xp_history xh ON xh.user_id = u.id AND xh.season = ?
+      WHERE u.accepted_tos = 1${regionFilter}
+      GROUP BY u.id
+      HAVING season_xp > 0
+      ORDER BY season_xp DESC
+      LIMIT 10
+    `).all(CURRENT_SEASON, ...regionParams);
+
+    return showLeaderboard(interaction, `${REGION_LABELS[region]} — Season ${CURRENT_SEASON}`, rows, callerId, (row) => {
+      const record = `${row.total_wins || 0}W-${row.total_losses || 0}L`;
+      return `${row.season_xp.toLocaleString()} XP | ${record}`;
+    }, 0xe67e22);
+  }
+
+  if (id === 'lb_earnings') {
+    const rows = db.prepare(
+      `SELECT * FROM users WHERE accepted_tos = 1 AND CAST(total_earnings_usdc AS INTEGER) > 0${regionFilter} ORDER BY CAST(total_earnings_usdc AS INTEGER) DESC LIMIT 10`
+    ).all(...regionParams);
+
+    return showLeaderboard(interaction, `${REGION_LABELS[region]} — Earnings`, rows, callerId, (row) => {
+      const usdc = (Number(row.total_earnings_usdc) / USDC_PER_UNIT).toFixed(2);
+      return `$${usdc} USDC earned`;
+    }, 0x57F287);
+  }
+}
+
+/**
+ * Helper to build and send a leaderboard embed.
+ */
+function showLeaderboard(interaction, title, rows, callerId, formatLine, color) {
+  if (rows.length === 0) {
+    return interaction.reply({ content: `No data for ${title} yet.`, ephemeral: true });
+  }
+
   const lines = rows.map((row, i) => {
-    const earnings = Number(row.total_earnings_usdc || 0) / USDC_PER_UNIT;
-    const record = `${row.total_wins || 0}W - ${row.total_losses || 0}L`;
-    return `**#${i + 1}.** <@${row.discord_id}> — ${row.xp_points.toLocaleString()} XP | ${record} | $${earnings.toFixed(2)} earned`;
+    const ign = row.cod_ign ? ` (${row.cod_ign})` : '';
+    return `**#${i + 1}.** <@${row.discord_id}>${ign} — ${formatLine(row)}`;
   });
 
-  // Check if caller is in top 10
+  // Show caller's rank if not in top 10
   const callerInTop = rows.some(r => r.discord_id === callerId);
   if (!callerInTop) {
     const callerUser = userRepo.findByDiscordId(callerId);
     if (callerUser && callerUser.xp_points > 0) {
-      let allUsers;
-      if (region === 'global') {
-        allUsers = db.prepare(
-          'SELECT * FROM users WHERE accepted_tos = 1 AND xp_points > 0 ORDER BY xp_points DESC'
-        ).all();
-      } else {
-        allUsers = db.prepare(
-          'SELECT * FROM users WHERE accepted_tos = 1 AND region = ? AND xp_points > 0 ORDER BY xp_points DESC'
-        ).all(region);
-      }
-      const callerIndex = allUsers.findIndex(r => r.discord_id === callerId);
-      if (callerIndex !== -1) {
-        const earnings = Number(callerUser.total_earnings_usdc || 0) / USDC_PER_UNIT;
-        const record = `${callerUser.total_wins || 0}W - ${callerUser.total_losses || 0}L`;
-        lines.push('');
-        lines.push(`**#${callerIndex + 1}.** <@${callerId}> — ${callerUser.xp_points.toLocaleString()} XP | ${record} | $${earnings.toFixed(2)} earned`);
-      }
+      lines.push('');
+      lines.push(`**You:** <@${callerId}> — ${formatLine(callerUser)}`);
     }
   }
 
   const embed = new EmbedBuilder()
-    .setTitle(`${REGION_LABELS[region]} Leaderboard`)
+    .setTitle(title)
     .setDescription(lines.join('\n'))
-    .setColor(0x5865F2)
+    .setColor(color)
     .setTimestamp();
 
   return interaction.reply({ embeds: [embed], ephemeral: true });

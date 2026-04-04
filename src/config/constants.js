@@ -16,7 +16,6 @@ const GAME_MODES = {
 };
 
 // Mode rotation orders for series
-// For mixed modes, this defines the order maps are played
 const MODE_ROTATIONS = {
   hp: (length) => Array(length).fill('HP'),
   ctrl: (length) => Array(length).fill('CTRL'),
@@ -41,14 +40,14 @@ const MODE_ROTATIONS = {
 
 // Timers (in milliseconds)
 const TIMERS = {
-  CHALLENGE_EXPIRY: 10 * 60 * 1000,       // 10 minutes
-  CHALLENGE_EXTEND: 10 * 60 * 1000,       // +10 minutes per extend
-  TEAMMATE_ACCEPT: 10 * 60 * 1000,        // 10 minutes to accept
-  RESULT_RESPONSE: 10 * 60 * 1000,        // 10 minutes for opponent to accept/dispute
-  NO_SHOW: 10 * 60 * 1000,                // 10 minutes
-  DEPOSIT_POLL_INTERVAL: 30 * 1000,        // 30 seconds
+  CHALLENGE_EXPIRY: 10 * 60 * 1000,
+  CHALLENGE_EXTEND: 10 * 60 * 1000,
+  TEAMMATE_ACCEPT: 10 * 60 * 1000,
+  RESULT_RESPONSE: 10 * 60 * 1000,
+  NO_SHOW: 10 * 60 * 1000,
+  DEPOSIT_POLL_INTERVAL: 30 * 1000,
   MATCH_INACTIVITY: Number(process.env.MATCH_INACTIVITY_HOURS || 24) * 60 * 60 * 1000,
-  HEALTH_CHECK_INTERVAL: 10 * 60 * 1000,  // 10 minutes
+  HEALTH_CHECK_INTERVAL: 10 * 60 * 1000,
 };
 
 // SOL thresholds (in lamports)
@@ -65,10 +64,33 @@ const COOLDOWNS = {
 
 // Solana / USDC
 const USDC_DECIMALS = 6;
-const USDC_PER_UNIT = 1_000_000; // 1 USDC = 1,000,000 smallest units
+const USDC_PER_UNIT = 1_000_000;
 const LAMPORTS_PER_SOL = 1_000_000_000;
 const USDC_MINT_MAINNET = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const USDC_MINT_DEVNET = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+
+// XP Match ELO-based rewards
+const XP_MATCH = {
+  BASE_WIN: 100,    // Even match win
+  BASE_LOSS: 60,    // Even match loss
+  MIN_WIN: 50,      // Favorite stomps (minimum reward)
+  MAX_WIN: 160,     // Underdog upset (maximum reward)
+  MIN_LOSS: 30,     // Loser vs much stronger team (minimum penalty)
+  MAX_LOSS: 100,    // Loser upset by much weaker team (maximum penalty)
+  ELO_CAP: 500,     // XP difference where scaling maxes out
+};
+
+// Wager XP rewards (scaled by wager amount)
+const XP_WAGER = {
+  MIN_XP: 100,      // XP for $0.50 wager win
+  MAX_XP: 1000,     // XP for $100 wager win
+  MIN_WAGER: 0.50,  // Minimum wager in USDC
+  MAX_WAGER: 100,   // Maximum wager in USDC
+  LOSS_XP: 0,       // No penalty for losing a wager
+};
+
+// Current season identifier
+const CURRENT_SEASON = process.env.CURRENT_SEASON || '2026-S1';
 
 // Challenge statuses
 const CHALLENGE_STATUS = {
@@ -110,10 +132,6 @@ const PLAYER_STATUS = {
   DECLINED: 'declined',
 };
 
-// XP rewards (wager matches only)
-const XP_WAGER_WIN = 350;
-const XP_WAGER_LOSS = 0; // No penalty for wager losses
-
 // Transaction types
 const TRANSACTION_TYPE = {
   DEPOSIT: 'deposit',
@@ -139,12 +157,13 @@ module.exports = {
   ESCROW_SOL_WARNING,
   ESCROW_SOL_CRITICAL,
   COOLDOWNS,
+  XP_MATCH,
+  XP_WAGER,
+  CURRENT_SEASON,
   CHALLENGE_STATUS,
   MATCH_STATUS,
   CHALLENGE_TYPE,
   PLAYER_ROLE,
   PLAYER_STATUS,
-  XP_WAGER_WIN,
-  XP_WAGER_LOSS,
   TRANSACTION_TYPE,
 };
