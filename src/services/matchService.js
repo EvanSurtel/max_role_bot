@@ -195,6 +195,11 @@ async function createMatchChannels(client, challenge) {
     content: `**Welcome, Team 2!**\n\nYour match for Challenge #${challenge.id} is ready.${potText}\n\nUse this channel to coordinate with your team. When the match is over, both captains must vote on the result in the voting channel.`,
   });
 
+  // Generate random map picks for the series
+  const { pickMaps, formatMapPicks } = require('../utils/mapPicker');
+  const mapPicks = pickMaps(challenge.game_modes, challenge.series_length);
+  const mapText = mapPicks.length > 0 ? `\n\n**Maps**\n${formatMapPicks(mapPicks)}` : '';
+
   // Send welcome message in shared channel
   const team1Mentions = team1DiscordIds.map(id => `<@${id}>`).join(', ');
   const team2Mentions = team2DiscordIds.map(id => `<@${id}>`).join(', ');
@@ -206,6 +211,7 @@ async function createMatchChannels(client, challenge) {
       `**Team 1:** ${team1Mentions}`,
       `**Team 2:** ${team2Mentions}`,
       potText,
+      mapText,
       '',
       'Good luck! When the match is complete, captains should head to the voting channel to confirm the result.',
     ].join('\n'),

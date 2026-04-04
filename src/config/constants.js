@@ -15,6 +15,13 @@ const GAME_MODES = {
   hp_ctrl_snd: { label: 'HP/CTRL/S&D', description: 'Hardpoint, Control & Search & Destroy rotation' },
 };
 
+// Map pools per game mode
+const MAP_POOLS = {
+  HP: ['Summit', 'Hacienda', 'Combine', 'Takeoff', 'Arsenal'],
+  'S&D': ['Tunisia', 'Firing Range', 'Slums', 'Meltdown', 'Coastal'],
+  CTRL: ['Raid', 'Standoff', 'Crossroads Strike'],
+};
+
 // Mode rotation orders for series
 const MODE_ROTATIONS = {
   hp: (length) => Array(length).fill('HP'),
@@ -143,6 +150,7 @@ const TRANSACTION_TYPE = {
 };
 
 module.exports = {
+  MAP_POOLS,
   TEAM_SIZES,
   SERIES_LENGTHS,
   GAME_MODES,
