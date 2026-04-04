@@ -14,6 +14,17 @@ const userRepo = require('../database/repositories/userRepo');
 const matchService = require('../services/matchService');
 const { MATCH_STATUS, CHALLENGE_STATUS, TIMERS, PLAYER_ROLE } = require('../config/constants');
 
+/**
+ * Check if a member has dispute resolution permissions (admin or wager staff).
+ */
+function canResolveDisputes(member) {
+  const adminRoleId = process.env.ADMIN_ROLE_ID;
+  const staffRoleId = process.env.WAGER_STAFF_ROLE_ID;
+  if (adminRoleId && member.roles.cache.has(adminRoleId)) return true;
+  if (staffRoleId && member.roles.cache.has(staffRoleId)) return true;
+  return false;
+}
+
 // Track response deadline timers
 const responseTimers = new Map(); // matchId -> timeout handle
 
@@ -435,7 +446,11 @@ async function triggerDispute(client, matchId) {
 
   if (notifyChannel) {
     const adminRoleId = process.env.ADMIN_ROLE_ID;
-    const adminPing = adminRoleId ? `<@&${adminRoleId}>` : 'Admins';
+    const staffRoleId = process.env.WAGER_STAFF_ROLE_ID;
+    const pings = [];
+    if (staffRoleId) pings.push(`<@&${staffRoleId}>`);
+    if (adminRoleId) pings.push(`<@&${adminRoleId}>`);
+    const staffPing = pings.length > 0 ? pings.join(' ') : 'Staff';
     const allPings = allDiscordIds.map(id => `<@${id}>`).join(' ');
 
     const evidenceRow = new ActionRowBuilder().addComponents(
@@ -453,7 +468,7 @@ async function triggerDispute(client, matchId) {
         '',
         'Both teams — submit evidence (screenshots, video links) using the button below or discuss in the voice call.',
         '',
-        `${adminPing} — please join the dispute call and review evidence to resolve this.`,
+        `${staffPing} — please join the dispute call and review evidence to resolve this.`,
       ].join('\n'),
       components: [evidenceRow],
     });
@@ -571,10 +586,8 @@ async function handleEvidenceSubmission(interaction) {
 async function handleAdminResolve(interaction) {
   const id = interaction.customId;
 
-  // Check admin role
-  const adminRoleId = process.env.ADMIN_ROLE_ID;
-  if (adminRoleId && !interaction.member.roles.cache.has(adminRoleId)) {
-    return interaction.reply({ content: 'Only admins can resolve disputes.', ephemeral: true });
+  if (!canResolveDisputes(interaction.member)) {
+    return interaction.reply({ content: 'Only admins and wager staff can resolve disputes.', ephemeral: true });
   }
 
   let winningTeam, matchId;
@@ -629,17 +642,16 @@ async function handleAdminConfirm(interaction) {
   const matchId = parseInt(parts[0], 10);
   const winningTeam = parseInt(parts[1], 10);
 
-  const adminRoleId = process.env.ADMIN_ROLE_ID;
-  if (adminRoleId && !interaction.member.roles.cache.has(adminRoleId)) {
-    return interaction.reply({ content: 'Only admins can resolve disputes.', ephemeral: true });
+  if (!canResolveDisputes(interaction.member)) {
+    return interaction.reply({ content: 'Only admins and wager staff can resolve disputes.', ephemeral: true });
   }
 
-  // Log admin action
+  // Log staff action
   const { logAdminAction } = require('../utils/adminAudit');
   logAdminAction(interaction.user.id, 'resolve_dispute', 'match', matchId, { winningTeam });
 
   await interaction.update({
-    content: `Admin <@${interaction.user.id}> resolved the dispute. **Team ${winningTeam} wins!** Paying out...`,
+    content: `<@${interaction.user.id}> resolved the dispute. **Team ${winningTeam} wins!** Paying out...`,
     embeds: [],
     components: [],
   });

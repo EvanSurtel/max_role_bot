@@ -189,7 +189,11 @@ async function handleDisputeSelect(interaction) {
       : '';
 
     const adminRoleId = process.env.ADMIN_ROLE_ID;
-    const adminPing = adminRoleId ? `<@&${adminRoleId}>` : 'Admins';
+    const staffRoleId = process.env.WAGER_STAFF_ROLE_ID;
+    const rolePings = [];
+    if (staffRoleId) rolePings.push(`<@&${staffRoleId}>`);
+    if (adminRoleId) rolePings.push(`<@&${adminRoleId}>`);
+    const staffPing = rolePings.length > 0 ? rolePings.join(' ') : 'Staff';
     const allPings = allDiscordIds.map(id => `<@${id}>`).join(' ');
 
     const disputeEmbed = new EmbedBuilder()
@@ -216,7 +220,7 @@ async function handleDisputeSelect(interaction) {
     );
 
     await disputeChat.send({
-      content: `${allPings}\n\n${adminPing} — a dispute has been created for Match #${matchId}.`,
+      content: `${allPings}\n\n${staffPing} — a dispute has been created for Match #${matchId}.`,
       embeds: [disputeEmbed],
       components: [evidenceRow],
     });
