@@ -77,7 +77,7 @@ const XP_MATCH = {
   MAX_WIN: 160,     // Underdog upset (maximum reward)
   MIN_LOSS: 30,     // Loser vs much stronger team (minimum penalty)
   MAX_LOSS: 100,    // Loser upset by much weaker team (maximum penalty)
-  ELO_CAP: 500,     // XP difference where scaling maxes out
+  ELO_CAP: 1000,    // XP difference where scaling maxes out
 };
 
 // Wager XP rewards (scaled by wager amount)
