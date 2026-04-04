@@ -448,67 +448,78 @@ async function resolveMatch(client, matchId, winningTeam) {
     }
   }
 
-  // Post result to the results channel
-  const resultsChannelId = process.env.RESULTS_CHANNEL_ID;
-  if (resultsChannelId) {
+  // Build the result embed (shared between channels)
+  const { EmbedBuilder } = require('discord.js');
+  const { GAME_MODES } = require('../config/constants');
+
+  const modeInfo = GAME_MODES[challenge.game_modes];
+  const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
+  const totalPot = Number(challenge.total_pot_usdc);
+  const entryAmount = Number(challenge.entry_amount_usdc);
+  const perPlayerPayout = totalPot > 0 ? totalPot / winningPlayers.length : 0;
+  const perPlayerProfit = perPlayerPayout - entryAmount;
+  const displayWinXp = match._winXp || winXp;
+  const displayLoseXp = match._loseXp || loseXp;
+  const matchTypeLabel = isWagerMatch ? 'Wager' : 'XP Match';
+
+  const winnerLines = [];
+  for (const p of winningPlayers) {
+    const u = userRepo.findById(p.user_id);
+    if (!u) continue;
+    const ign = u.cod_ign ? `(${u.cod_ign})` : '';
+    const moneyText = isWagerMatch ? `**+${formatUsdc(perPlayerProfit)} USDC** ` : '';
+    winnerLines.push(`<@${u.discord_id}> ${ign} — ${moneyText}+${displayWinXp} XP`);
+  }
+  const loserLines = [];
+  for (const p of losingPlayers) {
+    const u = userRepo.findById(p.user_id);
+    if (!u) continue;
+    const ign = u.cod_ign ? `(${u.cod_ign})` : '';
+    const moneyText = isWagerMatch ? `**-${formatUsdc(entryAmount)} USDC** ` : '';
+    const xpText = displayLoseXp > 0 ? `-${displayLoseXp} XP` : '';
+    loserLines.push(`<@${u.discord_id}> ${ign} — ${moneyText}${xpText}`);
+  }
+
+  const titleLine = isWagerMatch
+    ? `**Team ${winningTeam} wins! Pot: ${formatUsdc(totalPot)} USDC**`
+    : `**Team ${winningTeam} wins!**`;
+
+  const resultEmbed = new EmbedBuilder()
+    .setTitle(`${matchTypeLabel} #${matchId} — Result`)
+    .setColor(isWagerMatch ? 0xf1c40f : 0x3498db)
+    .setDescription([titleLine, '', '**Winners**', ...winnerLines, '', '**Losers**', ...loserLines].join('\n'))
+    .addFields(
+      { name: 'Mode', value: modeLabel, inline: true },
+      { name: 'Series', value: `Best of ${challenge.series_length}`, inline: true },
+      { name: 'Team Size', value: `${challenge.team_size}v${challenge.team_size}`, inline: true },
+    )
+    .setTimestamp();
+
+  if (isWagerMatch) {
+    resultEmbed.addFields({ name: 'Entry', value: `${formatUsdc(entryAmount)} per player`, inline: true });
+  }
+
+  // Post to all-results channel (wagers + XP matches — shared with NeatQueue)
+  const allResultsChannelId = process.env.RESULTS_CHANNEL_ID;
+  if (allResultsChannelId) {
     try {
-      const resultsChannel = client.channels.cache.get(resultsChannelId);
-      if (resultsChannel) {
-        const { EmbedBuilder } = require('discord.js');
-        const { GAME_MODES } = require('../config/constants');
-
-        const modeInfo = GAME_MODES[challenge.game_modes];
-        const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
-        const totalPot = Number(challenge.total_pot_usdc);
-        const entryAmount = Number(challenge.entry_amount_usdc);
-        const perPlayerPayout = totalPot > 0 ? totalPot / winningPlayers.length : 0;
-
-        const perPlayerProfit = perPlayerPayout - entryAmount; // actual gain = payout - their entry
-        const displayWinXp = match._winXp || winXp;
-        const displayLoseXp = match._loseXp || loseXp;
-
-        const winnerLines = [];
-        for (const p of winningPlayers) {
-          const u = userRepo.findById(p.user_id);
-          if (!u) continue;
-          const ign = u.cod_ign ? `(${u.cod_ign})` : '';
-          const moneyText = totalPot > 0 ? `**+${formatUsdc(perPlayerProfit)} USDC** ` : '';
-          winnerLines.push(`<@${u.discord_id}> ${ign} — ${moneyText}+${displayWinXp} XP`);
-        }
-        const loserLines = [];
-        for (const p of losingPlayers) {
-          const u = userRepo.findById(p.user_id);
-          if (!u) continue;
-          const ign = u.cod_ign ? `(${u.cod_ign})` : '';
-          const moneyText = totalPot > 0 ? `**-${formatUsdc(entryAmount)} USDC** ` : '';
-          const xpText = displayLoseXp > 0 ? `-${displayLoseXp} XP` : '';
-          loserLines.push(`<@${u.discord_id}> ${ign} — ${moneyText}${xpText}`);
-        }
-
-        const resultEmbed = new EmbedBuilder()
-          .setTitle(`Match #${matchId} — Result`)
-          .setColor(0x2ecc71)
-          .setDescription([
-            `**Team ${winningTeam} wins! Total Pot: ${formatUsdc(totalPot)} USDC**`,
-            '',
-            `**Winners**`,
-            ...winnerLines,
-            '',
-            `**Losers**`,
-            ...loserLines,
-          ].join('\n'))
-          .addFields(
-            { name: 'Mode', value: modeLabel, inline: true },
-            { name: 'Series', value: `Best of ${challenge.series_length}`, inline: true },
-            { name: 'Team Size', value: `${challenge.team_size}v${challenge.team_size}`, inline: true },
-            { name: 'Entry', value: `${formatUsdc(entryAmount)} per player`, inline: true },
-          )
-          .setTimestamp();
-
-        await resultsChannel.send({ embeds: [resultEmbed] });
-      }
+      const ch = client.channels.cache.get(allResultsChannelId);
+      if (ch) await ch.send({ embeds: [resultEmbed] });
     } catch (err) {
-      console.error(`[MatchService] Failed to post result for match #${matchId}:`, err.message);
+      console.error(`[MatchService] Failed to post to all-results for match #${matchId}:`, err.message);
+    }
+  }
+
+  // Post to wager-only results channel (wagers only)
+  if (isWagerMatch) {
+    const wagerResultsChannelId = process.env.WAGER_RESULTS_CHANNEL_ID;
+    if (wagerResultsChannelId) {
+      try {
+        const ch = client.channels.cache.get(wagerResultsChannelId);
+        if (ch) await ch.send({ embeds: [resultEmbed] });
+      } catch (err) {
+        console.error(`[MatchService] Failed to post to wager-results for match #${matchId}:`, err.message);
+      }
     }
   }
 
