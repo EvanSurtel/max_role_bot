@@ -608,17 +608,43 @@ async function handleAdminResolve(interaction) {
     return interaction.reply({ content: 'This match is not in a disputed state.', ephemeral: true });
   }
 
-  // Show admin confirmation
+  // Build team rosters for confirmation
   const { formatUsdc } = require('../utils/embeds');
   const challenge = challengeRepo.findById(match.challenge_id);
+  const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
+
+  const winningPlayers = allPlayers.filter(p => p.team === winningTeam);
+  const losingTeam = winningTeam === 1 ? 2 : 1;
+  const losingPlayers = allPlayers.filter(p => p.team === losingTeam);
+
+  const winnerNames = winningPlayers.map(p => {
+    const u = userRepo.findById(p.user_id);
+    return u ? `<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''}` : 'Unknown';
+  });
+  const loserNames = losingPlayers.map(p => {
+    const u = userRepo.findById(p.user_id);
+    return u ? `<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''}` : 'Unknown';
+  });
+
   const potText = challenge && Number(challenge.total_pot_usdc) > 0
-    ? ` This pays out **${formatUsdc(challenge.total_pot_usdc)} USDC**.`
+    ? `\n\n**Pot:** ${formatUsdc(challenge.total_pot_usdc)} USDC will be paid to the winners.`
     : '';
 
   const confirmEmbed = new EmbedBuilder()
-    .setTitle('Admin Confirmation')
+    .setTitle('Are you sure?')
     .setColor(0xe74c3c)
-    .setDescription(`Award win to **Team ${winningTeam}**?${potText}\n\nThis cannot be undone.`);
+    .setDescription([
+      `You are awarding the win to **Team ${winningTeam}**.`,
+      '',
+      `**Winners (Team ${winningTeam}):**`,
+      ...winnerNames,
+      '',
+      `**Losers (Team ${losingTeam}):**`,
+      ...loserNames,
+      potText,
+      '',
+      '**This cannot be undone.**',
+    ].join('\n'));
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
