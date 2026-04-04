@@ -142,7 +142,7 @@ async function handleRegistrationModal(interaction) {
     });
   }
 
-  await interaction.deferReply();
+  await interaction.deferReply({ ephemeral: true });
 
   try {
     // Create or get user
