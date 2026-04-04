@@ -12,7 +12,7 @@ const challengeRepo = require('../database/repositories/challengeRepo');
 const challengePlayerRepo = require('../database/repositories/challengePlayerRepo');
 const userRepo = require('../database/repositories/userRepo');
 const matchService = require('../services/matchService');
-const { MATCH_STATUS, CHALLENGE_STATUS, TIMERS } = require('../config/constants');
+const { MATCH_STATUS, CHALLENGE_STATUS, TIMERS, PLAYER_ROLE } = require('../config/constants');
 
 // Track response deadline timers
 const responseTimers = new Map(); // matchId -> timeout handle
@@ -110,7 +110,7 @@ async function handleReportWin(interaction) {
   const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
   let reporterTeam = null;
   for (const player of allPlayers) {
-    if (player.user_id === user.id && player.role === 'captain') {
+    if (player.user_id === user.id && player.role === PLAYER_ROLE.CAPTAIN) {
       reporterTeam = player.team;
       break;
     }
@@ -138,7 +138,7 @@ async function handleReportWin(interaction) {
   const otherTeam = reporterTeam === 1 ? 2 : 1;
   let otherCaptainDiscordId = null;
   for (const player of allPlayers) {
-    if (player.team === otherTeam && player.role === 'captain') {
+    if (player.team === otherTeam && player.role === PLAYER_ROLE.CAPTAIN) {
       const otherUser = userRepo.findById(player.user_id);
       if (otherUser) otherCaptainDiscordId = otherUser.discord_id;
       break;
@@ -217,7 +217,7 @@ async function handleAcceptResult(interaction) {
   const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
   let responderTeam = null;
   for (const player of allPlayers) {
-    if (player.user_id === user.id && player.role === 'captain') {
+    if (player.user_id === user.id && player.role === PLAYER_ROLE.CAPTAIN) {
       responderTeam = player.team;
       break;
     }

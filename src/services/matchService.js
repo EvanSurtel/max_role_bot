@@ -6,7 +6,7 @@ const userRepo = require('../database/repositories/userRepo');
 const escrowManager = require('../solana/escrowManager');
 const { privateTextOverwrites, privateVoiceOverwrites, votingChannelOverwrites, sharedOverwrites } = require('../utils/permissions');
 const { formatUsdc } = require('../utils/embeds');
-const { MATCH_STATUS, CHALLENGE_STATUS, CHALLENGE_TYPE, CURRENT_SEASON } = require('../config/constants');
+const { MATCH_STATUS, CHALLENGE_STATUS, CHALLENGE_TYPE, CURRENT_SEASON, PLAYER_ROLE } = require('../config/constants');
 const { calculateXpMatchRewards, calculateWagerXpRewards } = require('../utils/xpCalculator');
 const neatqueueService = require('./neatqueueService');
 
@@ -55,7 +55,7 @@ async function createMatchChannels(client, challenge) {
     if (user) {
       team1DiscordIds.push(user.discord_id);
       allDiscordIds.push(user.discord_id);
-      if (player.role === 'captain') {
+      if (player.role === PLAYER_ROLE.CAPTAIN) {
         captainDiscordIds.push(user.discord_id);
       }
     }
@@ -66,7 +66,7 @@ async function createMatchChannels(client, challenge) {
     if (user) {
       team2DiscordIds.push(user.discord_id);
       allDiscordIds.push(user.discord_id);
-      if (player.role === 'captain') {
+      if (player.role === PLAYER_ROLE.CAPTAIN) {
         captainDiscordIds.push(user.discord_id);
       }
     }
