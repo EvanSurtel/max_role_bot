@@ -206,7 +206,7 @@ async function handleRegistrationModal(interaction) {
       }
     }
 
-    // Create permanent wallet channel under the wallets category
+    // Create permanent wallet channel — only user and admins can see (not staff)
     const walletChannelName = `wallet-${displayName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
     const walletCategoryId = process.env.WALLET_CATEGORY_ID || null;
     const walletChannel = await channelService.createPrivateChannel(
@@ -214,6 +214,7 @@ async function handleRegistrationModal(interaction) {
       walletChannelName,
       [discordId],
       walletCategoryId,
+      { adminOnly: true },
     );
 
     db.prepare('UPDATE users SET wallet_channel_id = ? WHERE id = ?').run(walletChannel.id, user.id);

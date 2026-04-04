@@ -33,7 +33,7 @@ function addStaffOverwrites(overwrites) {
  * @param {string[]} allowedUserIds - Array of Discord user IDs.
  * @returns {object[]} Permission overwrites array for channel creation.
  */
-function privateTextOverwrites(guild, allowedUserIds, includeStaff = false) {
+function privateTextOverwrites(guild, allowedUserIds, includeStaff = false, adminOnly = false) {
   const overwrites = [
     {
       id: guild.id, // @everyone role
@@ -53,6 +53,18 @@ function privateTextOverwrites(guild, allowedUserIds, includeStaff = false) {
   }
 
   if (includeStaff) addStaffOverwrites(overwrites);
+
+  // Admin-only access (for wallet channels — staff cannot see these)
+  if (adminOnly) {
+    const adminRoleId = process.env.ADMIN_ROLE_ID;
+    if (adminRoleId) {
+      overwrites.push({
+        id: adminRoleId,
+        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+      });
+    }
+  }
+
   return overwrites;
 }
 
