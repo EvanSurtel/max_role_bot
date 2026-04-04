@@ -5,7 +5,7 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
  */
 function buildWelcomePanel() {
   const welcomeEmbed = new EmbedBuilder()
-    .setTitle('Welcome to CODM Wagers')
+    .setTitle('Welcome to Rank $ - Call of Duty Mobile Wagers and XP Matches')
     .setColor(0x3498db)
     .setDescription(
       'Before you can access the server, you must read and agree to our Terms of Service and verify your eligibility.\n\n' +
@@ -122,7 +122,7 @@ async function postWelcomePanel(client) {
   try {
     const messages = await channel.messages.fetch({ limit: 10 });
     const existingPanel = messages.find(
-      m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0]?.title === 'Welcome to CODM Wagers',
+      m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0]?.title?.includes('Rank $'),
     );
 
     const panel = buildWelcomePanel();

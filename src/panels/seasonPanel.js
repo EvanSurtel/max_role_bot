@@ -102,8 +102,11 @@ function buildSeasonPanel() {
  * Post the season panel in the admin alerts channel.
  */
 async function postSeasonPanel(client) {
-  const channelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
-  if (!channelId) return;
+  const channelId = process.env.SEASON_CHANNEL_ID;
+  if (!channelId) {
+    console.warn('[Panel] SEASON_CHANNEL_ID not set — skipping season panel');
+    return;
+  }
 
   const channel = client.channels.cache.get(channelId);
   if (!channel) return;
@@ -296,7 +299,7 @@ async function handleSeasonModal(interaction) {
     // Update the season panel
     const panel = buildSeasonPanel();
     try {
-      const channelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
+      const channelId = process.env.SEASON_CHANNEL_ID;
       if (channelId) {
         const channel = interaction.client.channels.cache.get(channelId);
         if (channel) {

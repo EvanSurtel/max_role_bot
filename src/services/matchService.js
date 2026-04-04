@@ -85,7 +85,7 @@ async function createMatchChannels(client, challenge) {
     name: 'team-1',
     type: ChannelType.GuildText,
     parent: category.id,
-    permissionOverwrites: privateTextOverwrites(guild, team1DiscordIds),
+    permissionOverwrites: privateTextOverwrites(guild, team1DiscordIds, true),
     reason: 'Wager bot match channel',
   });
 
@@ -94,7 +94,7 @@ async function createMatchChannels(client, challenge) {
     name: 'Team 1',
     type: ChannelType.GuildVoice,
     parent: category.id,
-    permissionOverwrites: privateVoiceOverwrites(guild, team1DiscordIds),
+    permissionOverwrites: privateVoiceOverwrites(guild, team1DiscordIds, true),
     reason: 'Wager bot match channel',
   });
 
@@ -103,7 +103,7 @@ async function createMatchChannels(client, challenge) {
     name: 'team-2',
     type: ChannelType.GuildText,
     parent: category.id,
-    permissionOverwrites: privateTextOverwrites(guild, team2DiscordIds),
+    permissionOverwrites: privateTextOverwrites(guild, team2DiscordIds, true),
     reason: 'Wager bot match channel',
   });
 
@@ -112,7 +112,7 @@ async function createMatchChannels(client, challenge) {
     name: 'Team 2',
     type: ChannelType.GuildVoice,
     parent: category.id,
-    permissionOverwrites: privateVoiceOverwrites(guild, team2DiscordIds),
+    permissionOverwrites: privateVoiceOverwrites(guild, team2DiscordIds, true),
     reason: 'Wager bot match channel',
   });
 

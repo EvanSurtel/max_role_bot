@@ -1,13 +1,39 @@
 const { PermissionFlagsBits } = require('discord.js');
 
 /**
+ * Add staff roles (wager staff, XP staff, admin) to permission overwrites
+ * so they can view and interact with match/dispute channels.
+ */
+function addStaffOverwrites(overwrites) {
+  const staffRoles = [
+    process.env.WAGER_STAFF_ROLE_ID,
+    process.env.XP_STAFF_ROLE_ID,
+    process.env.ADMIN_ROLE_ID,
+  ].filter(Boolean);
+
+  for (const roleId of staffRoles) {
+    overwrites.push({
+      id: roleId,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+      ],
+    });
+  }
+
+  return overwrites;
+}
+
+/**
  * Build permission overwrites for a private text channel.
  * Denies @everyone ViewChannel, allows the bot and each specified user to View and Send.
  * @param {import('discord.js').Guild} guild - The Discord guild.
  * @param {string[]} allowedUserIds - Array of Discord user IDs.
  * @returns {object[]} Permission overwrites array for channel creation.
  */
-function privateTextOverwrites(guild, allowedUserIds) {
+function privateTextOverwrites(guild, allowedUserIds, includeStaff = false) {
   const overwrites = [
     {
       id: guild.id, // @everyone role
@@ -26,6 +52,7 @@ function privateTextOverwrites(guild, allowedUserIds) {
     });
   }
 
+  if (includeStaff) addStaffOverwrites(overwrites);
   return overwrites;
 }
 
@@ -36,7 +63,7 @@ function privateTextOverwrites(guild, allowedUserIds) {
  * @param {string[]} allowedUserIds - Array of Discord user IDs.
  * @returns {object[]} Permission overwrites array for channel creation.
  */
-function privateVoiceOverwrites(guild, allowedUserIds) {
+function privateVoiceOverwrites(guild, allowedUserIds, includeStaff = false) {
   const overwrites = [
     {
       id: guild.id, // @everyone role
@@ -63,6 +90,7 @@ function privateVoiceOverwrites(guild, allowedUserIds) {
     });
   }
 
+  if (includeStaff) addStaffOverwrites(overwrites);
   return overwrites;
 }
 

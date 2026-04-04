@@ -51,6 +51,13 @@ async function handleButton(interaction) {
       });
     }
 
+    // Check if user is busy (in another challenge or match)
+    const { isPlayerBusy } = require('../utils/playerStatus');
+    const busy = isPlayerBusy(dbUser.id);
+    if (busy.busy) {
+      return interaction.reply({ content: busy.reason, ephemeral: true });
+    }
+
     // Check if user already has an active flow
     const existing = activeFlows.get(userId);
     if (existing && existing.channelId) {

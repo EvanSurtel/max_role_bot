@@ -38,24 +38,30 @@ const MATCH_TIMERS = {
 };
 
 // Mode rotation orders for series
+// Mode rotation orders for series
+// Bo1 with mixed modes: random pick. Bo3+: rotate in order.
 const MODE_ROTATIONS = {
   hp: (length) => Array(length).fill('HP'),
   ctrl: (length) => Array(length).fill('CTRL'),
   snd: (length) => Array(length).fill('S&D'),
   hp_snd: (length) => {
     const rotation = ['HP', 'S&D'];
+    if (length === 1) return [rotation[Math.floor(Math.random() * rotation.length)]];
     return Array.from({ length }, (_, i) => rotation[i % rotation.length]);
   },
   hp_ctrl: (length) => {
     const rotation = ['HP', 'CTRL'];
+    if (length === 1) return [rotation[Math.floor(Math.random() * rotation.length)]];
     return Array.from({ length }, (_, i) => rotation[i % rotation.length]);
   },
   ctrl_snd: (length) => {
     const rotation = ['CTRL', 'S&D'];
+    if (length === 1) return [rotation[Math.floor(Math.random() * rotation.length)]];
     return Array.from({ length }, (_, i) => rotation[i % rotation.length]);
   },
   hp_ctrl_snd: (length) => {
     const rotation = ['HP', 'CTRL', 'S&D'];
+    if (length === 1) return [rotation[Math.floor(Math.random() * rotation.length)]];
     return Array.from({ length }, (_, i) => rotation[i % rotation.length]);
   },
 };

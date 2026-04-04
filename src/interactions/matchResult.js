@@ -19,9 +19,11 @@ const { MATCH_STATUS, CHALLENGE_STATUS, PLAYER_ROLE } = require('../config/const
  */
 function canResolveDisputes(member) {
   const adminRoleId = process.env.ADMIN_ROLE_ID;
-  const staffRoleId = process.env.WAGER_STAFF_ROLE_ID;
+  const wagerStaffId = process.env.WAGER_STAFF_ROLE_ID;
+  const xpStaffId = process.env.XP_STAFF_ROLE_ID;
   if (adminRoleId && member.roles.cache.has(adminRoleId)) return true;
-  if (staffRoleId && member.roles.cache.has(staffRoleId)) return true;
+  if (wagerStaffId && member.roles.cache.has(wagerStaffId)) return true;
+  if (xpStaffId && member.roles.cache.has(xpStaffId)) return true;
   return false;
 }
 

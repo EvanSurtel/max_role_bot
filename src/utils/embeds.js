@@ -79,7 +79,7 @@ function walletEmbed(wallet, user) {
  */
 function onboardingEmbed() {
   return new EmbedBuilder()
-    .setTitle('Welcome to CODM Wagers')
+    .setTitle('Welcome to Rank $ - Call of Duty Mobile Wagers and XP Matches')
     .setColor(0xe74c3c)
     .setDescription(
       'Before you can participate in wagers and XP matches, you must accept our Terms of Service.',

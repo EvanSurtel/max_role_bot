@@ -117,6 +117,13 @@ async function handleConfirmedAccept(interaction) {
     return interaction.reply({ content: 'Registration required.', ephemeral: true });
   }
 
+  // Check if acceptor is busy
+  const { isPlayerBusy } = require('../utils/playerStatus');
+  const busy = isPlayerBusy(user.id);
+  if (busy.busy) {
+    return interaction.reply({ content: busy.reason, ephemeral: true });
+  }
+
   const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
   const entryUsdc = challenge.entry_amount_usdc;
 

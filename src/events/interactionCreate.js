@@ -56,6 +56,14 @@ module.exports = {
         if (id.startsWith('dispute_select_')) {
           return await disputeCreate.handleDisputeSelect(interaction);
         }
+        // Dispute confirmation
+        if (id.startsWith('dispute_confirm_')) {
+          return await disputeCreate.handleDisputeConfirm(interaction);
+        }
+        // Dispute nevermind
+        if (id === 'dispute_nevermind') {
+          return interaction.update({ content: 'Dispute cancelled.', embeds: [], components: [] });
+        }
         // Onboarding TOS buttons + wallet refresh
         if (id.startsWith('tos_') || id === 'wallet_refresh') {
           return await onboarding.handleButton(interaction);

@@ -12,12 +12,9 @@ const userRepo = require('../database/repositories/userRepo');
 const { MATCH_STATUS, CHALLENGE_STATUS, GAME_MODES } = require('../config/constants');
 const { formatUsdc } = require('../utils/embeds');
 const { sharedOverwrites, privateTextOverwrites, privateVoiceOverwrites } = require('../utils/permissions');
-const escrowManager = require('../solana/escrowManager');
-const { logAdminAction } = require('../utils/adminAudit');
 
 /**
  * Handle the "Create Dispute" button from the lobby panel.
- * Shows the user's recent matches to pick from.
  */
 async function handleCreateDispute(interaction) {
   const discordId = interaction.user.id;
@@ -26,7 +23,6 @@ async function handleCreateDispute(interaction) {
     return interaction.reply({ content: 'You must be registered first.', ephemeral: true });
   }
 
-  // Find recent matches this user was in (completed, active, or voting — last 10)
   const db = require('../database/db');
   const recentMatches = db.prepare(`
     SELECT m.*, c.game_modes, c.series_length, c.team_size, c.entry_amount_usdc, c.total_pot_usdc, c.type
@@ -39,13 +35,9 @@ async function handleCreateDispute(interaction) {
   `).all(user.id);
 
   if (recentMatches.length === 0) {
-    return interaction.reply({
-      content: 'You have no recent matches to dispute.',
-      ephemeral: true,
-    });
+    return interaction.reply({ content: 'You have no recent matches to dispute.', ephemeral: true });
   }
 
-  // Build buttons for each match (max 5 per row, max 2 rows = 10 matches)
   const rows = [];
   for (let i = 0; i < recentMatches.length; i += 5) {
     const chunk = recentMatches.slice(i, i + 5);
@@ -72,39 +64,55 @@ async function handleCreateDispute(interaction) {
 }
 
 /**
- * Handle match selection for dispute — create the dispute category and channels.
+ * Handle match selection — show confirmation before creating dispute.
  */
 async function handleDisputeSelect(interaction) {
   const matchId = parseInt(interaction.customId.replace('dispute_select_', ''), 10);
-  if (isNaN(matchId)) {
-    return interaction.reply({ content: 'Invalid match.', ephemeral: true });
-  }
+  if (isNaN(matchId)) return interaction.reply({ content: 'Invalid match.', ephemeral: true });
 
   const match = matchRepo.findById(matchId);
-  if (!match) {
-    return interaction.reply({ content: 'Match not found.', ephemeral: true });
-  }
+  if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
 
-  // Don't allow duplicate disputes
   if (match.status === MATCH_STATUS.DISPUTED) {
     return interaction.reply({ content: 'This match is already being disputed.', ephemeral: true });
   }
 
-  // Verify user is a player in this match
   const discordId = interaction.user.id;
   const user = userRepo.findByDiscordId(discordId);
-  if (!user) {
-    return interaction.reply({ content: 'You must be registered.', ephemeral: true });
-  }
+  if (!user) return interaction.reply({ content: 'You must be registered.', ephemeral: true });
+
   const playerRecord = challengePlayerRepo.findByChallengeAndUser(match.challenge_id, user.id);
-  if (!playerRecord) {
-    return interaction.reply({ content: 'You are not a player in this match.', ephemeral: true });
+  if (!playerRecord) return interaction.reply({ content: 'You are not a player in this match.', ephemeral: true });
+
+  const confirmEmbed = new EmbedBuilder()
+    .setTitle('Confirm Dispute')
+    .setColor(0xe74c3c)
+    .setDescription(`Are you sure you want to dispute **Match #${matchId}**?\n\nThis will create dispute channels and notify staff.`);
+
+  const confirmRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`dispute_confirm_${matchId}`).setLabel('Yes, Dispute').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`dispute_nevermind`).setLabel('Nevermind').setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.update({ embeds: [confirmEmbed], components: [confirmRow] });
+}
+
+/**
+ * Handle confirmed dispute — create dispute channels.
+ */
+async function handleDisputeConfirm(interaction) {
+  const matchId = parseInt(interaction.customId.replace('dispute_confirm_', ''), 10);
+  if (isNaN(matchId)) return interaction.reply({ content: 'Invalid match.', ephemeral: true });
+
+  const match = matchRepo.findById(matchId);
+  if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
+  if (match.status === MATCH_STATUS.DISPUTED) {
+    return interaction.update({ content: 'Already disputed.', embeds: [], components: [] });
   }
 
-  await interaction.deferUpdate();
+  await interaction.update({ content: 'Creating dispute channels...', embeds: [], components: [] });
 
   try {
-    // Mark as disputed
     matchRepo.updateStatus(matchId, MATCH_STATUS.DISPUTED);
     challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.DISPUTED);
 
@@ -113,7 +121,6 @@ async function handleDisputeSelect(interaction) {
     const team1Players = allPlayers.filter(p => p.team === 1);
     const team2Players = allPlayers.filter(p => p.team === 2);
 
-    // Get Discord IDs
     const team1DiscordIds = [];
     const team2DiscordIds = [];
     const allDiscordIds = [];
@@ -129,69 +136,31 @@ async function handleDisputeSelect(interaction) {
 
     const guild = interaction.guild;
 
-    // Create dispute category
     const category = await guild.channels.create({
       name: `Dispute #${matchId}`,
       type: ChannelType.GuildCategory,
       reason: 'Wager bot dispute',
     });
 
-    // Team 1 channels
-    const team1Text = await guild.channels.create({
-      name: 'team-1',
-      type: ChannelType.GuildText,
-      parent: category.id,
-      permissionOverwrites: privateTextOverwrites(guild, team1DiscordIds),
-    });
+    await guild.channels.create({ name: 'team-1', type: ChannelType.GuildText, parent: category.id, permissionOverwrites: privateTextOverwrites(guild, team1DiscordIds, true) });
+    await guild.channels.create({ name: 'Team 1 Voice', type: ChannelType.GuildVoice, parent: category.id, permissionOverwrites: privateVoiceOverwrites(guild, team1DiscordIds, true) });
+    await guild.channels.create({ name: 'team-2', type: ChannelType.GuildText, parent: category.id, permissionOverwrites: privateTextOverwrites(guild, team2DiscordIds, true) });
+    await guild.channels.create({ name: 'Team 2 Voice', type: ChannelType.GuildVoice, parent: category.id, permissionOverwrites: privateVoiceOverwrites(guild, team2DiscordIds, true) });
 
-    const team1Voice = await guild.channels.create({
-      name: 'Team 1 Voice',
-      type: ChannelType.GuildVoice,
-      parent: category.id,
-      permissionOverwrites: privateVoiceOverwrites(guild, team1DiscordIds),
-    });
+    const disputeChat = await guild.channels.create({ name: 'dispute-chat', type: ChannelType.GuildText, parent: category.id, permissionOverwrites: sharedOverwrites(guild, allDiscordIds) });
+    await guild.channels.create({ name: 'Dispute Call', type: ChannelType.GuildVoice, parent: category.id, permissionOverwrites: sharedOverwrites(guild, allDiscordIds) });
 
-    // Team 2 channels
-    const team2Text = await guild.channels.create({
-      name: 'team-2',
-      type: ChannelType.GuildText,
-      parent: category.id,
-      permissionOverwrites: privateTextOverwrites(guild, team2DiscordIds),
-    });
-
-    const team2Voice = await guild.channels.create({
-      name: 'Team 2 Voice',
-      type: ChannelType.GuildVoice,
-      parent: category.id,
-      permissionOverwrites: privateVoiceOverwrites(guild, team2DiscordIds),
-    });
-
-    // Shared channels (both teams + admins)
-    const disputeChat = await guild.channels.create({
-      name: 'dispute-chat',
-      type: ChannelType.GuildText,
-      parent: category.id,
-      permissionOverwrites: sharedOverwrites(guild, allDiscordIds),
-    });
-
-    const disputeVoice = await guild.channels.create({
-      name: 'Dispute Call',
-      type: ChannelType.GuildVoice,
-      parent: category.id,
-      permissionOverwrites: sharedOverwrites(guild, allDiscordIds),
-    });
-
-    // Build match info for the dispute chat
     const modeInfo = GAME_MODES[challenge?.game_modes];
     const modeLabel = modeInfo ? modeInfo.label : (challenge?.game_modes || 'N/A');
     const potText = challenge && Number(challenge.total_pot_usdc) > 0
-      ? `**Pot:** ${formatUsdc(challenge.total_pot_usdc)} USDC`
-      : '';
+      ? `**Pot:** ${formatUsdc(challenge.total_pot_usdc)} USDC` : '';
 
     const adminRoleId = process.env.ADMIN_ROLE_ID;
-    const staffRoleId = process.env.WAGER_STAFF_ROLE_ID;
+    const wagerStaffId = process.env.WAGER_STAFF_ROLE_ID;
+    const xpStaffId = process.env.XP_STAFF_ROLE_ID;
     const rolePings = [];
-    if (staffRoleId) rolePings.push(`<@&${staffRoleId}>`);
+    if (wagerStaffId) rolePings.push(`<@&${wagerStaffId}>`);
+    if (xpStaffId) rolePings.push(`<@&${xpStaffId}>`);
     if (adminRoleId) rolePings.push(`<@&${adminRoleId}>`);
     const staffPing = rolePings.length > 0 ? rolePings.join(' ') : 'Staff';
     const allPings = allDiscordIds.map(id => `<@${id}>`).join(' ');
@@ -200,7 +169,7 @@ async function handleDisputeSelect(interaction) {
       .setTitle(`Dispute — Match #${matchId}`)
       .setColor(0xe74c3c)
       .setDescription([
-        `**Match Details**`,
+        '**Match Details**',
         `Mode: ${modeLabel} | Series: Bo${challenge?.series_length || '?'} | ${challenge?.team_size || '?'}v${challenge?.team_size || '?'}`,
         potText,
         '',
@@ -208,15 +177,11 @@ async function handleDisputeSelect(interaction) {
         `**Team 2:** ${team2DiscordIds.map(id => `<@${id}>`).join(', ')}`,
         '',
         'Submit evidence (screenshots, recordings) in this channel.',
-        'Join the voice call to discuss with admins.',
+        'Join the voice call to discuss with staff.',
       ].join('\n'));
 
-    // Evidence submit button
     const evidenceRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`submit_evidence_${matchId}`)
-        .setLabel('Submit Evidence')
-        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`submit_evidence_${matchId}`).setLabel('Submit Evidence').setStyle(ButtonStyle.Primary),
     );
 
     await disputeChat.send({
@@ -225,47 +190,30 @@ async function handleDisputeSelect(interaction) {
       components: [evidenceRow],
     });
 
-    // Admin resolve panel
     const adminRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`admin_resolve_team1_${matchId}`)
-        .setLabel('Team 1 Wins')
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId(`admin_resolve_team2_${matchId}`)
-        .setLabel('Team 2 Wins')
-        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`admin_resolve_team1_${matchId}`).setLabel('Team 1 Wins').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`admin_resolve_team2_${matchId}`).setLabel('Team 2 Wins').setStyle(ButtonStyle.Danger),
     );
 
-    await disputeChat.send({
-      content: `**Admin Panel** — After reviewing evidence, resolve the dispute:`,
-      components: [adminRow],
-    });
+    await disputeChat.send({ content: '**Staff Panel** — After reviewing evidence, resolve:', components: [adminRow] });
 
-    // Store dispute category ID on the match for cleanup later
     const db = require('../database/db');
     db.prepare('UPDATE matches SET dispute_category_id = ? WHERE id = ?').run(category.id, matchId);
 
-    await interaction.editReply({
+    await interaction.followUp({
       content: `Dispute created for Match #${matchId}. Head to <#${disputeChat.id}>.`,
-      embeds: [],
-      components: [],
+      ephemeral: true,
     });
 
     console.log(`[Dispute] Created dispute category for match #${matchId}`);
   } catch (err) {
     console.error(`[Dispute] Error creating dispute for match #${matchId}:`, err);
-    await interaction.editReply({
-      content: 'Failed to create dispute. Please contact an administrator.',
-      embeds: [],
-      components: [],
-    });
+    await interaction.followUp({ content: 'Failed to create dispute. Contact an administrator.', ephemeral: true });
   }
 }
 
 /**
- * Handle admin "Dispute Handled" — clean up dispute channels after resolution.
- * Called after admin confirms which team wins in matchResult.js.
+ * Clean up dispute channels after resolution.
  */
 async function cleanupDisputeChannels(client, matchId) {
   const match = matchRepo.findById(matchId);
@@ -274,7 +222,6 @@ async function cleanupDisputeChannels(client, matchId) {
   const guild = client.guilds.cache.get(process.env.GUILD_ID) || client.guilds.cache.first();
   if (!guild) return;
 
-  // Delete all channels in the dispute category
   try {
     const category = guild.channels.cache.get(match.dispute_category_id);
     if (category) {
@@ -289,4 +236,4 @@ async function cleanupDisputeChannels(client, matchId) {
   }
 }
 
-module.exports = { handleCreateDispute, handleDisputeSelect, cleanupDisputeChannels };
+module.exports = { handleCreateDispute, handleDisputeSelect, handleDisputeConfirm, cleanupDisputeChannels };
