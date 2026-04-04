@@ -91,7 +91,7 @@ async function buildXpLeaderboardEmbed(region, view = 'alltime') {
     .setFooter({ text: footerText })
     .setTimestamp();
 
-  const row = new ActionRowBuilder().addComponents(
+  const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`xplb_alltime_${region}`)
       .setLabel('All-Time')
@@ -102,7 +102,12 @@ async function buildXpLeaderboardEmbed(region, view = 'alltime') {
       .setStyle(view === 'season' ? ButtonStyle.Primary : ButtonStyle.Secondary),
   );
 
-  return { embeds: [embed], components: [row] };
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('lb_admin_adjust_xp').setLabel('Adjust XP').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('lb_admin_adjust_wl').setLabel('Adjust W/L').setStyle(ButtonStyle.Danger),
+  );
+
+  return { embeds: [embed], components: [row1, row2] };
 }
 
 async function buildEarningsLeaderboardEmbed(region) {
@@ -128,14 +133,18 @@ async function buildEarningsLeaderboardEmbed(region) {
     .setColor(0x57F287)
     .setTimestamp();
 
-  const row = new ActionRowBuilder().addComponents(
+  const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`earnlb_refresh_${region}`)
       .setLabel('Refresh')
       .setStyle(ButtonStyle.Primary),
   );
 
-  return { embeds: [embed], components: [row] };
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('lb_admin_adjust_earnings').setLabel('Adjust Earnings').setStyle(ButtonStyle.Danger),
+  );
+
+  return { embeds: [embed], components: [row1, row2] };
 }
 
 // ─── Post Panels on Startup ─────────────────────────────────────
@@ -204,6 +213,14 @@ async function postAllLeaderboardPanels(client) {
 
 // ─── Refresh Button Handler ──────────────────────────────────────
 
+function isAdmin(member) {
+  const adminRoleId = process.env.ADMIN_ROLE_ID;
+  const staffRoleId = process.env.WAGER_STAFF_ROLE_ID;
+  if (adminRoleId && member.roles.cache.has(adminRoleId)) return true;
+  if (staffRoleId && member.roles.cache.has(staffRoleId)) return true;
+  return false;
+}
+
 async function handleLeaderboardButton(interaction) {
   const id = interaction.customId;
 
@@ -227,6 +244,140 @@ async function handleLeaderboardButton(interaction) {
     const panel = await buildEarningsLeaderboardEmbed(region);
     return interaction.update(panel);
   }
+
+  // Admin: open adjust modal
+  if (id === 'lb_admin_adjust_xp') {
+    if (!isAdmin(interaction.member)) return interaction.reply({ content: 'Admin only.', ephemeral: true });
+    const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+    const modal = new ModalBuilder().setCustomId('lb_admin_xp_modal').setTitle('Adjust User XP');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('target_user_id').setLabel('Discord User ID').setPlaceholder('Right-click user → Copy User ID').setStyle(TextInputStyle.Short).setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('xp_amount').setLabel('XP Amount (positive to add, negative to subtract)').setPlaceholder('e.g. 500 or -200').setStyle(TextInputStyle.Short).setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('reason').setLabel('Reason').setPlaceholder('e.g. Manual correction').setStyle(TextInputStyle.Short).setRequired(true)),
+    );
+    return interaction.showModal(modal);
+  }
+
+  if (id === 'lb_admin_adjust_wl') {
+    if (!isAdmin(interaction.member)) return interaction.reply({ content: 'Admin only.', ephemeral: true });
+    const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+    const modal = new ModalBuilder().setCustomId('lb_admin_wl_modal').setTitle('Adjust Wins/Losses');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('target_user_id').setLabel('Discord User ID').setPlaceholder('Right-click user → Copy User ID').setStyle(TextInputStyle.Short).setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('wins_adjust').setLabel('Wins adjustment (e.g. 1 or -1)').setPlaceholder('0').setStyle(TextInputStyle.Short).setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('losses_adjust').setLabel('Losses adjustment (e.g. 1 or -1)').setPlaceholder('0').setStyle(TextInputStyle.Short).setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('reason').setLabel('Reason').setPlaceholder('e.g. Dispute correction').setStyle(TextInputStyle.Short).setRequired(true)),
+    );
+    return interaction.showModal(modal);
+  }
+
+  if (id === 'lb_admin_adjust_earnings') {
+    if (!isAdmin(interaction.member)) return interaction.reply({ content: 'Admin only.', ephemeral: true });
+    const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+    const modal = new ModalBuilder().setCustomId('lb_admin_earn_modal').setTitle('Adjust Earnings');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('target_user_id').setLabel('Discord User ID').setPlaceholder('Right-click user → Copy User ID').setStyle(TextInputStyle.Short).setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('usdc_amount').setLabel('USDC Amount (e.g. 10.50 or -5.00)').setPlaceholder('e.g. 10.50').setStyle(TextInputStyle.Short).setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('reason').setLabel('Reason').setPlaceholder('e.g. Manual correction').setStyle(TextInputStyle.Short).setRequired(true)),
+    );
+    return interaction.showModal(modal);
+  }
 }
 
-module.exports = { postAllLeaderboardPanels, handleLeaderboardButton };
+/**
+ * Handle admin adjustment modals.
+ */
+async function handleAdminModal(interaction) {
+  const id = interaction.customId;
+
+  if (!isAdmin(interaction.member)) {
+    return interaction.reply({ content: 'Admin only.', ephemeral: true });
+  }
+
+  const { logAdminAction } = require('../utils/adminAudit');
+  const db = require('../database/db');
+
+  if (id === 'lb_admin_xp_modal') {
+    const targetId = interaction.fields.getTextInputValue('target_user_id').trim();
+    const xpAmount = parseInt(interaction.fields.getTextInputValue('xp_amount').trim(), 10);
+    const reason = interaction.fields.getTextInputValue('reason').trim();
+
+    if (isNaN(xpAmount)) return interaction.reply({ content: 'Invalid XP amount.', ephemeral: true });
+
+    const user = userRepo.findByDiscordId(targetId);
+    if (!user) return interaction.reply({ content: `User ${targetId} not found.`, ephemeral: true });
+
+    userRepo.addXp(user.id, xpAmount);
+
+    // Log to xp_history
+    db.prepare('INSERT INTO xp_history (user_id, match_id, match_type, xp_amount, season) VALUES (?, NULL, ?, ?, ?)')
+      .run(user.id, 'admin_adjust', xpAmount, CURRENT_SEASON);
+
+    // Sync to NeatQueue
+    if (neatqueueService.isConfigured()) {
+      neatqueueService.addPoints(targetId, xpAmount).catch(() => {});
+    }
+
+    logAdminAction(interaction.user.id, 'adjust_xp', 'user', user.id, { xpAmount, reason });
+
+    return interaction.reply({
+      content: `**XP adjusted.** <@${targetId}>: ${xpAmount > 0 ? '+' : ''}${xpAmount} XP. Reason: ${reason}`,
+      ephemeral: true,
+    });
+  }
+
+  if (id === 'lb_admin_wl_modal') {
+    const targetId = interaction.fields.getTextInputValue('target_user_id').trim();
+    const winsAdj = parseInt(interaction.fields.getTextInputValue('wins_adjust').trim(), 10);
+    const lossesAdj = parseInt(interaction.fields.getTextInputValue('losses_adjust').trim(), 10);
+    const reason = interaction.fields.getTextInputValue('reason').trim();
+
+    if (isNaN(winsAdj) || isNaN(lossesAdj)) return interaction.reply({ content: 'Invalid numbers.', ephemeral: true });
+
+    const user = userRepo.findByDiscordId(targetId);
+    if (!user) return interaction.reply({ content: `User ${targetId} not found.`, ephemeral: true });
+
+    if (winsAdj !== 0) {
+      db.prepare('UPDATE users SET total_wins = MAX(0, total_wins + ?) WHERE id = ?').run(winsAdj, user.id);
+    }
+    if (lossesAdj !== 0) {
+      db.prepare('UPDATE users SET total_losses = MAX(0, total_losses + ?) WHERE id = ?').run(lossesAdj, user.id);
+    }
+
+    // Sync to NeatQueue
+    if (neatqueueService.isConfigured()) {
+      if (winsAdj > 0) for (let i = 0; i < winsAdj; i++) neatqueueService.addWin(targetId).catch(() => {});
+      if (lossesAdj > 0) for (let i = 0; i < lossesAdj; i++) neatqueueService.addLoss(targetId).catch(() => {});
+    }
+
+    logAdminAction(interaction.user.id, 'adjust_wl', 'user', user.id, { winsAdj, lossesAdj, reason });
+
+    return interaction.reply({
+      content: `**W/L adjusted.** <@${targetId}>: ${winsAdj >= 0 ? '+' : ''}${winsAdj}W, ${lossesAdj >= 0 ? '+' : ''}${lossesAdj}L. Reason: ${reason}`,
+      ephemeral: true,
+    });
+  }
+
+  if (id === 'lb_admin_earn_modal') {
+    const targetId = interaction.fields.getTextInputValue('target_user_id').trim();
+    const usdcAmount = parseFloat(interaction.fields.getTextInputValue('usdc_amount').trim());
+    const reason = interaction.fields.getTextInputValue('reason').trim();
+
+    if (isNaN(usdcAmount)) return interaction.reply({ content: 'Invalid USDC amount.', ephemeral: true });
+
+    const user = userRepo.findByDiscordId(targetId);
+    if (!user) return interaction.reply({ content: `User ${targetId} not found.`, ephemeral: true });
+
+    const amountSmallest = Math.round(usdcAmount * USDC_PER_UNIT);
+    userRepo.addEarnings(user.id, amountSmallest.toString());
+
+    logAdminAction(interaction.user.id, 'adjust_earnings', 'user', user.id, { usdcAmount, reason });
+
+    return interaction.reply({
+      content: `**Earnings adjusted.** <@${targetId}>: ${usdcAmount >= 0 ? '+' : ''}$${usdcAmount.toFixed(2)} USDC. Reason: ${reason}`,
+      ephemeral: true,
+    });
+  }
+}
+
+module.exports = { postAllLeaderboardPanels, handleLeaderboardButton, handleAdminModal };

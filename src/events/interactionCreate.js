@@ -63,8 +63,8 @@ module.exports = {
         if (id.startsWith('wallet_')) {
           return await walletPanel.handleWalletSubButton(interaction);
         }
-        // Leaderboard buttons (all-time, season, refresh)
-        if (id.startsWith('xplb_') || id.startsWith('earnlb_')) {
+        // Leaderboard buttons (all-time, season, refresh, admin)
+        if (id.startsWith('xplb_') || id.startsWith('earnlb_') || id.startsWith('lb_admin_')) {
           return await leaderboardPanel.handleLeaderboardButton(interaction);
         }
         console.warn(`[Interaction] Unhandled button customId: ${id}`);
@@ -89,6 +89,9 @@ module.exports = {
         }
         if (id.startsWith('evidence_modal_')) {
           return await matchResult.handleModal(interaction);
+        }
+        if (id.startsWith('lb_admin_')) {
+          return await leaderboardPanel.handleAdminModal(interaction);
         }
 
         console.warn(`[Interaction] Unhandled modal customId: ${id}`);
