@@ -22,6 +22,21 @@ const MAP_POOLS = {
   CTRL: ['Raid', 'Standoff', 'Crossroads Strike'],
 };
 
+// Estimated duration per map in minutes (for match timers)
+const MAP_DURATION_MINUTES = {
+  HP: 12,
+  'S&D': 18,  // CODM: first to 5 wins, max 9 rounds (~2 min/round)
+  CTRL: 12,
+};
+
+// Match timer settings (in minutes)
+const MATCH_TIMERS = {
+  NO_SHOW: 10,          // Minutes to show up after match creation
+  NO_SHOW_WARNING: 5,   // Extra minutes after no-show alert
+  REPORT_WINDOW: 10,    // Minutes to report after estimated match end
+  REPORT_BUFFER: 30,    // Minutes after estimate + window before auto-dispute
+};
+
 // Mode rotation orders for series
 const MODE_ROTATIONS = {
   hp: (length) => Array(length).fill('HP'),
@@ -151,6 +166,8 @@ const TRANSACTION_TYPE = {
 
 module.exports = {
   MAP_POOLS,
+  MAP_DURATION_MINUTES,
+  MATCH_TIMERS,
   TEAM_SIZES,
   SERIES_LENGTHS,
   GAME_MODES,

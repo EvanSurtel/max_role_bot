@@ -62,30 +62,33 @@ function registerAll(client) {
   });
 
   // --- match_inactivity: referenceId is matchId ---
-  // Fires 24h after match start if no captain reports a result
+  // Fires after estimated match duration + buffer if no result reported
   timerService.registerHandler('match_inactivity', async (matchId) => {
     const match = matchRepo.findById(matchId);
     if (!match) return;
 
-    // Only auto-dispute if still active (no report has been made)
-    if (match.status !== MATCH_STATUS.ACTIVE) {
+    // Only auto-dispute if still active or voting (no final result)
+    if (match.status !== MATCH_STATUS.ACTIVE && match.status !== MATCH_STATUS.VOTING) {
       console.log(`[TimerHandler] match_inactivity: match ${matchId} status is '${match.status}', skipping`);
       return;
     }
 
-    // Auto-dispute
-    matchRepo.updateStatus(matchId, MATCH_STATUS.DISPUTED);
-    challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.DISPUTED);
+    // Auto-dispute via matchResult's triggerDispute
+    const { triggerDispute } = require('../interactions/matchResult');
+    await triggerDispute(client, matchId);
 
     // Notify in shared channel
     if (match.shared_text_id) {
       try {
         const sharedChannel = client.channels.cache.get(match.shared_text_id);
         if (sharedChannel) {
+          const staffRoleId = process.env.WAGER_STAFF_ROLE_ID;
           const adminRoleId = process.env.ADMIN_ROLE_ID;
-          const adminPing = adminRoleId ? `<@&${adminRoleId}>` : 'Admins';
+          const pings = [];
+          if (staffRoleId) pings.push(`<@&${staffRoleId}>`);
+          if (adminRoleId) pings.push(`<@&${adminRoleId}>`);
           await sharedChannel.send(
-            `**Match #${matchId} has been inactive for 24 hours.** No result was reported.\n\n${adminPing} — please review this match.`
+            `**Match #${matchId} timed out.** No result was reported in time.\n\n${pings.join(' ')} — please review this match.`
           );
         }
       } catch (err) {
@@ -93,7 +96,7 @@ function registerAll(client) {
       }
     }
 
-    console.log(`[TimerHandler] match_inactivity: match ${matchId} auto-disputed after 24h inactivity`);
+    console.log(`[TimerHandler] match_inactivity: match ${matchId} auto-disputed after timeout`);
   });
 }
 

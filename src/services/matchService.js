@@ -159,22 +159,41 @@ async function createMatchChannels(client, challenge) {
     votingChannelId: voteChannel.id,
   });
 
-  // Send "Report Win" button in the vote channel
+  // Calculate estimated match duration and post vote panel
   const { EmbedBuilder } = require('discord.js');
+  const { estimateMatchDuration, formatDuration } = require('../utils/matchTimer');
+  const estimatedMinutes = estimateMatchDuration(challenge.game_modes, challenge.series_length);
+
   const reportEmbed = new EmbedBuilder()
     .setTitle(`Match #${match.id} — Report Result`)
     .setColor(0xe67e22)
-    .setDescription(
-      'When the match is over, the winning captain should click **Report Win**.\n\n' +
-      'The other captain will be asked to confirm or dispute the result.',
-    )
-    .setFooter({ text: 'Only team captains can report results.' });
+    .setDescription([
+      `**Estimated match time:** ${formatDuration(estimatedMinutes)}`,
+      '',
+      'When the match is over, **both captains** must report the result.',
+      '',
+      'Click **We Won** if your team won, or **We Lost** if your team lost.',
+      '',
+      '- If both captains agree → match resolved instantly',
+      '- If captains disagree → match goes to dispute',
+      '',
+      `If your opponent doesn't show up within 10 minutes, click **Report No-Show**.`,
+    ].join('\n'))
+    .setFooter({ text: 'Only team captains can report.' });
 
   const reportRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`report_win_${match.id}`)
-      .setLabel('Report Win')
+      .setCustomId(`report_won_${match.id}`)
+      .setLabel('We Won')
       .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`report_lost_${match.id}`)
+      .setLabel('We Lost')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`noshow_report_${match.id}`)
+      .setLabel('Report No-Show')
+      .setStyle(ButtonStyle.Secondary),
   );
 
   await voteChannel.send({
@@ -272,10 +291,12 @@ async function startMatch(client, challengeId) {
   // Update match status to active
   matchRepo.updateStatus(match.id, MATCH_STATUS.ACTIVE);
 
-  // Start 24h inactivity timer
+  // Start inactivity timer based on estimated match duration + buffer
   const timerService = require('./timerService');
-  const { TIMERS } = require('../config/constants');
-  timerService.createTimer('match_inactivity', match.id, TIMERS.MATCH_INACTIVITY);
+  const { getAutoDisputeMs } = require('../utils/matchTimer');
+  const autoDisputeMs = getAutoDisputeMs(challenge.game_modes, challenge.series_length);
+  timerService.createTimer('match_inactivity', match.id, autoDisputeMs);
+  console.log(`[MatchService] Auto-dispute timer set for match #${match.id}: ${Math.round(autoDisputeMs / 60000)} minutes`);
 
   console.log(`[MatchService] Match #${match.id} started for challenge #${challengeId}`);
   return match;

@@ -12,7 +12,7 @@ const challengeRepo = require('../database/repositories/challengeRepo');
 const challengePlayerRepo = require('../database/repositories/challengePlayerRepo');
 const userRepo = require('../database/repositories/userRepo');
 const matchService = require('../services/matchService');
-const { MATCH_STATUS, CHALLENGE_STATUS, TIMERS, PLAYER_ROLE } = require('../config/constants');
+const { MATCH_STATUS, CHALLENGE_STATUS, PLAYER_ROLE } = require('../config/constants');
 
 /**
  * Check if a member has dispute resolution permissions (admin or wager staff).
@@ -25,63 +25,30 @@ function canResolveDisputes(member) {
   return false;
 }
 
-// Track response deadline timers
-const responseTimers = new Map(); // matchId -> timeout handle
-
 /**
  * Handle all match result button interactions.
  */
 async function handleButton(interaction) {
   const id = interaction.customId;
 
-  // Step 1: Captain clicks "Report Win"
-  if (id.startsWith('report_win_')) {
-    return handleReportWin(interaction);
-  }
+  // No-show report
+  if (id.startsWith('noshow_report_')) return handleNoShowReport(interaction);
 
-  // Step 2: Opponent clicks "Accept" (claim is valid)
-  if (id.startsWith('result_accept_')) {
-    return handleAcceptResult(interaction);
-  }
+  // Both captains report: "We Won" or "We Lost"
+  if (id.startsWith('report_won_')) return handleReport(interaction, 'won');
+  if (id.startsWith('report_lost_')) return handleReport(interaction, 'lost');
 
-  // Step 2: Opponent clicks "Dispute"
-  if (id.startsWith('result_dispute_')) {
-    return handleDisputeResult(interaction);
-  }
+  // Dispute
+  if (id.startsWith('submit_evidence_')) return handleSubmitEvidenceButton(interaction);
 
-  // Step 3: Confirmation — "Yes, they won"
-  if (id.startsWith('result_confirm_')) {
-    return handleConfirmResult(interaction);
-  }
-
-  // Step 3: "Go Back" — return to accept/dispute screen
-  if (id.startsWith('result_goback_')) {
-    return handleGoBack(interaction);
-  }
-
-  // Dispute evidence submission button
-  if (id.startsWith('submit_evidence_')) {
-    return handleSubmitEvidenceButton(interaction);
-  }
-
-  // Admin resolve buttons
-  if (id.startsWith('admin_resolve_team1_') || id.startsWith('admin_resolve_team2_')) {
-    return handleAdminResolve(interaction);
-  }
-
-  // Admin confirmation
-  if (id.startsWith('admin_confirm_')) {
-    return handleAdminConfirm(interaction);
-  }
-
-  // Admin go back
-  if (id.startsWith('admin_goback_')) {
-    return handleAdminGoBack(interaction);
-  }
+  // Admin resolve
+  if (id.startsWith('admin_resolve_team1_') || id.startsWith('admin_resolve_team2_')) return handleAdminResolve(interaction);
+  if (id.startsWith('admin_confirm_')) return handleAdminConfirm(interaction);
+  if (id.startsWith('admin_goback_')) return handleAdminGoBack(interaction);
 }
 
 /**
- * Handle modal submissions (evidence, admin).
+ * Handle modal submissions (evidence).
  */
 async function handleModal(interaction) {
   if (interaction.customId.startsWith('evidence_modal_')) {
@@ -89,312 +56,174 @@ async function handleModal(interaction) {
   }
 }
 
-// ─── Step 1: Report Win ──────────────────────────────────────────
+// ─── No-Show Report ──────────────────────────────────────────────
 
-async function handleReportWin(interaction) {
-  const matchId = parseInt(interaction.customId.replace('report_win_', ''), 10);
-  if (isNaN(matchId)) {
-    return interaction.reply({ content: 'Invalid match.', ephemeral: true });
-  }
-
+async function handleNoShowReport(interaction) {
+  const matchId = parseInt(interaction.customId.replace('noshow_report_', ''), 10);
   const match = matchRepo.findById(matchId);
-  if (!match) {
-    return interaction.reply({ content: 'Match not found.', ephemeral: true });
+  if (!match || match.status !== MATCH_STATUS.ACTIVE) {
+    return interaction.reply({ content: 'Match is no longer active.', ephemeral: true });
   }
 
-  if (match.status !== MATCH_STATUS.ACTIVE) {
-    return interaction.reply({ content: 'This match is no longer active.', ephemeral: true });
-  }
-
-  const challenge = challengeRepo.findById(match.challenge_id);
-  if (!challenge) {
-    return interaction.reply({ content: 'Challenge not found.', ephemeral: true });
-  }
-
-  // Verify the user is a captain
-  const discordId = interaction.user.id;
-  const user = userRepo.findByDiscordId(discordId);
-  if (!user) {
-    return interaction.reply({ content: 'You are not registered.', ephemeral: true });
-  }
+  // Verify captain
+  const user = userRepo.findByDiscordId(interaction.user.id);
+  if (!user) return interaction.reply({ content: 'Not registered.', ephemeral: true });
 
   const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
   let reporterTeam = null;
-  for (const player of allPlayers) {
-    if (player.user_id === user.id && player.role === PLAYER_ROLE.CAPTAIN) {
-      reporterTeam = player.team;
+  for (const p of allPlayers) {
+    if (p.user_id === user.id && p.role === PLAYER_ROLE.CAPTAIN) {
+      reporterTeam = p.team;
       break;
     }
   }
+  if (!reporterTeam) {
+    return interaction.reply({ content: 'Only captains can report no-shows.', ephemeral: true });
+  }
 
-  if (reporterTeam === null) {
+  const otherTeam = reporterTeam === 1 ? 2 : 1;
+
+  // Auto-dispute with no-show context — staff resolves
+  matchRepo.updateStatus(matchId, MATCH_STATUS.DISPUTED);
+  challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.DISPUTED);
+
+  await interaction.reply({
+    content: `**No-show reported.** Team ${reporterTeam} claims Team ${otherTeam} did not show up. Staff will review.`,
+  });
+
+  // Ping staff
+  const adminRoleId = process.env.ADMIN_ROLE_ID;
+  const staffRoleId = process.env.WAGER_STAFF_ROLE_ID;
+  const pings = [];
+  if (staffRoleId) pings.push(`<@&${staffRoleId}>`);
+  if (adminRoleId) pings.push(`<@&${adminRoleId}>`);
+
+  const adminRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`admin_resolve_team1_${matchId}`).setLabel('Team 1 Wins').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`admin_resolve_team2_${matchId}`).setLabel('Team 2 Wins').setStyle(ButtonStyle.Danger),
+  );
+
+  if (match.voting_channel_id) {
+    const ch = interaction.client.channels.cache.get(match.voting_channel_id);
+    if (ch) {
+      await ch.send({
+        content: `**No-Show Report** — Team ${reporterTeam} says Team ${otherTeam} didn't show up.\n\n${pings.join(' ')} — please verify and resolve.`,
+        components: [adminRow],
+      });
+    }
+  }
+}
+
+// ─── Both Captains Report (CMG-style) ────────────────────────────
+
+async function handleReport(interaction, outcome) {
+  // customId: report_won_{matchId} or report_lost_{matchId}
+  const matchId = parseInt(interaction.customId.replace(`report_${outcome}_`, ''), 10);
+  if (isNaN(matchId)) return interaction.reply({ content: 'Invalid match.', ephemeral: true });
+
+  const match = matchRepo.findById(matchId);
+  if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
+
+  if (match.status !== MATCH_STATUS.ACTIVE && match.status !== MATCH_STATUS.VOTING) {
+    return interaction.reply({ content: 'This match is no longer accepting reports.', ephemeral: true });
+  }
+
+  // Verify captain
+  const user = userRepo.findByDiscordId(interaction.user.id);
+  if (!user) return interaction.reply({ content: 'Not registered.', ephemeral: true });
+
+  const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
+  let captainTeam = null;
+  for (const p of allPlayers) {
+    if (p.user_id === user.id && p.role === PLAYER_ROLE.CAPTAIN) {
+      captainTeam = p.team;
+      break;
+    }
+  }
+  if (!captainTeam) {
     return interaction.reply({ content: 'Only team captains can report results.', ephemeral: true });
   }
 
-  // Check if someone already reported
-  if (match.captain1_vote !== null || match.captain2_vote !== null) {
-    return interaction.reply({ content: 'A result has already been reported for this match.', ephemeral: true });
+  // Check if this captain already reported
+  if (captainTeam === 1 && match.captain1_vote !== null) {
+    return interaction.reply({ content: 'You already reported. Waiting for the other captain.', ephemeral: true });
+  }
+  if (captainTeam === 2 && match.captain2_vote !== null) {
+    return interaction.reply({ content: 'You already reported. Waiting for the other captain.', ephemeral: true });
   }
 
-  // Record the report: the reporter's team claims they won
-  matchRepo.setCaptainVote(matchId, reporterTeam, reporterTeam);
-  matchRepo.updateStatus(matchId, MATCH_STATUS.VOTING);
+  // Determine what team this captain says won
+  let reportedWinner;
+  if (outcome === 'won') {
+    reportedWinner = captainTeam; // "we won" = my team won
+  } else {
+    reportedWinner = captainTeam === 1 ? 2 : 1; // "we lost" = other team won
+  }
+
+  // Record the vote
+  matchRepo.setCaptainVote(matchId, captainTeam, reportedWinner);
+
+  if (match.status === MATCH_STATUS.ACTIVE) {
+    matchRepo.updateStatus(matchId, MATCH_STATUS.VOTING);
+  }
 
   await interaction.reply({
-    content: `You reported that **Team ${reporterTeam}** won. The other captain has been notified.`,
+    content: `You reported: **${outcome === 'won' ? 'We Won' : 'We Lost'}**. Waiting for the other captain to report.`,
     ephemeral: true,
   });
 
-  // Find the other captain and send them the claim
-  const otherTeam = reporterTeam === 1 ? 2 : 1;
-  let otherCaptainDiscordId = null;
-  for (const player of allPlayers) {
-    if (player.team === otherTeam && player.role === PLAYER_ROLE.CAPTAIN) {
-      const otherUser = userRepo.findById(player.user_id);
-      if (otherUser) otherCaptainDiscordId = otherUser.discord_id;
-      break;
-    }
-  }
+  // Re-fetch to check if both have now reported
+  const updatedMatch = matchRepo.findById(matchId);
+  const c1Vote = captainTeam === 1 ? reportedWinner : updatedMatch.captain1_vote;
+  const c2Vote = captainTeam === 2 ? reportedWinner : updatedMatch.captain2_vote;
 
-  // Send the claim to the voting channel
-  const voteChannel = interaction.client.channels.cache.get(match.voting_channel_id);
-  if (voteChannel) {
-    const claimEmbed = new EmbedBuilder()
-      .setTitle(`Match #${matchId}`)
-      .setColor(0xe67e22)
-      .setDescription(
-        `<@${discordId}> claims **Team ${reporterTeam}** won.\nDo you accept this result?`
-      )
-      .setFooter({ text: 'You have 10 minutes to respond.' });
+  if (c1Vote !== null && c2Vote !== null) {
+    // Both reported
+    if (c1Vote === c2Vote) {
+      // AGREE — same team reported as winner by both
+      const winningTeam = c1Vote;
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`result_accept_${matchId}_${reporterTeam}`)
-        .setLabel('Accept')
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId(`result_dispute_${matchId}`)
-        .setLabel('Dispute')
-        .setStyle(ButtonStyle.Danger),
-    );
-
-    const mention = otherCaptainDiscordId ? `<@${otherCaptainDiscordId}>` : 'Other captain';
-    await voteChannel.send({
-      content: `${mention} — the other captain has reported a result:`,
-      embeds: [claimEmbed],
-      components: [row],
-    });
-  }
-
-  // Start 10-minute response timer — auto-dispute if no response
-  if (!responseTimers.has(matchId)) {
-    const timer = setTimeout(async () => {
-      responseTimers.delete(matchId);
       try {
-        const currentMatch = matchRepo.findById(matchId);
-        if (!currentMatch || currentMatch.status !== MATCH_STATUS.VOTING) return;
-
-        // Auto-dispute
-        await triggerDispute(interaction.client, matchId);
+        const voteChannel = interaction.client.channels.cache.get(match.voting_channel_id);
+        if (voteChannel) {
+          await voteChannel.send({
+            content: `Both captains agree: **Team ${winningTeam} wins!** Resolving match...`,
+          });
+        }
+        await matchService.resolveMatch(interaction.client, matchId, winningTeam);
       } catch (err) {
-        console.error(`[MatchResult] Error handling response timeout for match #${matchId}:`, err);
+        console.error(`[MatchResult] Failed to resolve match #${matchId}:`, err);
       }
-    }, 10 * 60 * 1000); // 10 minutes
+    } else {
+      // DISAGREE — dispute
+      await triggerDispute(interaction.client, matchId);
 
-    responseTimers.set(matchId, timer);
-  }
-}
-
-// ─── Step 2: Accept ──────────────────────────────────────────────
-
-async function handleAcceptResult(interaction) {
-  // customId: result_accept_{matchId}_{winningTeam}
-  const parts = interaction.customId.replace('result_accept_', '').split('_');
-  const matchId = parseInt(parts[0], 10);
-  const winningTeam = parseInt(parts[1], 10);
-
-  const match = matchRepo.findById(matchId);
-  if (!match || match.status !== MATCH_STATUS.VOTING) {
-    return interaction.reply({ content: 'This match is no longer accepting responses.', ephemeral: true });
-  }
-
-  // Verify this is the OTHER captain (not the one who reported)
-  const discordId = interaction.user.id;
-  const user = userRepo.findByDiscordId(discordId);
-  if (!user) {
-    return interaction.reply({ content: 'You are not registered.', ephemeral: true });
-  }
-
-  const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
-  let responderTeam = null;
-  for (const player of allPlayers) {
-    if (player.user_id === user.id && player.role === PLAYER_ROLE.CAPTAIN) {
-      responderTeam = player.team;
-      break;
-    }
-  }
-
-  if (responderTeam === null) {
-    return interaction.reply({ content: 'Only team captains can respond.', ephemeral: true });
-  }
-
-  if (responderTeam === winningTeam) {
-    return interaction.reply({ content: 'You reported this win — waiting for the other captain to respond.', ephemeral: true });
-  }
-
-  // Show confirmation screen
-  const { formatUsdc } = require('../utils/embeds');
-  const challenge = challengeRepo.findById(match.challenge_id);
-  const potText = challenge && Number(challenge.total_pot_usdc) > 0
-    ? `\n\nYour team will **lose** and forfeit the pot of **${formatUsdc(challenge.total_pot_usdc)} USDC**. This cannot be undone.`
-    : '\n\nThis cannot be undone.';
-
-  const confirmEmbed = new EmbedBuilder()
-    .setTitle('Are you sure?')
-    .setColor(0xe74c3c)
-    .setDescription(
-      `You are confirming that **Team ${winningTeam}** won this match.${potText}`
-    );
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`result_confirm_${matchId}_${winningTeam}`)
-      .setLabel('Yes, they won')
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId(`result_goback_${matchId}_${winningTeam}`)
-      .setLabel('Go Back')
-      .setStyle(ButtonStyle.Secondary),
-  );
-
-  return interaction.update({
-    content: '',
-    embeds: [confirmEmbed],
-    components: [row],
-  });
-}
-
-// ─── Step 3: Confirm ─────────────────────────────────────────────
-
-async function handleConfirmResult(interaction) {
-  const parts = interaction.customId.replace('result_confirm_', '').split('_');
-  const matchId = parseInt(parts[0], 10);
-  const winningTeam = parseInt(parts[1], 10);
-
-  const match = matchRepo.findById(matchId);
-  if (!match || match.status !== MATCH_STATUS.VOTING) {
-    return interaction.reply({ content: 'This match is no longer accepting responses.', ephemeral: true });
-  }
-
-  // Clear the response timer
-  const existingTimer = responseTimers.get(matchId);
-  if (existingTimer) {
-    clearTimeout(existingTimer);
-    responseTimers.delete(matchId);
-  }
-
-  await interaction.update({
-    content: `**Match #${matchId} confirmed.** Team ${winningTeam} wins! Paying out...`,
-    embeds: [],
-    components: [],
-  });
-
-  // Resolve the match
-  try {
-    await matchService.resolveMatch(interaction.client, matchId, winningTeam);
-
-    // Notify in shared channel
-    if (match.shared_text_id) {
-      const sharedChannel = interaction.client.channels.cache.get(match.shared_text_id);
-      if (sharedChannel) {
-        await sharedChannel.send({
-          content: `Both captains agree: **Team ${winningTeam} wins!** Match resolved and payouts sent.`,
+      const voteChannel = interaction.client.channels.cache.get(match.voting_channel_id);
+      if (voteChannel) {
+        await voteChannel.send({
+          content: `**Captains disagree!** Team 1 says Team ${c1Vote} won, Team 2 says Team ${c2Vote} won. Match is now **disputed**.`,
         });
       }
     }
-  } catch (err) {
-    console.error(`[MatchResult] Failed to resolve match #${matchId}:`, err);
   }
-}
-
-// ─── Go Back ─────────────────────────────────────────────────────
-
-async function handleGoBack(interaction) {
-  const parts = interaction.customId.replace('result_goback_', '').split('_');
-  const matchId = parseInt(parts[0], 10);
-  const winningTeam = parseInt(parts[1], 10);
-
-  const match = matchRepo.findById(matchId);
-  if (!match || match.status !== MATCH_STATUS.VOTING) {
-    return interaction.reply({ content: 'This match is no longer accepting responses.', ephemeral: true });
-  }
-
-  // Return to accept/dispute screen
-  const claimEmbed = new EmbedBuilder()
-    .setTitle(`Match #${matchId}`)
-    .setColor(0xe67e22)
-    .setDescription(`The other captain claims **Team ${winningTeam}** won.\nDo you accept this result?`)
-    .setFooter({ text: 'You have 10 minutes to respond.' });
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`result_accept_${matchId}_${winningTeam}`)
-      .setLabel('Accept')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId(`result_dispute_${matchId}`)
-      .setLabel('Dispute')
-      .setStyle(ButtonStyle.Danger),
-  );
-
-  return interaction.update({
-    embeds: [claimEmbed],
-    components: [row],
-  });
 }
 
 // ─── Dispute ─────────────────────────────────────────────────────
 
-async function handleDisputeResult(interaction) {
-  const matchId = parseInt(interaction.customId.replace('result_dispute_', ''), 10);
-
-  const match = matchRepo.findById(matchId);
-  if (!match || match.status !== MATCH_STATUS.VOTING) {
-    return interaction.reply({ content: 'This match is no longer accepting responses.', ephemeral: true });
-  }
-
-  // Clear the response timer
-  const existingTimer = responseTimers.get(matchId);
-  if (existingTimer) {
-    clearTimeout(existingTimer);
-    responseTimers.delete(matchId);
-  }
-
-  await interaction.update({
-    content: `**Match #${matchId}** has been disputed. Both teams have been notified to submit evidence.`,
-    embeds: [],
-    components: [],
-  });
-
-  await triggerDispute(interaction.client, matchId);
-}
-
 /**
- * Trigger dispute — mark match as disputed, create dispute text + voice channels,
- * ping both teams and admins.
+ * Trigger dispute — mark match as disputed, create dispute channels.
  */
 async function triggerDispute(client, matchId) {
   const match = matchRepo.findById(matchId);
   if (!match) return;
 
-  const challenge = challengeRepo.findById(match.challenge_id);
-  if (!challenge) return;
-
-  // Prevent duplicate dispute channel creation
   if (match.status === MATCH_STATUS.DISPUTED) {
     console.log(`[MatchResult] Match #${matchId} already disputed, skipping`);
     return;
   }
+
+  const challenge = challengeRepo.findById(match.challenge_id);
+  if (!challenge) return;
 
   matchRepo.updateStatus(matchId, MATCH_STATUS.DISPUTED);
   challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.DISPUTED);
@@ -409,39 +238,30 @@ async function triggerDispute(client, matchId) {
 
   // Create dispute channels in the match category
   let disputeText = null;
-  let disputeVoice = null;
-
   try {
     const guild = client.guilds.cache.get(process.env.GUILD_ID) || client.guilds.cache.first();
     if (guild && match.category_id) {
       const { ChannelType } = require('discord.js');
       const { sharedOverwrites } = require('../utils/permissions');
 
-      // Dispute text channel — both teams + admins can see
       disputeText = await guild.channels.create({
         name: 'dispute',
         type: ChannelType.GuildText,
         parent: match.category_id,
         permissionOverwrites: sharedOverwrites(guild, allDiscordIds),
-        reason: 'Wager bot dispute channel',
       });
 
-      // Dispute voice channel — for live call between teams + admin
-      disputeVoice = await guild.channels.create({
+      await guild.channels.create({
         name: 'Dispute Call',
         type: ChannelType.GuildVoice,
         parent: match.category_id,
         permissionOverwrites: sharedOverwrites(guild, allDiscordIds),
-        reason: 'Wager bot dispute voice channel',
       });
-
-      console.log(`[MatchResult] Created dispute channels for match #${matchId}`);
     }
   } catch (err) {
-    console.error(`[MatchResult] Failed to create dispute channels for match #${matchId}:`, err.message);
+    console.error(`[MatchResult] Failed to create dispute channels:`, err.message);
   }
 
-  // Send dispute notification in the dispute text channel (or shared channel as fallback)
   const notifyChannel = disputeText || (match.shared_text_id ? client.channels.cache.get(match.shared_text_id) : null);
 
   if (notifyChannel) {
@@ -454,83 +274,40 @@ async function triggerDispute(client, matchId) {
     const allPings = allDiscordIds.map(id => `<@${id}>`).join(' ');
 
     const evidenceRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`submit_evidence_${matchId}`)
-        .setLabel('Submit Evidence')
-        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`submit_evidence_${matchId}`).setLabel('Submit Evidence').setStyle(ButtonStyle.Primary),
     );
 
     await notifyChannel.send({
-      content: [
-        '**Match Disputed!**',
-        '',
-        `${allPings}`,
-        '',
-        'Both teams — submit evidence (screenshots, video links) using the button below or discuss in the voice call.',
-        '',
-        `${staffPing} — please join the dispute call and review evidence to resolve this.`,
-      ].join('\n'),
+      content: `**Match Disputed!**\n\n${allPings}\n\nBoth teams — submit evidence using the button below or discuss in the voice call.\n\n${staffPing} — please review and resolve.`,
       components: [evidenceRow],
     });
 
-    // Admin resolve buttons
     const adminRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`admin_resolve_team1_${matchId}`)
-        .setLabel('Team 1 Wins')
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId(`admin_resolve_team2_${matchId}`)
-        .setLabel('Team 2 Wins')
-        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`admin_resolve_team1_${matchId}`).setLabel('Team 1 Wins').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`admin_resolve_team2_${matchId}`).setLabel('Team 2 Wins').setStyle(ButtonStyle.Danger),
     );
 
-    await notifyChannel.send({
-      content: '**Admin Panel** — After reviewing evidence, resolve the dispute:',
-      components: [adminRow],
-    });
-  }
-
-  // Also notify in shared channel if dispute channel was created separately
-  if (disputeText && match.shared_text_id) {
-    const sharedChannel = client.channels.cache.get(match.shared_text_id);
-    if (sharedChannel) {
-      await sharedChannel.send({
-        content: `**Match #${matchId} is now disputed.** Head to <#${disputeText.id}> to submit evidence and discuss.`,
-      });
-    }
+    await notifyChannel.send({ content: '**Staff Panel** — After reviewing evidence, resolve:', components: [adminRow] });
   }
 
   console.log(`[MatchResult] Match #${matchId} disputed`);
 }
 
-// ─── Evidence Submission ─────────────────────────────────────────
+// ─── Evidence ────────────────────────────────────────────────────
 
 async function handleSubmitEvidenceButton(interaction) {
   const matchId = parseInt(interaction.customId.replace('submit_evidence_', ''), 10);
-
   const modal = new ModalBuilder()
     .setCustomId(`evidence_modal_${matchId}`)
     .setTitle('Submit Dispute Evidence');
 
-  const linkInput = new TextInputBuilder()
-    .setCustomId('evidence_link')
-    .setLabel('Link to evidence (screenshot/video)')
-    .setPlaceholder('https://...')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
-
-  const notesInput = new TextInputBuilder()
-    .setCustomId('evidence_notes')
-    .setLabel('Additional notes (optional)')
-    .setPlaceholder('Explain what happened...')
-    .setStyle(TextInputStyle.Paragraph)
-    .setRequired(false)
-    .setMaxLength(500);
-
   modal.addComponents(
-    new ActionRowBuilder().addComponents(linkInput),
-    new ActionRowBuilder().addComponents(notesInput),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('evidence_link').setLabel('Link to evidence (screenshot/video)').setPlaceholder('https://...').setStyle(TextInputStyle.Short).setRequired(true),
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('evidence_notes').setLabel('Additional notes (optional)').setPlaceholder('Explain what happened...').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(500),
+    ),
   );
 
   return interaction.showModal(modal);
@@ -542,46 +319,33 @@ async function handleEvidenceSubmission(interaction) {
   const notes = interaction.fields.getTextInputValue('evidence_notes')?.trim() || '';
 
   const match = matchRepo.findById(matchId);
-  if (!match) {
-    return interaction.reply({ content: 'Match not found.', ephemeral: true });
-  }
+  if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
 
-  // Store evidence in DB first (persists after channels deleted)
   try {
     const evidenceRepo = require('../database/repositories/evidenceRepo');
     evidenceRepo.create(matchId, interaction.user.id, link, notes);
   } catch (err) {
-    console.error(`[MatchResult] Failed to store evidence for match #${matchId}:`, err.message);
+    console.error(`[MatchResult] Failed to store evidence:`, err.message);
   }
 
-  await interaction.reply({
-    content: 'Your evidence has been submitted. An admin will review it.',
-    ephemeral: true,
-  });
+  await interaction.reply({ content: 'Your evidence has been submitted.', ephemeral: true });
 
-  // Post the evidence in the voting channel for admin review
   if (match.voting_channel_id) {
     const voteChannel = interaction.client.channels.cache.get(match.voting_channel_id);
     if (voteChannel) {
-      const evidenceEmbed = new EmbedBuilder()
+      const embed = new EmbedBuilder()
         .setTitle('Evidence Submitted')
         .setColor(0x3498db)
         .setDescription(`**From:** <@${interaction.user.id}>`)
-        .addFields(
-          { name: 'Link', value: link },
-        )
+        .addFields({ name: 'Link', value: link })
         .setTimestamp();
-
-      if (notes) {
-        evidenceEmbed.addFields({ name: 'Notes', value: notes });
-      }
-
-      await voteChannel.send({ embeds: [evidenceEmbed] });
+      if (notes) embed.addFields({ name: 'Notes', value: notes });
+      await voteChannel.send({ embeds: [embed] });
     }
   }
 }
 
-// ─── Admin Resolve ───────────────────────────────────────────────
+// ─── Admin/Staff Resolve ─────────────────────────────────────────
 
 async function handleAdminResolve(interaction) {
   const id = interaction.customId;
@@ -599,29 +363,24 @@ async function handleAdminResolve(interaction) {
     matchId = parseInt(id.replace('admin_resolve_team2_', ''), 10);
   }
 
-  if (isNaN(matchId)) {
-    return interaction.reply({ content: 'Invalid match.', ephemeral: true });
-  }
+  if (isNaN(matchId)) return interaction.reply({ content: 'Invalid match.', ephemeral: true });
 
   const match = matchRepo.findById(matchId);
   if (!match || match.status !== MATCH_STATUS.DISPUTED) {
     return interaction.reply({ content: 'This match is not in a disputed state.', ephemeral: true });
   }
 
-  // Build team rosters for confirmation
+  // Show confirmation with team rosters
   const { formatUsdc } = require('../utils/embeds');
   const challenge = challengeRepo.findById(match.challenge_id);
   const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
 
-  const winningPlayers = allPlayers.filter(p => p.team === winningTeam);
   const losingTeam = winningTeam === 1 ? 2 : 1;
-  const losingPlayers = allPlayers.filter(p => p.team === losingTeam);
-
-  const winnerNames = winningPlayers.map(p => {
+  const winnerNames = allPlayers.filter(p => p.team === winningTeam).map(p => {
     const u = userRepo.findById(p.user_id);
     return u ? `<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''}` : 'Unknown';
   });
-  const loserNames = losingPlayers.map(p => {
+  const loserNames = allPlayers.filter(p => p.team === losingTeam).map(p => {
     const u = userRepo.findById(p.user_id);
     return u ? `<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''}` : 'Unknown';
   });
@@ -635,32 +394,17 @@ async function handleAdminResolve(interaction) {
     .setColor(0xe74c3c)
     .setDescription([
       `You are awarding the win to **Team ${winningTeam}**.`,
-      '',
-      `**Winners (Team ${winningTeam}):**`,
-      ...winnerNames,
-      '',
-      `**Losers (Team ${losingTeam}):**`,
-      ...loserNames,
-      potText,
-      '',
-      '**This cannot be undone.**',
+      '', `**Winners (Team ${winningTeam}):**`, ...winnerNames,
+      '', `**Losers (Team ${losingTeam}):**`, ...loserNames,
+      potText, '', '**This cannot be undone.**',
     ].join('\n'));
 
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`admin_confirm_${matchId}_${winningTeam}`)
-      .setLabel(`Confirm Team ${winningTeam} Wins`)
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId(`admin_goback_${matchId}`)
-      .setLabel('Go Back')
-      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`admin_confirm_${matchId}_${winningTeam}`).setLabel(`Confirm Team ${winningTeam} Wins`).setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`admin_goback_${matchId}`).setLabel('Go Back').setStyle(ButtonStyle.Secondary),
   );
 
-  return interaction.update({
-    embeds: [confirmEmbed],
-    components: [row],
-  });
+  return interaction.update({ embeds: [confirmEmbed], components: [row] });
 }
 
 async function handleAdminConfirm(interaction) {
@@ -672,26 +416,20 @@ async function handleAdminConfirm(interaction) {
     return interaction.reply({ content: 'Only admins and wager staff can resolve disputes.', ephemeral: true });
   }
 
-  // Log staff action
   const { logAdminAction } = require('../utils/adminAudit');
   logAdminAction(interaction.user.id, 'resolve_dispute', 'match', matchId, { winningTeam });
 
   await interaction.update({
     content: `<@${interaction.user.id}> resolved the dispute. **Team ${winningTeam} wins!** Paying out...`,
-    embeds: [],
-    components: [],
+    embeds: [], components: [],
   });
 
   try {
     await matchService.resolveMatch(interaction.client, matchId, winningTeam);
-
-    // Clean up dispute channels after a delay
     const { cleanupDisputeChannels } = require('./disputeCreate');
     setTimeout(() => {
-      cleanupDisputeChannels(interaction.client, matchId).catch(err => {
-        console.error(`[MatchResult] Failed to clean up dispute channels:`, err.message);
-      });
-    }, 30000); // 30 seconds to read the result
+      cleanupDisputeChannels(interaction.client, matchId).catch(() => {});
+    }, 30000);
   } catch (err) {
     console.error(`[MatchResult] Admin resolve failed for match #${matchId}:`, err);
   }
@@ -699,23 +437,11 @@ async function handleAdminConfirm(interaction) {
 
 async function handleAdminGoBack(interaction) {
   const matchId = parseInt(interaction.customId.replace('admin_goback_', ''), 10);
-
   const adminRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`admin_resolve_team1_${matchId}`)
-      .setLabel('Team 1 Wins')
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId(`admin_resolve_team2_${matchId}`)
-      .setLabel('Team 2 Wins')
-      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`admin_resolve_team1_${matchId}`).setLabel('Team 1 Wins').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`admin_resolve_team2_${matchId}`).setLabel('Team 2 Wins').setStyle(ButtonStyle.Danger),
   );
-
-  return interaction.update({
-    content: '**Admin Panel** — Review evidence submitted below, then resolve:',
-    embeds: [],
-    components: [adminRow],
-  });
+  return interaction.update({ content: '**Staff Panel** — Review evidence, then resolve:', embeds: [], components: [adminRow] });
 }
 
-module.exports = { handleButton, handleModal };
+module.exports = { handleButton, handleModal, triggerDispute };

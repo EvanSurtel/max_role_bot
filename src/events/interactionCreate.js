@@ -40,10 +40,11 @@ module.exports = {
         if (id.startsWith('teammate_')) {
           return await teammateResponse.handleButton(interaction);
         }
-        // Match result flow (report win, accept, confirm, dispute, evidence, admin)
-        if (id.startsWith('report_win_') || id.startsWith('result_') ||
-            id.startsWith('submit_evidence_') || id.startsWith('admin_resolve_') ||
-            id.startsWith('admin_confirm_') || id.startsWith('admin_goback_')) {
+        // Match result flow (report won/lost, no-show, evidence, admin)
+        if (id.startsWith('report_won_') || id.startsWith('report_lost_') ||
+            id.startsWith('noshow_report_') || id.startsWith('submit_evidence_') ||
+            id.startsWith('admin_resolve_') || id.startsWith('admin_confirm_') ||
+            id.startsWith('admin_goback_')) {
           return await matchResult.handleButton(interaction);
         }
         // Create Dispute button from lobby
