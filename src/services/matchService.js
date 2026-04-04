@@ -6,8 +6,9 @@ const userRepo = require('../database/repositories/userRepo');
 const escrowManager = require('../solana/escrowManager');
 const { privateTextOverwrites, privateVoiceOverwrites, votingChannelOverwrites, sharedOverwrites } = require('../utils/permissions');
 const { formatUsdc } = require('../utils/embeds');
-const { MATCH_STATUS, CHALLENGE_STATUS, CHALLENGE_TYPE, CURRENT_SEASON, PLAYER_ROLE } = require('../config/constants');
+const { MATCH_STATUS, CHALLENGE_STATUS, CHALLENGE_TYPE, PLAYER_ROLE } = require('../config/constants');
 const { calculateXpMatchRewards, calculateWagerXpRewards } = require('../utils/xpCalculator');
+const { getCurrentSeason } = require('../panels/leaderboardPanel');
 const neatqueueService = require('./neatqueueService');
 
 /**
@@ -395,7 +396,7 @@ async function resolveMatch(client, matchId, winningTeam) {
     try {
       userRepo.addXp(player.user_id, winXp);
       userRepo.addWin(player.user_id);
-      insertXpHistory.run(player.user_id, matchId, challenge.type, winXp, CURRENT_SEASON);
+      insertXpHistory.run(player.user_id, matchId, challenge.type, winXp, getCurrentSeason());
       if (isWagerMatch) {
         userRepo.addEarnings(player.user_id, perPlayerEarnings);
         userRepo.addWagered(player.user_id, challenge.entry_amount_usdc);
@@ -423,7 +424,7 @@ async function resolveMatch(client, matchId, winningTeam) {
     try {
       if (loseXp > 0) {
         userRepo.addXp(player.user_id, -loseXp);
-        insertXpHistory.run(player.user_id, matchId, challenge.type, -loseXp, CURRENT_SEASON);
+        insertXpHistory.run(player.user_id, matchId, challenge.type, -loseXp, getCurrentSeason());
       }
       userRepo.addLoss(player.user_id);
       if (isWagerMatch) {

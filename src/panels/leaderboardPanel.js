@@ -1,7 +1,36 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const userRepo = require('../database/repositories/userRepo');
 const neatqueueService = require('../services/neatqueueService');
-const { USDC_PER_UNIT, CURRENT_SEASON } = require('../config/constants');
+const { USDC_PER_UNIT } = require('../config/constants');
+
+// Season stored in DB so it can be changed from Discord without restarting
+let currentSeason = null;
+
+function getCurrentSeason() {
+  if (currentSeason) return currentSeason;
+  try {
+    const db = require('../database/db');
+    const row = db.prepare("SELECT value FROM bot_settings WHERE key = 'current_season'").get();
+    if (row) {
+      currentSeason = row.value;
+      return currentSeason;
+    }
+  } catch { /* table may not exist yet */ }
+  currentSeason = process.env.CURRENT_SEASON || '2026-S1';
+  return currentSeason;
+}
+
+function setCurrentSeason(season) {
+  currentSeason = season;
+  const db = require('../database/db');
+  try {
+    db.prepare("INSERT OR REPLACE INTO bot_settings (key, value) VALUES ('current_season', ?)").run(season);
+  } catch {
+    // Table might not exist, create it
+    db.prepare('CREATE TABLE IF NOT EXISTS bot_settings (key TEXT PRIMARY KEY, value TEXT)').run();
+    db.prepare("INSERT OR REPLACE INTO bot_settings (key, value) VALUES ('current_season', ?)").run(season);
+  }
+}
 
 const REGIONS = ['global', 'na', 'latam', 'eu', 'asia'];
 const REGION_LABELS = { global: 'Global', na: 'NA', latam: 'LATAM', eu: 'EU', asia: 'Asia' };
@@ -35,8 +64,8 @@ async function buildXpLeaderboardEmbed(region, view = 'alltime') {
 
   if (view === 'season') {
     // Season view — sum xp_history for current season
-    title = `${REGION_LABELS[region]} XP — Season ${CURRENT_SEASON}`;
-    footerText = `Season ${CURRENT_SEASON}`;
+    title = `${REGION_LABELS[region]} XP — Season ${getCurrentSeason()}`;
+    footerText = `Season ${getCurrentSeason()}`;
 
     const rows = db.prepare(`
       SELECT u.discord_id, u.cod_ign, u.total_wins, u.total_losses,
@@ -48,7 +77,7 @@ async function buildXpLeaderboardEmbed(region, view = 'alltime') {
       HAVING season_xp > 0
       ORDER BY season_xp DESC
       LIMIT 10
-    `).all(CURRENT_SEASON, ...regionParams);
+    `).all(getCurrentSeason(), ...regionParams);
 
     entries = rows.map(r => ({
       discord_id: r.discord_id,
@@ -98,13 +127,14 @@ async function buildXpLeaderboardEmbed(region, view = 'alltime') {
       .setStyle(view === 'alltime' ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(`xplb_season_${region}`)
-      .setLabel(`Season ${CURRENT_SEASON}`)
+      .setLabel(`Season ${getCurrentSeason()}`)
       .setStyle(view === 'season' ? ButtonStyle.Primary : ButtonStyle.Secondary),
   );
 
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('lb_admin_adjust_xp').setLabel('Adjust XP').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('lb_admin_adjust_wl').setLabel('Adjust W/L').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('lb_admin_change_season').setLabel('Change Season').setStyle(ButtonStyle.Danger),
   );
 
   return { embeds: [embed], components: [row1, row2] };
@@ -271,6 +301,18 @@ async function handleLeaderboardButton(interaction) {
     return interaction.showModal(modal);
   }
 
+  if (id === 'lb_admin_change_season') {
+    if (!isAdmin(interaction.member)) return interaction.reply({ content: 'Admin only.', ephemeral: true });
+    const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+    const modal = new ModalBuilder().setCustomId('lb_admin_season_modal').setTitle('Change Season');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId('new_season').setLabel(`Current: ${getCurrentSeason()}. Enter new season ID`).setPlaceholder('e.g. 2026-S2').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(1).setMaxLength(20),
+      ),
+    );
+    return interaction.showModal(modal);
+  }
+
   if (id === 'lb_admin_adjust_earnings') {
     if (!isAdmin(interaction.member)) return interaction.reply({ content: 'Admin only.', ephemeral: true });
     const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
@@ -311,7 +353,7 @@ async function handleAdminModal(interaction) {
 
     // Log to xp_history
     db.prepare('INSERT INTO xp_history (user_id, match_id, match_type, xp_amount, season) VALUES (?, NULL, ?, ?, ?)')
-      .run(user.id, 'admin_adjust', xpAmount, CURRENT_SEASON);
+      .run(user.id, 'admin_adjust', xpAmount, getCurrentSeason());
 
     // Sync to NeatQueue
     if (neatqueueService.isConfigured()) {
@@ -358,6 +400,18 @@ async function handleAdminModal(interaction) {
     });
   }
 
+  if (id === 'lb_admin_season_modal') {
+    const newSeason = interaction.fields.getTextInputValue('new_season').trim();
+    const oldSeason = getCurrentSeason();
+    setCurrentSeason(newSeason);
+    logAdminAction(interaction.user.id, 'change_season', 'system', 0, { oldSeason, newSeason });
+
+    return interaction.reply({
+      content: `**Season changed:** ${oldSeason} → **${newSeason}**\n\nAll new XP will be tracked under ${newSeason}. Old season data is preserved.`,
+      ephemeral: true,
+    });
+  }
+
   if (id === 'lb_admin_earn_modal') {
     const targetId = interaction.fields.getTextInputValue('target_user_id').trim();
     const usdcAmount = parseFloat(interaction.fields.getTextInputValue('usdc_amount').trim());
@@ -380,4 +434,4 @@ async function handleAdminModal(interaction) {
   }
 }
 
-module.exports = { postAllLeaderboardPanels, handleLeaderboardButton, handleAdminModal };
+module.exports = { postAllLeaderboardPanels, handleLeaderboardButton, handleAdminModal, getCurrentSeason };

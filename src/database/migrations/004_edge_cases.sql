@@ -45,6 +45,12 @@ ALTER TABLE wallets ADD COLUMN encryption_salt TEXT;
 -- Dispute category tracking
 ALTER TABLE matches ADD COLUMN dispute_category_id TEXT;
 
+-- Bot settings (key-value store for runtime config like seasons)
+CREATE TABLE IF NOT EXISTS bot_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
+
 -- XP history for season leaderboards
 CREATE TABLE IF NOT EXISTS xp_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
