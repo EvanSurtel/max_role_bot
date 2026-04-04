@@ -1,4 +1,4 @@
-const { ActionRowBuilder, UserSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ActionRowBuilder, UserSelectMenuBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const challengeRepo = require('../database/repositories/challengeRepo');
 const challengePlayerRepo = require('../database/repositories/challengePlayerRepo');
 const userRepo = require('../database/repositories/userRepo');
@@ -59,6 +59,66 @@ async function handleButton(interaction) {
   if (challenge.creator_user_id === user.id) {
     return interaction.reply({ content: 'You cannot accept your own challenge.', ephemeral: true });
   }
+
+  // Show confirmation before accepting
+  const { GAME_MODES } = require('../config/constants');
+  const modeInfo = GAME_MODES[challenge.game_modes];
+  const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
+  const entryText = isWager ? `\n**Entry:** ${formatUsdc(entryUsdc)} USDC per player` : '';
+
+  const confirmEmbed = new EmbedBuilder()
+    .setTitle('Confirm Accept')
+    .setColor(0xe67e22)
+    .setDescription([
+      `You are about to accept **Challenge #${challengeId}**`,
+      '',
+      `**Type:** ${isWager ? 'Wager' : 'XP Match'}`,
+      `**Team Size:** ${challenge.team_size}v${challenge.team_size}`,
+      `**Mode:** ${modeLabel}`,
+      `**Series:** Best of ${challenge.series_length}`,
+      entryText,
+      '',
+      isWager ? `Your **${formatUsdc(entryUsdc)} USDC** will be held from your wallet.` : '',
+      '',
+      'Are you sure?',
+    ].join('\n'));
+
+  const confirmRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`challenge_confirm_${challengeId}`)
+      .setLabel('Yes, Accept')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`challenge_nevermind_${challengeId}`)
+      .setLabel('Nevermind')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
+}
+
+/**
+ * Handle the confirmed acceptance after the user clicks "Yes, Accept".
+ */
+async function handleConfirmedAccept(interaction) {
+  const challengeId = parseInt(interaction.customId.replace('challenge_confirm_', ''), 10);
+  if (isNaN(challengeId)) {
+    return interaction.reply({ content: 'Invalid challenge.', ephemeral: true });
+  }
+
+  const challenge = challengeRepo.findById(challengeId);
+  if (!challenge || challenge.status !== CHALLENGE_STATUS.OPEN) {
+    return interaction.reply({ content: 'This challenge is no longer available.', ephemeral: true });
+  }
+
+  const discordId = interaction.user.id;
+  const user = userRepo.findByDiscordId(discordId);
+  if (!user || !user.cod_uid) {
+    return interaction.reply({ content: 'Registration required.', ephemeral: true });
+  }
+
+  const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+  const entryUsdc = challenge.entry_amount_usdc;
 
   // 1v1 challenges — immediate acceptance
   if (challenge.team_size === 1) {
@@ -493,4 +553,4 @@ async function disableBoardMessage(client, challenge) {
   }
 }
 
-module.exports = { handleButton, handleUserSelect };
+module.exports = { handleButton, handleConfirmedAccept, handleUserSelect };

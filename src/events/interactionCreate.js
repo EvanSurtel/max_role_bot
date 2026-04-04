@@ -21,8 +21,16 @@ module.exports = {
           return await challengeCreate.handleButton(interaction);
         }
         // Challenge board accept button
-        if (id.startsWith('challenge_accept')) {
+        if (id.startsWith('challenge_accept_')) {
           return await challengeAccept.handleButton(interaction);
+        }
+        // Challenge accept confirmation
+        if (id.startsWith('challenge_confirm_')) {
+          return await challengeAccept.handleConfirmedAccept(interaction);
+        }
+        // Challenge nevermind (cancel confirmation)
+        if (id.startsWith('challenge_nevermind_')) {
+          return interaction.update({ content: 'No problem. Challenge not accepted.', embeds: [], components: [] });
         }
         // Challenge cancel button
         if (id.startsWith('challenge_cancel_')) {
