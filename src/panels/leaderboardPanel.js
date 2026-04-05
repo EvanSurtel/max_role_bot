@@ -1,6 +1,26 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
 const userRepo = require('../database/repositories/userRepo');
 const { USDC_PER_UNIT } = require('../config/constants');
+const { renderLeaderboard, renderEarningsLeaderboard } = require('../utils/leaderboardImage');
+
+/**
+ * Fetch Discord user data (username + avatar URL) for a list of Discord IDs.
+ */
+async function fetchDiscordUsers(client, discordIds) {
+  const results = new Map();
+  for (const id of discordIds) {
+    try {
+      const user = await client.users.fetch(id);
+      results.set(id, {
+        username: user.displayName || user.username,
+        avatarUrl: user.displayAvatarURL({ extension: 'png', size: 128 }),
+      });
+    } catch {
+      results.set(id, { username: null, avatarUrl: null });
+    }
+  }
+  return results;
+}
 
 // Season stored in DB so it can be changed from Discord without restarting
 let currentSeason = null;
@@ -66,7 +86,7 @@ function getAvailableSeasons() {
   }
 }
 
-async function buildXpLeaderboardEmbed(region, view = 'season', seasonOverride = null) {
+async function buildXpLeaderboardEmbed(region, view = 'season', seasonOverride = null, client = null) {
   if (!REGIONS.includes(region)) region = 'global';
   const db = require('../database/db');
   const regionFilter = region === 'global' ? '' : ' AND u.region = ?';
@@ -120,26 +140,52 @@ async function buildXpLeaderboardEmbed(region, view = 'season', seasonOverride =
     }));
   }
 
-  const rankEmoji = (i) => {
-    if (i === 0) return '🥇';
-    if (i === 1) return '🥈';
-    if (i === 2) return '🥉';
-    return `**#${i + 1}.**`;
-  };
+  // Fetch Discord user data for all entries (username + avatar URL)
+  let attachments = [];
+  let embed;
 
-  const lines = entries.length > 0
-    ? entries.map((e, i) => {
-        const ign = e.cod_ign ? ` \`${e.cod_ign}\`` : '';
-        return `${rankEmoji(i)} <@${e.discord_id}>${ign} — **${e.points.toLocaleString()} XP** \`(${e.wins}-${e.losses})\``;
-      })
-    : ['No players on this leaderboard yet.'];
+  if (entries.length > 0 && client) {
+    const discordIds = entries.map(e => e.discord_id);
+    const userMap = await fetchDiscordUsers(client, discordIds);
+    const enrichedEntries = entries.map(e => {
+      const u = userMap.get(e.discord_id) || {};
+      return {
+        ...e,
+        username: u.username,
+        avatarUrl: u.avatarUrl,
+      };
+    });
 
-  const embed = new EmbedBuilder()
-    .setTitle(title)
-    .setDescription(lines.join('\n'))
-    .setColor(view === 'season' ? 0xe67e22 : 0x5865F2)
-    .setFooter({ text: footerText })
-    .setTimestamp();
+    try {
+      const imageBuffer = await renderLeaderboard(title, enrichedEntries);
+      const attachment = new AttachmentBuilder(imageBuffer, { name: 'leaderboard.png' });
+      attachments = [attachment];
+
+      embed = new EmbedBuilder()
+        .setColor(view === 'season' ? 0xe67e22 : 0x5865F2)
+        .setImage('attachment://leaderboard.png')
+        .setFooter({ text: footerText })
+        .setTimestamp();
+    } catch (err) {
+      console.error('[Leaderboard] Failed to render image:', err.message);
+      // Fallback to text embed
+      embed = new EmbedBuilder()
+        .setTitle(title)
+        .setDescription(entries.map((e, i) =>
+          `**#${i + 1}.** <@${e.discord_id}> — **${e.points.toLocaleString()} XP** \`(${e.wins}-${e.losses})\``
+        ).join('\n'))
+        .setColor(view === 'season' ? 0xe67e22 : 0x5865F2)
+        .setFooter({ text: footerText })
+        .setTimestamp();
+    }
+  } else {
+    embed = new EmbedBuilder()
+      .setTitle(title)
+      .setDescription('No players on this leaderboard yet.')
+      .setColor(view === 'season' ? 0xe67e22 : 0x5865F2)
+      .setFooter({ text: footerText })
+      .setTimestamp();
+  }
 
   // Build buttons — All-Time + Current Season + Past Seasons (if any)
   const row1Buttons = [
@@ -171,10 +217,10 @@ async function buildXpLeaderboardEmbed(region, view = 'season', seasonOverride =
     new ButtonBuilder().setCustomId('lb_admin_adjust_wl').setLabel('Adjust W/L').setStyle(ButtonStyle.Danger),
   );
 
-  return { embeds: [embed], components: [row1, row2] };
+  return { embeds: [embed], components: [row1, row2], files: attachments };
 }
 
-async function buildEarningsLeaderboardEmbed(region) {
+async function buildEarningsLeaderboardEmbed(region, client = null) {
   if (!REGIONS.includes(region)) region = 'global';
   const db = require('../database/db');
   const regionFilter = region === 'global' ? '' : ' AND region = ?';
@@ -184,19 +230,54 @@ async function buildEarningsLeaderboardEmbed(region) {
     `SELECT * FROM users WHERE accepted_tos = 1 AND CAST(total_earnings_usdc AS INTEGER) > 0${regionFilter} ORDER BY CAST(total_earnings_usdc AS INTEGER) DESC LIMIT 10`
   ).all(...regionParams);
 
-  const lines = rows.length > 0
-    ? rows.map((row, i) => {
-        const ign = row.cod_ign ? ` (${row.cod_ign})` : '';
-        const usdc = (Number(row.total_earnings_usdc) / USDC_PER_UNIT).toFixed(2);
-        return `**#${i + 1}.** <@${row.discord_id}>${ign} — **$${usdc} USDC** | ${row.total_wins}W-${row.total_losses}L`;
-      })
-    : ['No earnings data yet.'];
+  const title = `${REGION_LABELS[region]} Earnings Leaderboard`;
 
-  const embed = new EmbedBuilder()
-    .setTitle(`${REGION_LABELS[region]} Earnings Leaderboard`)
-    .setDescription(lines.join('\n'))
-    .setColor(0x57F287)
-    .setTimestamp();
+  let attachments = [];
+  let embed;
+
+  if (rows.length > 0 && client) {
+    const entries = rows.map(row => ({
+      discord_id: row.discord_id,
+      cod_ign: row.cod_ign,
+      earnings: Number(row.total_earnings_usdc) / USDC_PER_UNIT,
+      wins: row.total_wins,
+      losses: row.total_losses,
+    }));
+
+    const discordIds = entries.map(e => e.discord_id);
+    const userMap = await fetchDiscordUsers(client, discordIds);
+    const enrichedEntries = entries.map(e => {
+      const u = userMap.get(e.discord_id) || {};
+      return { ...e, username: u.username, avatarUrl: u.avatarUrl };
+    });
+
+    try {
+      const imageBuffer = await renderEarningsLeaderboard(title, enrichedEntries);
+      const attachment = new AttachmentBuilder(imageBuffer, { name: 'earnings.png' });
+      attachments = [attachment];
+
+      embed = new EmbedBuilder()
+        .setColor(0x57F287)
+        .setImage('attachment://earnings.png')
+        .setTimestamp();
+    } catch (err) {
+      console.error('[Leaderboard] Failed to render earnings image:', err.message);
+      embed = new EmbedBuilder()
+        .setTitle(title)
+        .setDescription(rows.map((row, i) => {
+          const usdc = (Number(row.total_earnings_usdc) / USDC_PER_UNIT).toFixed(2);
+          return `**#${i + 1}.** <@${row.discord_id}> — **$${usdc} USDC** (${row.total_wins}-${row.total_losses})`;
+        }).join('\n'))
+        .setColor(0x57F287)
+        .setTimestamp();
+    }
+  } else {
+    embed = new EmbedBuilder()
+      .setTitle(title)
+      .setDescription('No earnings data yet.')
+      .setColor(0x57F287)
+      .setTimestamp();
+  }
 
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -209,7 +290,7 @@ async function buildEarningsLeaderboardEmbed(region) {
     new ButtonBuilder().setCustomId('lb_admin_adjust_earnings').setLabel('Adjust Earnings').setStyle(ButtonStyle.Danger),
   );
 
-  return { embeds: [embed], components: [row1, row2] };
+  return { embeds: [embed], components: [row1, row2], files: attachments };
 }
 
 // ─── Post Panels on Startup ─────────────────────────────────────
@@ -259,28 +340,15 @@ async function postAllLeaderboardPanels(client) {
       try {
         const ch = client.channels.cache.get(xpChannelId);
         if (ch) {
-          const panel = await buildXpLeaderboardEmbed(region, 'alltime');
+          const panel = await buildXpLeaderboardEmbed(region, 'season', null, client);
           const messages = await ch.messages.fetch({ limit: 20 });
-          // Clean up any stale bot messages (wrong region or earnings in XP channel)
+          // Clean up any stale bot messages — delete all bot messages since we'll repost
           for (const [, m] of messages) {
             if (m.author.id !== client.user.id) continue;
-            const title = m.embeds[0]?.title || '';
-            const isCorrectPanel = title.startsWith(`${regionLabel} XP`);
-            if (!isCorrectPanel && (title.includes('XP') || title.includes('Earnings Leaderboard'))) {
-              try { await m.delete(); } catch { /* */ }
-            }
+            try { await m.delete(); } catch { /* */ }
           }
-          // Find the correct existing panel (refresh after cleanup)
-          const freshMessages = await ch.messages.fetch({ limit: 20 });
-          const existing = freshMessages.find(m =>
-            m.author.id === client.user.id &&
-            m.embeds[0]?.title?.startsWith(`${regionLabel} XP`)
-          );
-          if (existing) {
-            await existing.edit(panel);
-          } else {
-            await ch.send(panel);
-          }
+          // Post fresh panel (image attachments can't be edited, so we always delete+repost)
+          await ch.send(panel);
           console.log(`[Panel] Posted XP leaderboard: ${region}`);
         } else {
           console.warn(`[Panel] XP channel ${xpChannelId} for region ${region} not found in cache`);
@@ -296,27 +364,14 @@ async function postAllLeaderboardPanels(client) {
       try {
         const ch = client.channels.cache.get(earnChannelId);
         if (ch) {
-          const panel = await buildEarningsLeaderboardEmbed(region);
+          const panel = await buildEarningsLeaderboardEmbed(region, client);
           const messages = await ch.messages.fetch({ limit: 20 });
-          // Clean up stale bot messages
+          // Clean up all existing bot messages
           for (const [, m] of messages) {
             if (m.author.id !== client.user.id) continue;
-            const title = m.embeds[0]?.title || '';
-            const isCorrectPanel = title === `${regionLabel} Earnings Leaderboard`;
-            if (!isCorrectPanel && (title.includes('XP') || title.includes('Earnings Leaderboard'))) {
-              try { await m.delete(); } catch { /* */ }
-            }
+            try { await m.delete(); } catch { /* */ }
           }
-          const freshMessages = await ch.messages.fetch({ limit: 20 });
-          const existing = freshMessages.find(m =>
-            m.author.id === client.user.id &&
-            m.embeds[0]?.title === `${regionLabel} Earnings Leaderboard`
-          );
-          if (existing) {
-            await existing.edit(panel);
-          } else {
-            await ch.send(panel);
-          }
+          await ch.send(panel);
           console.log(`[Panel] Posted earnings leaderboard: ${region}`);
         } else {
           console.warn(`[Panel] Earnings channel ${earnChannelId} for region ${region} not found in cache`);
@@ -346,25 +401,27 @@ async function handleLeaderboardButton(interaction) {
   // XP leaderboard — All-Time (ephemeral, per-user view)
   if (id.startsWith('xplb_alltime_')) {
     const region = id.replace('xplb_alltime_', '');
-    const panel = await buildXpLeaderboardEmbed(region, 'alltime');
-    return interaction.reply({ embeds: panel.embeds, ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+    const panel = await buildXpLeaderboardEmbed(region, 'alltime', null, interaction.client);
+    return interaction.editReply({ embeds: panel.embeds, files: panel.files || [] });
   }
 
   // XP leaderboard — Season view (ephemeral, per-user view)
-  // Format: xplb_season_{region}_{seasonName}
   if (id.startsWith('xplb_season_')) {
     const parts = id.replace('xplb_season_', '').split('_');
     const region = parts[0];
     const season = parts.slice(1).join('_');
-    const panel = await buildXpLeaderboardEmbed(region, 'season', season || null);
-    return interaction.reply({ embeds: panel.embeds, ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+    const panel = await buildXpLeaderboardEmbed(region, 'season', season || null, interaction.client);
+    return interaction.editReply({ embeds: panel.embeds, files: panel.files || [] });
   }
 
-  // Earnings leaderboard — Refresh
+  // Earnings leaderboard — Refresh (re-renders in place by delete+repost)
   if (id.startsWith('earnlb_refresh_')) {
     const region = id.replace('earnlb_refresh_', '');
-    const panel = await buildEarningsLeaderboardEmbed(region);
-    return interaction.update(panel);
+    await interaction.deferReply({ ephemeral: true });
+    const panel = await buildEarningsLeaderboardEmbed(region, interaction.client);
+    return interaction.editReply({ embeds: panel.embeds, files: panel.files || [] });
   }
 
   // Admin: open adjust modal
