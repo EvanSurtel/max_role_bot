@@ -93,6 +93,10 @@ function buildSeasonPanel() {
       .setLabel('End Season & Start New')
       .setStyle(ButtonStyle.Danger)
       .setDisabled(!paused || activeMatches > 0),
+    new ButtonBuilder()
+      .setCustomId('lb_admin_change_season')
+      .setLabel('Change Season Name')
+      .setStyle(ButtonStyle.Secondary),
   );
 
   return { embeds: [embed], components: [row1, row2] };

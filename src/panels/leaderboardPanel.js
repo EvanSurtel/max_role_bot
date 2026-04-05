@@ -66,7 +66,7 @@ function getAvailableSeasons() {
   }
 }
 
-async function buildXpLeaderboardEmbed(region, view = 'alltime', seasonOverride = null) {
+async function buildXpLeaderboardEmbed(region, view = 'season', seasonOverride = null) {
   if (!REGIONS.includes(region)) region = 'global';
   const db = require('../database/db');
   const regionFilter = region === 'global' ? '' : ' AND u.region = ?';
@@ -120,10 +120,17 @@ async function buildXpLeaderboardEmbed(region, view = 'alltime', seasonOverride 
     }));
   }
 
+  const rankEmoji = (i) => {
+    if (i === 0) return '🥇';
+    if (i === 1) return '🥈';
+    if (i === 2) return '🥉';
+    return `**#${i + 1}.**`;
+  };
+
   const lines = entries.length > 0
     ? entries.map((e, i) => {
-        const ign = e.cod_ign ? ` (${e.cod_ign})` : '';
-        return `**#${i + 1}.** <@${e.discord_id}>${ign} — ${e.points.toLocaleString()} XP | ${e.wins}W-${e.losses}L`;
+        const ign = e.cod_ign ? ` \`${e.cod_ign}\`` : '';
+        return `${rankEmoji(i)} <@${e.discord_id}>${ign} — **${e.points.toLocaleString()} XP** \`(${e.wins}-${e.losses})\``;
       })
     : ['No players on this leaderboard yet.'];
 
@@ -162,7 +169,6 @@ async function buildXpLeaderboardEmbed(region, view = 'alltime', seasonOverride 
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('lb_admin_adjust_xp').setLabel('Adjust XP').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('lb_admin_adjust_wl').setLabel('Adjust W/L').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('lb_admin_change_season').setLabel('Change Season').setStyle(ButtonStyle.Danger),
   );
 
   return { embeds: [embed], components: [row1, row2] };
@@ -337,21 +343,21 @@ function isAdmin(member) {
 async function handleLeaderboardButton(interaction) {
   const id = interaction.customId;
 
-  // XP leaderboard — All-Time
+  // XP leaderboard — All-Time (ephemeral, per-user view)
   if (id.startsWith('xplb_alltime_')) {
     const region = id.replace('xplb_alltime_', '');
     const panel = await buildXpLeaderboardEmbed(region, 'alltime');
-    return interaction.update(panel);
+    return interaction.reply({ embeds: panel.embeds, ephemeral: true });
   }
 
-  // XP leaderboard — Season (current or past)
+  // XP leaderboard — Season view (ephemeral, per-user view)
   // Format: xplb_season_{region}_{seasonName}
   if (id.startsWith('xplb_season_')) {
     const parts = id.replace('xplb_season_', '').split('_');
     const region = parts[0];
-    const season = parts.slice(1).join('_'); // season name may have underscores
+    const season = parts.slice(1).join('_');
     const panel = await buildXpLeaderboardEmbed(region, 'season', season || null);
-    return interaction.update(panel);
+    return interaction.reply({ embeds: panel.embeds, ephemeral: true });
   }
 
   // Earnings leaderboard — Refresh
