@@ -225,7 +225,28 @@ const EARN_CHANNEL_KEYS = {
 };
 
 async function postAllLeaderboardPanels(client) {
+  // First, collect all configured channel IDs and detect duplicates
+  const channelAssignments = {};
   for (const region of REGIONS) {
+    const xpCh = process.env[XP_CHANNEL_KEYS[region]];
+    const earnCh = process.env[EARN_CHANNEL_KEYS[region]];
+    if (xpCh) {
+      if (channelAssignments[xpCh]) {
+        console.error(`[Panel] DUPLICATE channel ID ${xpCh} — already assigned to ${channelAssignments[xpCh]}, now trying to use for XP ${region}`);
+      }
+      channelAssignments[xpCh] = `XP ${region}`;
+    }
+    if (earnCh) {
+      if (channelAssignments[earnCh]) {
+        console.error(`[Panel] DUPLICATE channel ID ${earnCh} — already assigned to ${channelAssignments[earnCh]}, now trying to use for Earnings ${region}`);
+      }
+      channelAssignments[earnCh] = `Earnings ${region}`;
+    }
+  }
+
+  for (const region of REGIONS) {
+    const regionLabel = REGION_LABELS[region];
+
     // XP leaderboard
     const xpChannelId = process.env[XP_CHANNEL_KEYS[region]];
     if (xpChannelId) {
@@ -233,14 +254,30 @@ async function postAllLeaderboardPanels(client) {
         const ch = client.channels.cache.get(xpChannelId);
         if (ch) {
           const panel = await buildXpLeaderboardEmbed(region, 'alltime');
-          const messages = await ch.messages.fetch({ limit: 5 });
-          const existing = messages.find(m => m.author.id === client.user.id && m.embeds[0]?.title?.includes('XP'));
+          const messages = await ch.messages.fetch({ limit: 20 });
+          // Clean up any stale bot messages (wrong region or earnings in XP channel)
+          for (const [, m] of messages) {
+            if (m.author.id !== client.user.id) continue;
+            const title = m.embeds[0]?.title || '';
+            const isCorrectPanel = title.startsWith(`${regionLabel} XP`);
+            if (!isCorrectPanel && (title.includes('XP') || title.includes('Earnings Leaderboard'))) {
+              try { await m.delete(); } catch { /* */ }
+            }
+          }
+          // Find the correct existing panel (refresh after cleanup)
+          const freshMessages = await ch.messages.fetch({ limit: 20 });
+          const existing = freshMessages.find(m =>
+            m.author.id === client.user.id &&
+            m.embeds[0]?.title?.startsWith(`${regionLabel} XP`)
+          );
           if (existing) {
             await existing.edit(panel);
           } else {
             await ch.send(panel);
           }
           console.log(`[Panel] Posted XP leaderboard: ${region}`);
+        } else {
+          console.warn(`[Panel] XP channel ${xpChannelId} for region ${region} not found in cache`);
         }
       } catch (err) {
         console.error(`[Panel] Failed to post XP leaderboard (${region}):`, err.message);
@@ -254,14 +291,29 @@ async function postAllLeaderboardPanels(client) {
         const ch = client.channels.cache.get(earnChannelId);
         if (ch) {
           const panel = await buildEarningsLeaderboardEmbed(region);
-          const messages = await ch.messages.fetch({ limit: 5 });
-          const existing = messages.find(m => m.author.id === client.user.id && m.embeds[0]?.title?.includes('Earnings Leaderboard'));
+          const messages = await ch.messages.fetch({ limit: 20 });
+          // Clean up stale bot messages
+          for (const [, m] of messages) {
+            if (m.author.id !== client.user.id) continue;
+            const title = m.embeds[0]?.title || '';
+            const isCorrectPanel = title === `${regionLabel} Earnings Leaderboard`;
+            if (!isCorrectPanel && (title.includes('XP') || title.includes('Earnings Leaderboard'))) {
+              try { await m.delete(); } catch { /* */ }
+            }
+          }
+          const freshMessages = await ch.messages.fetch({ limit: 20 });
+          const existing = freshMessages.find(m =>
+            m.author.id === client.user.id &&
+            m.embeds[0]?.title === `${regionLabel} Earnings Leaderboard`
+          );
           if (existing) {
             await existing.edit(panel);
           } else {
             await ch.send(panel);
           }
           console.log(`[Panel] Posted earnings leaderboard: ${region}`);
+        } else {
+          console.warn(`[Panel] Earnings channel ${earnChannelId} for region ${region} not found in cache`);
         }
       } catch (err) {
         console.error(`[Panel] Failed to post earnings leaderboard (${region}):`, err.message);
