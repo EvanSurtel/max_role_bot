@@ -73,9 +73,12 @@ async function handleWalletButton(interaction) {
  */
 async function handleWalletSubButton(interaction) {
   const id = interaction.customId;
-  const user = userRepo.findByDiscordId(interaction.user.id);
+  // Look up wallet owner by channel (admins can view other users' wallet channels)
+  const db = require('../database/db');
+  const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
+  const user = channelOwner || userRepo.findByDiscordId(interaction.user.id);
   if (!user) {
-    return interaction.reply({ content: 'You need to complete onboarding first.', ephemeral: true });
+    return interaction.reply({ content: 'User not found.', ephemeral: true });
   }
 
   const wallet = walletRepo.findByUserId(user.id);

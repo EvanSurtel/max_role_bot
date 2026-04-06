@@ -379,7 +379,10 @@ async function sendWalletPanel(channel, wallet) {
  * Handle wallet refresh button.
  */
 async function handleWalletRefresh(interaction) {
-  const user = userRepo.findByDiscordId(interaction.user.id);
+  // Look up the wallet owner by channel ID (not who clicked — admins can see all wallets)
+  const db = require('../database/db');
+  const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
+  const user = channelOwner || userRepo.findByDiscordId(interaction.user.id);
   if (!user) return interaction.reply({ content: 'User not found.', ephemeral: true });
 
   const wallet = walletRepo.findByUserId(user.id);
