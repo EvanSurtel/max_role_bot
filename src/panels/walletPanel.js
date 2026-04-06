@@ -295,6 +295,10 @@ async function handleWithdrawModal(interaction) {
       memo: `Withdrawal of $${amountUsdc} USDC`,
     });
 
+    // Post to admin transaction feed
+    const { postTransaction } = require('../utils/transactionFeed');
+    postTransaction({ type: 'withdrawal', username: user.server_username, discordId: user.discord_id, amount: `$${amountUsdc.toFixed(2)}`, currency: 'USDC', fromAddress: freshWallet.solana_address, toAddress: address, signature, memo: `Withdrawal of $${amountUsdc.toFixed(2)} USDC` });
+
     walletRepo.releaseLock(user.id);
     return interaction.editReply({
       content: `**Withdrawal successful!**\n\nSent **$${amountUsdc.toFixed(2)} USDC** to \`${address}\`\nSignature: \`${signature}\``,
@@ -368,6 +372,10 @@ async function handleWithdrawSolModal(interaction) {
       status: 'completed',
       memo: `SOL withdrawal: ${amountSol} SOL (${lamports} lamports)`,
     });
+
+    // Post to admin transaction feed
+    const { postTransaction } = require('../utils/transactionFeed');
+    postTransaction({ type: 'sol_withdrawal', username: user.server_username, discordId: user.discord_id, amount: `${amountSol}`, currency: 'SOL', fromAddress: wallet.solana_address, toAddress: address, signature, memo: `SOL withdrawal: ${amountSol} SOL` });
 
     return interaction.editReply({
       content: `**SOL Withdrawal successful!**\n\nSent **${amountSol} SOL** to \`${address}\`\nSignature: \`${signature}\``,

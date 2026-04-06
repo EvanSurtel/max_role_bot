@@ -91,6 +91,11 @@ async function checkDeposits() {
         memo: `Deposit detected: $${depositUsdc} USDC`,
       });
 
+      // Post to admin transaction feed
+      const { postTransaction } = require('../utils/transactionFeed');
+      const userRecord = require('../database/repositories/userRepo').findById(wallet.user_id);
+      postTransaction({ type: 'deposit', username: userRecord?.server_username, discordId: userRecord?.discord_id, amount: `$${depositUsdc}`, currency: 'USDC', toAddress: wallet.solana_address, memo: `Deposit detected: $${depositUsdc} USDC` });
+
       console.log(
         `[Deposits] Detected deposit of $${depositUsdc} USDC (${depositAmount.toString()} units) ` +
         `for user ${wallet.user_id} at ${wallet.solana_address}`

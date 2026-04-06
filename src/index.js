@@ -41,6 +41,10 @@ client.once('ready', async () => {
     timerHandlers.registerAll(client);
     timerService.loadPendingTimers();
 
+    // Initialize transaction feed
+    const { setClient: setTxFeedClient } = require('./utils/transactionFeed');
+    setTxFeedClient(client);
+
     // Initialize Solana connection
     const { getConnection } = require('./solana/connection');
     getConnection();

@@ -3,7 +3,8 @@ const walletRepo = require('../database/repositories/walletRepo');
 const transactionRepo = require('../database/repositories/transactionRepo');
 const walletManager = require('./walletManager');
 const transactionService = require('./transactionService');
-const { TRANSACTION_TYPE, MIN_SOL_FOR_GAS } = require('../config/constants');
+const { TRANSACTION_TYPE, MIN_SOL_FOR_GAS, USDC_PER_UNIT } = require('../config/constants');
+const { postTransaction } = require('../utils/transactionFeed');
 
 /**
  * Get the escrow authority keypair from env var.
@@ -45,6 +46,8 @@ function holdFunds(userId, amountUsdc, challengeId) {
       memo: `Hold for challenge #${challengeId}`,
     });
 
+    const userRecord = require('../database/repositories/userRepo').findById(userId);
+    postTransaction({ type: 'hold', username: userRecord?.server_username, discordId: userRecord?.discord_id, amount: `$${(Number(amountUsdc) / USDC_PER_UNIT).toFixed(2)}`, currency: 'USDC', fromAddress: wallet?.solana_address, challengeId, memo: `Hold for challenge #${challengeId}` });
     console.log(`[Escrow] Held ${amountUsdc} USDC units for user ${userId}, challenge ${challengeId}`);
     return true;
   } catch (err) {
@@ -76,6 +79,8 @@ function releaseFunds(userId, amountUsdc, challengeId) {
       memo: `Release for challenge #${challengeId}`,
     });
 
+    const userRecord = require('../database/repositories/userRepo').findById(userId);
+    postTransaction({ type: 'release', username: userRecord?.server_username, discordId: userRecord?.discord_id, amount: `$${(Number(amountUsdc) / USDC_PER_UNIT).toFixed(2)}`, currency: 'USDC', toAddress: wallet?.solana_address, challengeId, memo: `Release for challenge #${challengeId}` });
     console.log(`[Escrow] Released ${amountUsdc} USDC units for user ${userId}, challenge ${challengeId}`);
     return true;
   } catch (err) {
@@ -114,10 +119,10 @@ async function transferToEscrow(userId, amountUsdc, challengeId) {
     throw new Error(`No wallet found for user ${userId}`);
   }
 
-  // Check SOL for gas
-  const solBalance = BigInt(await walletManager.getSolBalance(walletRecord.solana_address));
-  if (solBalance < BigInt(MIN_SOL_FOR_GAS)) {
-    throw new Error(`User ${userId} has insufficient SOL for gas (${solBalance} lamports)`);
+  // Check SOL for gas and record pre-transfer balance
+  const solBefore = BigInt(await walletManager.getSolBalance(walletRecord.solana_address));
+  if (solBefore < BigInt(MIN_SOL_FOR_GAS)) {
+    throw new Error(`User ${userId} has insufficient SOL for gas (${solBefore} lamports)`);
   }
 
   const userKeypair = walletManager.getKeypairFromEncrypted(
@@ -180,7 +185,13 @@ async function transferToEscrow(userId, amountUsdc, challengeId) {
     memo: `Escrow transfer for challenge #${challengeId}`,
   });
 
-  console.log(`[Escrow] Transferred ${amountUsdc} USDC + gas SOL from user ${userId} to escrow. TX: ${signature}`);
+  // Calculate actual gas spent by checking SOL balance before vs after
+  const solAfter = BigInt(await walletManager.getSolBalance(walletRecord.solana_address));
+  const gasSpent = solBefore - solAfter;
+
+  const userRecord = require('../database/repositories/userRepo').findById(userId);
+  postTransaction({ type: 'escrow_in', username: userRecord?.server_username, discordId: userRecord?.discord_id, amount: `$${(Number(amountUsdc) / USDC_PER_UNIT).toFixed(2)}`, currency: 'USDC', fromAddress: walletRecord.solana_address, toAddress: escrowKeypair.publicKey.toBase58(), signature, challengeId, memo: `Escrow transfer for challenge #${challengeId} | Gas: ${gasSpent.toString()} lamports (${(Number(gasSpent) / 1_000_000_000).toFixed(8)} SOL)` });
+  console.log(`[Escrow] Transferred ${amountUsdc} USDC from user ${userId} to escrow. Gas: ${gasSpent} lamports. TX: ${signature}`);
   return { signature };
 }
 
@@ -237,6 +248,8 @@ async function disburseWinnings(challengeId, winningPlayerIds, totalPotUsdc) {
         memo: `Winnings for challenge #${challengeId}`,
       });
 
+      const winUserRecord = require('../database/repositories/userRepo').findById(userId);
+      postTransaction({ type: 'disbursement', username: winUserRecord?.server_username, discordId: winUserRecord?.discord_id, amount: `$${(Number(perPlayerShare) / USDC_PER_UNIT).toFixed(2)}`, currency: 'USDC', fromAddress: escrowKeypair.publicKey.toBase58(), toAddress: walletRecord.solana_address, signature, challengeId, memo: `Winnings for challenge #${challengeId}` });
       disbursements.push({ userId, signature, amount: perPlayerShare.toString() });
       console.log(`[Escrow] Disbursed ${perPlayerShare} USDC to user ${userId}. TX: ${signature}`);
     } catch (err) {
