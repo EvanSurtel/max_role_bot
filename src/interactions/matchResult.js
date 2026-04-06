@@ -36,9 +36,18 @@ async function handleButton(interaction) {
   // No-show report
   if (id.startsWith('noshow_report_')) return handleNoShowReport(interaction);
 
-  // Both captains report: "We Won" or "We Lost"
-  if (id.startsWith('report_won_')) return handleReport(interaction, 'won');
-  if (id.startsWith('report_lost_')) return handleReport(interaction, 'lost');
+  // Both captains report: "We Won" or "We Lost" — show confirmation first
+  if (id.startsWith('report_won_')) return showReportConfirm(interaction, 'won');
+  if (id.startsWith('report_lost_')) return showReportConfirm(interaction, 'lost');
+
+  // Confirmed report
+  if (id.startsWith('confirm_won_')) return handleReport(interaction, 'won');
+  if (id.startsWith('confirm_lost_')) return handleReport(interaction, 'lost');
+
+  // Cancel report
+  if (id === 'report_cancel') {
+    return interaction.update({ content: 'Report cancelled.', embeds: [], components: [] });
+  }
 
   // Dispute
   if (id.startsWith('submit_evidence_')) return handleSubmitEvidenceButton(interaction);
@@ -116,11 +125,71 @@ async function handleNoShowReport(interaction) {
   }
 }
 
+// ─── Report Confirmation ─────────────────────────────────────────
+
+async function showReportConfirm(interaction, outcome) {
+  const matchId = parseInt(interaction.customId.replace(`report_${outcome}_`, ''), 10);
+  if (isNaN(matchId)) return interaction.reply({ content: 'Invalid match.', ephemeral: true });
+
+  const match = matchRepo.findById(matchId);
+  if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
+
+  if (match.status !== MATCH_STATUS.ACTIVE && match.status !== MATCH_STATUS.VOTING) {
+    return interaction.reply({ content: 'This match is no longer accepting reports.', ephemeral: true });
+  }
+
+  const user = userRepo.findByDiscordId(interaction.user.id);
+  if (!user) return interaction.reply({ content: 'Not registered.', ephemeral: true });
+
+  const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
+  let captainTeam = null;
+  for (const p of allPlayers) {
+    if (p.user_id === user.id && p.role === PLAYER_ROLE.CAPTAIN) {
+      captainTeam = p.team;
+      break;
+    }
+  }
+  if (!captainTeam) {
+    return interaction.reply({ content: 'Only team captains can report results.', ephemeral: true });
+  }
+
+  if (captainTeam === 1 && match.captain1_vote !== null) {
+    return interaction.reply({ content: 'You already reported.', ephemeral: true });
+  }
+  if (captainTeam === 2 && match.captain2_vote !== null) {
+    return interaction.reply({ content: 'You already reported.', ephemeral: true });
+  }
+
+  const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
+  const confirmEmbed = new EmbedBuilder()
+    .setTitle('Confirm Report')
+    .setColor(outcome === 'won' ? 0x2ecc71 : 0xe74c3c)
+    .setDescription(
+      outcome === 'won'
+        ? `You are reporting that **your team (Team ${captainTeam}) WON** Match #${matchId}.\n\nAre you sure?`
+        : `You are reporting that **your team (Team ${captainTeam}) LOST** Match #${matchId}.\n\nAre you sure?`
+    );
+
+  const confirmRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`confirm_${outcome}_${matchId}`)
+      .setLabel(outcome === 'won' ? 'Yes, We Won' : 'Yes, We Lost')
+      .setStyle(outcome === 'won' ? ButtonStyle.Success : ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId('report_cancel')
+      .setLabel('Cancel')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
+}
+
 // ─── Both Captains Report (CMG-style) ────────────────────────────
 
 async function handleReport(interaction, outcome) {
-  // customId: report_won_{matchId} or report_lost_{matchId}
-  const matchId = parseInt(interaction.customId.replace(`report_${outcome}_`, ''), 10);
+  // customId: confirm_won_{matchId} or confirm_lost_{matchId}
+  const matchId = parseInt(interaction.customId.replace(`confirm_${outcome}_`, ''), 10);
   if (isNaN(matchId)) return interaction.reply({ content: 'Invalid match.', ephemeral: true });
 
   const match = matchRepo.findById(matchId);
