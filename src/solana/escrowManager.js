@@ -191,6 +191,15 @@ async function transferToEscrow(userId, amountUsdc, challengeId) {
 
   const userRecord = require('../database/repositories/userRepo').findById(userId);
   postTransaction({ type: 'escrow_in', username: userRecord?.server_username, discordId: userRecord?.discord_id, amount: `$${(Number(amountUsdc) / USDC_PER_UNIT).toFixed(2)}`, currency: 'USDC', fromAddress: walletRecord.solana_address, toAddress: escrowKeypair.publicKey.toBase58(), signature, challengeId, memo: `Escrow transfer for challenge #${challengeId} | Gas: ${gasSpent.toString()} lamports (${(Number(gasSpent) / 1_000_000_000).toFixed(8)} SOL)` });
+  // Verify on-chain USDC balance matches DB after transfer
+  const onChainUsdc = BigInt(await walletManager.getUsdcBalance(walletRecord.solana_address));
+  const dbWalletAfter = walletRepo.findByUserId(userId);
+  const dbTotal = BigInt(dbWalletAfter.balance_available) + BigInt(dbWalletAfter.balance_held);
+  if (onChainUsdc !== dbTotal) {
+    console.warn(`[Escrow] BALANCE MISMATCH after escrow transfer for user ${userId}: on-chain=${onChainUsdc}, DB=${dbTotal}`);
+    postTransaction({ type: 'escrow_in', username: userRecord?.server_username, discordId: userRecord?.discord_id, amount: 'MISMATCH', currency: '', memo: `⚠️ On-chain: ${onChainUsdc} vs DB: ${dbTotal}` });
+  }
+
   console.log(`[Escrow] Transferred ${amountUsdc} USDC from user ${userId} to escrow. Gas: ${gasSpent} lamports. TX: ${signature}`);
   return { signature };
 }
@@ -250,6 +259,15 @@ async function disburseWinnings(challengeId, winningPlayerIds, totalPotUsdc) {
 
       const winUserRecord = require('../database/repositories/userRepo').findById(userId);
       postTransaction({ type: 'disbursement', username: winUserRecord?.server_username, discordId: winUserRecord?.discord_id, amount: `$${(Number(perPlayerShare) / USDC_PER_UNIT).toFixed(2)}`, currency: 'USDC', fromAddress: escrowKeypair.publicKey.toBase58(), toAddress: walletRecord.solana_address, signature, challengeId, memo: `Winnings for challenge #${challengeId}` });
+      // Verify on-chain balance matches DB after disbursement
+      const verifyBalance = BigInt(await walletManager.getUsdcBalance(walletRecord.solana_address));
+      const verifyDb = walletRepo.findByUserId(userId);
+      const verifyDbTotal = BigInt(verifyDb.balance_available) + BigInt(verifyDb.balance_held);
+      if (verifyBalance !== verifyDbTotal) {
+        console.warn(`[Escrow] BALANCE MISMATCH after disbursement for user ${userId}: on-chain=${verifyBalance}, DB=${verifyDbTotal}`);
+        postTransaction({ type: 'disbursement', username: winUserRecord?.server_username, discordId: winUserRecord?.discord_id, amount: 'MISMATCH', currency: '', memo: `⚠️ On-chain: ${verifyBalance} vs DB: ${verifyDbTotal}` });
+      }
+
       disbursements.push({ userId, signature, amount: perPlayerShare.toString() });
       console.log(`[Escrow] Disbursed ${perPlayerShare} USDC to user ${userId}. TX: ${signature}`);
     } catch (err) {
