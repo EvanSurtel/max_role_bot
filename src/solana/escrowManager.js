@@ -137,16 +137,26 @@ async function transferToEscrow(userId, amountUsdc, challengeId) {
   );
 
   // Transfer a small SOL amount to escrow to cover payout gas fees
-  // ~10000 lamports per player covers their share of the resolve transaction
-  const GAS_CONTRIBUTION = 10_000; // 0.00001 SOL (~$0.002)
+  const GAS_CONTRIBUTION = 10_000; // 0.00001 SOL
   try {
-    await transactionService.transferSol(
+    const { signature: solSig } = await transactionService.transferSol(
       userKeypair,
       escrowKeypair.publicKey.toBase58(),
       GAS_CONTRIBUTION,
     );
+
+    transactionRepo.create({
+      type: 'gas_contribution',
+      userId,
+      challengeId,
+      amountUsdc: '0',
+      solanaTxSignature: solSig,
+      fromAddress: walletRecord.solana_address,
+      toAddress: escrowKeypair.publicKey.toBase58(),
+      status: 'completed',
+      memo: `Gas contribution (${GAS_CONTRIBUTION} lamports) for challenge #${challengeId}`,
+    });
   } catch (err) {
-    // Non-critical — escrow may already have enough SOL
     console.warn(`[Escrow] Gas contribution from user ${userId} failed (non-critical):`, err.message);
   }
 

@@ -357,6 +357,18 @@ async function handleWithdrawSolModal(interaction) {
 
     const { signature } = await transactionService.transferSol(senderKeypair, address, lamports);
 
+    // Log SOL withdrawal
+    transactionRepo.create({
+      type: 'sol_withdrawal',
+      userId: user.id,
+      amountUsdc: '0',
+      solanaTxSignature: signature,
+      fromAddress: wallet.solana_address,
+      toAddress: address,
+      status: 'completed',
+      memo: `SOL withdrawal: ${amountSol} SOL (${lamports} lamports)`,
+    });
+
     return interaction.editReply({
       content: `**SOL Withdrawal successful!**\n\nSent **${amountSol} SOL** to \`${address}\`\nSignature: \`${signature}\``,
     });
