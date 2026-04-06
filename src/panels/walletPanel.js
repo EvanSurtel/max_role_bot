@@ -81,16 +81,7 @@ async function handleWalletSubButton(interaction) {
 
   if (id === 'wallet_deposit') {
     return interaction.reply({
-      content: [
-        '**Your Solana Deposit Address:**',
-        `\`\`\`${wallet.solana_address}\`\`\``,
-        '',
-        '**To fund your wager wallet:**',
-        '1. Send **USDC** (SPL token) to this address for wagers',
-        '2. Send a small amount of **SOL** (~$0.50) for transaction fees — lasts ~100 wagers',
-        '',
-        'Deposits are detected automatically every 30 seconds.',
-      ].join('\n'),
+      content: `**Your Solana Deposit Address:**\n\n${wallet.solana_address}\n\n**To fund your wager wallet:**\n1. Send **USDC** (SPL token) to this address for wagers\n2. Send a small amount of **SOL** (~$0.50) for transaction fees — lasts ~100 wagers\n\nDeposits are detected automatically every 30 seconds.`,
       ephemeral: true,
     });
   }
