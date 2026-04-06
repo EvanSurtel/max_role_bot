@@ -140,52 +140,23 @@ async function buildXpLeaderboardEmbed(region, view = 'season', seasonOverride =
     }));
   }
 
-  // Fetch Discord user data for all entries (username + avatar URL)
   let attachments = [];
-  let embed;
 
-  if (entries.length > 0 && client) {
-    const discordIds = entries.map(e => e.discord_id);
-    const userMap = await fetchDiscordUsers(client, discordIds);
-    const enrichedEntries = entries.map(e => {
-      const u = userMap.get(e.discord_id) || {};
-      return {
-        ...e,
-        username: u.username,
-        avatarUrl: u.avatarUrl,
-      };
-    });
+  const rankEmoji = (i) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
 
-    try {
-      const imageBuffer = await renderLeaderboard(title, enrichedEntries);
-      const attachment = new AttachmentBuilder(imageBuffer, { name: 'leaderboard.png' });
-      attachments = [attachment];
+  const lines = entries.length > 0
+    ? entries.map((e, i) => {
+        const ign = e.cod_ign ? ` \`${e.cod_ign}\`` : '';
+        return `${rankEmoji(i)} <@${e.discord_id}>${ign} — **${e.points.toLocaleString()} XP** \`(${e.wins}W-${e.losses}L)\``;
+      })
+    : ['No players on this leaderboard yet.'];
 
-      embed = new EmbedBuilder()
-        .setColor(view === 'season' ? 0xe67e22 : 0x5865F2)
-        .setImage('attachment://leaderboard.png')
-        .setFooter({ text: footerText })
-        .setTimestamp();
-    } catch (err) {
-      console.error('[Leaderboard] Failed to render image:', err.message);
-      // Fallback to text embed
-      embed = new EmbedBuilder()
-        .setTitle(title)
-        .setDescription(entries.map((e, i) =>
-          `**#${i + 1}.** <@${e.discord_id}> — **${e.points.toLocaleString()} XP** \`(${e.wins}-${e.losses})\``
-        ).join('\n'))
-        .setColor(view === 'season' ? 0xe67e22 : 0x5865F2)
-        .setFooter({ text: footerText })
-        .setTimestamp();
-    }
-  } else {
-    embed = new EmbedBuilder()
-      .setTitle(title)
-      .setDescription('No players on this leaderboard yet.')
-      .setColor(view === 'season' ? 0xe67e22 : 0x5865F2)
-      .setFooter({ text: footerText })
-      .setTimestamp();
-  }
+  const embed = new EmbedBuilder()
+    .setTitle(title)
+    .setDescription(lines.join('\n'))
+    .setColor(view === 'season' ? 0xe67e22 : 0x5865F2)
+    .setFooter({ text: footerText })
+    .setTimestamp();
 
   // Build buttons — All-Time + Current Season + Past Seasons (if any)
   const row1Buttons = [
@@ -231,53 +202,23 @@ async function buildEarningsLeaderboardEmbed(region, client = null) {
   ).all(...regionParams);
 
   const title = `${REGION_LABELS[region]} Earnings Leaderboard`;
-
   let attachments = [];
-  let embed;
 
-  if (rows.length > 0 && client) {
-    const entries = rows.map(row => ({
-      discord_id: row.discord_id,
-      cod_ign: row.cod_ign,
-      earnings: Number(row.total_earnings_usdc) / USDC_PER_UNIT,
-      wins: row.total_wins,
-      losses: row.total_losses,
-    }));
+  const rankEmoji = (i) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
 
-    const discordIds = entries.map(e => e.discord_id);
-    const userMap = await fetchDiscordUsers(client, discordIds);
-    const enrichedEntries = entries.map(e => {
-      const u = userMap.get(e.discord_id) || {};
-      return { ...e, username: u.username, avatarUrl: u.avatarUrl };
-    });
+  const lines = rows.length > 0
+    ? rows.map((row, i) => {
+        const ign = row.cod_ign ? ` \`${row.cod_ign}\`` : '';
+        const usdc = (Number(row.total_earnings_usdc) / USDC_PER_UNIT).toFixed(2);
+        return `${rankEmoji(i)} <@${row.discord_id}>${ign} — **$${usdc} USDC** \`(${row.total_wins}W-${row.total_losses}L)\``;
+      })
+    : ['No earnings data yet.'];
 
-    try {
-      const imageBuffer = await renderEarningsLeaderboard(title, enrichedEntries);
-      const attachment = new AttachmentBuilder(imageBuffer, { name: 'earnings.png' });
-      attachments = [attachment];
-
-      embed = new EmbedBuilder()
-        .setColor(0x57F287)
-        .setImage('attachment://earnings.png')
-        .setTimestamp();
-    } catch (err) {
-      console.error('[Leaderboard] Failed to render earnings image:', err.message);
-      embed = new EmbedBuilder()
-        .setTitle(title)
-        .setDescription(rows.map((row, i) => {
-          const usdc = (Number(row.total_earnings_usdc) / USDC_PER_UNIT).toFixed(2);
-          return `**#${i + 1}.** <@${row.discord_id}> — **$${usdc} USDC** (${row.total_wins}-${row.total_losses})`;
-        }).join('\n'))
-        .setColor(0x57F287)
-        .setTimestamp();
-    }
-  } else {
-    embed = new EmbedBuilder()
-      .setTitle(title)
-      .setDescription('No earnings data yet.')
-      .setColor(0x57F287)
-      .setTimestamp();
-  }
+  const embed = new EmbedBuilder()
+    .setTitle(title)
+    .setDescription(lines.join('\n'))
+    .setColor(0x57F287)
+    .setTimestamp();
 
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
