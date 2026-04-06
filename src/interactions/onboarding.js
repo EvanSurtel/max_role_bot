@@ -349,7 +349,7 @@ async function sendWalletPanel(channel, wallet) {
     .setColor(0x2ecc71)
     .setDescription([
       '**Deposit Address:**',
-      `\`${wallet.solana_address}\``,
+      `\`\`\`${wallet.solana_address}\`\`\``,
       '',
       '**To fund your wallet:**',
       '1. Send **USDC** (SPL token on Solana) to the address above for wagers',
@@ -398,7 +398,7 @@ async function handleWalletRefresh(interaction) {
     .setColor(0x2ecc71)
     .setDescription([
       '**Deposit Address:**',
-      `\`${wallet.solana_address}\``,
+      `\`\`\`${wallet.solana_address}\`\`\``,
       '',
       '**To fund your wallet:**',
       '1. Send **USDC** (SPL token on Solana) to the address above for wagers',
