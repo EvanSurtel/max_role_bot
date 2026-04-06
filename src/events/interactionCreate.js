@@ -8,6 +8,7 @@ const onboarding = require('../interactions/onboarding');
 const walletPanel = require('../panels/walletPanel');
 const leaderboardPanel = require('../panels/leaderboardPanel');
 const seasonPanel = require('../panels/seasonPanel');
+const escrowPanel = require('../panels/escrowPanel');
 
 module.exports = {
   name: 'interactionCreate',
@@ -71,6 +72,10 @@ module.exports = {
         // Wallet action buttons (withdraw, history) — in wallet channel
         if (id.startsWith('wallet_')) {
           return await walletPanel.handleWalletSubButton(interaction);
+        }
+        // Escrow panel buttons
+        if (id.startsWith('escrow_')) {
+          return await escrowPanel.handleEscrowButton(interaction);
         }
         // Season management buttons
         if (id.startsWith('season_')) {

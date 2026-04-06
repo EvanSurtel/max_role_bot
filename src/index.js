@@ -80,6 +80,9 @@ client.once('ready', async () => {
     const { postSeasonPanel } = require('./panels/seasonPanel');
     await postSeasonPanel(client);
 
+    const { postEscrowPanel } = require('./panels/escrowPanel');
+    await postEscrowPanel(client);
+
     console.log('[Boot] All systems ready');
   } catch (err) {
     console.error('[Boot] Startup error:', err);
