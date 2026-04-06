@@ -123,10 +123,31 @@ async function handleRegistrationModal(interaction) {
   const serverInput = interaction.fields.getTextInputValue('reg_server').trim();
   const country = interaction.fields.getTextInputValue('reg_country').trim();
 
-  // Validate UID: must be numeric and 10-20 digits
-  if (!/^\d{10,20}$/.test(codUid)) {
+  // Validate CODM UID:
+  // - Must be numeric
+  // - 13-19 digits (standard CODM UID length)
+  // - Must start with valid year prefix (67-75 for 2019-2027)
+  if (!/^\d{13,19}$/.test(codUid)) {
     return interaction.reply({
-      content: 'Invalid COD Mobile UID. It must be a 10-20 digit number. Open CODM → Profile (top left) → your UID is below your avatar.',
+      content: 'Invalid COD Mobile UID. It must be a 13-19 digit number.\n\n**How to find your UID:** Open CODM → tap your profile picture (top left) → your UID is the number below your avatar.',
+      ephemeral: true,
+    });
+  }
+
+  const uidPrefix = parseInt(codUid.substring(0, 2), 10);
+  if (uidPrefix < 67 || uidPrefix > 75) {
+    return interaction.reply({
+      content: `Invalid COD Mobile UID. The UID \`${codUid}\` doesn't match a valid CODM account format.\n\n**How to find your UID:** Open CODM → tap your profile picture (top left) → your UID is the number below your avatar.`,
+      ephemeral: true,
+    });
+  }
+
+  // Check if UID is already registered by another user
+  const db = require('../database/db');
+  const existingUid = db.prepare('SELECT discord_id FROM users WHERE cod_uid = ? AND discord_id != ?').get(codUid, discordId);
+  if (existingUid) {
+    return interaction.reply({
+      content: 'This COD Mobile UID is already registered to another account. Each UID can only be used once.',
       ephemeral: true,
     });
   }
