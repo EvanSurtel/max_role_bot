@@ -235,7 +235,7 @@ async function handleRegistrationModal(interaction) {
       walletChannelName,
       [discordId],
       walletCategoryId,
-      { adminOnly: true },
+      { adminOnly: true, readOnly: true },
     );
 
     db.prepare('UPDATE users SET wallet_channel_id = ? WHERE id = ?').run(walletChannel.id, user.id);

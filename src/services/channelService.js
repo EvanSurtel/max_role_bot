@@ -10,7 +10,7 @@ const { privateTextOverwrites, privateVoiceOverwrites } = require('../utils/perm
  * @returns {Promise<import('discord.js').TextChannel>}
  */
 async function createPrivateChannel(guild, name, allowedUsers, categoryId, opts = {}) {
-  const overwrites = privateTextOverwrites(guild, allowedUsers, opts.includeStaff || false, opts.adminOnly || false);
+  const overwrites = privateTextOverwrites(guild, allowedUsers, opts.includeStaff || false, opts.adminOnly || false, opts.readOnly || false);
 
   const options = {
     name,

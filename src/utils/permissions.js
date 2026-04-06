@@ -33,7 +33,7 @@ function addStaffOverwrites(overwrites) {
  * @param {string[]} allowedUserIds - Array of Discord user IDs.
  * @returns {object[]} Permission overwrites array for channel creation.
  */
-function privateTextOverwrites(guild, allowedUserIds, includeStaff = false, adminOnly = false) {
+function privateTextOverwrites(guild, allowedUserIds, includeStaff = false, adminOnly = false, readOnly = false) {
   const overwrites = [
     {
       id: guild.id, // @everyone role
@@ -46,10 +46,18 @@ function privateTextOverwrites(guild, allowedUserIds, includeStaff = false, admi
   ];
 
   for (const userId of allowedUserIds) {
-    overwrites.push({
-      id: userId,
-      allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
-    });
+    if (readOnly) {
+      overwrites.push({
+        id: userId,
+        allow: [PermissionFlagsBits.ViewChannel],
+        deny: [PermissionFlagsBits.SendMessages],
+      });
+    } else {
+      overwrites.push({
+        id: userId,
+        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+      });
+    }
   }
 
   if (includeStaff) addStaffOverwrites(overwrites);
