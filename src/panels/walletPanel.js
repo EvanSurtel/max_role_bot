@@ -40,10 +40,14 @@ async function handleWalletButton(interaction) {
   const solBalance = await walletManager.getSolBalance(wallet.solana_address).catch(() => '0');
   const solFormatted = (Number(solBalance) / 1_000_000_000).toFixed(4);
 
-  const row = new ActionRowBuilder().addComponents(
+  const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('wallet_copy_address')
+      .setLabel('Copy Address')
+      .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('wallet_deposit')
-      .setLabel('Deposit Address')
+      .setLabel('Deposit Info')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('wallet_withdraw')
@@ -61,7 +65,7 @@ async function handleWalletButton(interaction) {
 
   embed.addFields({ name: 'SOL (for gas)', value: `${solFormatted} SOL`, inline: true });
 
-  return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+  return interaction.reply({ embeds: [embed], components: [row1], ephemeral: true });
 }
 
 /**
@@ -82,6 +86,14 @@ async function handleWalletSubButton(interaction) {
   if (id === 'wallet_deposit') {
     return interaction.reply({
       content: `**Your Solana Deposit Address:**\n\n${wallet.solana_address}\n\n**To fund your wager wallet:**\n1. Send **USDC** (SPL token) to this address for wagers\n2. Send a small amount of **SOL** (~$0.50) for transaction fees — lasts ~100 wagers\n\nDeposits are detected automatically every 30 seconds.`,
+      ephemeral: true,
+    });
+  }
+
+  if (id === 'wallet_copy_address') {
+    // Send ONLY the address as a plain message — easy to tap and copy on mobile
+    return interaction.reply({
+      content: wallet.solana_address,
       ephemeral: true,
     });
   }

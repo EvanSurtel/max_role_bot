@@ -123,10 +123,10 @@ async function handleRegistrationModal(interaction) {
   const serverInput = interaction.fields.getTextInputValue('reg_server').trim();
   const country = interaction.fields.getTextInputValue('reg_country').trim();
 
-  // Validate UID is numeric
-  if (!/^\d+$/.test(codUid)) {
+  // Validate UID: must be numeric and 10-20 digits
+  if (!/^\d{10,20}$/.test(codUid)) {
     return interaction.reply({
-      content: 'Invalid COD Mobile UID. It must be a numeric value. Check your CODM profile for your UID.',
+      content: 'Invalid COD Mobile UID. It must be a 10-20 digit number. Open CODM → Profile (top left) → your UID is below your avatar.',
       ephemeral: true,
     });
   }
@@ -344,6 +344,7 @@ async function sendWalletPanel(channel, wallet) {
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('wallet_copy_address').setLabel('Copy Address').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('wallet_refresh').setLabel('Refresh Balance').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('wallet_withdraw').setLabel('Withdraw USDC').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('wallet_withdraw_sol').setLabel('Withdraw SOL').setStyle(ButtonStyle.Danger),
@@ -392,6 +393,7 @@ async function handleWalletRefresh(interaction) {
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('wallet_copy_address').setLabel('Copy Address').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('wallet_refresh').setLabel('Refresh Balance').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('wallet_withdraw').setLabel('Withdraw USDC').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('wallet_withdraw_sol').setLabel('Withdraw SOL').setStyle(ButtonStyle.Danger),
