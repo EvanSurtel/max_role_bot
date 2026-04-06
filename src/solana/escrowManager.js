@@ -150,8 +150,13 @@ async function transferToEscrow(userId, amountUsdc, challengeId) {
     console.warn(`[Escrow] Gas contribution from user ${userId} failed (non-critical):`, err.message);
   }
 
-  // Reduce the held balance now that funds are on-chain in escrow
-  walletRepo.releaseFunds(userId, amountUsdc);
+  // Remove the held balance — funds are now on-chain in escrow (NOT back to available)
+  const walletAfter = walletRepo.findByUserId(userId);
+  const heldAfter = BigInt(walletAfter.balance_held) - BigInt(amountUsdc);
+  walletRepo.updateBalance(userId, {
+    balanceAvailable: walletAfter.balance_available,
+    balanceHeld: (heldAfter < 0n ? 0n : heldAfter).toString(),
+  });
 
   transactionRepo.create({
     type: TRANSACTION_TYPE.ESCROW_IN,
