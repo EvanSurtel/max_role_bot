@@ -38,7 +38,7 @@ async function handleWalletButton(interaction) {
   const embed = walletEmbed(wallet, interaction.user);
   // Show SOL balance too
   const solBalance = await walletManager.getSolBalance(wallet.solana_address).catch(() => '0');
-  const solFormatted = (Number(solBalance) / 1_000_000_000).toFixed(4);
+  const solFormatted = (Number(solBalance) / 1_000_000_000).toFixed(8);
 
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -342,7 +342,7 @@ async function handleWithdrawSolModal(interaction) {
     // Keep ~0.005 SOL for rent/fees
     const reserveLamports = 5_000_000;
     if (lamports > solBalance - reserveLamports) {
-      const availSol = ((solBalance - reserveLamports) / 1_000_000_000).toFixed(4);
+      const availSol = ((solBalance - reserveLamports) / 1_000_000_000).toFixed(8);
       return interaction.editReply({
         content: `Insufficient SOL. You have ~**${availSol} SOL** available after reserves.`,
       });

@@ -392,7 +392,7 @@ async function handleWalletRefresh(interaction) {
 
   let solBalance = '0';
   try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
-  const solFormatted = (Number(solBalance) / 1_000_000_000).toFixed(4);
+  const solFormatted = (Number(solBalance) / 1_000_000_000).toFixed(8);
   const available = Number(wallet.balance_available);
   const held = Number(wallet.balance_held);
 
