@@ -618,6 +618,10 @@ async function handleAdminConfirm(interaction) {
 
   try {
     await matchService.resolveMatch(interaction.client, matchId, winningTeam);
+
+    // Post dispute result to permanent dispute results channel
+    await postDisputeResult(interaction.client, matchId, winningTeam, interaction.user.id);
+
     const { cleanupDisputeChannels } = require('./disputeCreate');
     setTimeout(() => {
       cleanupDisputeChannels(interaction.client, matchId).catch(() => {});
@@ -710,6 +714,9 @@ async function handleAdminConfirmNoWinner(interaction) {
 
     // No XP changes for anyone
 
+    // Post dispute result to permanent channel
+    await postDisputeResult(interaction.client, matchId, 0, interaction.user.id);
+
     // Cleanup dispute channels
     const { cleanupDisputeChannels } = require('./disputeCreate');
     setTimeout(() => {
@@ -723,6 +730,95 @@ async function handleAdminConfirmNoWinner(interaction) {
 
   } catch (err) {
     console.error(`[MatchResult] No-winner resolution failed for match #${matchId}:`, err);
+  }
+}
+
+/**
+ * Post full dispute result with all evidence to the permanent dispute results channel.
+ */
+async function postDisputeResult(client, matchId, winningTeam, resolverDiscordId) {
+  const channelId = process.env.DISPUTE_RESULTS_CHANNEL_ID;
+  if (!channelId) return;
+
+  const ch = client.channels.cache.get(channelId);
+  if (!ch) return;
+
+  try {
+    const match = matchRepo.findById(matchId);
+    const challenge = match ? challengeRepo.findById(match.challenge_id) : null;
+    const allPlayers = match ? challengePlayerRepo.findByChallengeId(match.challenge_id) : [];
+
+    // Get all evidence from DB
+    const evidenceRepo = require('../database/repositories/evidenceRepo');
+    const allEvidence = evidenceRepo.findByMatchId(matchId);
+
+    // Build team rosters
+    const team1 = allPlayers.filter(p => p.team === 1).map(p => {
+      const u = userRepo.findById(p.user_id);
+      return u ? `<@${u.discord_id}> ${u.cod_ign || ''}` : 'Unknown';
+    });
+    const team2 = allPlayers.filter(p => p.team === 2).map(p => {
+      const u = userRepo.findById(p.user_id);
+      return u ? `<@${u.discord_id}> ${u.cod_ign || ''}` : 'Unknown';
+    });
+
+    const { GAME_MODES } = require('../config/constants');
+    const { formatUsdc } = require('../utils/embeds');
+    const modeInfo = challenge ? GAME_MODES[challenge.game_modes] : null;
+    const modeLabel = modeInfo ? modeInfo.label : (challenge?.game_modes || 'N/A');
+
+    const outcomeText = winningTeam === 0
+      ? '**No Winner** — All funds refunded'
+      : `**Team ${winningTeam} wins**`;
+
+    const potText = challenge && Number(challenge.total_pot_usdc) > 0
+      ? `**Pot:** ${formatUsdc(challenge.total_pot_usdc)} USDC`
+      : 'XP Match';
+
+    const resultEmbed = new EmbedBuilder()
+      .setTitle(`Dispute Result — Match #${matchId}`)
+      .setColor(winningTeam === 0 ? 0x95a5a6 : 0x2ecc71)
+      .setDescription([
+        `**Resolved by:** <@${resolverDiscordId}>`,
+        `**Outcome:** ${outcomeText}`,
+        '',
+        `**Match Details**`,
+        `Mode: ${modeLabel} | Bo${challenge?.series_length || '?'} | ${challenge?.team_size || '?'}v${challenge?.team_size || '?'}`,
+        potText,
+        '',
+        `**Team 1:**`,
+        ...team1,
+        '',
+        `**Team 2:**`,
+        ...team2,
+      ].join('\n'))
+      .setTimestamp();
+
+    await ch.send({ embeds: [resultEmbed] });
+
+    // Post all evidence as separate embeds
+    if (allEvidence.length > 0) {
+      for (const ev of allEvidence) {
+        const evEmbed = new EmbedBuilder()
+          .setTitle(`Evidence — Match #${matchId}`)
+          .setColor(0x3498db)
+          .addFields(
+            { name: 'Submitted by', value: `<@${ev.submitted_by}>`, inline: true },
+            { name: 'Submitted at', value: ev.submitted_at || 'N/A', inline: true },
+            { name: 'Link', value: ev.link },
+          );
+        if (ev.notes) evEmbed.addFields({ name: 'Notes', value: ev.notes });
+        await ch.send({ embeds: [evEmbed] });
+      }
+    } else {
+      await ch.send({ content: `*No evidence was submitted for Match #${matchId}.*` });
+    }
+
+    // Separator
+    await ch.send({ content: '───────────────────────────────' });
+
+  } catch (err) {
+    console.error(`[MatchResult] Failed to post dispute result for match #${matchId}:`, err.message);
   }
 }
 
