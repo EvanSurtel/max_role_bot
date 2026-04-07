@@ -458,7 +458,6 @@ async function showChallengeConfirm(interaction, flow, amountUsdc) {
       entryText,
       teammateText,
       '',
-      'Does everything look correct?',
     ].filter(Boolean).join('\n'));
 
   const confirmRow = new ActionRowBuilder().addComponents(
