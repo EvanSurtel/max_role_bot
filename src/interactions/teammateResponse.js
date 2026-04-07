@@ -18,14 +18,17 @@ async function handleButton(interaction) {
 
   // Parse action and challenge ID
   let action, challengeId;
-  if (customId.startsWith('teammate_accept_')) {
+  if (customId.startsWith('teammate_confirm_accept_')) {
     action = 'accept';
+    challengeId = parseInt(customId.replace('teammate_confirm_accept_', ''), 10);
+  } else if (customId.startsWith('teammate_accept_')) {
+    action = 'accept_pending'; // show confirmation first
     challengeId = parseInt(customId.replace('teammate_accept_', ''), 10);
   } else if (customId.startsWith('teammate_decline_')) {
     action = 'decline';
     challengeId = parseInt(customId.replace('teammate_decline_', ''), 10);
   } else {
-    return; // Not a teammate response button
+    return;
   }
 
   if (isNaN(challengeId)) {
@@ -73,13 +76,63 @@ async function handleButton(interaction) {
   }
 
   // Clear the teammate timeout timer since they responded
+  // For initial accept click, show confirmation (don't clear timer yet)
+  if (action === 'accept_pending') {
+    return showAcceptConfirm(interaction, challenge, player, user);
+  }
+
+  // Clear timer only on confirmed accept or decline
   challengeService.clearTeammateTimer(challengeId, player.id);
 
   if (action === 'accept') {
-    return handleAccept(interaction, challenge, player, user);
+    return showAcceptConfirm(interaction, challenge, player, user);
   } else {
     return handleDecline(interaction, challenge, player, user);
   }
+}
+
+/**
+ * Show confirmation before accepting team invite.
+ */
+async function showAcceptConfirm(interaction, challenge, player, user) {
+  const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+  const { GAME_MODES, CHALLENGE_TYPE } = require('../config/constants');
+  const { formatUsdc } = require('../utils/embeds');
+
+  const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+  const modeInfo = GAME_MODES[challenge.game_modes];
+  const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
+  const entryText = isWager && Number(challenge.entry_amount_usdc) > 0
+    ? `\n**Entry:** ${formatUsdc(challenge.entry_amount_usdc)} USDC will be held from your wallet.`
+    : '';
+
+  const confirmEmbed = new EmbedBuilder()
+    .setTitle('Confirm Accept')
+    .setColor(0x2ecc71)
+    .setDescription([
+      `You are joining **Challenge #${challenge.id}**`,
+      '',
+      `**Type:** ${isWager ? 'Wager' : 'XP Match'}`,
+      `**Team Size:** ${challenge.team_size}v${challenge.team_size}`,
+      `**Mode:** ${modeLabel}`,
+      `**Series:** Best of ${challenge.series_length}`,
+      entryText,
+      '',
+      'Are you sure?',
+    ].join('\n'));
+
+  const confirmRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`teammate_confirm_accept_${challenge.id}`)
+      .setLabel('Yes, Join Team')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`teammate_decline_${challenge.id}`)
+      .setLabel('Decline')
+      .setStyle(ButtonStyle.Danger),
+  );
+
+  return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
 }
 
 /**
