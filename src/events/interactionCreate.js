@@ -51,7 +51,9 @@ module.exports = {
         }
         // Match result flow (report won/lost, no-show, evidence, admin)
         if (id.startsWith('report_won_') || id.startsWith('report_lost_') ||
-            id.startsWith('noshow_report_') ||
+            id.startsWith('confirm_won_') || id.startsWith('confirm_lost_') ||
+            id.startsWith('noshow_report_') || id.startsWith('noshow_confirm_') ||
+            id === 'report_cancel' ||
             id.startsWith('admin_resolve_') || id.startsWith('admin_confirm_') ||
             id.startsWith('admin_goback_')) {
           return await matchResult.handleButton(interaction);
