@@ -238,6 +238,10 @@ async function handleReport(interaction, outcome) {
     matchRepo.updateStatus(matchId, MATCH_STATUS.VOTING);
   }
 
+  // Log to admin feed
+  const { postTransaction } = require('../utils/transactionFeed');
+  postTransaction({ type: 'match_report', username: user.server_username, discordId: user.discord_id, challengeId: match.challenge_id, memo: `Match #${matchId} | Team ${captainTeam} captain reported: ${outcome === 'won' ? 'WE WON' : 'WE LOST'} (says Team ${reportedWinner} won)` });
+
   await interaction.reply({
     content: `You reported: **${outcome === 'won' ? 'We Won' : 'We Lost'}**. Waiting for the other captain to report.`,
     ephemeral: true,
@@ -360,6 +364,9 @@ async function triggerDispute(client, matchId) {
 
     await notifyChannel.send({ content: '**Staff Panel** — After reviewing evidence, resolve:', components: [adminRow] });
   }
+
+  const { postTransaction: ptx } = require('../utils/transactionFeed');
+  ptx({ type: 'match_disputed', challengeId: match.challenge_id, memo: `Match #${matchId} disputed — channels created for staff review` });
 
   console.log(`[MatchResult] Match #${matchId} disputed`);
 }

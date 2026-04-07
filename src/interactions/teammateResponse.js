@@ -166,6 +166,9 @@ async function handleAccept(interaction, challenge, player, user) {
   // Update player status to accepted
   challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.ACCEPTED);
 
+  const { postTransaction } = require('../utils/transactionFeed');
+  postTransaction({ type: 'teammate_accepted', username: user.server_username, discordId: user.discord_id, challengeId: challenge.id, memo: `Joined team for Challenge #${challenge.id}` });
+
   // Reply confirming acceptance
   await interaction.reply({
     content: `You have **accepted** the invitation for Challenge #${challenge.id}! Your funds have been held.`,
@@ -205,6 +208,9 @@ async function handleAccept(interaction, challenge, player, user) {
 async function handleDecline(interaction, challenge, player, user) {
   // Update player status to declined
   challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.DECLINED);
+
+  const { postTransaction } = require('../utils/transactionFeed');
+  postTransaction({ type: 'teammate_declined', username: user.server_username, discordId: user.discord_id, challengeId: challenge.id, memo: `Declined team invite for Challenge #${challenge.id} — challenge cancelled` });
 
   // Reply confirming decline
   await interaction.reply({

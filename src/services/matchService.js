@@ -299,6 +299,9 @@ async function startMatch(client, challengeId) {
   timerService.createTimer('match_inactivity', match.id, autoDisputeMs);
   console.log(`[MatchService] Auto-dispute timer set for match #${match.id}: ${Math.round(autoDisputeMs / 60000)} minutes`);
 
+  const { postTransaction } = require('../utils/transactionFeed');
+  postTransaction({ type: 'match_started', challengeId, memo: `Match #${match.id} started | ${challenge.team_size}v${challenge.team_size} | ${challenge.game_modes} | Bo${challenge.series_length}${challenge.type === 'wager' ? ` | Pot: $${(Number(challenge.total_pot_usdc) / 1000000).toFixed(2)}` : ' | XP Match'}` });
+
   console.log(`[MatchService] Match #${match.id} started for challenge #${challengeId}`);
   return match;
 }
@@ -449,6 +452,25 @@ async function resolveMatch(client, matchId, winningTeam) {
           console.error(`[MatchService] NeatQueue loss failed for ${loseUser.discord_id}:`, err.message);
         });
       }
+    }
+  }
+
+  // Log resolution to admin feed
+  const { postTransaction: postTx } = require('../utils/transactionFeed');
+  const winnerNames = winningPlayers.map(p => { const u = userRepo.findById(p.user_id); return u?.server_username || '?'; }).join(', ');
+  const loserNames = losingPlayers.map(p => { const u = userRepo.findById(p.user_id); return u?.server_username || '?'; }).join(', ');
+  const isWager2 = challenge.type === CHALLENGE_TYPE.WAGER && Number(challenge.total_pot_usdc) > 0;
+  postTx({ type: 'match_resolved', challengeId: match.challenge_id, memo: `Match #${matchId} | Team ${winningTeam} wins\nWinners: ${winnerNames} (+${winXp} XP${isWager2 ? `, +$${(Number(perPlayerEarnings) / 1000000).toFixed(2)} each` : ''})\nLosers: ${loserNames} (${loseXp > 0 ? `-${loseXp} XP` : '0 XP'})` });
+
+  // Log each XP award
+  for (const player of winningPlayers) {
+    const u = userRepo.findById(player.user_id);
+    if (u) postTx({ type: 'xp_awarded', username: u.server_username, discordId: u.discord_id, challengeId: match.challenge_id, memo: `+${winXp} XP (win) | Total: ${u.xp_points} XP` });
+  }
+  for (const player of losingPlayers) {
+    if (loseXp > 0) {
+      const u = userRepo.findById(player.user_id);
+      if (u) postTx({ type: 'xp_awarded', username: u.server_username, discordId: u.discord_id, challengeId: match.challenge_id, memo: `-${loseXp} XP (loss) | Total: ${u.xp_points} XP` });
     }
   }
 

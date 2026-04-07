@@ -50,6 +50,9 @@ async function handleButton(interaction) {
     // Update the board message to show cancelled
     await disableBoardMessage(interaction.client, challenge);
 
+    const { postTransaction } = require('../utils/transactionFeed');
+    postTransaction({ type: 'challenge_cancelled', discordId: interaction.user.id, challengeId, memo: `Challenge #${challengeId} cancelled by creator — all funds refunded` });
+
     await interaction.editReply({
       content: `Challenge #${challengeId} has been cancelled. All funds have been refunded.`,
     });

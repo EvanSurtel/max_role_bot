@@ -27,6 +27,17 @@ async function postTransaction({ type, username, discordId, amount, currency, fr
     escrow_in: 0x9b59b6,
     gas_contribution: 0x95a5a6,
     disbursement: 0x2ecc71,
+    challenge_created: 0x3498db,
+    challenge_accepted: 0x2ecc71,
+    challenge_cancelled: 0xe74c3c,
+    teammate_accepted: 0x2ecc71,
+    teammate_declined: 0xe74c3c,
+    match_started: 0x9b59b6,
+    match_report: 0xf39c12,
+    match_resolved: 0x2ecc71,
+    match_disputed: 0xe74c3c,
+    xp_awarded: 0x5865f2,
+    balance_mismatch: 0xe74c3c,
   };
 
   const typeIcons = {
@@ -38,6 +49,17 @@ async function postTransaction({ type, username, discordId, amount, currency, fr
     escrow_in: '➡️',
     gas_contribution: '⛽',
     disbursement: '💰',
+    challenge_created: '📝',
+    challenge_accepted: '✅',
+    challenge_cancelled: '❌',
+    teammate_accepted: '🤝',
+    teammate_declined: '👋',
+    match_started: '🎮',
+    match_report: '📊',
+    match_resolved: '🏆',
+    match_disputed: '⚠️',
+    xp_awarded: '⭐',
+    balance_mismatch: '🚨',
   };
 
   const color = typeColors[type] || 0x5865f2;

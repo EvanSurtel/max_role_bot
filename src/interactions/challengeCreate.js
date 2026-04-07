@@ -445,6 +445,16 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
       ? `\nEntry: **$${amountUsdc} USDC** per player`
       : '\nType: **XP Match** (no wager)';
 
+    // Log to admin transaction feed
+    const { postTransaction } = require('../utils/transactionFeed');
+    postTransaction({
+      type: 'challenge_created',
+      username: user.server_username,
+      discordId: userId,
+      challengeId: challenge.id,
+      memo: `${flow.type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match'} | ${flow.teamSize}v${flow.teamSize} | ${modeLabel} | Bo${flow.series}${flow.type === CHALLENGE_TYPE.WAGER ? ` | $${amountUsdc} entry` : ''}`,
+    });
+
     const summary = [
       `**Challenge #${challenge.id} created!**`,
       '',

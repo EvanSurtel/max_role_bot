@@ -187,6 +187,10 @@ async function handleConfirmedAccept(interaction) {
       // Edit the challenge board message to show "ACCEPTED" and disable the button
       await disableBoardMessage(interaction.client, challenge);
 
+      // Log to admin feed
+      const { postTransaction } = require('../utils/transactionFeed');
+      postTransaction({ type: 'challenge_accepted', username: user.server_username, discordId: discordId, challengeId, memo: `Challenge #${challengeId} accepted by ${user.server_username} (1v1)` });
+
       return interaction.editReply({
         content: `You have accepted Challenge #${challengeId}! Match channels have been created. Good luck!`,
       });
