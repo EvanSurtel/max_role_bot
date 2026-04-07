@@ -72,7 +72,7 @@ async function handleButton(interaction) {
       .setTitle('Confirm Accept')
       .setColor(0xe67e22)
       .setDescription([
-        `You are about to accept **\${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challengeId}**`,
+        `You are about to accept **${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId}**`,
         '',
         `**Type:** ${isWager ? 'Wager' : 'XP Match'}`,
         `**Team Size:** 1v1`,
@@ -112,7 +112,7 @@ async function handleButton(interaction) {
   );
 
   return interaction.reply({
-    content: `**Select your teammates for \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challengeId}:**\n\nTeam size: **${challenge.team_size}v${challenge.team_size}** — Pick **${teammatesNeeded}** teammate(s).`,
+    content: `**Select your teammates for ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId}:**\n\nTeam size: **${challenge.team_size}v${challenge.team_size}** — Pick **${teammatesNeeded}** teammate(s).`,
     components: [selectRow],
     ephemeral: true,
   });
@@ -210,10 +210,10 @@ async function handleConfirmedAccept(interaction) {
 
       // Log to admin feed
       const { postTransaction } = require('../utils/transactionFeed');
-      postTransaction({ type: 'challenge_accepted', username: user.server_username, discordId: discordId, challengeId, memo: `\${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challengeId} accepted by ${user.server_username} (1v1)` });
+      postTransaction({ type: 'challenge_accepted', username: user.server_username, discordId: discordId, challengeId, memo: `${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId} accepted by ${user.server_username} (1v1)` });
 
       return interaction.editReply({
-        content: `You have accepted \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challengeId}! Match channels have been created. Good luck!`,
+        content: `You have accepted ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId}! Match channels have been created. Good luck!`,
       });
     } catch (err) {
       console.error(`[ChallengeAccept] Error accepting 1v1 challenge #${challengeId}:`, err);
@@ -239,7 +239,7 @@ async function handleConfirmedAccept(interaction) {
   );
 
   return interaction.reply({
-    content: `**Select your teammates for \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challengeId}:**\n\nTeam size: **${challenge.team_size}v${challenge.team_size}** — Pick **${teammatesNeeded}** teammate(s).`,
+    content: `**Select your teammates for ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId}:**\n\nTeam size: **${challenge.team_size}v${challenge.team_size}** — Pick **${teammatesNeeded}** teammate(s).`,
     components: [selectRow],
     ephemeral: true,
   });
@@ -344,7 +344,7 @@ async function handleUserSelect(interaction) {
       .setTitle('Confirm Accept')
       .setColor(0xe67e22)
       .setDescription([
-        `**\${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challengeId}**`,
+        `**${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId}**`,
         '',
         `**Type:** ${isWager ? 'Wager' : 'XP Match'}`,
         `**Mode:** ${modeLabel} | Bo${challenge.series_length} | ${challenge.team_size}v${challenge.team_size}`,
@@ -481,7 +481,7 @@ async function handleTeamConfirmedAccept(interaction) {
     const teammatesMention = selectedDiscordIds.map(id => `<@${id}>`).join(', ');
     return interaction.editReply({
       content: [
-        `**\${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challengeId} accepted!**`,
+        `**${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId} accepted!**`,
         '',
         `Your teammates (${teammatesMention}) have been notified.`,
         'Once all teammates accept, the match will begin and channels will be created.',
@@ -581,7 +581,7 @@ async function notifyTeam2Teammates(guild, challenge) {
         content: `<@${playerDiscordId}>`,
         embeds: [
           {
-            title: `Team Invite — \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id}`,
+            title: `Team Invite — ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id}`,
             description: description.join('\n'),
             color: isWager ? 0xf1c40f : 0x3498db,
           },

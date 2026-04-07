@@ -38,11 +38,12 @@ const MATCH_TIMERS = {
 };
 
 // Minimum minutes before captains can report results (prevents spam)
+// TODO: Re-enable for production: 1: 5, 3: 10, 5: 15, 7: 20
 const MIN_REPORT_MINUTES = {
-  1: 5,    // Bo1: 5 minutes
-  3: 10,   // Bo3: 10 minutes
-  5: 15,   // Bo5: 15 minutes
-  7: 20,   // Bo7: 20 minutes
+  1: 0,    // DISABLED FOR TESTING
+  3: 0,
+  5: 0,
+  7: 0,
 };
 
 // Mode rotation orders for series

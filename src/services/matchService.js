@@ -208,11 +208,11 @@ async function createMatchChannels(client, challenge) {
 
   // Send welcome messages in team channels
   await team1Text.send({
-    content: `**Welcome, Team 1!**\n\nYour match for \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id} is ready.${potText}\n\nUse this channel to coordinate with your team. When the match is over, both captains must vote on the result in the voting channel.`,
+    content: `**Welcome, Team 1!**\n\nYour match for ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id} is ready.${potText}\n\nUse this channel to coordinate with your team. When the match is over, both captains must vote on the result in the voting channel.`,
   });
 
   await team2Text.send({
-    content: `**Welcome, Team 2!**\n\nYour match for \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id} is ready.${potText}\n\nUse this channel to coordinate with your team. When the match is over, both captains must vote on the result in the voting channel.`,
+    content: `**Welcome, Team 2!**\n\nYour match for ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id} is ready.${potText}\n\nUse this channel to coordinate with your team. When the match is over, both captains must vote on the result in the voting channel.`,
   });
 
   // Generate random map picks for the series
@@ -232,7 +232,7 @@ async function createMatchChannels(client, challenge) {
 
   await sharedText.send({
     content: [
-      `**Match #${match.id} — \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id}**`,
+      `**Match #${match.id} — ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id}**`,
       '',
       `**Team 1:** ${team1Lines.join(', ')}`,
       `**Team 2:** ${team2Lines.join(', ')}`,

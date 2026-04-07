@@ -48,7 +48,7 @@ async function handleButton(interaction) {
   const confirmEmbed = new EmbedBuilder()
     .setTitle('Confirm Cancel')
     .setColor(0xe74c3c)
-    .setDescription(`Are you sure you want to cancel **\${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challengeId}**?\n\nAll held funds will be refunded to all players.`);
+    .setDescription(`Are you sure you want to cancel **${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId}**?${challenge.type === 'wager' ? '\n\nAll held funds will be refunded to all players.' : ''}`);
 
   const confirmRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -94,10 +94,10 @@ async function handleConfirmedCancel(interaction) {
     await disableBoardMessage(interaction.client, challenge);
 
     const { postTransaction } = require('../utils/transactionFeed');
-    postTransaction({ type: 'challenge_cancelled', discordId: interaction.user.id, challengeId, memo: `\${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challengeId} cancelled by creator — all funds refunded` });
+    postTransaction({ type: 'challenge_cancelled', discordId: interaction.user.id, challengeId, memo: `${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId} cancelled by creator — all funds refunded` });
 
     await interaction.followUp({
-      content: `\${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challengeId} has been cancelled. All funds have been refunded.`,
+      content: `${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId} has been cancelled.${challenge.type === 'wager' ? ' All funds have been refunded.' : ''}`,
       ephemeral: true,
     });
   } catch (err) {
