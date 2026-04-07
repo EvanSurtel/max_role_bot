@@ -392,65 +392,40 @@ async function triggerDispute(client, matchId) {
   matchRepo.updateStatus(matchId, MATCH_STATUS.DISPUTED);
   challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.DISPUTED);
 
-  // Get all players' Discord IDs
-  const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
-  const allDiscordIds = [];
-  for (const player of allPlayers) {
-    const u = userRepo.findById(player.user_id);
-    if (u) allDiscordIds.push(u.discord_id);
-  }
+  // Post dispute in the existing shared-chat channel (no new channels created)
+  const sharedChannel = match.shared_text_id ? client.channels.cache.get(match.shared_text_id) : null;
 
-  // Create dispute channels in the match category
-  let disputeText = null;
-  try {
-    const guild = client.guilds.cache.get(process.env.GUILD_ID) || client.guilds.cache.first();
-    if (guild && match.category_id) {
-      const { ChannelType } = require('discord.js');
-      const { sharedOverwrites } = require('../utils/permissions');
+  if (sharedChannel) {
+    const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
+    const allPings = allPlayers.map(p => {
+      const u = userRepo.findById(p.user_id);
+      return u ? `<@${u.discord_id}>` : '';
+    }).filter(Boolean).join(' ');
 
-      disputeText = await guild.channels.create({
-        name: 'dispute',
-        type: ChannelType.GuildText,
-        parent: match.category_id,
-        permissionOverwrites: sharedOverwrites(guild, allDiscordIds),
-      });
-
-      await guild.channels.create({
-        name: 'Dispute Call',
-        type: ChannelType.GuildVoice,
-        parent: match.category_id,
-        permissionOverwrites: sharedOverwrites(guild, allDiscordIds),
-      });
-    }
-  } catch (err) {
-    console.error(`[MatchResult] Failed to create dispute channels:`, err.message);
-  }
-
-  const notifyChannel = disputeText || (match.shared_text_id ? client.channels.cache.get(match.shared_text_id) : null);
-
-  if (notifyChannel) {
     const adminRoleId = process.env.ADMIN_ROLE_ID;
-    const staffRoleId = process.env.WAGER_STAFF_ROLE_ID;
+    const wagerStaffId = process.env.WAGER_STAFF_ROLE_ID;
+    const xpStaffId = process.env.XP_STAFF_ROLE_ID;
     const pings = [];
-    if (staffRoleId) pings.push(`<@&${staffRoleId}>`);
+    if (wagerStaffId) pings.push(`<@&${wagerStaffId}>`);
+    if (xpStaffId) pings.push(`<@&${xpStaffId}>`);
     if (adminRoleId) pings.push(`<@&${adminRoleId}>`);
     const staffPing = pings.length > 0 ? pings.join(' ') : 'Staff';
-    const allPings = allDiscordIds.map(id => `<@${id}>`).join(' ');
 
-    await notifyChannel.send({
-      content: `**Match Disputed!**\n\n${allPings}\n\n**Post your evidence directly in this channel** — screenshots, photos, videos, links, text — anything to support your case.\n\nJoin the voice call to discuss.\n\n${staffPing} — please review evidence and resolve.`,
+    await sharedChannel.send({
+      content: `**Match Disputed!**\n\n${allPings}\n\n**Post your evidence directly in this channel** — screenshots, photos, videos, links, text.\n\n${staffPing} — please review and resolve.`,
     });
 
     const adminRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`admin_resolve_team1_${matchId}`).setLabel('Team 1 Wins').setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId(`admin_resolve_team2_${matchId}`).setLabel('Team 2 Wins').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`admin_resolve_nowinner_${matchId}`).setLabel('No Winner').setStyle(ButtonStyle.Secondary),
     );
 
-    await notifyChannel.send({ content: '**Staff Panel** — After reviewing evidence, resolve:', components: [adminRow] });
+    await sharedChannel.send({ content: '**Staff Panel** — Review evidence and resolve:', components: [adminRow] });
   }
 
   const { postTransaction: ptx } = require('../utils/transactionFeed');
-  ptx({ type: 'match_disputed', challengeId: match.challenge_id, memo: `Match #${matchId} disputed — channels created for staff review` });
+  ptx({ type: 'match_disputed', challengeId: match.challenge_id, memo: `Match #${matchId} disputed` });
 
   console.log(`[MatchResult] Match #${matchId} disputed`);
 }
@@ -559,7 +534,7 @@ async function handleAdminConfirm(interaction) {
   logAdminAction(interaction.user.id, 'resolve_dispute', 'match', matchId, { winningTeam });
 
   await interaction.update({
-    content: `<@${interaction.user.id}> resolved the dispute. **Team ${winningTeam} wins!** Paying out...`,
+    content: `<@${interaction.user.id}> resolved the dispute. **Team ${winningTeam} wins!**`,
     embeds: [], components: [],
   });
 
@@ -569,9 +544,9 @@ async function handleAdminConfirm(interaction) {
     // Post dispute result to permanent dispute results channel
     await postDisputeResult(interaction.client, matchId, winningTeam, interaction.user.id);
 
-    const { cleanupDisputeChannels } = require('./disputeCreate');
+    // Clean up match channels after resolution
     setTimeout(() => {
-      cleanupDisputeChannels(interaction.client, matchId).catch(() => {});
+      matchService.cleanupChannels(interaction.client, matchId).catch(() => {});
     }, 30000);
   } catch (err) {
     console.error(`[MatchResult] Admin resolve failed for match #${matchId}:`, err);
@@ -743,18 +718,14 @@ async function postDisputeResult(client, matchId, winningTeam, resolverDiscordId
 
     await ch.send({ embeds: [resultEmbed] });
 
-    // Archive all messages from the dispute channel (text + images)
+    // Archive evidence messages from the shared-chat channel
     let disputeMessages = [];
     try {
-      // Find the dispute channel (dispute-chat in the dispute category)
-      const guild = client.guilds.cache.get(process.env.GUILD_ID) || client.guilds.cache.first();
-      if (guild && match.dispute_category_id) {
-        const disputeChat = guild.channels.cache.find(
-          c => c.parentId === match.dispute_category_id && c.name === 'dispute-chat'
-        );
-        if (disputeChat) {
-          const msgs = await disputeChat.messages.fetch({ limit: 100 });
-          disputeMessages = [...msgs.values()].reverse(); // oldest first
+      if (match.shared_text_id) {
+        const sharedCh = client.channels.cache.get(match.shared_text_id);
+        if (sharedCh) {
+          const msgs = await sharedCh.messages.fetch({ limit: 100 });
+          disputeMessages = [...msgs.values()].reverse();
         }
       }
     } catch (err) {
