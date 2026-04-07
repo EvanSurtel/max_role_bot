@@ -34,8 +34,11 @@ module.exports = {
         if (id.startsWith('challenge_nevermind_')) {
           return interaction.update({ content: 'No problem. Challenge not accepted.', embeds: [], components: [] });
         }
-        // Challenge cancel button
-        if (id.startsWith('challenge_cancel_')) {
+        // Challenge cancel + confirm cancel
+        if (id === 'challenge_cancel_nevermind') {
+          return interaction.update({ content: 'Cancel aborted.', embeds: [], components: [] });
+        }
+        if (id.startsWith('challenge_cancel_') || id.startsWith('challenge_confirm_cancel_')) {
           return await challengeCancel.handleButton(interaction);
         }
         // Teammate accept/decline buttons

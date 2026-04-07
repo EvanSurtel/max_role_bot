@@ -3,9 +3,8 @@ const userRepo = require('../database/repositories/userRepo');
 const challengeService = require('../services/challengeService');
 const { challengeEmbed } = require('../utils/embeds');
 const { CHALLENGE_STATUS } = require('../config/constants');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 
-// Statuses where the creator can still cancel
 const CANCELLABLE = [
   CHALLENGE_STATUS.PENDING_TEAMMATES,
   CHALLENGE_STATUS.OPEN,
@@ -13,11 +12,18 @@ const CANCELLABLE = [
 ];
 
 /**
- * Handle the cancel button on a challenge board post or during teammate phase.
- * customId: challenge_cancel_{challengeId}
+ * Handle cancel button — show confirmation first.
  */
 async function handleButton(interaction) {
-  const challengeId = parseInt(interaction.customId.replace('challenge_cancel_', ''), 10);
+  const customId = interaction.customId;
+
+  // Confirmed cancel
+  if (customId.startsWith('challenge_confirm_cancel_')) {
+    return handleConfirmedCancel(interaction);
+  }
+
+  // Initial cancel click — show confirmation
+  const challengeId = parseInt(customId.replace('challenge_cancel_', ''), 10);
   if (isNaN(challengeId)) {
     return interaction.reply({ content: 'Invalid challenge.', ephemeral: true });
   }
@@ -27,13 +33,11 @@ async function handleButton(interaction) {
     return interaction.reply({ content: 'Challenge not found.', ephemeral: true });
   }
 
-  // Only the creator can cancel
   const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user || user.id !== challenge.creator_user_id) {
     return interaction.reply({ content: 'Only the challenge creator can cancel.', ephemeral: true });
   }
 
-  // Check the challenge is in a cancellable state
   if (!CANCELLABLE.includes(challenge.status)) {
     return interaction.reply({
       content: 'This challenge can no longer be cancelled (match already started or completed).',
@@ -41,24 +45,64 @@ async function handleButton(interaction) {
     });
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  const confirmEmbed = new EmbedBuilder()
+    .setTitle('Confirm Cancel')
+    .setColor(0xe74c3c)
+    .setDescription(`Are you sure you want to cancel **Challenge #${challengeId}**?\n\nAll held funds will be refunded to all players.`);
+
+  const confirmRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`challenge_confirm_cancel_${challengeId}`)
+      .setLabel('Yes, Cancel Challenge')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId('challenge_cancel_nevermind')
+      .setLabel('Nevermind')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
+}
+
+/**
+ * Handle confirmed cancel.
+ */
+async function handleConfirmedCancel(interaction) {
+  const challengeId = parseInt(interaction.customId.replace('challenge_confirm_cancel_', ''), 10);
+  if (isNaN(challengeId)) {
+    return interaction.reply({ content: 'Invalid challenge.', ephemeral: true });
+  }
+
+  const challenge = challengeRepo.findById(challengeId);
+  if (!challenge) {
+    return interaction.reply({ content: 'Challenge not found.', ephemeral: true });
+  }
+
+  const user = userRepo.findByDiscordId(interaction.user.id);
+  if (!user || user.id !== challenge.creator_user_id) {
+    return interaction.reply({ content: 'Only the challenge creator can cancel.', ephemeral: true });
+  }
+
+  if (!CANCELLABLE.includes(challenge.status)) {
+    return interaction.reply({ content: 'This challenge can no longer be cancelled.', ephemeral: true });
+  }
 
   try {
-    // Cancel + refund all held funds
-    await challengeService.cancelChallenge(challengeId);
+    await interaction.update({ content: 'Cancelling challenge...', embeds: [], components: [] });
 
-    // Update the board message to show cancelled
+    await challengeService.cancelChallenge(challengeId);
     await disableBoardMessage(interaction.client, challenge);
 
     const { postTransaction } = require('../utils/transactionFeed');
     postTransaction({ type: 'challenge_cancelled', discordId: interaction.user.id, challengeId, memo: `Challenge #${challengeId} cancelled by creator — all funds refunded` });
 
-    await interaction.editReply({
+    await interaction.followUp({
       content: `Challenge #${challengeId} has been cancelled. All funds have been refunded.`,
+      ephemeral: true,
     });
   } catch (err) {
     console.error(`[ChallengeCancel] Error cancelling challenge #${challengeId}:`, err);
-    await interaction.editReply({ content: 'Failed to cancel challenge. Please try again.' });
+    await interaction.followUp({ content: 'Failed to cancel challenge. Please try again.', ephemeral: true });
   }
 }
 
