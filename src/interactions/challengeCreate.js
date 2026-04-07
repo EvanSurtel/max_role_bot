@@ -17,15 +17,26 @@ const {
 } = require('../config/constants');
 const channelService = require('../services/channelService');
 
-// Cancel button row — added to every step
-function cancelRow() {
-  return new ActionRowBuilder().addComponents(
+// Navigation row — Previous + Cancel on every step
+function navRow(step) {
+  const buttons = [];
+  if (step > 1) {
+    buttons.push(
+      new ButtonBuilder()
+        .setCustomId('wager_prev')
+        .setLabel('Previous')
+        .setStyle(ButtonStyle.Secondary),
+    );
+  }
+  buttons.push(
     new ButtonBuilder()
       .setCustomId('wager_cancel_flow')
       .setLabel('Cancel')
       .setStyle(ButtonStyle.Danger),
   );
+  return new ActionRowBuilder().addComponents(...buttons);
 }
+function cancelRow() { return navRow(1); }
 
 // Track each user's in-progress challenge creation state
 // discordUserId -> { type, teamSize, teammates, gameMode, series, anonymous, channelId }
@@ -49,6 +60,65 @@ async function handleButton(interaction) {
       return;
     }
     return finalizeChallengeCreation(interaction, flow, flow.pendingAmount || 0);
+  }
+
+  // Previous button — go back one step
+  if (id === 'wager_prev') {
+    const flow = activeFlows.get(userId);
+    if (!flow) {
+      await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
+      return;
+    }
+
+    let prevStep = flow.step - 1;
+    // Skip teammate step for 1v1
+    if (prevStep === 2 && flow.teamSize === 1) prevStep = 1;
+    if (prevStep < 1) return interaction.reply({ content: 'Already at the first step.', ephemeral: true });
+
+    // Reconstruct the previous step UI
+    if (prevStep === 1) {
+      // Team size
+      flow.step = 1;
+      const row = new ActionRowBuilder().addComponents(
+        ...TEAM_SIZES.map(size =>
+          new ButtonBuilder().setCustomId(`wager_teamsize_${size}`).setLabel(`${size}v${size}`).setStyle(ButtonStyle.Secondary),
+        ),
+      );
+      const typeLabel = flow.type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match';
+      return interaction.update({ content: `**Setting up ${typeLabel}**\n\n**Select team size:**`, components: [row, navRow(1)] });
+    }
+
+    if (prevStep === 2) {
+      // Teammate select
+      flow.step = 2;
+      const selectRow = new ActionRowBuilder().addComponents(
+        new UserSelectMenuBuilder()
+          .setCustomId('select_teammates')
+          .setPlaceholder(`Select ${flow.teamSize - 1} teammate(s)`)
+          .setMinValues(flow.teamSize - 1)
+          .setMaxValues(flow.teamSize - 1),
+      );
+      return interaction.update({ content: `**Select your teammates:**\n\nTeam size: **${flow.teamSize}v${flow.teamSize}**`, components: [selectRow, navRow(2)] });
+    }
+
+    if (prevStep === 3) {
+      // Game mode — call showGameModes
+      return showGameModes(interaction, flow);
+    }
+
+    if (prevStep === 4) {
+      // Series length
+      flow.step = 4;
+      const row = new ActionRowBuilder().addComponents(
+        ...SERIES_LENGTHS.map(len =>
+          new ButtonBuilder().setCustomId(`wager_series_${len}`).setLabel(`Best of ${len}`).setStyle(ButtonStyle.Secondary),
+        ),
+      );
+      return interaction.update({ content: `**Select series length:**\n\nMode: **${GAME_MODES[flow.gameMode]?.label || flow.gameMode}**`, components: [row, navRow(4)] });
+    }
+
+    return interaction.reply({ content: 'Cannot go back further.', ephemeral: true });
   }
 
   // Cancel challenge creation — delete setup channel
@@ -109,18 +179,23 @@ async function handleButton(interaction) {
 
     const type = id === 'wager_type_wager' ? CHALLENGE_TYPE.WAGER : CHALLENGE_TYPE.XP;
 
-    // Create a private channel for this user's setup
+    // Create a private channel for this user's setup under the right category
     const guild = interaction.guild;
     let username = interaction.user.username;
     const channelPrefix = type === CHALLENGE_TYPE.WAGER ? 'wager' : 'xp-match';
+    const categoryId = type === CHALLENGE_TYPE.WAGER
+      ? (process.env.WAGER_SETUP_CATEGORY_ID || null)
+      : (process.env.XP_SETUP_CATEGORY_ID || null);
     const channel = await channelService.createPrivateChannel(
       guild,
       `${channelPrefix}-${username}`,
       [userId],
+      categoryId,
     );
 
     activeFlows.set(userId, {
       type,
+      step: 1,
       teamSize: null,
       teammates: [],
       gameMode: null,
@@ -172,9 +247,10 @@ async function handleButton(interaction) {
           .setMaxValues(teamSize - 1),
       );
 
+      flow.step = 2;
       return interaction.update({
         content: `**Select your teammates:**\n\nTeam size: **${teamSize}v${teamSize}** — Pick **${teamSize - 1}** teammate(s).`,
-        components: [selectRow, cancelRow()],
+        components: [selectRow, navRow(2)],
       });
     }
 
@@ -205,9 +281,10 @@ async function handleButton(interaction) {
       ),
     );
 
+    flow.step = 4;
     return interaction.update({
       content: `**Select series length:**\n\nMode: **${GAME_MODES[mode]?.label || mode}**`,
-      components: [row, cancelRow()],
+      components: [row, navRow(4)],
     });
   }
 
@@ -245,8 +322,9 @@ async function handleButton(interaction) {
         '',
         '**Show Names** — Your name and teammates will be visible on the challenge board so opponents can see who\'s challenging.',
       ].join('\n'),
-      components: [row, cancelRow()],
+      components: [row, navRow(5)],
     });
+    flow.step = 5;
   }
 
   // Step 6: Visibility selection
@@ -425,7 +503,8 @@ async function showGameModes(interaction, flow) {
     ? `\nTeammates: ${flow.teammates.map(id => `<@${id}>`).join(', ')}`
     : '';
 
-  rows.push(cancelRow());
+  flow.step = 3;
+  rows.push(navRow(3));
   return interaction.update({
     content: `**Select game mode:**\n\nTeam size: **${flow.teamSize}v${flow.teamSize}**${teammateText}`,
     components: rows,
