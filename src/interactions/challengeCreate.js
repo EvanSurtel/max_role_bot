@@ -84,12 +84,13 @@ async function handleButton(interaction) {
 
     const type = id === 'wager_type_wager' ? CHALLENGE_TYPE.WAGER : CHALLENGE_TYPE.XP;
 
-    // Create a private channel for this user's wager setup
+    // Create a private channel for this user's setup
     const guild = interaction.guild;
     let username = interaction.user.username;
+    const channelPrefix = type === CHALLENGE_TYPE.WAGER ? 'wager' : 'xp-match';
     const channel = await channelService.createPrivateChannel(
       guild,
-      `wager-${username}`,
+      `${channelPrefix}-${username}`,
       [userId],
     );
 
@@ -120,7 +121,7 @@ async function handleButton(interaction) {
     });
 
     return interaction.editReply({
-      content: `Your wager setup channel has been created: <#${channel.id}>`,
+      content: `Your ${typeLabel.toLowerCase()} setup channel has been created: <#${channel.id}>`,
     });
   }
 
