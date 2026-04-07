@@ -57,8 +57,9 @@ async function handleButton(interaction) {
   if (id.startsWith('submit_evidence_')) return handleSubmitEvidenceButton(interaction);
 
   // Admin resolve
-  if (id.startsWith('admin_resolve_team1_') || id.startsWith('admin_resolve_team2_')) return handleAdminResolve(interaction);
+  if (id.startsWith('admin_resolve_team1_') || id.startsWith('admin_resolve_team2_') || id.startsWith('admin_resolve_nowinner_')) return handleAdminResolve(interaction);
   if (id.startsWith('admin_confirm_')) return handleAdminConfirm(interaction);
+  if (id.startsWith('admin_confirm_nowinner_')) return handleAdminConfirmNoWinner(interaction);
   if (id.startsWith('admin_goback_')) return handleAdminGoBack(interaction);
 }
 
@@ -175,6 +176,7 @@ async function handleNoShowReport(interaction) {
   const adminRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`admin_resolve_team1_${matchId}`).setLabel('Team 1 Wins').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`admin_resolve_team2_${matchId}`).setLabel('Team 2 Wins').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`admin_resolve_nowinner_${matchId}`).setLabel('No Winner').setStyle(ButtonStyle.Secondary),
   );
 
   // Send to admin alerts channel (staff only)
@@ -522,7 +524,10 @@ async function handleAdminResolve(interaction) {
   }
 
   let winningTeam, matchId;
-  if (id.startsWith('admin_resolve_team1_')) {
+  if (id.startsWith('admin_resolve_nowinner_')) {
+    winningTeam = 0; // no winner
+    matchId = parseInt(id.replace('admin_resolve_nowinner_', ''), 10);
+  } else if (id.startsWith('admin_resolve_team1_')) {
     winningTeam = 1;
     matchId = parseInt(id.replace('admin_resolve_team1_', ''), 10);
   } else {
@@ -541,6 +546,26 @@ async function handleAdminResolve(interaction) {
   const { formatUsdc } = require('../utils/embeds');
   const challenge = challengeRepo.findById(match.challenge_id);
   const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
+
+  if (winningTeam === 0) {
+    // No Winner confirmation
+    const isWager = challenge && Number(challenge.total_pot_usdc) > 0;
+    const refundText = isWager
+      ? `\n\nAll players will be **refunded** their entry of ${formatUsdc(challenge.entry_amount_usdc)} USDC each.`
+      : '\n\nNo XP changes will be applied.';
+
+    const confirmEmbed = new EmbedBuilder()
+      .setTitle('Confirm: No Winner')
+      .setColor(0x95a5a6)
+      .setDescription(`You are declaring **no winner** for Match #${matchId}.${refundText}\n\n**This cannot be undone.**`);
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`admin_confirm_nowinner_${matchId}`).setLabel('Confirm No Winner').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`admin_goback_${matchId}`).setLabel('Go Back').setStyle(ButtonStyle.Primary),
+    );
+
+    return interaction.update({ embeds: [confirmEmbed], components: [row] });
+  }
 
   const losingTeam = winningTeam === 1 ? 2 : 1;
   const winnerNames = allPlayers.filter(p => p.team === winningTeam).map(p => {
@@ -602,11 +627,111 @@ async function handleAdminConfirm(interaction) {
   }
 }
 
+async function handleAdminConfirmNoWinner(interaction) {
+  const matchId = parseInt(interaction.customId.replace('admin_confirm_nowinner_', ''), 10);
+
+  if (!canResolveDisputes(interaction.member)) {
+    return interaction.reply({ content: 'Only admins and wager staff can resolve disputes.', ephemeral: true });
+  }
+
+  const match = matchRepo.findById(matchId);
+  if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
+
+  const challenge = challengeRepo.findById(match.challenge_id);
+
+  const { logAdminAction } = require('../utils/adminAudit');
+  logAdminAction(interaction.user.id, 'resolve_no_winner', 'match', matchId, {});
+
+  await interaction.update({
+    content: `<@${interaction.user.id}> declared **no winner** for Match #${matchId}. Refunding all players.`,
+    embeds: [], components: [],
+  });
+
+  try {
+    // For wagers: refund all escrow funds back to players
+    if (challenge && challenge.type === 'wager' && Number(challenge.total_pot_usdc) > 0) {
+      const escrowManager = require('../solana/escrowManager');
+      const challengePlayerRepo2 = require('../database/repositories/challengePlayerRepo');
+      const allPlayers = challengePlayerRepo2.findByChallengeId(match.challenge_id);
+      const escrowKeypair = escrowManager.__test_getEscrowKeypair ? escrowManager.__test_getEscrowKeypair() : null;
+
+      // Refund each player their entry amount from escrow
+      for (const player of allPlayers) {
+        try {
+          const walletRepo = require('../database/repositories/walletRepo');
+          const walletRecord = walletRepo.findByUserId(player.user_id);
+          if (!walletRecord) continue;
+
+          const transactionService = require('../solana/transactionService');
+          const { Keypair } = require('@solana/web3.js');
+          const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
+          if (!secretKeyJson) continue;
+          const escrowKp = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyJson)));
+
+          const { signature } = await transactionService.transferUsdc(
+            escrowKp,
+            walletRecord.solana_address,
+            challenge.entry_amount_usdc,
+          );
+
+          // Update DB balance
+          const currentAvailable = BigInt(walletRecord.balance_available);
+          const entryAmount = BigInt(challenge.entry_amount_usdc);
+          walletRepo.updateBalance(player.user_id, {
+            balanceAvailable: (currentAvailable + entryAmount).toString(),
+            balanceHeld: walletRecord.balance_held,
+          });
+
+          const transactionRepo = require('../database/repositories/transactionRepo');
+          transactionRepo.create({
+            type: 'refund',
+            userId: player.user_id,
+            challengeId: match.challenge_id,
+            amountUsdc: challenge.entry_amount_usdc,
+            solanaTxSignature: signature,
+            fromAddress: escrowKp.publicKey.toBase58(),
+            toAddress: walletRecord.solana_address,
+            status: 'completed',
+            memo: `Refund (no winner) for challenge #${match.challenge_id}`,
+          });
+
+          const { postTransaction } = require('../utils/transactionFeed');
+          const userRecord = require('../database/repositories/userRepo').findById(player.user_id);
+          postTransaction({ type: 'release', username: userRecord?.server_username, discordId: userRecord?.discord_id, amount: `$${(Number(challenge.entry_amount_usdc) / 1000000).toFixed(2)}`, currency: 'USDC', signature, challengeId: match.challenge_id, memo: `Refund (no winner)` });
+        } catch (err) {
+          console.error(`[MatchResult] Failed to refund player ${player.user_id}:`, err.message);
+        }
+      }
+    }
+
+    // Mark match as completed with no winner
+    matchRepo.updateStatus(matchId, MATCH_STATUS.COMPLETED);
+    challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.COMPLETED);
+
+    // No XP changes for anyone
+
+    // Cleanup dispute channels
+    const { cleanupDisputeChannels } = require('./disputeCreate');
+    setTimeout(() => {
+      cleanupDisputeChannels(interaction.client, matchId).catch(() => {});
+    }, 30000);
+
+    // Cleanup match channels
+    setTimeout(() => {
+      matchService.cleanupChannels(interaction.client, matchId).catch(() => {});
+    }, 60000);
+
+  } catch (err) {
+    console.error(`[MatchResult] No-winner resolution failed for match #${matchId}:`, err);
+  }
+}
+
 async function handleAdminGoBack(interaction) {
   const matchId = parseInt(interaction.customId.replace('admin_goback_', ''), 10);
   const adminRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`admin_resolve_team1_${matchId}`).setLabel('Team 1 Wins').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`admin_resolve_team2_${matchId}`).setLabel('Team 2 Wins').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`admin_resolve_nowinner_${matchId}`).setLabel('No Winner').setStyle(ButtonStyle.Secondary),
   );
   return interaction.update({ content: '**Staff Panel** — Review evidence, then resolve:', embeds: [], components: [adminRow] });
 }
