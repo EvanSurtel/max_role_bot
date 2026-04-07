@@ -142,6 +142,21 @@ async function showReportConfirm(interaction, outcome) {
     return interaction.reply({ content: 'This match is no longer accepting reports.', ephemeral: true });
   }
 
+  // Check minimum time before reporting
+  const { MIN_REPORT_MINUTES } = require('../config/constants');
+  const challenge = challengeRepo.findById(match.challenge_id);
+  const minMinutes = MIN_REPORT_MINUTES[challenge?.series_length] || 5;
+  const matchCreatedAt = new Date(match.created_at).getTime();
+  const elapsedMinutes = (Date.now() - matchCreatedAt) / 60000;
+
+  if (elapsedMinutes < minMinutes) {
+    const remaining = Math.ceil(minMinutes - elapsedMinutes);
+    return interaction.reply({
+      content: `You can't report yet. Minimum **${minMinutes} minutes** must pass for a Best of ${challenge?.series_length || '?'} match. **${remaining} minute(s) remaining.**`,
+      ephemeral: true,
+    });
+  }
+
   const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) return interaction.reply({ content: 'Not registered.', ephemeral: true });
 

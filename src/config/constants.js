@@ -37,6 +37,14 @@ const MATCH_TIMERS = {
   REPORT_BUFFER: 30,    // Minutes after estimate + window before auto-dispute
 };
 
+// Minimum minutes before captains can report results (prevents spam)
+const MIN_REPORT_MINUTES = {
+  1: 5,    // Bo1: 5 minutes
+  3: 10,   // Bo3: 10 minutes
+  5: 15,   // Bo5: 15 minutes
+  7: 20,   // Bo7: 20 minutes
+};
+
 // Mode rotation orders for series
 // Mode rotation orders for series
 // Bo1 with mixed modes: random pick. Bo3+: rotate in order.
@@ -174,6 +182,7 @@ module.exports = {
   MAP_POOLS,
   MAP_DURATION_MINUTES,
   MATCH_TIMERS,
+  MIN_REPORT_MINUTES,
   TEAM_SIZES,
   SERIES_LENGTHS,
   GAME_MODES,
