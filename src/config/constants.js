@@ -76,7 +76,7 @@ const MODE_ROTATIONS = {
 
 // Timers (in milliseconds)
 const TIMERS = {
-  CHALLENGE_EXPIRY: 10 * 60 * 1000,
+  CHALLENGE_EXPIRY: 60 * 60 * 1000, // 1 hour
   CHALLENGE_EXTEND: 10 * 60 * 1000,
   TEAMMATE_ACCEPT: 10 * 60 * 1000,
   RESULT_RESPONSE: 10 * 60 * 1000,
