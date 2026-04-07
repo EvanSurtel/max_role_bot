@@ -54,8 +54,6 @@ async function handleButton(interaction) {
   }
 
   // Dispute
-  if (id.startsWith('submit_evidence_')) return handleSubmitEvidenceButton(interaction);
-
   // Admin resolve
   if (id.startsWith('admin_resolve_team1_') || id.startsWith('admin_resolve_team2_') || id.startsWith('admin_resolve_nowinner_')) return handleAdminResolve(interaction);
   if (id.startsWith('admin_confirm_')) return handleAdminConfirm(interaction);
@@ -439,13 +437,8 @@ async function triggerDispute(client, matchId) {
     const staffPing = pings.length > 0 ? pings.join(' ') : 'Staff';
     const allPings = allDiscordIds.map(id => `<@${id}>`).join(' ');
 
-    const evidenceRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`submit_evidence_${matchId}`).setLabel('Submit Evidence').setStyle(ButtonStyle.Primary),
-    );
-
     await notifyChannel.send({
-      content: `**Match Disputed!**\n\n${allPings}\n\nBoth teams — submit evidence using the button below or discuss in the voice call.\n\n${staffPing} — please review and resolve.`,
-      components: [evidenceRow],
+      content: `**Match Disputed!**\n\n${allPings}\n\n**Post your evidence directly in this channel** — screenshots, photos, videos, links, text — anything to support your case.\n\nJoin the voice call to discuss.\n\n${staffPing} — please review evidence and resolve.`,
     });
 
     const adminRow = new ActionRowBuilder().addComponents(
@@ -464,55 +457,9 @@ async function triggerDispute(client, matchId) {
 
 // ─── Evidence ────────────────────────────────────────────────────
 
-async function handleSubmitEvidenceButton(interaction) {
-  const matchId = parseInt(interaction.customId.replace('submit_evidence_', ''), 10);
-  const modal = new ModalBuilder()
-    .setCustomId(`evidence_modal_${matchId}`)
-    .setTitle('Submit Dispute Evidence');
-
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId('evidence_link').setLabel('Link to evidence (screenshot/video)').setPlaceholder('https://...').setStyle(TextInputStyle.Short).setRequired(true),
-    ),
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId('evidence_notes').setLabel('Additional notes (optional)').setPlaceholder('Explain what happened...').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(500),
-    ),
-  );
-
-  return interaction.showModal(modal);
-}
-
-async function handleEvidenceSubmission(interaction) {
-  const matchId = parseInt(interaction.customId.replace('evidence_modal_', ''), 10);
-  const link = interaction.fields.getTextInputValue('evidence_link').trim();
-  const notes = interaction.fields.getTextInputValue('evidence_notes')?.trim() || '';
-
-  const match = matchRepo.findById(matchId);
-  if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
-
-  try {
-    const evidenceRepo = require('../database/repositories/evidenceRepo');
-    evidenceRepo.create(matchId, interaction.user.id, link, notes);
-  } catch (err) {
-    console.error(`[MatchResult] Failed to store evidence:`, err.message);
-  }
-
-  await interaction.reply({ content: 'Your evidence has been submitted.', ephemeral: true });
-
-  if (match.voting_channel_id) {
-    const voteChannel = interaction.client.channels.cache.get(match.voting_channel_id);
-    if (voteChannel) {
-      const embed = new EmbedBuilder()
-        .setTitle('Evidence Submitted')
-        .setColor(0x3498db)
-        .setDescription(`**From:** <@${interaction.user.id}>`)
-        .addFields({ name: 'Link', value: link })
-        .setTimestamp();
-      if (notes) embed.addFields({ name: 'Notes', value: notes });
-      await voteChannel.send({ embeds: [embed] });
-    }
-  }
-}
+// Evidence is now submitted by posting directly in the dispute channel.
+// No modal needed — users post text, images, links, whatever they want.
+// When dispute resolves, all messages are archived to the permanent results channel.
 
 // ─── Admin/Staff Resolve ─────────────────────────────────────────
 
@@ -796,25 +743,53 @@ async function postDisputeResult(client, matchId, winningTeam, resolverDiscordId
 
     await ch.send({ embeds: [resultEmbed] });
 
-    // Post all evidence as separate embeds
-    if (allEvidence.length > 0) {
-      for (const ev of allEvidence) {
-        const evEmbed = new EmbedBuilder()
-          .setTitle(`Evidence — Match #${matchId}`)
-          .setColor(0x3498db)
-          .addFields(
-            { name: 'Submitted by', value: `<@${ev.submitted_by}>`, inline: true },
-            { name: 'Submitted at', value: ev.submitted_at || 'N/A', inline: true },
-            { name: 'Link', value: ev.link },
-          );
-        if (ev.notes) evEmbed.addFields({ name: 'Notes', value: ev.notes });
-        await ch.send({ embeds: [evEmbed] });
+    // Archive all messages from the dispute channel (text + images)
+    let disputeMessages = [];
+    try {
+      // Find the dispute channel (dispute-chat in the dispute category)
+      const guild = client.guilds.cache.get(process.env.GUILD_ID) || client.guilds.cache.first();
+      if (guild && match.dispute_category_id) {
+        const disputeChat = guild.channels.cache.find(
+          c => c.parentId === match.dispute_category_id && c.name === 'dispute-chat'
+        );
+        if (disputeChat) {
+          const msgs = await disputeChat.messages.fetch({ limit: 100 });
+          disputeMessages = [...msgs.values()].reverse(); // oldest first
+        }
       }
-    } else {
-      await ch.send({ content: `*No evidence was submitted for Match #${matchId}.*` });
+    } catch (err) {
+      console.error(`[MatchResult] Failed to fetch dispute messages:`, err.message);
     }
 
-    // Separator
+    if (disputeMessages.length > 0) {
+      await ch.send({ content: `**Evidence & Discussion (${disputeMessages.filter(m => !m.author.bot).length} messages):**` });
+
+      for (const msg of disputeMessages) {
+        if (msg.author.bot) continue; // skip bot messages
+
+        const parts = [];
+        parts.push(`**<@${msg.author.id}>** — ${msg.createdAt.toISOString().slice(0, 16).replace('T', ' ')}`);
+        if (msg.content) parts.push(msg.content);
+
+        // Re-upload any image attachments
+        const files = [];
+        for (const [, att] of msg.attachments) {
+          files.push(att.url);
+        }
+
+        const sendOpts = { content: parts.join('\n') };
+        if (files.length > 0) {
+          sendOpts.content += '\n' + files.join('\n');
+        }
+
+        try {
+          await ch.send(sendOpts);
+        } catch { /* skip if message too long */ }
+      }
+    } else {
+      await ch.send({ content: `*No evidence was posted for Match #${matchId}.*` });
+    }
+
     await ch.send({ content: '───────────────────────────────' });
 
   } catch (err) {

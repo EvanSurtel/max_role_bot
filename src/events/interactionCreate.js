@@ -51,7 +51,7 @@ module.exports = {
         }
         // Match result flow (report won/lost, no-show, evidence, admin)
         if (id.startsWith('report_won_') || id.startsWith('report_lost_') ||
-            id.startsWith('noshow_report_') || id.startsWith('submit_evidence_') ||
+            id.startsWith('noshow_report_') ||
             id.startsWith('admin_resolve_') || id.startsWith('admin_confirm_') ||
             id.startsWith('admin_goback_')) {
           return await matchResult.handleButton(interaction);
@@ -112,9 +112,7 @@ module.exports = {
         if (id === 'wallet_withdraw_sol_modal') {
           return await walletPanel.handleWithdrawSolModal(interaction);
         }
-        if (id.startsWith('evidence_modal_')) {
-          return await matchResult.handleModal(interaction);
-        }
+        // evidence_modal_ removed — evidence posted directly in channel
         if (id.startsWith('lb_admin_')) {
           return await leaderboardPanel.handleAdminModal(interaction);
         }

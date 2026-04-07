@@ -176,18 +176,13 @@ async function handleDisputeConfirm(interaction) {
         `**Team 1:** ${team1DiscordIds.map(id => `<@${id}>`).join(', ')}`,
         `**Team 2:** ${team2DiscordIds.map(id => `<@${id}>`).join(', ')}`,
         '',
-        'Submit evidence (screenshots, recordings) in this channel.',
+        '**Post your evidence directly in this channel** — screenshots, photos, videos, links, text.',
         'Join the voice call to discuss with staff.',
       ].join('\n'));
-
-    const evidenceRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`submit_evidence_${matchId}`).setLabel('Submit Evidence').setStyle(ButtonStyle.Primary),
-    );
 
     await disputeChat.send({
       content: `${allPings}\n\n${staffPing} — a dispute has been created for Match #${matchId}.`,
       embeds: [disputeEmbed],
-      components: [evidenceRow],
     });
 
     const adminRow = new ActionRowBuilder().addComponents(
