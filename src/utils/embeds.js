@@ -21,7 +21,7 @@ function challengeEmbed(challenge, isAnonymous, teamPlayers) {
   const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
 
   const embed = new EmbedBuilder()
-    .setTitle(`${isWager ? 'Wager' : 'XP Match'} Challenge #${challenge.id}`)
+    .setTitle(`${isWager ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id}`)
     .setColor(isWager ? 0xf1c40f : 0x3498db)
     .addFields(
       { name: 'Team Size', value: `${challenge.team_size}v${challenge.team_size}`, inline: true },

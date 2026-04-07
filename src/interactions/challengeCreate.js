@@ -636,7 +636,7 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
     });
 
     const summary = [
-      `**Challenge #${challenge.id} created!**`,
+      `**${flow.type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id} created!**`,
       '',
       `Type: **${flow.type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match'}**`,
       `Team size: **${flow.teamSize}v${flow.teamSize}**`,

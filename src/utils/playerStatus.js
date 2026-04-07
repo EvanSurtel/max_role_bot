@@ -14,14 +14,16 @@ const db = require('../database/db');
 function isPlayerBusy(userId) {
   // Check if in a forming challenge (pending_teammates, open, accepted)
   const formingChallenge = db.prepare(`
-    SELECT c.id, c.status FROM challenges c
+    SELECT c.id, c.status, c.type, c.display_number FROM challenges c
     JOIN challenge_players cp ON cp.challenge_id = c.id
     WHERE cp.user_id = ? AND c.status IN ('pending_teammates', 'open', 'accepted')
     LIMIT 1
   `).get(userId);
 
   if (formingChallenge) {
-    return { busy: true, reason: `You are already in Challenge #${formingChallenge.id} (${formingChallenge.status}). Cancel or wait for it to finish.` };
+    const label = formingChallenge.type === 'wager' ? 'Wager' : 'XP Match';
+    const num = formingChallenge.display_number || formingChallenge.id;
+    return { busy: true, reason: `You are already in ${label} #${num} (${formingChallenge.status}). Cancel or wait for it to finish.` };
   }
 
   // Check if in an active match where their captain hasn't voted

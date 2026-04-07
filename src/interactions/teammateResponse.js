@@ -115,7 +115,7 @@ async function showAcceptConfirm(interaction, challenge, player, user) {
     .setTitle('Confirm Accept')
     .setColor(0x2ecc71)
     .setDescription([
-      `You are joining **Challenge #${challenge.id}**`,
+      `You are joining **\${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id}**`,
       '',
       `**Type:** ${isWager ? 'Wager' : 'XP Match'}`,
       `**Team Size:** ${challenge.team_size}v${challenge.team_size}`,
@@ -149,7 +149,7 @@ async function showDeclineConfirm(interaction, challenge, player, user) {
   const confirmEmbed = new EmbedBuilder()
     .setTitle('Confirm Decline')
     .setColor(0xe74c3c)
-    .setDescription(`Are you sure you want to **decline** the invite for Challenge #${challenge.id}?\n\n**This will cancel the entire challenge** and refund all held funds to all players.`);
+    .setDescription(`Are you sure you want to **decline** the invite for \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id}?\n\n**This will cancel the entire challenge** and refund all held funds to all players.`);
 
   const confirmRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -197,11 +197,11 @@ async function handleAccept(interaction, challenge, player, user) {
   challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.ACCEPTED);
 
   const { postTransaction } = require('../utils/transactionFeed');
-  postTransaction({ type: 'teammate_accepted', username: user.server_username, discordId: user.discord_id, challengeId: challenge.id, memo: `Joined team for Challenge #${challenge.id}` });
+  postTransaction({ type: 'teammate_accepted', username: user.server_username, discordId: user.discord_id, challengeId: challenge.id, memo: `Joined team for \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id}` });
 
   // Reply confirming acceptance
   await interaction.reply({
-    content: `You have **accepted** the invitation for Challenge #${challenge.id}! Your funds have been held.`,
+    content: `You have **accepted** the invitation for \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id}! Your funds have been held.`,
   });
 
   // Check if all players are now accepted
@@ -240,11 +240,11 @@ async function handleDecline(interaction, challenge, player, user) {
   challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.DECLINED);
 
   const { postTransaction } = require('../utils/transactionFeed');
-  postTransaction({ type: 'teammate_declined', username: user.server_username, discordId: user.discord_id, challengeId: challenge.id, memo: `Declined team invite for Challenge #${challenge.id} — challenge cancelled` });
+  postTransaction({ type: 'teammate_declined', username: user.server_username, discordId: user.discord_id, challengeId: challenge.id, memo: `Declined team invite for \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id} — challenge cancelled` });
 
   // Reply confirming decline
   await interaction.reply({
-    content: `You have **declined** the invitation for Challenge #${challenge.id}. The challenge will be cancelled.`,
+    content: `You have **declined** the invitation for \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id}. The challenge will be cancelled.`,
   });
 
   // Notify the creator
@@ -254,7 +254,7 @@ async function handleDecline(interaction, challenge, player, user) {
       const creatorDiscord = await interaction.client.users.fetch(creator.discord_id);
       if (creatorDiscord) {
         await creatorDiscord.send(
-          `Your Challenge #${challenge.id} has been cancelled because <@${user.discord_id}> declined the team invitation.`,
+          `Your \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id} has been cancelled because <@${user.discord_id}> declined the team invitation.`,
         ).catch(() => {
           // DMs may be disabled; this is non-critical
           console.log(`[TeammateResponse] Could not DM creator ${creator.discord_id} about decline`);

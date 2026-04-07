@@ -91,7 +91,7 @@ async function notifyTeammates(guild, challenge) {
         content: `<@${discordId}>`,
         embeds: [
           {
-            title: `Team Invite — Challenge #${challenge.id}`,
+            title: `Team Invite — \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id}`,
             description: description.join('\n'),
             color: isWager ? 0xf1c40f : 0x3498db,
           },
@@ -211,7 +211,7 @@ async function postToBoard(client, challenge) {
     } else {
       // Already expired — fire immediately
       timerService.createTimer('challenge_expiry', challenge.id, 0);
-      console.log(`[ChallengeService] Challenge #${challenge.id} already past expiry, firing immediately`);
+      console.log(`[ChallengeService] \${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #\${challenge.display_number || challenge.id} already past expiry, firing immediately`);
     }
   }
 

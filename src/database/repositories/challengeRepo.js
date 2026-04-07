@@ -34,7 +34,11 @@ const challengeRepo = {
   },
 
   create({ type, creatorUserId, teamSize, gameModes, seriesLength, entryAmountUsdc, totalPotUsdc, isAnonymous, expiresAt }) {
-    return stmts.create.get({
+    // Get next display number for this type (separate sequences for wager vs xp)
+    const countRow = db.prepare('SELECT COUNT(*) as c FROM challenges WHERE type = ?').get(type);
+    const displayNumber = (countRow?.c || 0) + 1;
+
+    const result = stmts.create.get({
       type,
       creatorUserId,
       teamSize,
@@ -45,6 +49,16 @@ const challengeRepo = {
       isAnonymous: isAnonymous != null ? isAnonymous : 1,
       expiresAt: expiresAt || null,
     });
+
+    // Set display number
+    if (result) {
+      try {
+        db.prepare('UPDATE challenges SET display_number = ? WHERE id = ?').run(displayNumber, result.id);
+        result.display_number = displayNumber;
+      } catch { /* column may not exist yet */ }
+    }
+
+    return result;
   },
 
   updateStatus(id, status) {
