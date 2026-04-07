@@ -17,6 +17,16 @@ const {
 } = require('../config/constants');
 const channelService = require('../services/channelService');
 
+// Cancel button row — added to every step
+function cancelRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('wager_cancel_flow')
+      .setLabel('Cancel')
+      .setStyle(ButtonStyle.Danger),
+  );
+}
+
 // Track each user's in-progress challenge creation state
 // discordUserId -> { type, teamSize, teammates, gameMode, series, anonymous, channelId }
 const activeFlows = new Map();
@@ -132,7 +142,7 @@ async function handleButton(interaction) {
     const typeLabel = type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match';
     await channel.send({
       content: `<@${userId}> **Setting up ${typeLabel}**\n\n**Select team size:**`,
-      components: [row],
+      components: [row, cancelRow()],
     });
 
     return interaction.editReply({
@@ -164,7 +174,7 @@ async function handleButton(interaction) {
 
       return interaction.update({
         content: `**Select your teammates:**\n\nTeam size: **${teamSize}v${teamSize}** — Pick **${teamSize - 1}** teammate(s).`,
-        components: [selectRow],
+        components: [selectRow, cancelRow()],
       });
     }
 
@@ -197,7 +207,7 @@ async function handleButton(interaction) {
 
     return interaction.update({
       content: `**Select series length:**\n\nMode: **${GAME_MODES[mode]?.label || mode}**`,
-      components: [row],
+      components: [row, cancelRow()],
     });
   }
 
@@ -235,7 +245,7 @@ async function handleButton(interaction) {
         '',
         '**Show Names** — Your name and teammates will be visible on the challenge board so opponents can see who\'s challenging.',
       ].join('\n'),
-      components: [row],
+      components: [row, cancelRow()],
     });
   }
 
@@ -415,6 +425,7 @@ async function showGameModes(interaction, flow) {
     ? `\nTeammates: ${flow.teammates.map(id => `<@${id}>`).join(', ')}`
     : '';
 
+  rows.push(cancelRow());
   return interaction.update({
     content: `**Select game mode:**\n\nTeam size: **${flow.teamSize}v${flow.teamSize}**${teammateText}`,
     components: rows,
