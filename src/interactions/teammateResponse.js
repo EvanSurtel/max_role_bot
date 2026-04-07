@@ -88,7 +88,7 @@ async function handleButton(interaction) {
   challengeService.clearTeammateTimer(challengeId, player.id);
 
   if (action === 'accept') {
-    return showAcceptConfirm(interaction, challenge, player, user);
+    return handleAccept(interaction, challenge, player, user);
   } else if (action === 'decline') {
     return showDeclineConfirm(interaction, challenge, player, user);
   } else if (action === 'confirm_decline') {
