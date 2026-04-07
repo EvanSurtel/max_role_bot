@@ -579,6 +579,13 @@ async function resolveMatch(client, matchId, winningTeam) {
     }
   }
 
+  // Update nicknames with new XP and earnings
+  const { updateNicknames } = require('../utils/nicknameUpdater');
+  const allPlayerIds = allPlayers.map(p => p.user_id);
+  updateNicknames(client, allPlayerIds).catch(err => {
+    console.error(`[MatchService] Nickname update failed:`, err.message);
+  });
+
   // Schedule channel cleanup after 5 minutes
   setTimeout(() => {
     cleanupChannels(client, matchId).catch(err => {
