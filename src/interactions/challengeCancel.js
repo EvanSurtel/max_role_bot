@@ -119,9 +119,9 @@ async function disableBoardMessage(client, challenge) {
     const message = await boardChannel.messages.fetch(challenge.challenge_message_id);
     if (!message) return;
 
-    const embed = challengeEmbed(challenge, !!challenge.is_anonymous);
-    embed.setTitle(`[CANCELLED] ${embed.data.title}`);
-    embed.setColor(0x95a5a6);
+    // Delete the challenge from the board entirely
+    await message.delete();
+    return;
 
     const disabledRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
