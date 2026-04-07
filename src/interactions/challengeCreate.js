@@ -30,6 +30,19 @@ async function handleButton(interaction) {
   const id = interaction.customId;
   const userId = interaction.user.id;
 
+  // Confirm & Create challenge
+  if (id === 'wager_confirm_create') {
+    const flow = activeFlows.get(userId);
+    if (!flow) return interaction.reply({ content: 'Session expired. Please start over.', ephemeral: true });
+    return finalizeChallengeCreation(interaction, flow, flow.pendingAmount || 0);
+  }
+
+  // Cancel challenge creation
+  if (id === 'wager_cancel_create') {
+    activeFlows.delete(userId);
+    return interaction.update({ content: 'Challenge creation cancelled.', embeds: [], components: [] });
+  }
+
   // Step 1: Create Wager or XP Match — create a private channel for this user
   if (id === 'wager_type_wager' || id === 'wager_type_xp') {
     // Check if matches are paused (season transition)
@@ -234,8 +247,8 @@ async function handleButton(interaction) {
       return interaction.showModal(modal);
     }
 
-    // XP match — no entry amount, create directly
-    return finalizeChallengeCreation(interaction, flow, 0);
+    // XP match — show confirmation before creating
+    return showChallengeConfirm(interaction, flow, 0);
   }
 }
 
@@ -263,7 +276,7 @@ async function handleModal(interaction) {
       });
     }
 
-    return finalizeChallengeCreation(interaction, flow, amount);
+    return showChallengeConfirm(interaction, flow, amount);
   }
 }
 
@@ -297,6 +310,56 @@ async function handleUserSelect(interaction) {
     flow.teammates = selectedUsers;
     return showGameModes(interaction, flow);
   }
+}
+
+/**
+ * Show challenge summary and confirm before creating.
+ */
+async function showChallengeConfirm(interaction, flow, amountUsdc) {
+  const userId = interaction.user.id;
+  flow.pendingAmount = amountUsdc; // store for after confirmation
+
+  const modeLabel = GAME_MODES[flow.gameMode]?.label || flow.gameMode;
+  const typeLabel = flow.type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match';
+  const entryText = flow.type === CHALLENGE_TYPE.WAGER && amountUsdc > 0
+    ? `**Entry:** $${amountUsdc} USDC per player\n**Total Pot:** $${amountUsdc * flow.teamSize * 2} USDC`
+    : '**Entry:** None (XP Match)';
+  const teammateText = flow.teammates.length > 0
+    ? `**Teammates:** ${flow.teammates.map(id => `<@${id}>`).join(', ')}`
+    : '';
+
+  const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
+  const confirmEmbed = new EmbedBuilder()
+    .setTitle('Confirm & Create Challenge')
+    .setColor(0xf1c40f)
+    .setDescription([
+      `**Type:** ${typeLabel}`,
+      `**Team Size:** ${flow.teamSize}v${flow.teamSize}`,
+      `**Mode:** ${modeLabel}`,
+      `**Series:** Best of ${flow.series}`,
+      `**Visibility:** ${flow.anonymous ? 'Anonymous' : 'Show Names'}`,
+      entryText,
+      teammateText,
+      '',
+      'Does everything look correct?',
+    ].filter(Boolean).join('\n'));
+
+  const confirmRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('wager_confirm_create')
+      .setLabel('Confirm & Create')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('wager_cancel_create')
+      .setLabel('Cancel')
+      .setStyle(ButtonStyle.Danger),
+  );
+
+  if (interaction.isModalSubmit()) {
+    return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow] });
+  }
+  return interaction.update({ embeds: [confirmEmbed], components: [confirmRow] });
 }
 
 /**

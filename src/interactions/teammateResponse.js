@@ -21,8 +21,11 @@ async function handleButton(interaction) {
   if (customId.startsWith('teammate_confirm_accept_')) {
     action = 'accept';
     challengeId = parseInt(customId.replace('teammate_confirm_accept_', ''), 10);
+  } else if (customId.startsWith('teammate_confirm_decline_')) {
+    action = 'confirm_decline';
+    challengeId = parseInt(customId.replace('teammate_confirm_decline_', ''), 10);
   } else if (customId.startsWith('teammate_accept_')) {
-    action = 'accept_pending'; // show confirmation first
+    action = 'accept_pending';
     challengeId = parseInt(customId.replace('teammate_accept_', ''), 10);
   } else if (customId.startsWith('teammate_decline_')) {
     action = 'decline';
@@ -86,7 +89,9 @@ async function handleButton(interaction) {
 
   if (action === 'accept') {
     return showAcceptConfirm(interaction, challenge, player, user);
-  } else {
+  } else if (action === 'decline') {
+    return showDeclineConfirm(interaction, challenge, player, user);
+  } else if (action === 'confirm_decline') {
     return handleDecline(interaction, challenge, player, user);
   }
 }
@@ -130,6 +135,31 @@ async function showAcceptConfirm(interaction, challenge, player, user) {
       .setCustomId(`teammate_decline_${challenge.id}`)
       .setLabel('Decline')
       .setStyle(ButtonStyle.Danger),
+  );
+
+  return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
+}
+
+/**
+ * Show confirmation before declining team invite.
+ */
+async function showDeclineConfirm(interaction, challenge, player, user) {
+  const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
+  const confirmEmbed = new EmbedBuilder()
+    .setTitle('Confirm Decline')
+    .setColor(0xe74c3c)
+    .setDescription(`Are you sure you want to **decline** the invite for Challenge #${challenge.id}?\n\n**This will cancel the entire challenge** and refund all held funds to all players.`);
+
+  const confirmRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`teammate_confirm_decline_${challenge.id}`)
+      .setLabel('Yes, Decline')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`teammate_accept_${challenge.id}`)
+      .setLabel('Go Back')
+      .setStyle(ButtonStyle.Secondary),
   );
 
   return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
