@@ -103,14 +103,16 @@ async function handleNoShowReport(interaction) {
   challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.DISPUTED);
 
   await interaction.reply({
-    content: `**No-show reported.** Team ${reporterTeam} claims Team ${otherTeam} did not show up. Staff will review.`,
+    content: `**No-show reported.** Team ${reporterTeam} claims Team ${otherTeam} did not show up. Staff has been notified.`,
   });
 
-  // Ping staff
+  // Post admin resolve buttons to staff-only channel (admin alerts), NOT the vote channel
   const adminRoleId = process.env.ADMIN_ROLE_ID;
-  const staffRoleId = process.env.WAGER_STAFF_ROLE_ID;
+  const wagerStaffId = process.env.WAGER_STAFF_ROLE_ID;
+  const xpStaffId = process.env.XP_STAFF_ROLE_ID;
   const pings = [];
-  if (staffRoleId) pings.push(`<@&${staffRoleId}>`);
+  if (wagerStaffId) pings.push(`<@&${wagerStaffId}>`);
+  if (xpStaffId) pings.push(`<@&${xpStaffId}>`);
   if (adminRoleId) pings.push(`<@&${adminRoleId}>`);
 
   const adminRow = new ActionRowBuilder().addComponents(
@@ -118,11 +120,13 @@ async function handleNoShowReport(interaction) {
     new ButtonBuilder().setCustomId(`admin_resolve_team2_${matchId}`).setLabel('Team 2 Wins').setStyle(ButtonStyle.Danger),
   );
 
-  if (match.voting_channel_id) {
-    const ch = interaction.client.channels.cache.get(match.voting_channel_id);
-    if (ch) {
-      await ch.send({
-        content: `**No-Show Report** — Team ${reporterTeam} says Team ${otherTeam} didn't show up.\n\n${pings.join(' ')} — please verify and resolve.`,
+  // Send to admin alerts channel (staff only)
+  const alertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
+  if (alertChannelId) {
+    const alertCh = interaction.client.channels.cache.get(alertChannelId);
+    if (alertCh) {
+      await alertCh.send({
+        content: `**No-Show Report — Match #${matchId}**\nTeam ${reporterTeam} says Team ${otherTeam} didn't show up.\n\n${pings.join(' ')} — please verify and resolve.`,
         components: [adminRow],
       });
     }
