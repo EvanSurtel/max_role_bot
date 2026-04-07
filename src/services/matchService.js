@@ -220,16 +220,22 @@ async function createMatchChannels(client, challenge) {
   const mapPicks = pickMaps(challenge.game_modes, challenge.series_length);
   const mapText = mapPicks.length > 0 ? `\n\n**Maps**\n${formatMapPicks(mapPicks)}` : '';
 
-  // Send welcome message in shared channel
-  const team1Mentions = team1DiscordIds.map(id => `<@${id}>`).join(', ');
-  const team2Mentions = team2DiscordIds.map(id => `<@${id}>`).join(', ');
+  // Send welcome message in shared channel with captain labels
+  const team1Lines = team1DiscordIds.map((id, i) => {
+    const isCaptain = captainDiscordIds.includes(id);
+    return `<@${id}>${isCaptain ? ' (Captain)' : ''}`;
+  });
+  const team2Lines = team2DiscordIds.map((id, i) => {
+    const isCaptain = captainDiscordIds.includes(id);
+    return `<@${id}>${isCaptain ? ' (Captain)' : ''}`;
+  });
 
   await sharedText.send({
     content: [
       `**Match #${match.id} — Challenge #${challenge.id}**`,
       '',
-      `**Team 1:** ${team1Mentions}`,
-      `**Team 2:** ${team2Mentions}`,
+      `**Team 1:** ${team1Lines.join(', ')}`,
+      `**Team 2:** ${team2Lines.join(', ')}`,
       potText,
       mapText,
       '',

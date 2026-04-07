@@ -46,7 +46,11 @@ async function handleButton(interaction) {
 
   // Cancel report
   if (id === 'report_cancel') {
-    return interaction.update({ content: 'Report cancelled.', embeds: [], components: [] });
+    try {
+      return await interaction.update({ content: 'Report cancelled.', embeds: [], components: [] });
+    } catch {
+      return interaction.reply({ content: 'Report cancelled.', ephemeral: true });
+    }
   }
 
   // Dispute
@@ -242,10 +246,19 @@ async function handleReport(interaction, outcome) {
   const { postTransaction } = require('../utils/transactionFeed');
   postTransaction({ type: 'match_report', username: user.server_username, discordId: user.discord_id, challengeId: match.challenge_id, memo: `Match #${matchId} | Team ${captainTeam} captain reported: ${outcome === 'won' ? 'WE WON' : 'WE LOST'} (says Team ${reportedWinner} won)` });
 
-  await interaction.reply({
-    content: `You reported: **${outcome === 'won' ? 'We Won' : 'We Lost'}**. Waiting for the other captain to report.`,
-    ephemeral: true,
-  });
+  // Update the ephemeral confirmation message
+  try {
+    await interaction.update({
+      content: `You reported: **${outcome === 'won' ? 'We Won' : 'We Lost'}**. Waiting for the other captain to report.`,
+      embeds: [],
+      components: [],
+    });
+  } catch {
+    await interaction.reply({
+      content: `You reported: **${outcome === 'won' ? 'We Won' : 'We Lost'}**. Waiting for the other captain to report.`,
+      ephemeral: true,
+    });
+  }
 
   // Re-fetch to check if both have now reported
   const updatedMatch = matchRepo.findById(matchId);
