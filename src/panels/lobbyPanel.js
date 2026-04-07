@@ -47,17 +47,17 @@ async function postLobbyPanel(client) {
   }
 
   try {
-    const messages = await channel.messages.fetch({ limit: 10 });
-    const existingPanel = messages.find(
-      m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0]?.title === 'CODM Wager Bot',
-    );
-
+    const messages = await channel.messages.fetch({ limit: 50 });
+    const botMessages = messages.filter(m => m.author.id === client.user.id);
+    const existingPanel = botMessages.find(m => m.embeds.length > 0);
     const panel = buildLobbyPanel();
 
     if (existingPanel) {
+      for (const [, m] of botMessages) { if (m.id !== existingPanel.id) try { await m.delete(); } catch { /* */ } }
       await existingPanel.edit(panel);
       console.log('[Panel] Updated existing lobby panel');
     } else {
+      for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
       await channel.send(panel);
       console.log('[Panel] Posted new lobby panel');
     }

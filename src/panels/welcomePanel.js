@@ -120,17 +120,31 @@ async function postWelcomePanel(client) {
   }
 
   try {
-    const messages = await channel.messages.fetch({ limit: 10 });
-    const existingPanel = messages.find(
-      m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0]?.title?.includes('Rank $'),
+    const messages = await channel.messages.fetch({ limit: 50 });
+    const botMessages = messages.filter(m => m.author.id === client.user.id);
+
+    // Find existing welcome panel (if any)
+    const existingPanel = botMessages.find(
+      m => m.embeds.length > 0 && (m.embeds[0]?.title?.includes('Rank $') || m.embeds[0]?.title?.includes('Welcome')),
     );
 
     const panel = buildWelcomePanel();
 
     if (existingPanel) {
+      // Delete any OTHER bot messages (duplicates from past restarts)
+      for (const [, m] of botMessages) {
+        if (m.id !== existingPanel.id) {
+          try { await m.delete(); } catch { /* */ }
+        }
+      }
+      // Edit the one existing panel in place
       await existingPanel.edit(panel);
       console.log('[Panel] Updated existing welcome panel');
     } else {
+      // No panel exists — clean up any stale bot messages and post fresh
+      for (const [, m] of botMessages) {
+        try { await m.delete(); } catch { /* */ }
+      }
       await channel.send(panel);
       console.log('[Panel] Posted new welcome panel');
     }
