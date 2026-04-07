@@ -33,8 +33,8 @@ function canResolveDisputes(member) {
 async function handleButton(interaction) {
   const id = interaction.customId;
 
-  // No-show report
-  if (id.startsWith('noshow_report_')) return handleNoShowReport(interaction);
+  // No-show report + confirmation
+  if (id.startsWith('noshow_report_') || id.startsWith('noshow_confirm_')) return handleNoShowReport(interaction);
 
   // Both captains report: "We Won" or "We Lost" — show confirmation first
   if (id.startsWith('report_won_')) return showReportConfirm(interaction, 'won');
@@ -74,13 +74,71 @@ async function handleModal(interaction) {
 // ─── No-Show Report ──────────────────────────────────────────────
 
 async function handleNoShowReport(interaction) {
-  const matchId = parseInt(interaction.customId.replace('noshow_report_', ''), 10);
+  const id = interaction.customId;
+
+  // First click — show confirmation
+  if (id.startsWith('noshow_report_')) {
+    const matchId = parseInt(id.replace('noshow_report_', ''), 10);
+    const match = matchRepo.findById(matchId);
+    if (!match || match.status !== MATCH_STATUS.ACTIVE) {
+      return interaction.reply({ content: 'Match is no longer active.', ephemeral: true });
+    }
+
+    // Check 10 min has passed since match creation
+    const matchCreatedAt = new Date(match.created_at).getTime();
+    const elapsedMinutes = (Date.now() - matchCreatedAt) / 60000;
+    if (elapsedMinutes < 10) {
+      const remaining = Math.ceil(10 - elapsedMinutes);
+      return interaction.reply({
+        content: `You can only report a no-show after **10 minutes** from match start. **${remaining} minute(s) remaining.**`,
+        ephemeral: true,
+      });
+    }
+
+    const user = userRepo.findByDiscordId(interaction.user.id);
+    if (!user) return interaction.reply({ content: 'Not registered.', ephemeral: true });
+
+    const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
+    let reporterTeam = null;
+    for (const p of allPlayers) {
+      if (p.user_id === user.id && p.role === PLAYER_ROLE.CAPTAIN) {
+        reporterTeam = p.team;
+        break;
+      }
+    }
+    if (!reporterTeam) {
+      return interaction.reply({ content: 'Only captains can report no-shows.', ephemeral: true });
+    }
+
+    const otherTeam = reporterTeam === 1 ? 2 : 1;
+
+    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+    const confirmEmbed = new EmbedBuilder()
+      .setTitle('Confirm No-Show')
+      .setColor(0xe74c3c)
+      .setDescription(`You are reporting that **Team ${otherTeam} did not show up** within 10 minutes of match start.\n\nThis will flag the match for staff review.\n\nAre you sure?`);
+
+    const confirmRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`noshow_confirm_${matchId}`)
+        .setLabel('Yes, They Didn\'t Show Up')
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId('report_cancel')
+        .setLabel('Cancel')
+        .setStyle(ButtonStyle.Secondary),
+    );
+
+    return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
+  }
+
+  // Confirmed no-show
+  const matchId = parseInt(id.replace('noshow_confirm_', ''), 10);
   const match = matchRepo.findById(matchId);
   if (!match || match.status !== MATCH_STATUS.ACTIVE) {
     return interaction.reply({ content: 'Match is no longer active.', ephemeral: true });
   }
 
-  // Verify captain
   const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) return interaction.reply({ content: 'Not registered.', ephemeral: true });
 
@@ -98,7 +156,6 @@ async function handleNoShowReport(interaction) {
 
   const otherTeam = reporterTeam === 1 ? 2 : 1;
 
-  // Auto-dispute with no-show context — staff resolves
   matchRepo.updateStatus(matchId, MATCH_STATUS.DISPUTED);
   challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.DISPUTED);
 
