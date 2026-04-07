@@ -653,9 +653,18 @@ async function disableBoardMessage(client, challenge) {
     const message = await boardChannel.messages.fetch(challenge.challenge_message_id);
     if (!message) return;
 
-    // Delete the challenge from the board
-    await message.delete();
-    return;
+    // Update the embed to show "ACCEPTED"
+    const embed = challengeEmbed(challenge, !!challenge.is_anonymous);
+    embed.setTitle(`[ACCEPTED] ${embed.data.title}`);
+    embed.setColor(0x2ecc71);
+
+    const disabledRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`challenge_accept_${challenge.id}`)
+        .setLabel('Accepted')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(true),
+    );
 
     await message.edit({
       embeds: [embed],
