@@ -33,7 +33,11 @@ async function handleButton(interaction) {
   // Confirm & Create challenge
   if (id === 'wager_confirm_create') {
     const flow = activeFlows.get(userId);
-    if (!flow) return interaction.reply({ content: 'Session expired. Please start over.', ephemeral: true });
+    if (!flow) {
+      await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
+      return;
+    }
     return finalizeChallengeCreation(interaction, flow, flow.pendingAmount || 0);
   }
 
@@ -140,7 +144,9 @@ async function handleButton(interaction) {
   if (id.startsWith('wager_teamsize_')) {
     const flow = activeFlows.get(userId);
     if (!flow) {
-      return interaction.reply({ content: 'Session expired. Please start over from the lobby.', ephemeral: true });
+      await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
+      return;
     }
 
     const teamSize = parseInt(id.split('_')[2], 10);
@@ -171,7 +177,9 @@ async function handleButton(interaction) {
   if (id.startsWith('wager_mode_')) {
     const flow = activeFlows.get(userId);
     if (!flow) {
-      return interaction.reply({ content: 'Session expired. Please start over from the lobby.', ephemeral: true });
+      await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
+      return;
     }
 
     const mode = id.replace('wager_mode_', '');
@@ -197,7 +205,9 @@ async function handleButton(interaction) {
   if (id.startsWith('wager_series_')) {
     const flow = activeFlows.get(userId);
     if (!flow) {
-      return interaction.reply({ content: 'Session expired. Please start over from the lobby.', ephemeral: true });
+      await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
+      return;
     }
 
     const series = parseInt(id.split('_')[2], 10);
@@ -233,7 +243,9 @@ async function handleButton(interaction) {
   if (id === 'wager_vis_anon' || id === 'wager_vis_named') {
     const flow = activeFlows.get(userId);
     if (!flow) {
-      return interaction.reply({ content: 'Session expired. Please start over from the lobby.', ephemeral: true });
+      await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
+      return;
     }
 
     flow.anonymous = id === 'wager_vis_anon';
@@ -271,7 +283,9 @@ async function handleModal(interaction) {
   const userId = interaction.user.id;
   const flow = activeFlows.get(userId);
   if (!flow) {
-    return interaction.reply({ content: 'Session expired. Please start over from the lobby.', ephemeral: true });
+    await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
+      return;
   }
 
   if (interaction.customId === 'entry_amount') {
@@ -299,7 +313,9 @@ async function handleUserSelect(interaction) {
   const userId = interaction.user.id;
   const flow = activeFlows.get(userId);
   if (!flow) {
-    return interaction.reply({ content: 'Session expired. Please start over from the lobby.', ephemeral: true });
+    await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
+      return;
   }
 
   if (interaction.customId === 'select_teammates') {
