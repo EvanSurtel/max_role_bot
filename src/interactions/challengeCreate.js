@@ -37,10 +37,21 @@ async function handleButton(interaction) {
     return finalizeChallengeCreation(interaction, flow, flow.pendingAmount || 0);
   }
 
-  // Cancel challenge creation
-  if (id === 'wager_cancel_create') {
+  // Cancel challenge creation — delete setup channel
+  if (id === 'wager_cancel_create' || id === 'wager_cancel_flow') {
+    const flow = activeFlows.get(userId);
     activeFlows.delete(userId);
-    return interaction.update({ content: 'Challenge creation cancelled.', embeds: [], components: [] });
+    finalizingUsers.delete(userId);
+    await interaction.update({ content: 'Challenge creation cancelled. This channel will be deleted.', embeds: [], components: [] });
+    if (flow?.channelId) {
+      setTimeout(async () => {
+        try {
+          const ch = interaction.client.channels.cache.get(flow.channelId);
+          if (ch && ch.deletable) await ch.delete('Challenge creation cancelled');
+        } catch { /* */ }
+      }, 3000);
+    }
+    return;
   }
 
   // Step 1: Create Wager or XP Match — create a private channel for this user

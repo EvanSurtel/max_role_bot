@@ -151,9 +151,12 @@ async function notifyTeammates(guild, challenge) {
  * @param {object} challenge - The challenge DB record.
  */
 async function postToBoard(client, challenge) {
-  const channelId = process.env.CHALLENGES_CHANNEL_ID;
+  // Route wager challenges to CHALLENGES_CHANNEL_ID, XP challenges to XP_CHALLENGES_CHANNEL_ID
+  const channelId = challenge.type === 'xp'
+    ? (process.env.XP_CHALLENGES_CHANNEL_ID || process.env.CHALLENGES_CHANNEL_ID)
+    : process.env.CHALLENGES_CHANNEL_ID;
   if (!channelId) {
-    console.error('[ChallengeService] CHALLENGES_CHANNEL_ID is not set');
+    console.error('[ChallengeService] Challenge channel ID not set');
     return;
   }
 

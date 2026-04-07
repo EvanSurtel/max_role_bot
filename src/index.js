@@ -78,8 +78,8 @@ client.once('ready', async () => {
     const { postXpMatchPanel } = require('./panels/xpMatchPanel');
     await postXpMatchPanel(client);
 
-    const { postAllLeaderboardPanels } = require('./panels/leaderboardPanel');
-    await postAllLeaderboardPanels(client);
+    const leaderboardPanel = require('./panels/leaderboardPanel');
+    await leaderboardPanel.postAllLeaderboardPanels(client);
 
     const { postSeasonPanel } = require('./panels/seasonPanel');
     await postSeasonPanel(client);

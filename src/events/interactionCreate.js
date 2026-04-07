@@ -88,8 +88,8 @@ module.exports = {
         if (id.startsWith('season_')) {
           return await seasonPanel.handleSeasonButton(interaction);
         }
-        // Leaderboard buttons (all-time, season, refresh, admin)
-        if (id.startsWith('xplb_') || id.startsWith('earnlb_') || id.startsWith('lb_admin_')) {
+        // Leaderboard admin buttons
+        if (id.startsWith('lb_admin_')) {
           return await leaderboardPanel.handleLeaderboardButton(interaction);
         }
         console.warn(`[Interaction] Unhandled button customId: ${id}`);
@@ -123,6 +123,16 @@ module.exports = {
         }
 
         console.warn(`[Interaction] Unhandled modal customId: ${id}`);
+        return;
+      }
+
+      // String select menus (leaderboard dropdowns)
+      if (interaction.isStringSelectMenu()) {
+        const id = interaction.customId;
+        if (id.startsWith('xplb_') || id.startsWith('earnlb_')) {
+          return await leaderboardPanel.handleLeaderboardSelect(interaction);
+        }
+        console.warn(`[Interaction] Unhandled string select customId: ${id}`);
         return;
       }
 
