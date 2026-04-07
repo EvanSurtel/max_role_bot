@@ -60,41 +60,62 @@ async function handleButton(interaction) {
     return interaction.reply({ content: 'You cannot accept your own challenge.', ephemeral: true });
   }
 
-  // Show confirmation before accepting
   const { GAME_MODES } = require('../config/constants');
-  const modeInfo = GAME_MODES[challenge.game_modes];
-  const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
-  const entryText = isWager ? `\n**Entry:** ${formatUsdc(entryUsdc)} USDC per player` : '';
 
-  const confirmEmbed = new EmbedBuilder()
-    .setTitle('Confirm Accept')
-    .setColor(0xe67e22)
-    .setDescription([
-      `You are about to accept **Challenge #${challengeId}**`,
-      '',
-      `**Type:** ${isWager ? 'Wager' : 'XP Match'}`,
-      `**Team Size:** ${challenge.team_size}v${challenge.team_size}`,
-      `**Mode:** ${modeLabel}`,
-      `**Series:** Best of ${challenge.series_length}`,
-      entryText,
-      '',
-      isWager ? `Your **${formatUsdc(entryUsdc)} USDC** will be held from your wallet.` : '',
-      '',
-      'Are you sure?',
-    ].join('\n'));
+  // 1v1: show confirmation directly
+  if (challenge.team_size === 1) {
+    const modeInfo = GAME_MODES[challenge.game_modes];
+    const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
+    const entryText = isWager ? `\n**Entry:** ${formatUsdc(entryUsdc)} USDC per player` : '';
 
-  const confirmRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`challenge_confirm_${challengeId}`)
-      .setLabel('Yes, Accept')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId(`challenge_nevermind_${challengeId}`)
-      .setLabel('Nevermind')
-      .setStyle(ButtonStyle.Secondary),
+    const confirmEmbed = new EmbedBuilder()
+      .setTitle('Confirm Accept')
+      .setColor(0xe67e22)
+      .setDescription([
+        `You are about to accept **Challenge #${challengeId}**`,
+        '',
+        `**Type:** ${isWager ? 'Wager' : 'XP Match'}`,
+        `**Team Size:** 1v1`,
+        `**Mode:** ${modeLabel}`,
+        `**Series:** Best of ${challenge.series_length}`,
+        entryText,
+        '',
+        isWager ? `Your **${formatUsdc(entryUsdc)} USDC** will be held from your wallet.` : '',
+        '',
+        'Are you sure?',
+      ].join('\n'));
+
+    const confirmRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`challenge_confirm_${challengeId}`)
+        .setLabel('Yes, Accept')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`challenge_nevermind_${challengeId}`)
+        .setLabel('Nevermind')
+        .setStyle(ButtonStyle.Secondary),
+    );
+
+    return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
+  }
+
+  // Team games: show teammate select first (confirmation comes after selection)
+  acceptFlows.set(discordId, { challengeId, teammates: [] });
+
+  const teammatesNeeded = challenge.team_size - 1;
+  const selectRow = new ActionRowBuilder().addComponents(
+    new UserSelectMenuBuilder()
+      .setCustomId(`select_opponents_${challengeId}`)
+      .setPlaceholder(`Select ${teammatesNeeded} teammate(s)`)
+      .setMinValues(teammatesNeeded)
+      .setMaxValues(teammatesNeeded),
   );
 
-  return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
+  return interaction.reply({
+    content: `**Select your teammates for Challenge #${challengeId}:**\n\nTeam size: **${challenge.team_size}v${challenge.team_size}** — Pick **${teammatesNeeded}** teammate(s).`,
+    components: [selectRow],
+    ephemeral: true,
+  });
 }
 
 /**
@@ -294,15 +315,101 @@ async function handleUserSelect(interaction) {
     const user = userRepo.findByDiscordId(discordId);
     if (!user) {
       acceptFlows.delete(discordId);
-      return interaction.editReply({
-        content: 'You need to complete onboarding first.',
-        components: [],
-      });
+      return interaction.editReply({ content: 'You need to complete onboarding first.', components: [] });
     }
 
+    // Show full confirmation with team rosters before processing
+    const { GAME_MODES } = require('../config/constants');
     const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
     const entryUsdc = challenge.entry_amount_usdc;
+    const modeInfo = GAME_MODES[challenge.game_modes];
+    const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
 
+    // Get team 1 players
+    const team1Players = challengePlayerRepo.findByChallengeAndTeam(challengeId, 1);
+    const team1Lines = team1Players.map(p => {
+      const u = userRepo.findById(p.user_id);
+      return u ? `<@${u.discord_id}>${p.role === 'captain' ? ' (Captain)' : ''}` : 'Unknown';
+    });
+
+    // Team 2 = acceptor + selected teammates
+    const team2Lines = [`<@${discordId}> (Captain)`];
+    for (const tmId of selectedDiscordIds) {
+      team2Lines.push(`<@${tmId}>`);
+    }
+
+    const entryText = isWager ? `\n**Entry:** ${formatUsdc(entryUsdc)} USDC per player\n**Total Pot:** ${formatUsdc(Number(entryUsdc) * challenge.team_size * 2)} USDC` : '';
+
+    const confirmEmbed = new EmbedBuilder()
+      .setTitle('Confirm Accept')
+      .setColor(0xe67e22)
+      .setDescription([
+        `**Challenge #${challengeId}**`,
+        '',
+        `**Type:** ${isWager ? 'Wager' : 'XP Match'}`,
+        `**Mode:** ${modeLabel} | Bo${challenge.series_length} | ${challenge.team_size}v${challenge.team_size}`,
+        entryText,
+        '',
+        `**Team 1:**`,
+        ...team1Lines,
+        '',
+        `**Team 2 (Your Team):**`,
+        ...team2Lines,
+        '',
+        isWager ? `Your **${formatUsdc(entryUsdc)} USDC** will be held from your wallet.` : '',
+        '',
+        'Does this look correct?',
+      ].join('\n'));
+
+    const confirmRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`challenge_team_confirm_${challengeId}`)
+        .setLabel('Confirm & Accept')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`challenge_nevermind_${challengeId}`)
+        .setLabel('Cancel')
+        .setStyle(ButtonStyle.Secondary),
+    );
+
+    return interaction.editReply({ embeds: [confirmEmbed], components: [confirmRow] });
+
+  } catch (err) {
+    console.error(`[ChallengeAccept] Error in team select for challenge #${challengeId}:`, err);
+    acceptFlows.delete(discordId);
+    return interaction.editReply({ content: 'Something went wrong.', components: [] });
+  }
+}
+
+/**
+ * Handle confirmed team acceptance after teammate selection.
+ */
+async function handleTeamConfirmedAccept(interaction) {
+  const challengeId = parseInt(interaction.customId.replace('challenge_team_confirm_', ''), 10);
+  if (isNaN(challengeId)) return interaction.reply({ content: 'Invalid.', ephemeral: true });
+
+  const discordId = interaction.user.id;
+  const flow = acceptFlows.get(discordId);
+  if (!flow || flow.challengeId !== challengeId) {
+    return interaction.reply({ content: 'Session expired. Please try again.', ephemeral: true });
+  }
+
+  const challenge = challengeRepo.findById(challengeId);
+  if (!challenge || challenge.status !== CHALLENGE_STATUS.OPEN) {
+    acceptFlows.delete(discordId);
+    return interaction.update({ content: 'This challenge is no longer available.', embeds: [], components: [] });
+  }
+
+  const user = userRepo.findByDiscordId(discordId);
+  if (!user) return interaction.reply({ content: 'Not registered.', ephemeral: true });
+
+  const selectedDiscordIds = flow.teammates;
+  const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+  const entryUsdc = challenge.entry_amount_usdc;
+
+  await interaction.update({ content: 'Processing...', embeds: [], components: [] });
+
+  try {
     // Check acceptor's balance and hold funds (if wager)
     if (isWager && Number(entryUsdc) > 0) {
       if (!escrowManager.canAfford(user.id, entryUsdc)) {
@@ -569,4 +676,4 @@ async function disableBoardMessage(client, challenge) {
   }
 }
 
-module.exports = { handleButton, handleConfirmedAccept, handleUserSelect };
+module.exports = { handleButton, handleConfirmedAccept, handleTeamConfirmedAccept, handleUserSelect };

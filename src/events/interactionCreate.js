@@ -26,9 +26,13 @@ module.exports = {
         if (id.startsWith('challenge_accept_')) {
           return await challengeAccept.handleButton(interaction);
         }
-        // Challenge accept confirmation
-        if (id.startsWith('challenge_confirm_')) {
+        // Challenge accept confirmation (1v1)
+        if (id.startsWith('challenge_confirm_') && !id.startsWith('challenge_confirm_cancel_')) {
           return await challengeAccept.handleConfirmedAccept(interaction);
+        }
+        // Challenge team accept confirmation (after teammate selection)
+        if (id.startsWith('challenge_team_confirm_')) {
+          return await challengeAccept.handleTeamConfirmedAccept(interaction);
         }
         // Challenge nevermind (cancel confirmation)
         if (id.startsWith('challenge_nevermind_')) {
