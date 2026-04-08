@@ -10,14 +10,16 @@ const challengePlayerRepo = require('../database/repositories/challengePlayerRep
 const userRepo = require('../database/repositories/userRepo');
 const { MATCH_STATUS, CHALLENGE_STATUS, GAME_MODES } = require('../config/constants');
 const { formatUsdc } = require('../utils/embeds');
+const { t, langFor } = require('../locales/i18n');
 
 /**
  * Handle the "Create Dispute" button from the lobby panel.
  */
 async function handleCreateDispute(interaction) {
+  const lang = langFor(interaction);
   const discordId = interaction.user.id;
   const user = userRepo.findByDiscordId(discordId);
-  if (!user) return interaction.reply({ content: 'You must be registered first.', ephemeral: true });
+  if (!user) return interaction.reply({ content: t('common.not_registered', lang), ephemeral: true });
 
   const db = require('../database/db');
   const recentMatches = db.prepare(`
@@ -30,7 +32,7 @@ async function handleCreateDispute(interaction) {
   `).all(user.id);
 
   if (recentMatches.length === 0) {
-    return interaction.reply({ content: 'You have no recent matches to dispute.', ephemeral: true });
+    return interaction.reply({ content: t('dispute.no_recent', lang), ephemeral: true });
   }
 
   const rows = [];
@@ -51,7 +53,7 @@ async function handleCreateDispute(interaction) {
   }
 
   return interaction.reply({
-    embeds: [new EmbedBuilder().setTitle('Create Dispute').setColor(0xe74c3c).setDescription('Select the match you want to dispute:')],
+    embeds: [new EmbedBuilder().setTitle(t('dispute.create_title', lang)).setColor(0xe74c3c).setDescription(t('dispute.create_desc', lang))],
     components: rows,
     ephemeral: true,
   });
@@ -61,26 +63,27 @@ async function handleCreateDispute(interaction) {
  * Handle match selection — show confirmation.
  */
 async function handleDisputeSelect(interaction) {
+  const lang = langFor(interaction);
   const matchId = parseInt(interaction.customId.replace('dispute_select_', ''), 10);
-  if (isNaN(matchId)) return interaction.reply({ content: 'Invalid match.', ephemeral: true });
+  if (isNaN(matchId)) return interaction.reply({ content: t('match_result.invalid_match', lang), ephemeral: true });
 
   const match = matchRepo.findById(matchId);
-  if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
-  if (match.status === MATCH_STATUS.DISPUTED) return interaction.reply({ content: 'Already disputed.', ephemeral: true });
+  if (!match) return interaction.reply({ content: t('common.match_not_found', lang), ephemeral: true });
+  if (match.status === MATCH_STATUS.DISPUTED) return interaction.reply({ content: t('dispute.already_disputed', lang), ephemeral: true });
 
   const user = userRepo.findByDiscordId(interaction.user.id);
-  if (!user) return interaction.reply({ content: 'Not registered.', ephemeral: true });
+  if (!user) return interaction.reply({ content: t('common.not_registered_simple', lang), ephemeral: true });
   const playerRecord = challengePlayerRepo.findByChallengeAndUser(match.challenge_id, user.id);
-  if (!playerRecord) return interaction.reply({ content: 'You are not a player in this match.', ephemeral: true });
+  if (!playerRecord) return interaction.reply({ content: t('dispute.not_a_player', lang), ephemeral: true });
 
   const confirmEmbed = new EmbedBuilder()
-    .setTitle('Confirm Dispute')
+    .setTitle(t('dispute.confirm_title', lang))
     .setColor(0xe74c3c)
-    .setDescription(`Are you sure you want to dispute **Match #${matchId}**?\n\nThis will notify staff in the match shared channel.`);
+    .setDescription(t('dispute.confirm_desc', lang, { matchId }));
 
   const confirmRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`dispute_confirm_${matchId}`).setLabel('Yes, Dispute').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('dispute_nevermind').setLabel('Nevermind').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`dispute_confirm_${matchId}`).setLabel(t('dispute.btn_yes_dispute', lang)).setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('dispute_nevermind').setLabel(t('common.nevermind', lang)).setStyle(ButtonStyle.Secondary),
   );
 
   return interaction.update({ embeds: [confirmEmbed], components: [confirmRow] });
@@ -90,16 +93,17 @@ async function handleDisputeSelect(interaction) {
  * Handle confirmed dispute — trigger dispute in shared channel.
  */
 async function handleDisputeConfirm(interaction) {
+  const lang = langFor(interaction);
   const matchId = parseInt(interaction.customId.replace('dispute_confirm_', ''), 10);
-  if (isNaN(matchId)) return interaction.reply({ content: 'Invalid match.', ephemeral: true });
+  if (isNaN(matchId)) return interaction.reply({ content: t('match_result.invalid_match', lang), ephemeral: true });
 
   const match = matchRepo.findById(matchId);
-  if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
+  if (!match) return interaction.reply({ content: t('common.match_not_found', lang), ephemeral: true });
   if (match.status === MATCH_STATUS.DISPUTED) {
-    return interaction.update({ content: 'Already disputed.', embeds: [], components: [] });
+    return interaction.update({ content: t('dispute.already_disputed', lang), embeds: [], components: [] });
   }
 
-  await interaction.update({ content: 'Dispute created. Check the match shared channel.', embeds: [], components: [] });
+  await interaction.update({ content: t('dispute.created', lang), embeds: [], components: [] });
 
   // Use triggerDispute which posts in the existing shared-chat
   const { triggerDispute } = require('./matchResult');
