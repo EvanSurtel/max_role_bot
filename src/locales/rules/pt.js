@@ -157,7 +157,7 @@ module.exports = {
       '• O staff vai revisar e tomar a decisão — a decisão deles é final',
       '• Provas falsas = ban permanente e você perde seu dinheiro',
       '',
-      '**Você será banido permanentemente por:** Trapacear, hackear, combinar resultados, ataques DDoS, usar múltiplas contas, amañar partidas ou se passar por staff.',
+      '**Você será banido permanentemente por:** Trapacear, hackear, combinar resultados, ataques DDoS, usar múltiplas contas, manipular partidas ou se passar por staff.',
     ].join('\n'),
   },
 
@@ -182,7 +182,7 @@ module.exports = {
       '• Se tiver desacordo, poste suas provas no canal da partida',
       '• O staff vai revisar e tomar a decisão — a decisão deles é final',
       '',
-      '**Você será banido por:** Trapacear, combinar resultados, farmar XP ou amañar partidas.',
+      '**Você será banido por:** Trapacear, combinar resultados, farmar XP ou manipular partidas.',
     ].join('\n'),
     footer: 'Fonte: callofduty.com/mobile/esports/esports-settings',
   },

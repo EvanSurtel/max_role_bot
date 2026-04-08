@@ -218,7 +218,7 @@ module.exports = {
     confirm_title: 'Annahme Bestätigen',
     confirm_about_to_accept: 'Du bist dabei, **{type} #{num}** anzunehmen',
     confirm_field_team: 'Teamgröße',
-    confirm_held_notice: 'Deine **${amount} USDC** werden von deiner Wallet gesperrt.',
+    confirm_held_notice: 'Deine **${amount} USDC** werden in deiner Wallet reserviert.',
     confirm_question: 'Bist du sicher?',
     confirm_question_correct: 'Sieht das richtig aus?',
     btn_yes_accept: 'Ja, Annehmen',
@@ -255,7 +255,7 @@ module.exports = {
   teammate: {
     confirm_accept_title: 'Annahme Bestätigen',
     confirm_accept_intro: 'Du trittst **{type} #{num}** bei',
-    confirm_entry_held: '**Einsatz:** ${amount} USDC werden von deiner Wallet gesperrt.',
+    confirm_entry_held: '**Einsatz:** ${amount} USDC werden in deiner Wallet reserviert.',
     confirm_question: 'Bist du sicher?',
     btn_yes_join: 'Ja, Team Beitreten',
     btn_decline: 'Ablehnen',

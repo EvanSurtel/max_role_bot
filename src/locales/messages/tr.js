@@ -342,7 +342,7 @@ module.exports = {
     cannot_be_undone: '**Bu geri alınamaz.**',
     winners_team: '**Kazananlar (Takım {team}):**',
     losers_team: '**Kaybedenler (Takım {team}):**',
-    btn_confirm_team_wins: 'Takım {team} Kazancını Onayla',
+    btn_confirm_team_wins: 'Takım {team} Galibiyetini Onayla',
     resolved_msg: '{user} itirazı çözdü. **Takım {team} kazandı!**',
     no_winner_resolved_msg: '{user} Maç #{matchId} için **kazanan yok** ilan etti. Tüm oyunculara iade yapılıyor.',
     staff_panel_title: '**Personel Paneli** — Kanıtları incele ve çöz:',
