@@ -7,6 +7,7 @@ const channelService = require('./channelService');
 const timerService = require('./timerService');
 const { challengeEmbed, formatUsdc } = require('../utils/embeds');
 const { CHALLENGE_STATUS, PLAYER_STATUS, TIMERS, GAME_MODES, CHALLENGE_TYPE } = require('../config/constants');
+const { t, getLang } = require('../locales/i18n');
 
 // Track active teammate-accept timers so they can be cleared on cancel
 const teammateTimers = new Map(); // `${challengeId}_${playerId}` -> timeout handle
@@ -51,39 +52,42 @@ async function notifyTeammates(guild, challenge) {
       // Store the channel ID on the challenge_player record
       challengePlayerRepo.setNotificationChannel(player.id, channel.id);
 
-      // Build challenge details embed
+      // Build challenge details embed in the recipient's language
+      const lang = getLang(discordId);
       const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
       const modeInfo = GAME_MODES[challenge.game_modes];
       const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
 
       const creator = userRepo.findById(challenge.creator_user_id);
       const creatorMention = creator ? `<@${creator.discord_id}>` : 'Unknown';
+      const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+      const displayNum = challenge.display_number || challenge.id;
 
       const description = [
-        `${creatorMention} has invited you to join their team!`,
+        t('notify_team.description', lang, { creator: creatorMention }),
         '',
-        `**Type:** ${isWager ? 'Wager' : 'XP Match'}`,
-        `**Team Size:** ${challenge.team_size}v${challenge.team_size}`,
-        `**Game Mode:** ${modeLabel}`,
-        `**Series:** Best of ${challenge.series_length}`,
+        `**${t('notify_team.field_type', lang)}:** ${typeLabel}`,
+        `**${t('notify_team.field_team_size', lang)}:** ${challenge.team_size}v${challenge.team_size}`,
+        `**${t('notify_team.field_mode', lang)}:** ${modeLabel}`,
+        `**${t('notify_team.field_series', lang)}:** ${t('challenge_create.series_label', lang, { n: challenge.series_length })}`,
       ];
 
       if (isWager) {
-        const entry = formatUsdc(challenge.entry_amount_usdc);
-        description.push(`**Entry:** ${entry} USDC per player`);
+        const entryAmount = (Number(challenge.entry_amount_usdc) / 1_000_000).toFixed(2);
+        description.push(`**${t('notify_team.field_entry', lang)}:** ${t('notify_team.entry_per_player', lang, { amount: entryAmount })}`);
       }
 
-      description.push('', `You have **${TIMERS.TEAMMATE_ACCEPT / 60000} minutes** to accept or decline.`);
+      description.push('', t('notify_team.accept_window', lang, { minutes: TIMERS.TEAMMATE_ACCEPT / 60000 }));
 
-      // Build buttons
+      // Build buttons in the recipient's language
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId(`teammate_accept_${challenge.id}`)
-          .setLabel('Accept')
+          .setLabel(t('notify_team.btn_accept', lang))
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
           .setCustomId(`teammate_decline_${challenge.id}`)
-          .setLabel('Decline')
+          .setLabel(t('notify_team.btn_decline', lang))
           .setStyle(ButtonStyle.Danger),
       );
 
@@ -91,7 +95,7 @@ async function notifyTeammates(guild, challenge) {
         content: `<@${discordId}>`,
         embeds: [
           {
-            title: `Team Invite — ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id}`,
+            title: t('notify_team.title', lang, { type: typeLabel, num: displayNum }),
             description: description.join('\n'),
             color: isWager ? 0xf1c40f : 0x3498db,
           },
@@ -112,9 +116,9 @@ async function notifyTeammates(guild, challenge) {
           challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.DECLINED);
           console.log(`[ChallengeService] Teammate ${player.user_id} timed out for challenge ${challenge.id}`);
 
-          // Notify in the channel before deleting
+          // Notify in the channel before deleting (in player's language)
           try {
-            await channel.send('You did not respond in time. The invitation has expired and the challenge has been cancelled.');
+            await channel.send(t('notify_team.timeout_msg', getLang(user.discord_id)));
           } catch {
             // Channel may already be deleted
           }

@@ -10,6 +10,14 @@ const { MATCH_STATUS, CHALLENGE_STATUS, CHALLENGE_TYPE, PLAYER_ROLE } = require(
 const { calculateXpMatchRewards, calculateWagerXpRewards } = require('../utils/xpCalculator');
 const { getCurrentSeason } = require('../panels/leaderboardPanel');
 const neatqueueService = require('./neatqueueService');
+const { t, getLang } = require('../locales/i18n');
+
+// For shared match channels, pick the language of the first captain found.
+// Falls back to English if no captain or no preference saved.
+function _captainLang(captainDiscordIds) {
+  if (!captainDiscordIds || captainDiscordIds.length === 0) return 'en';
+  return getLang(captainDiscordIds[0]);
+}
 
 /**
  * Create match channels (team voice, team text, shared, voting) for a matched challenge.
@@ -165,35 +173,41 @@ async function createMatchChannels(client, challenge) {
   const { estimateMatchDuration, formatDuration } = require('../utils/matchTimer');
   const estimatedMinutes = estimateMatchDuration(challenge.game_modes, challenge.series_length);
 
+  // Use the first captain's language for shared match content (captain language).
+  // Per-team welcome messages use that team's captain language separately below.
+  const sharedLang = _captainLang(captainDiscordIds);
+  const team1CaptainLang = getLang(team1DiscordIds.find(id => captainDiscordIds.includes(id)));
+  const team2CaptainLang = getLang(team2DiscordIds.find(id => captainDiscordIds.includes(id)));
+
   const reportEmbed = new EmbedBuilder()
-    .setTitle(`Match #${match.id} — Report Result`)
+    .setTitle(t('match_channel.report_title', sharedLang, { matchId: match.id }))
     .setColor(0xe67e22)
     .setDescription([
-      `**Estimated match time:** ${formatDuration(estimatedMinutes)}`,
+      t('match_channel.estimated_time', sharedLang, { duration: formatDuration(estimatedMinutes) }),
       '',
-      'When the match is over, **both captains** must report the result.',
+      t('match_channel.report_intro', sharedLang),
       '',
-      'Click **We Won** if your team won, or **We Lost** if your team lost.',
+      t('match_channel.report_how', sharedLang),
       '',
-      '- If both captains agree → match resolved instantly',
-      '- If captains disagree → match goes to dispute',
+      t('match_channel.agree_resolved', sharedLang),
+      t('match_channel.disagree_dispute', sharedLang),
       '',
-      `If your opponent doesn't show up within 10 minutes, click **Report No-Show**.`,
+      t('match_channel.no_show_hint', sharedLang),
     ].join('\n'))
-    .setFooter({ text: 'Only team captains can report.' });
+    .setFooter({ text: t('match_channel.only_captains_footer', sharedLang) });
 
   const reportRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`report_won_${match.id}`)
-      .setLabel('We Won')
+      .setLabel(t('match_channel.btn_we_won', sharedLang))
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`report_lost_${match.id}`)
-      .setLabel('We Lost')
+      .setLabel(t('match_channel.btn_we_lost', sharedLang))
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId(`noshow_report_${match.id}`)
-      .setLabel('Report No-Show')
+      .setLabel(t('match_channel.btn_no_show', sharedLang))
       .setStyle(ButtonStyle.Secondary),
   );
 
@@ -204,42 +218,65 @@ async function createMatchChannels(client, challenge) {
 
   // Build match info for welcome messages
   const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
-  const potText = isWager ? `\nPot: **${formatUsdc(challenge.total_pot_usdc)} USDC**` : '';
+  const potAmountFormatted = isWager ? (Number(challenge.total_pot_usdc) / 1_000_000).toFixed(2) : '0';
 
-  // Send welcome messages in team channels
+  const typeLabel1 = isWager ? t('challenge_create.type_wager', team1CaptainLang) : t('challenge_create.type_xp_match', team1CaptainLang);
+  const typeLabel2 = isWager ? t('challenge_create.type_wager', team2CaptainLang) : t('challenge_create.type_xp_match', team2CaptainLang);
+  const typeLabelShared = isWager ? t('challenge_create.type_wager', sharedLang) : t('challenge_create.type_xp_match', sharedLang);
+  const potText1 = isWager ? t('match_channel.pot_label', team1CaptainLang, { amount: potAmountFormatted }) : '';
+  const potText2 = isWager ? t('match_channel.pot_label', team2CaptainLang, { amount: potAmountFormatted }) : '';
+  const potTextShared = isWager ? t('match_channel.pot_label', sharedLang, { amount: potAmountFormatted }) : '';
+
+  // Send welcome messages in team channels (each in their own captain's language)
   await team1Text.send({
-    content: `**Welcome, Team 1!**\n\nYour match for ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id} is ready.${potText}\n\nUse this channel to coordinate with your team. When the match is over, both captains must vote on the result in the voting channel.`,
+    content: t('match_channel.team_welcome', team1CaptainLang, {
+      team: 1,
+      type: typeLabel1,
+      num: challenge.display_number || challenge.id,
+      pot_text: potText1,
+    }),
   });
 
   await team2Text.send({
-    content: `**Welcome, Team 2!**\n\nYour match for ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id} is ready.${potText}\n\nUse this channel to coordinate with your team. When the match is over, both captains must vote on the result in the voting channel.`,
+    content: t('match_channel.team_welcome', team2CaptainLang, {
+      team: 2,
+      type: typeLabel2,
+      num: challenge.display_number || challenge.id,
+      pot_text: potText2,
+    }),
   });
 
   // Generate random map picks for the series
   const { pickMaps, formatMapPicks } = require('../utils/mapPicker');
   const mapPicks = pickMaps(challenge.game_modes, challenge.series_length);
-  const mapText = mapPicks.length > 0 ? `\n\n**Maps**\n${formatMapPicks(mapPicks)}` : '';
+  const mapText = mapPicks.length > 0 ? `\n\n${t('match_channel.shared_maps_header', sharedLang)}\n${formatMapPicks(mapPicks)}` : '';
 
-  // Send welcome message in shared channel with captain labels
-  const team1Lines = team1DiscordIds.map((id, i) => {
+  // Build team rosters with captain labels (translated)
+  const captainLabel = t('challenge_accept.captain_label', sharedLang);
+  const team1Lines = team1DiscordIds.map(id => {
     const isCaptain = captainDiscordIds.includes(id);
-    return `<@${id}>${isCaptain ? ' (Captain)' : ''}`;
+    return `<@${id}>${isCaptain ? ' ' + captainLabel : ''}`;
   });
-  const team2Lines = team2DiscordIds.map((id, i) => {
+  const team2Lines = team2DiscordIds.map(id => {
     const isCaptain = captainDiscordIds.includes(id);
-    return `<@${id}>${isCaptain ? ' (Captain)' : ''}`;
+    return `<@${id}>${isCaptain ? ' ' + captainLabel : ''}`;
   });
 
+  // Shared chat welcome — uses first captain's language
   await sharedText.send({
     content: [
-      `**Match #${match.id} — ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id}**`,
+      t('match_channel.shared_match_header', sharedLang, {
+        matchId: match.id,
+        type: typeLabelShared,
+        num: challenge.display_number || challenge.id,
+      }),
       '',
-      `**Team 1:** ${team1Lines.join(', ')}`,
-      `**Team 2:** ${team2Lines.join(', ')}`,
-      potText,
+      t('match_channel.shared_team1', sharedLang, { players: team1Lines.join(', ') }),
+      t('match_channel.shared_team2', sharedLang, { players: team2Lines.join(', ') }),
+      potTextShared,
       mapText,
       '',
-      'Good luck! When the match is complete, captains should head to the voting channel to confirm the result.',
+      t('match_channel.shared_good_luck', sharedLang),
     ].join('\n'),
   });
 
@@ -487,22 +524,32 @@ async function resolveMatch(client, matchId, winningTeam) {
     }
   }
 
-  // Send result message in shared channel
+  // Send result message in shared channel (in first captain's language)
   if (match.shared_text_id) {
     try {
       const sharedChannel = client.channels.cache.get(match.shared_text_id);
       if (sharedChannel) {
         const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
-        const potText = isWager ? `\nPot of **${formatUsdc(challenge.total_pot_usdc)} USDC** has been distributed to the winners.` : '';
+        // Get captain languages for the shared message
+        const allCaptains = allPlayers.filter(p => p.role === PLAYER_ROLE.CAPTAIN);
+        const captainDiscordIdsForLang = allCaptains.map(p => {
+          const u = userRepo.findById(p.user_id);
+          return u ? u.discord_id : null;
+        }).filter(Boolean);
+        const sharedLang = _captainLang(captainDiscordIdsForLang);
+        const potAmount = (Number(challenge.total_pot_usdc) / 1_000_000).toFixed(2);
+        const potText = isWager
+          ? t('match_channel.result_pot_distributed', sharedLang, { amount: potAmount })
+          : '';
 
         await sharedChannel.send({
           content: [
-            `**Match #${matchId} Complete!**`,
+            t('match_channel.result_complete', sharedLang, { matchId }),
             '',
-            `**Winner: Team ${winningTeam}**`,
+            t('match_channel.result_winner', sharedLang, { team: winningTeam }),
             potText,
             '',
-            'These channels will be cleaned up in 5 minutes. GG!',
+            t('match_channel.result_cleanup', sharedLang),
           ].join('\n'),
         });
       }
@@ -681,6 +728,13 @@ function startNoShowReminders(client, match, playerDiscordIds) {
   const sharedChannelId = match.shared_text_id;
   if (!sharedChannelId) return;
 
+  // For no-show reminders, use the first absent player's language as the message language.
+  // (Mentioning multiple users in different languages would be cluttered — pick one.)
+  const reminderLang = () => {
+    const notInVoice = getPlayersNotInVoice(client, match, playerDiscordIds);
+    return notInVoice.length > 0 ? getLang(notInVoice[0]) : 'en';
+  };
+
   // 5 minute reminder
   setTimeout(async () => {
     try {
@@ -693,7 +747,8 @@ function startNoShowReminders(client, match, playerDiscordIds) {
       const ch = client.channels.cache.get(sharedChannelId);
       if (ch) {
         const pings = notInVoice.map(id => `<@${id}>`).join(' ');
-        await ch.send({ content: `${pings}\n\n**You must join your team's voice channel or the shared voice channel within 10 minutes or you will be forfeited.** Time remaining: **10 minutes**.` });
+        const lang = reminderLang();
+        await ch.send({ content: t('match_channel.no_show_warning_5', lang, { pings }) });
       }
     } catch (err) {
       console.error(`[MatchService] No-show reminder (5min) failed:`, err.message);
@@ -712,7 +767,8 @@ function startNoShowReminders(client, match, playerDiscordIds) {
       const ch = client.channels.cache.get(sharedChannelId);
       if (ch) {
         const pings = notInVoice.map(id => `<@${id}>`).join(' ');
-        await ch.send({ content: `${pings}\n\n**FINAL WARNING — You have 5 minutes to join a voice channel or you will be forfeited.** Time remaining: **5 minutes**.` });
+        const lang = reminderLang();
+        await ch.send({ content: t('match_channel.no_show_warning_10', lang, { pings }) });
       }
     } catch (err) {
       console.error(`[MatchService] No-show reminder (10min) failed:`, err.message);

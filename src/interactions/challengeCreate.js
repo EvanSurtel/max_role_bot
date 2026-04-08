@@ -216,17 +216,20 @@ async function handleButton(interaction) {
       ),
     );
 
-    const typeLabel = type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match';
+    const typeLabel = type === CHALLENGE_TYPE.WAGER
+      ? t('challenge_create.type_wager', lang)
+      : t('challenge_create.type_xp_match', lang);
+    const introKey = type === CHALLENGE_TYPE.WAGER
+      ? 'challenge_create.setting_up_wager'
+      : 'challenge_create.setting_up_xp';
     await channel.send({
-      content: `<@${userId}> **Setting up ${typeLabel}**\n\n**Select team size:**`,
-      components: [row, cancelRow()],
+      content: `<@${userId}> ${t(introKey, lang)}`,
+      components: [row, cancelRow(lang)],
     });
 
     await interaction.editReply({
-      content: `Your ${typeLabel.toLowerCase()} setup channel has been created: <#${channel.id}>`,
+      content: t('challenge_create.setup_channel_created', lang, { type: typeLabel.toLowerCase(), channel: `<#${channel.id}>` }),
     });
-    // Auto-delete this ephemeral message after 30 seconds
-    setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 30000);
     return;
   }
 
@@ -234,7 +237,7 @@ async function handleButton(interaction) {
   if (id.startsWith('wager_teamsize_')) {
     const flow = activeFlows.get(userId);
     if (!flow) {
-      await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
       setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
       return;
     }
@@ -247,15 +250,15 @@ async function handleButton(interaction) {
       const selectRow = new ActionRowBuilder().addComponents(
         new UserSelectMenuBuilder()
           .setCustomId('select_teammates')
-          .setPlaceholder(`Select ${teamSize - 1} teammate(s)`)
+          .setPlaceholder(t('challenge_create.select_teammates_placeholder', lang, { count: teamSize - 1 }))
           .setMinValues(teamSize - 1)
           .setMaxValues(teamSize - 1),
       );
 
       flow.step = 2;
       return interaction.update({
-        content: `**Select your teammates:**\n\nTeam size: **${teamSize}v${teamSize}** — Pick **${teamSize - 1}** teammate(s).`,
-        components: [selectRow, navRow(2)],
+        content: t('challenge_create.select_teammates', lang, { size: teamSize, count: teamSize - 1 }),
+        components: [selectRow, navRow(2, lang)],
       });
     }
 
@@ -268,7 +271,7 @@ async function handleButton(interaction) {
   if (id.startsWith('wager_mode_')) {
     const flow = activeFlows.get(userId);
     if (!flow) {
-      await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
       setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
       return;
     }
@@ -281,15 +284,15 @@ async function handleButton(interaction) {
       ...SERIES_LENGTHS.map(len =>
         new ButtonBuilder()
           .setCustomId(`wager_series_${len}`)
-          .setLabel(`Best of ${len}`)
+          .setLabel(t('challenge_create.series_label', lang, { n: len }))
           .setStyle(ButtonStyle.Secondary),
       ),
     );
 
     flow.step = 4;
     return interaction.update({
-      content: `**Select series length:**\n\nMode: **${GAME_MODES[mode]?.label || mode}**`,
-      components: [row, navRow(4)],
+      content: t('challenge_create.select_series', lang, { mode: GAME_MODES[mode]?.label || mode }),
+      components: [row, navRow(4, lang)],
     });
   }
 
@@ -297,7 +300,7 @@ async function handleButton(interaction) {
   if (id.startsWith('wager_series_')) {
     const flow = activeFlows.get(userId);
     if (!flow) {
-      await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
       setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
       return;
     }
@@ -309,25 +312,25 @@ async function handleButton(interaction) {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('wager_vis_anon')
-        .setLabel('Anonymous')
+        .setLabel(t('challenge_create.btn_anonymous', lang))
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId('wager_vis_named')
-        .setLabel('Show My Name')
+        .setLabel(t('challenge_create.btn_show_names', lang))
         .setStyle(ButtonStyle.Primary),
     );
 
     return interaction.update({
       content: [
-        '**Challenge visibility:**',
+        t('challenge_create.visibility_title', lang),
         '',
-        `Series: **Best of ${series}**`,
+        `${t('challenge_create.confirm_field_series', lang)}: **${t('challenge_create.series_label', lang, { n: series })}**`,
         '',
-        '**Anonymous** — Your name and teammates will be hidden on the challenge board. Opponents won\'t know who they\'re facing until they accept.',
+        t('challenge_create.visibility_anon_desc', lang),
         '',
-        '**Show Names** — Your name and teammates will be visible on the challenge board so opponents can see who\'s challenging.',
+        t('challenge_create.visibility_named_desc', lang),
       ].join('\n'),
-      components: [row, navRow(5)],
+      components: [row, navRow(5, lang)],
     });
     flow.step = 5;
   }
@@ -336,7 +339,7 @@ async function handleButton(interaction) {
   if (id === 'wager_vis_anon' || id === 'wager_vis_named') {
     const flow = activeFlows.get(userId);
     if (!flow) {
-      await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
       setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
       return;
     }
@@ -344,15 +347,15 @@ async function handleButton(interaction) {
     flow.anonymous = id === 'wager_vis_anon';
 
     if (flow.type === CHALLENGE_TYPE.WAGER) {
-      // Show entry amount modal for wagers
+      // Show entry amount modal for wagers in user's language
       const modal = new ModalBuilder()
         .setCustomId('entry_amount')
-        .setTitle('Set Wager Amount');
+        .setTitle(t('challenge_create.entry_modal_title', lang));
 
       const amountInput = new TextInputBuilder()
         .setCustomId('amount_input')
-        .setLabel('Entry amount per player (in USDC)')
-        .setPlaceholder('e.g. 10')
+        .setLabel(t('challenge_create.entry_modal_label', lang))
+        .setPlaceholder(t('challenge_create.entry_modal_placeholder', lang))
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
         .setMinLength(1)
@@ -374,9 +377,10 @@ async function handleButton(interaction) {
  */
 async function handleModal(interaction) {
   const userId = interaction.user.id;
+  const lang = langFor(interaction);
   const flow = activeFlows.get(userId);
   if (!flow) {
-    await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+    await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
       setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
       return;
   }
@@ -390,7 +394,7 @@ async function handleModal(interaction) {
 
     if (isNaN(amount) || amount < minWager || amount > maxWager) {
       return interaction.reply({
-        content: `Invalid amount. Wager must be between **$${minWager}** and **$${maxWager}** USDC.`,
+        content: t('challenge_create.invalid_amount', lang, { min: minWager, max: maxWager }),
         ephemeral: true,
       });
     }
@@ -404,9 +408,10 @@ async function handleModal(interaction) {
  */
 async function handleUserSelect(interaction) {
   const userId = interaction.user.id;
+  const lang = langFor(interaction);
   const flow = activeFlows.get(userId);
   if (!flow) {
-    await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+    await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
       setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
       return;
   }
@@ -420,11 +425,11 @@ async function handleUserSelect(interaction) {
     for (const teammateDiscordId of selectedUsers) {
       const tmUser = userRepo.findByDiscordId(teammateDiscordId);
       if (!tmUser || !tmUser.cod_uid) {
-        return interaction.reply({ content: `<@${teammateDiscordId}> is not registered. They must register before joining a challenge.`, ephemeral: true });
+        return interaction.reply({ content: t('common.teammate_not_registered', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true });
       }
       const busy = isPlayerBusy(tmUser.id);
       if (busy.busy) {
-        return interaction.reply({ content: `<@${teammateDiscordId}> is currently busy: ${busy.reason}`, ephemeral: true });
+        return interaction.reply({ content: t('common.teammate_busy', lang, { user: `<@${teammateDiscordId}>`, reason: busy.reason }), ephemeral: true });
       }
     }
 
@@ -438,28 +443,35 @@ async function handleUserSelect(interaction) {
  */
 async function showChallengeConfirm(interaction, flow, amountUsdc) {
   const userId = interaction.user.id;
+  const lang = langFor(interaction);
   flow.pendingAmount = amountUsdc; // store for after confirmation
 
   const modeLabel = GAME_MODES[flow.gameMode]?.label || flow.gameMode;
-  const typeLabel = flow.type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match';
+  const typeLabel = flow.type === CHALLENGE_TYPE.WAGER
+    ? t('challenge_create.type_wager', lang)
+    : t('challenge_create.type_xp_match', lang);
   const entryText = flow.type === CHALLENGE_TYPE.WAGER && amountUsdc > 0
-    ? `**Entry:** $${amountUsdc} USDC per player\n**Total Pot:** $${amountUsdc * flow.teamSize * 2} USDC`
-    : '**Entry:** None (XP Match)';
+    ? `**${t('challenge_create.confirm_field_entry', lang)}:** ${t('challenge_create.confirm_entry_format', lang, { amount: amountUsdc })}\n**${t('challenge_create.confirm_field_pot', lang)}:** ${t('challenge_create.confirm_pot_format', lang, { amount: amountUsdc * flow.teamSize * 2 })}`
+    : `**${t('challenge_create.confirm_field_entry', lang)}:** ${t('challenge_create.confirm_no_entry', lang)}`;
   const teammateText = flow.teammates.length > 0
-    ? `**Teammates:** ${flow.teammates.map(id => `<@${id}>`).join(', ')}`
+    ? `**${t('challenge_create.confirm_field_teammates', lang)}:** ${flow.teammates.map(id => `<@${id}>`).join(', ')}`
     : '';
 
   const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
+  const visibilityLabel = flow.anonymous
+    ? t('challenge_create.visibility_anonymous', lang)
+    : t('challenge_create.visibility_named', lang);
+
   const confirmEmbed = new EmbedBuilder()
-    .setTitle('Confirm & Create Challenge')
+    .setTitle(t('challenge_create.confirm_title', lang))
     .setColor(0xf1c40f)
     .setDescription([
-      `**Type:** ${typeLabel}`,
-      `**Team Size:** ${flow.teamSize}v${flow.teamSize}`,
-      `**Mode:** ${modeLabel}`,
-      `**Series:** Best of ${flow.series}`,
-      `**Visibility:** ${flow.anonymous ? 'Anonymous' : 'Show Names'}`,
+      `**${t('challenge_create.confirm_field_type', lang)}:** ${typeLabel}`,
+      `**${t('challenge_create.confirm_field_team_size', lang)}:** ${flow.teamSize}v${flow.teamSize}`,
+      `**${t('challenge_create.confirm_field_mode', lang)}:** ${modeLabel}`,
+      `**${t('challenge_create.confirm_field_series', lang)}:** ${t('challenge_create.series_label', lang, { n: flow.series })}`,
+      `**${t('challenge_create.confirm_field_visibility', lang)}:** ${visibilityLabel}`,
       entryText,
       teammateText,
       '',
@@ -468,11 +480,11 @@ async function showChallengeConfirm(interaction, flow, amountUsdc) {
   const confirmRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('wager_confirm_create')
-      .setLabel('Confirm & Create')
+      .setLabel(t('challenge_create.btn_confirm_create', lang))
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('wager_cancel_create')
-      .setLabel('Cancel')
+      .setLabel(t('challenge_create.btn_cancel_create', lang))
       .setStyle(ButtonStyle.Danger),
   );
 
@@ -486,6 +498,7 @@ async function showChallengeConfirm(interaction, flow, amountUsdc) {
  * Show game mode selection buttons.
  */
 async function showGameModes(interaction, flow) {
+  const lang = langFor(interaction);
   const modeKeys = Object.keys(GAME_MODES);
 
   // Split into rows of 4 (Discord max 5 buttons per row)
@@ -503,16 +516,17 @@ async function showGameModes(interaction, flow) {
     rows.push(row);
   }
 
-  const teammateText = flow.teammates.length > 0
-    ? `\nTeammates: ${flow.teammates.map(id => `<@${id}>`).join(', ')}`
-    : '';
-
   flow.step = 3;
-  rows.push(navRow(3));
-  return interaction.update({
-    content: `**Select game mode:**\n\nTeam size: **${flow.teamSize}v${flow.teamSize}**${teammateText}`,
-    components: rows,
-  });
+  rows.push(navRow(3, lang));
+
+  const content = flow.teammates.length > 0
+    ? t('challenge_create.select_game_mode_with_teammates', lang, {
+        size: flow.teamSize,
+        teammates: flow.teammates.map(id => `<@${id}>`).join(', '),
+      })
+    : t('challenge_create.select_game_mode', lang, { size: flow.teamSize });
+
+  return interaction.update({ content, components: rows });
 }
 
 /**
@@ -521,10 +535,11 @@ async function showGameModes(interaction, flow) {
  */
 async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
   const userId = interaction.user.id;
+  const lang = langFor(interaction);
 
   // Prevent double-submit
   if (finalizingUsers.has(userId)) {
-    return interaction.reply ? interaction.reply({ content: 'Already processing your challenge...', ephemeral: true }) : null;
+    return interaction.reply ? interaction.reply({ content: t('challenge_create.already_processing', lang), ephemeral: true }) : null;
   }
   finalizingUsers.add(userId);
 
@@ -544,7 +559,7 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
 
     const user = userRepo.findByDiscordId(userId);
     if (!user) {
-      return sendFlowReply(interaction, 'You need to complete onboarding first.');
+      return sendFlowReply(interaction, t('common.onboarding_required', lang));
     }
 
     const entryUsdc = Math.floor(amountUsdc * USDC_PER_UNIT);
@@ -573,14 +588,14 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
       if (!escrowManager.canAfford(user.id, entryUsdc.toString())) {
         challengeRepo.updateStatus(challenge.id, CHALLENGE_STATUS.CANCELLED);
         await cleanupFlowChannel(interaction.client, flow, userId);
-        return sendFlowReply(interaction, `Insufficient balance. You need **$${amountUsdc} USDC** to create this wager.`);
+        return sendFlowReply(interaction, t('challenge_create.insufficient_create', lang, { amount: amountUsdc }));
       }
 
       const held = escrowManager.holdFunds(user.id, entryUsdc.toString(), challenge.id);
       if (!held) {
         challengeRepo.updateStatus(challenge.id, CHALLENGE_STATUS.CANCELLED);
         await cleanupFlowChannel(interaction.client, flow, userId);
-        return sendFlowReply(interaction, 'Failed to hold funds. Please try again.');
+        return sendFlowReply(interaction, t('challenge_create.failed_hold_funds', lang));
       }
     }
 
@@ -624,37 +639,43 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
       });
     }
 
-    // Build summary
+    // Build summary in user's language
     const modeLabel = GAME_MODES[flow.gameMode]?.label || flow.gameMode;
-    const entryText = flow.type === CHALLENGE_TYPE.WAGER
-      ? `\nEntry: **$${amountUsdc} USDC** per player`
-      : '\nType: **XP Match** (no wager)';
+    const isWager = flow.type === CHALLENGE_TYPE.WAGER;
+    const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+    const entryText = isWager
+      ? `\n${t('challenge_create.confirm_field_entry', lang)}: **${t('challenge_create.confirm_entry_format', lang, { amount: amountUsdc })}**`
+      : `\n${t('challenge_create.confirm_field_type', lang)}: **${typeLabel}** (${t('challenge_create.confirm_no_entry', lang)})`;
 
-    // Log to admin transaction feed
+    // Log to admin transaction feed (English — admin-only)
     const { postTransaction } = require('../utils/transactionFeed');
     postTransaction({
       type: 'challenge_created',
       username: user.server_username,
       discordId: userId,
       challengeId: challenge.id,
-      memo: `${flow.type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match'} | ${flow.teamSize}v${flow.teamSize} | ${modeLabel} | Bo${flow.series}${flow.type === CHALLENGE_TYPE.WAGER ? ` | $${amountUsdc} entry` : ''}`,
+      memo: `${isWager ? 'Wager' : 'XP Match'} | ${flow.teamSize}v${flow.teamSize} | ${modeLabel} | Bo${flow.series}${isWager ? ` | $${amountUsdc} entry` : ''}`,
     });
 
+    const visibilityLabel = flow.anonymous
+      ? t('challenge_create.visibility_anonymous', lang)
+      : t('challenge_create.visibility_named', lang);
+
     const summary = [
-      `**${flow.type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id} created!**`,
+      t('challenge_create.create_summary_header', lang, { type: typeLabel, num: challenge.display_number || challenge.id }),
       '',
-      `Type: **${flow.type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match'}**`,
-      `Team size: **${flow.teamSize}v${flow.teamSize}**`,
-      `Mode: **${modeLabel}**`,
-      `Series: **Best of ${flow.series}**`,
-      `Visibility: **${flow.anonymous ? 'Anonymous' : 'Named'}**`,
+      `${t('challenge_create.confirm_field_type', lang)}: **${typeLabel}**`,
+      `${t('challenge_create.confirm_field_team_size', lang)}: **${flow.teamSize}v${flow.teamSize}**`,
+      `${t('challenge_create.confirm_field_mode', lang)}: **${modeLabel}**`,
+      `${t('challenge_create.confirm_field_series', lang)}: **${t('challenge_create.series_label', lang, { n: flow.series })}**`,
+      `${t('challenge_create.confirm_field_visibility', lang)}: **${visibilityLabel}**`,
       entryText,
       '',
       flow.teammates.length > 0
-        ? 'Your teammates have been notified. Waiting for them to accept.'
-        : 'Your challenge is live on the board! Waiting for an opponent.',
+        ? t('challenge_create.create_summary_waiting_teammates', lang)
+        : t('challenge_create.create_summary_live_board', lang),
       '',
-      'This channel will be deleted in 10 seconds.',
+      t('challenge_create.create_summary_delete_notice', lang),
     ].join('\n');
 
     await sendFlowReply(interaction, summary);
@@ -666,7 +687,7 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
     console.error('[ChallengeCreate] Error finalizing challenge:', err);
     finalizingUsers.delete(userId);
     await cleanupFlowChannel(interaction.client, activeFlows.get(userId), userId);
-    return sendFlowReply(interaction, 'Something went wrong creating your challenge. Please try again.');
+    return sendFlowReply(interaction, t('challenge_create.error_creating', lang));
   }
 }
 

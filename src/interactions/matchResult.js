@@ -272,20 +272,21 @@ async function showReportConfirm(interaction, outcome) {
 // ─── Both Captains Report (CMG-style) ────────────────────────────
 
 async function handleReport(interaction, outcome) {
+  const lang = langFor(interaction);
   // customId: confirm_won_{matchId} or confirm_lost_{matchId}
   const matchId = parseInt(interaction.customId.replace(`confirm_${outcome}_`, ''), 10);
-  if (isNaN(matchId)) return interaction.reply({ content: 'Invalid match.', ephemeral: true });
+  if (isNaN(matchId)) return interaction.reply({ content: t('match_result.invalid_match', lang), ephemeral: true });
 
   const match = matchRepo.findById(matchId);
-  if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
+  if (!match) return interaction.reply({ content: t('common.match_not_found', lang), ephemeral: true });
 
   if (match.status !== MATCH_STATUS.ACTIVE && match.status !== MATCH_STATUS.VOTING) {
-    return interaction.reply({ content: 'This match is no longer accepting reports.', ephemeral: true });
+    return interaction.reply({ content: t('match_result.no_longer_reports', lang), ephemeral: true });
   }
 
   // Verify captain
   const user = userRepo.findByDiscordId(interaction.user.id);
-  if (!user) return interaction.reply({ content: 'Not registered.', ephemeral: true });
+  if (!user) return interaction.reply({ content: t('common.not_registered_simple', lang), ephemeral: true });
 
   const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
   let captainTeam = null;
@@ -296,15 +297,15 @@ async function handleReport(interaction, outcome) {
     }
   }
   if (!captainTeam) {
-    return interaction.reply({ content: 'Only team captains can report results.', ephemeral: true });
+    return interaction.reply({ content: t('common.only_captains', lang), ephemeral: true });
   }
 
   // Check if this captain already reported
   if (captainTeam === 1 && match.captain1_vote !== null) {
-    return interaction.reply({ content: 'You already reported. Waiting for the other captain.', ephemeral: true });
+    return interaction.reply({ content: t('match_result.you_already_reported_waiting', lang), ephemeral: true });
   }
   if (captainTeam === 2 && match.captain2_vote !== null) {
-    return interaction.reply({ content: 'You already reported. Waiting for the other captain.', ephemeral: true });
+    return interaction.reply({ content: t('match_result.you_already_reported_waiting', lang), ephemeral: true });
   }
 
   // Determine what team this captain says won
@@ -326,16 +327,17 @@ async function handleReport(interaction, outcome) {
   const { postTransaction } = require('../utils/transactionFeed');
   postTransaction({ type: 'match_report', username: user.server_username, discordId: user.discord_id, challengeId: match.challenge_id, memo: `Match #${matchId} | Team ${captainTeam} captain reported: ${outcome === 'won' ? 'WE WON' : 'WE LOST'} (says Team ${reportedWinner} won)` });
 
-  // Update the ephemeral confirmation message
+  // Update the ephemeral confirmation message in user's language
+  const reportedKey = outcome === 'won' ? 'match_result.report_recorded_won' : 'match_result.report_recorded_lost';
   try {
     await interaction.update({
-      content: `You reported: **${outcome === 'won' ? 'We Won' : 'We Lost'}**. Waiting for the other captain to report.`,
+      content: t(reportedKey, lang),
       embeds: [],
       components: [],
     });
   } catch {
     await interaction.reply({
-      content: `You reported: **${outcome === 'won' ? 'We Won' : 'We Lost'}**. Waiting for the other captain to report.`,
+      content: t(reportedKey, lang),
       ephemeral: true,
     });
   }
@@ -354,8 +356,13 @@ async function handleReport(interaction, outcome) {
       try {
         const voteChannel = interaction.client.channels.cache.get(match.voting_channel_id);
         if (voteChannel) {
+          // Use first captain's language for shared vote channel announcement
+          const allPlayersForLang = challengePlayerRepo.findByChallengeId(match.challenge_id);
+          const captainPlayer = allPlayersForLang.find(p => p.role === PLAYER_ROLE.CAPTAIN);
+          const captainUser = captainPlayer ? userRepo.findById(captainPlayer.user_id) : null;
+          const sharedLang = captainUser ? langFor({ user: { id: captainUser.discord_id }, locale: '' }) : 'en';
           await voteChannel.send({
-            content: `Both captains agree: **Team ${winningTeam} wins!** Resolving match...`,
+            content: t('match_channel.captains_agree', sharedLang, { team: winningTeam }),
           });
         }
         await matchService.resolveMatch(interaction.client, matchId, winningTeam);
@@ -368,8 +375,12 @@ async function handleReport(interaction, outcome) {
 
       const voteChannel = interaction.client.channels.cache.get(match.voting_channel_id);
       if (voteChannel) {
+        const allPlayersForLang = challengePlayerRepo.findByChallengeId(match.challenge_id);
+        const captainPlayer = allPlayersForLang.find(p => p.role === PLAYER_ROLE.CAPTAIN);
+        const captainUser = captainPlayer ? userRepo.findById(captainPlayer.user_id) : null;
+        const sharedLang = captainUser ? langFor({ user: { id: captainUser.discord_id }, locale: '' }) : 'en';
         await voteChannel.send({
-          content: `**Captains disagree!** Team 1 says Team ${c1Vote} won, Team 2 says Team ${c2Vote} won. Match is now **disputed**.`,
+          content: t('match_channel.captains_disagree', sharedLang, { t1: c1Vote, t2: c2Vote }),
         });
       }
     }
@@ -406,6 +417,11 @@ async function triggerDispute(client, matchId) {
       return u ? `<@${u.discord_id}>` : '';
     }).filter(Boolean).join(' ');
 
+    // Use first captain's language for shared dispute message
+    const captainPlayer = allPlayers.find(p => p.role === PLAYER_ROLE.CAPTAIN);
+    const captainUser = captainPlayer ? userRepo.findById(captainPlayer.user_id) : null;
+    const sharedLang = captainUser ? langFor({ user: { id: captainUser.discord_id }, locale: '' }) : 'en';
+
     const adminRoleId = process.env.ADMIN_ROLE_ID;
     const wagerStaffId = process.env.WAGER_STAFF_ROLE_ID;
     const xpStaffId = process.env.XP_STAFF_ROLE_ID;
@@ -416,16 +432,24 @@ async function triggerDispute(client, matchId) {
     const staffPing = pings.length > 0 ? pings.join(' ') : 'Staff';
 
     await sharedChannel.send({
-      content: `**Match Disputed!**\n\n${allPings}\n\n**Post your evidence directly in this channel** — screenshots, photos, videos, links, text.\n\n${staffPing} — please review and resolve.`,
+      content: [
+        t('match_channel.match_disputed_title', sharedLang),
+        '',
+        allPings,
+        '',
+        t('match_channel.match_disputed_post_evidence', sharedLang),
+        '',
+        t('match_channel.staff_review', sharedLang, { staff: staffPing }),
+      ].join('\n'),
     });
 
     const adminRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`admin_resolve_team1_${matchId}`).setLabel('Team 1 Wins').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`admin_resolve_team2_${matchId}`).setLabel('Team 2 Wins').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId(`admin_resolve_nowinner_${matchId}`).setLabel('No Winner').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`admin_resolve_team1_${matchId}`).setLabel(t('admin_resolve.btn_team1_wins', sharedLang)).setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`admin_resolve_team2_${matchId}`).setLabel(t('admin_resolve.btn_team2_wins', sharedLang)).setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`admin_resolve_nowinner_${matchId}`).setLabel(t('admin_resolve.btn_no_winner', sharedLang)).setStyle(ButtonStyle.Secondary),
     );
 
-    await sharedChannel.send({ content: '**Staff Panel** — Review evidence and resolve:', components: [adminRow] });
+    await sharedChannel.send({ content: t('admin_resolve.staff_panel_title', sharedLang), components: [adminRow] });
   }
 
   const { postTransaction: ptx } = require('../utils/transactionFeed');
@@ -444,9 +468,10 @@ async function triggerDispute(client, matchId) {
 
 async function handleAdminResolve(interaction) {
   const id = interaction.customId;
+  const lang = langFor(interaction);
 
   if (!canResolveDisputes(interaction.member)) {
-    return interaction.reply({ content: 'Only admins and wager staff can resolve disputes.', ephemeral: true });
+    return interaction.reply({ content: t('admin_resolve.only_admins', lang), ephemeral: true });
   }
 
   let winningTeam, matchId;
@@ -461,33 +486,33 @@ async function handleAdminResolve(interaction) {
     matchId = parseInt(id.replace('admin_resolve_team2_', ''), 10);
   }
 
-  if (isNaN(matchId)) return interaction.reply({ content: 'Invalid match.', ephemeral: true });
+  if (isNaN(matchId)) return interaction.reply({ content: t('match_result.invalid_match', lang), ephemeral: true });
 
   const match = matchRepo.findById(matchId);
   if (!match || match.status !== MATCH_STATUS.DISPUTED) {
-    return interaction.reply({ content: 'This match is not in a disputed state.', ephemeral: true });
+    return interaction.reply({ content: t('admin_resolve.not_disputed', lang), ephemeral: true });
   }
 
   // Show confirmation with team rosters
-  const { formatUsdc } = require('../utils/embeds');
   const challenge = challengeRepo.findById(match.challenge_id);
   const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
 
   if (winningTeam === 0) {
     // No Winner confirmation
     const isWager = challenge && Number(challenge.total_pot_usdc) > 0;
+    const entryAmount = isWager ? (Number(challenge.entry_amount_usdc) / 1_000_000).toFixed(2) : '0';
     const refundText = isWager
-      ? `\n\nAll players will be **refunded** their entry of ${formatUsdc(challenge.entry_amount_usdc)} USDC each.`
-      : '\n\nNo XP changes will be applied.';
+      ? t('admin_resolve.refund_text_wager', lang, { amount: entryAmount })
+      : t('admin_resolve.refund_text_xp', lang);
 
     const confirmEmbed = new EmbedBuilder()
-      .setTitle('Confirm: No Winner')
+      .setTitle(t('admin_resolve.confirm_no_winner_title', lang))
       .setColor(0x95a5a6)
-      .setDescription(`You are declaring **no winner** for Match #${matchId}.${refundText}\n\n**This cannot be undone.**`);
+      .setDescription(t('admin_resolve.confirm_no_winner_desc', lang, { matchId, refund_text: refundText }));
 
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`admin_confirm_nowinner_${matchId}`).setLabel('Confirm No Winner').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`admin_goback_${matchId}`).setLabel('Go Back').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`admin_confirm_nowinner_${matchId}`).setLabel(t('admin_resolve.btn_confirm_no_winner', lang)).setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`admin_goback_${matchId}`).setLabel(t('common.go_back', lang)).setStyle(ButtonStyle.Primary),
     );
 
     return interaction.update({ embeds: [confirmEmbed], components: [row] });
@@ -503,42 +528,46 @@ async function handleAdminResolve(interaction) {
     return u ? `<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''}` : 'Unknown';
   });
 
-  const potText = challenge && Number(challenge.total_pot_usdc) > 0
-    ? `\n\n**Pot:** ${formatUsdc(challenge.total_pot_usdc)} USDC will be paid to the winners.`
+  const potAmount = challenge && Number(challenge.total_pot_usdc) > 0
+    ? (Number(challenge.total_pot_usdc) / 1_000_000).toFixed(2)
+    : null;
+  const potText = potAmount
+    ? '\n\n' + t('admin_resolve.pot_will_be_paid', lang, { amount: potAmount })
     : '';
 
   const confirmEmbed = new EmbedBuilder()
-    .setTitle('Are you sure?')
+    .setTitle(t('admin_resolve.confirm_team_title', lang))
     .setColor(0xe74c3c)
     .setDescription([
-      `You are awarding the win to **Team ${winningTeam}**.`,
-      '', `**Winners (Team ${winningTeam}):**`, ...winnerNames,
-      '', `**Losers (Team ${losingTeam}):**`, ...loserNames,
-      potText, '', '**This cannot be undone.**',
+      t('admin_resolve.confirm_team_desc', lang, { team: winningTeam }),
+      '', t('admin_resolve.winners_team', lang, { team: winningTeam }), ...winnerNames,
+      '', t('admin_resolve.losers_team', lang, { team: losingTeam }), ...loserNames,
+      potText, '', t('admin_resolve.cannot_be_undone', lang),
     ].join('\n'));
 
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`admin_confirm_${matchId}_${winningTeam}`).setLabel(`Confirm Team ${winningTeam} Wins`).setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`admin_goback_${matchId}`).setLabel('Go Back').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`admin_confirm_${matchId}_${winningTeam}`).setLabel(t('admin_resolve.btn_confirm_team_wins', lang, { team: winningTeam })).setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`admin_goback_${matchId}`).setLabel(t('common.go_back', lang)).setStyle(ButtonStyle.Secondary),
   );
 
   return interaction.update({ embeds: [confirmEmbed], components: [row] });
 }
 
 async function handleAdminConfirm(interaction) {
+  const lang = langFor(interaction);
   const parts = interaction.customId.replace('admin_confirm_', '').split('_');
   const matchId = parseInt(parts[0], 10);
   const winningTeam = parseInt(parts[1], 10);
 
   if (!canResolveDisputes(interaction.member)) {
-    return interaction.reply({ content: 'Only admins and wager staff can resolve disputes.', ephemeral: true });
+    return interaction.reply({ content: t('admin_resolve.only_admins', lang), ephemeral: true });
   }
 
   const { logAdminAction } = require('../utils/adminAudit');
   logAdminAction(interaction.user.id, 'resolve_dispute', 'match', matchId, { winningTeam });
 
   await interaction.update({
-    content: `<@${interaction.user.id}> resolved the dispute. **Team ${winningTeam} wins!**`,
+    content: t('admin_resolve.resolved_msg', lang, { user: `<@${interaction.user.id}>`, team: winningTeam }),
     embeds: [], components: [],
   });
 
@@ -558,14 +587,15 @@ async function handleAdminConfirm(interaction) {
 }
 
 async function handleAdminConfirmNoWinner(interaction) {
+  const lang = langFor(interaction);
   const matchId = parseInt(interaction.customId.replace('admin_confirm_nowinner_', ''), 10);
 
   if (!canResolveDisputes(interaction.member)) {
-    return interaction.reply({ content: 'Only admins and wager staff can resolve disputes.', ephemeral: true });
+    return interaction.reply({ content: t('admin_resolve.only_admins', lang), ephemeral: true });
   }
 
   const match = matchRepo.findById(matchId);
-  if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
+  if (!match) return interaction.reply({ content: t('common.match_not_found', lang), ephemeral: true });
 
   const challenge = challengeRepo.findById(match.challenge_id);
 
@@ -573,7 +603,7 @@ async function handleAdminConfirmNoWinner(interaction) {
   logAdminAction(interaction.user.id, 'resolve_no_winner', 'match', matchId, {});
 
   await interaction.update({
-    content: `<@${interaction.user.id}> declared **no winner** for Match #${matchId}. Refunding all players.`,
+    content: t('admin_resolve.no_winner_resolved_msg', lang, { user: `<@${interaction.user.id}>`, matchId }),
     embeds: [], components: [],
   });
 
@@ -773,13 +803,14 @@ async function postDisputeResult(client, matchId, winningTeam, resolverDiscordId
 }
 
 async function handleAdminGoBack(interaction) {
+  const lang = langFor(interaction);
   const matchId = parseInt(interaction.customId.replace('admin_goback_', ''), 10);
   const adminRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`admin_resolve_team1_${matchId}`).setLabel('Team 1 Wins').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`admin_resolve_team2_${matchId}`).setLabel('Team 2 Wins').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`admin_resolve_nowinner_${matchId}`).setLabel('No Winner').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`admin_resolve_team1_${matchId}`).setLabel(t('admin_resolve.btn_team1_wins', lang)).setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`admin_resolve_team2_${matchId}`).setLabel(t('admin_resolve.btn_team2_wins', lang)).setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`admin_resolve_nowinner_${matchId}`).setLabel(t('admin_resolve.btn_no_winner', lang)).setStyle(ButtonStyle.Secondary),
   );
-  return interaction.update({ content: '**Staff Panel** — Review evidence, then resolve:', embeds: [], components: [adminRow] });
+  return interaction.update({ content: t('admin_resolve.staff_panel_review', lang), embeds: [], components: [adminRow] });
 }
 
 module.exports = { handleButton, handleModal, triggerDispute };
