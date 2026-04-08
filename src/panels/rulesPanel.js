@@ -4,7 +4,7 @@ function buildRulesPanel() {
   const generalEmbed = new EmbedBuilder()
     .setTitle('Server Rules & Match Regulations')
     .setColor(0xe74c3c)
-    .setDescription('By participating in any match (wager or XP), you agree to all rules below. Violations result in penalties up to permanent ban and forfeiture of funds.');
+    .setDescription('By playing any match (wager or XP), you agree to all rules below. Breaking these rules can get you banned and you may lose your funds.');
 
   const gameSettingsEmbed = new EmbedBuilder()
     .setTitle('Game Settings')
@@ -18,7 +18,7 @@ function buildRulesPanel() {
   const bannedWeaponsEmbed = new EmbedBuilder()
     .setTitle('Restricted Weapons')
     .setColor(0xe74c3c)
-    .setDescription('Any new content added to the game is restricted for 21 days after release. Administration may restrict or lift restrictions at their discretion.')
+    .setDescription('Any new content added to the game is banned for 21 days after it comes out. Staff can ban or unban items at any time.')
     .addFields(
       { name: 'Snipers', value: 'NA-45, SVD, XPR, SO-14', inline: true },
       { name: 'Shotguns', value: 'Argus', inline: true },
@@ -141,26 +141,26 @@ function buildRulesPanel() {
     .setDescription([
       '**Account:**',
       '• You MUST use your registered COD Mobile account (matching your registered UID)',
-      '• Playing on a different account = forfeit + potential ban',
+      '• Playing on a different account = you lose the match and could get banned',
       '',
       '**Match:**',
-      '• All wagers are final once both parties accept',
+      '• Once both sides accept a wager, the match must be played — no backing out',
       '• Both captains must report results honestly',
-      '• Disconnections are not grounds for restart unless both teams agree',
-      '• Maps are randomly selected by the bot — no changes after match starts',
+      '• If you disconnect, the match keeps going — no restart unless both teams agree',
+      '• The bot picks the maps randomly — you can\'t change them once the match starts',
       '',
-      '**Funds:**',
-      '• Entry: $0.50–$100 USDC per player',
-      '• Funds locked from your account during match, released when decided',
-      '• Winners receive the full pot split equally',
+      '**Money:**',
+      '• You can wager between $0.50 and $100 per player',
+      '• Your money is locked during the match — you get it back when the match is decided',
+      '• Winners split the full pot equally',
       '',
       '**Disputes:**',
-      '• Post evidence (screenshots/video) in the match shared channel',
-      '• Evidence must show match result AND player UIDs',
-      '• Staff decisions are final',
-      '• Falsified evidence = permanent ban + fund forfeiture',
+      '• If there\'s a disagreement, post your proof (screenshots/recordings) in the match channel',
+      '• Your proof should show the final score and player UIDs',
+      '• Staff will review and make the call — their decision is final',
+      '• Fake proof = permanent ban and you lose your money',
       '',
-      '**Prohibited:** Cheating, win trading, DDoS, multiple accounts, match fixing, impersonating staff. All result in permanent ban + forfeiture of funds.',
+      '**You will be permanently banned for:** Cheating, hacking, win trading, DDoS attacks, using multiple accounts, fixing matches, or pretending to be staff.',
     ].join('\n'));
 
   const xpMatchRulesEmbed = new EmbedBuilder()
@@ -172,20 +172,20 @@ function buildRulesPanel() {
       '• Your registered UID is not required for XP matches',
       '',
       '**Match:**',
-      '• All XP matches are final once both parties accept',
+      '• Once both sides accept, the match must be played',
       '• Both captains must report results honestly',
-      '• Disconnections are not grounds for restart unless both teams agree',
-      '• Maps are randomly selected by the bot — no changes after match starts',
+      '• If you disconnect, the match keeps going — no restart unless both teams agree',
+      '• The bot picks the maps randomly — you can\'t change them once the match starts',
       '',
       '**XP:**',
-      '• XP is calculated using an ELO system — beating stronger teams earns more XP',
-      '• XP synced across challenges and queue matches',
+      '• Beating a stronger team gives you more XP, beating a weaker team gives you less',
+      '• All your XP from challenges, queue matches, and wager wins goes to the same ranking',
       '',
       '**Disputes:**',
-      '• Post evidence (screenshots/video) in the match shared channel',
-      '• Staff decisions are final',
+      '• If there\'s a disagreement, post your proof in the match channel',
+      '• Staff will review and make the call — their decision is final',
       '',
-      '**Prohibited:** Cheating, win trading, XP boosting, match fixing. Results in ban.',
+      '**You will be banned for:** Cheating, win trading, XP boosting, or fixing matches.',
     ].join('\n'))
     .setFooter({ text: 'Source: callofduty.com/mobile/esports/esports-settings' });
 
