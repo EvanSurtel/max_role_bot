@@ -5,6 +5,7 @@ const stmts = {
   findByDiscordId: db.prepare('SELECT * FROM users WHERE discord_id = ?'),
   create: db.prepare('INSERT INTO users (discord_id) VALUES (?) RETURNING *'),
   acceptTos: db.prepare('UPDATE users SET accepted_tos = 1 WHERE id = ?'),
+  setLanguage: db.prepare('UPDATE users SET language = ? WHERE discord_id = ?'),
 
   // Leaderboard stats
   addXp: db.prepare('UPDATE users SET xp_points = xp_points + ? WHERE id = ?'),
@@ -56,6 +57,10 @@ const userRepo = {
 
   acceptTos(id) {
     return stmts.acceptTos.run(id);
+  },
+
+  setLanguage(discordId, lang) {
+    return stmts.setLanguage.run(lang, discordId);
   },
 
   addXp(id, points) {

@@ -75,11 +75,11 @@ module.exports = {
         if (id === 'dispute_nevermind') {
           return interaction.update({ content: 'Dispute cancelled.', embeds: [], components: [] });
         }
-        // Onboarding TOS buttons + wallet refresh
-        if (id.startsWith('tos_') || id === 'wallet_refresh') {
+        // Onboarding TOS buttons + wallet channel main panel buttons (refresh, lang)
+        if (id.startsWith('tos_') || id === 'wallet_refresh' || id === 'wallet_lang' || id === 'wallet_lang_cancel') {
           return await onboarding.handleButton(interaction);
         }
-        // Wallet action buttons (withdraw, history) — in wallet channel
+        // Wallet action buttons (copy, withdraw, history) — in wallet channel
         if (id.startsWith('wallet_')) {
           return await walletPanel.handleWalletSubButton(interaction);
         }
@@ -131,11 +131,14 @@ module.exports = {
         return;
       }
 
-      // String select menus (leaderboard dropdowns)
+      // String select menus (leaderboard dropdowns + wallet language picker)
       if (interaction.isStringSelectMenu()) {
         const id = interaction.customId;
         if (id.startsWith('xplb_') || id.startsWith('earnlb_')) {
           return await leaderboardPanel.handleLeaderboardSelect(interaction);
+        }
+        if (id === 'wallet_lang_select') {
+          return await onboarding.handleWalletLanguageSelect(interaction);
         }
         console.warn(`[Interaction] Unhandled string select customId: ${id}`);
         return;

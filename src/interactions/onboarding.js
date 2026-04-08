@@ -120,6 +120,12 @@ async function handleButton(interaction) {
   if (id === 'wallet_refresh') {
     return handleWalletRefresh(interaction);
   }
+  if (id === 'wallet_lang') {
+    return handleWalletLanguageButton(interaction);
+  }
+  if (id === 'wallet_lang_cancel') {
+    return handleWalletLanguageCancel(interaction);
+  }
 }
 
 /**
@@ -251,8 +257,9 @@ async function handleRegistrationModal(interaction) {
 
     db.prepare('UPDATE users SET wallet_channel_id = ? WHERE id = ?').run(walletChannel.id, user.id);
 
-    // Send wallet panel in the wallet channel
-    await sendWalletPanel(walletChannel, wallet);
+    // Send wallet panel in the wallet channel (in user's language if set)
+    const freshUser = userRepo.findById(user.id);
+    await sendWalletPanel(walletChannel, wallet, freshUser);
 
     // Send registration complete embed
     const completeEmbed = new EmbedBuilder()
@@ -354,43 +361,21 @@ async function syncIgnToNeatQueue(discordUserId, ign) {
 /**
  * Send the wallet panel in a wallet channel.
  */
-async function sendWalletPanel(channel, wallet) {
-  const embed = new EmbedBuilder()
-    .setTitle('Your Wallet')
-    .setColor(0x2ecc71)
-    .setDescription([
-      '**Deposit Address:**',
-      `\`\`\`${wallet.solana_address}\`\`\``,
-      '',
-      '**To fund your wallet:**',
-      '1. Send **USDC** (SPL token on Solana) to the address above for wagers',
-      '2. Send a small amount of **SOL** (~$0.50) to the same address for transaction fees — this will last ~100 wagers',
-      '',
-      'Deposits are detected automatically. Click **Refresh** to update your balance.',
-    ].join('\n'))
-    .addFields(
-      { name: 'USDC Balance', value: '$0.00 USDC', inline: true },
-      { name: 'Held in Wagers', value: '$0.00 USDC', inline: true },
-      { name: 'SOL (gas)', value: 'Click Refresh', inline: true },
-    )
-    .setTimestamp();
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('wallet_copy_address').setLabel('Copy Address').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('wallet_refresh').setLabel('Refresh Balance').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('wallet_withdraw').setLabel('Withdraw USDC').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('wallet_withdraw_sol').setLabel('Withdraw SOL').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('wallet_history').setLabel('History').setStyle(ButtonStyle.Secondary),
-  );
-
-  await channel.send({ embeds: [embed], components: [row] });
+async function sendWalletPanel(channel, wallet, user = null) {
+  const { buildWalletView } = require('../panels/walletPanelView');
+  const lang = (user && user.language) || 'en';
+  const view = buildWalletView(wallet, user, lang, null);
+  await channel.send(view);
 }
 
 /**
- * Handle wallet refresh button.
+ * Handle wallet refresh button — re-renders the wallet panel in place using
+ * the channel owner's saved language.
  */
 async function handleWalletRefresh(interaction) {
-  // Look up the wallet owner by channel ID (not who clicked — admins can see all wallets)
+  const { buildWalletView } = require('../panels/walletPanelView');
+
+  // Look up the wallet owner by channel ID (admins can see other users' wallet channels)
   const db = require('../database/db');
   const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
   const user = channelOwner || userRepo.findByDiscordId(interaction.user.id);
@@ -403,39 +388,88 @@ async function handleWalletRefresh(interaction) {
 
   let solBalance = '0';
   try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
-  const solFormatted = (Number(solBalance) / 1_000_000_000).toFixed(8);
-  const available = Number(wallet.balance_available);
-  const held = Number(wallet.balance_held);
 
-  const embed = new EmbedBuilder()
-    .setTitle('Your Wallet')
-    .setColor(0x2ecc71)
-    .setDescription([
-      '**Deposit Address:**',
-      `\`\`\`${wallet.solana_address}\`\`\``,
-      '',
-      '**To fund your wallet:**',
-      '1. Send **USDC** (SPL token on Solana) to the address above for wagers',
-      '2. Send a small amount of **SOL** (~$0.50) to the same address for transaction fees — this will last ~100 wagers',
-      '',
-      'Deposits are detected automatically. Click **Refresh** to update your balance.',
-    ].join('\n'))
-    .addFields(
-      { name: 'USDC Balance', value: `$${(available / 1_000_000).toFixed(2)} USDC`, inline: true },
-      { name: 'Held in Wagers', value: `$${(held / 1_000_000).toFixed(2)} USDC`, inline: true },
-      { name: 'SOL (gas)', value: `${solFormatted} SOL`, inline: true },
-    )
-    .setTimestamp();
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('wallet_copy_address').setLabel('Copy Address').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('wallet_refresh').setLabel('Refresh Balance').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('wallet_withdraw').setLabel('Withdraw USDC').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('wallet_withdraw_sol').setLabel('Withdraw SOL').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('wallet_history').setLabel('History').setStyle(ButtonStyle.Secondary),
-  );
-
-  await interaction.editReply({ embeds: [embed], components: [row] });
+  const lang = user.language || 'en';
+  const view = buildWalletView(wallet, user, lang, solBalance);
+  await interaction.editReply(view);
 }
 
-module.exports = { handleButton, handleRegistrationModal, sendWalletPanel };
+/**
+ * Show the language picker — replaces the wallet view with a language select menu.
+ */
+async function handleWalletLanguageButton(interaction) {
+  const { buildLanguagePickerView } = require('../panels/walletPanelView');
+
+  const db = require('../database/db');
+  const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
+  const user = channelOwner || userRepo.findByDiscordId(interaction.user.id);
+  if (!user) return interaction.reply({ content: 'User not found.', ephemeral: true });
+
+  const lang = user.language || 'en';
+  const view = buildLanguagePickerView(lang);
+  return interaction.update(view);
+}
+
+/**
+ * Cancel the language picker and go back to the wallet view.
+ */
+async function handleWalletLanguageCancel(interaction) {
+  const { buildWalletView } = require('../panels/walletPanelView');
+
+  const db = require('../database/db');
+  const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
+  const user = channelOwner || userRepo.findByDiscordId(interaction.user.id);
+  if (!user) return interaction.reply({ content: 'User not found.', ephemeral: true });
+
+  const wallet = walletRepo.findByUserId(user.id);
+  if (!wallet) return interaction.reply({ content: 'Wallet not found.', ephemeral: true });
+
+  let solBalance = '0';
+  try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
+
+  const lang = user.language || 'en';
+  const view = buildWalletView(wallet, user, lang, solBalance);
+  return interaction.update(view);
+}
+
+/**
+ * Save selected language and re-render the wallet panel in the new language.
+ */
+async function handleWalletLanguageSelect(interaction) {
+  const { buildWalletView } = require('../panels/walletPanelView');
+  const { SUPPORTED_LANGUAGES } = require('../locales');
+
+  const newLang = interaction.values[0];
+  if (!SUPPORTED_LANGUAGES[newLang]) {
+    return interaction.reply({ content: 'Unknown language.', ephemeral: true });
+  }
+
+  // Save preference for the channel owner (admins viewing other users' channels
+  // should not be able to change someone else's language)
+  const db = require('../database/db');
+  const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
+  if (!channelOwner) return interaction.reply({ content: 'Wallet channel owner not found.', ephemeral: true });
+  if (channelOwner.discord_id !== interaction.user.id) {
+    return interaction.reply({ content: 'Only the wallet owner can change the language.', ephemeral: true });
+  }
+
+  userRepo.setLanguage(channelOwner.discord_id, newLang);
+
+  const wallet = walletRepo.findByUserId(channelOwner.id);
+  let solBalance = '0';
+  try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
+
+  const freshUser = userRepo.findById(channelOwner.id);
+  const view = buildWalletView(wallet, freshUser, newLang, solBalance);
+  return interaction.update(view);
+}
+
+module.exports = {
+  handleButton,
+  handleRegistrationModal,
+  sendWalletPanel,
+  handleWalletRefresh,
+  handleWalletLanguageButton,
+  handleWalletLanguageCancel,
+  handleWalletLanguageSelect,
+};

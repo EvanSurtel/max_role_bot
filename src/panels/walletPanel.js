@@ -11,84 +11,47 @@ const walletRepo = require('../database/repositories/walletRepo');
 const transactionRepo = require('../database/repositories/transactionRepo');
 const walletManager = require('../solana/walletManager');
 const transactionService = require('../solana/transactionService');
-const { walletEmbed } = require('../utils/embeds');
 const { USDC_PER_UNIT, TRANSACTION_TYPE } = require('../config/constants');
+const { t } = require('../locales/i18n');
 
 /**
- * Handle the "My Wallet" panel button click.
- * Shows wallet info with sub-action buttons.
+ * Resolve the language to use for a wallet-channel interaction.
+ * Wallet channels are private per-user, so we look up the channel owner and
+ * use their saved language preference (admins viewing don't override it).
  */
-async function handleWalletButton(interaction) {
+function resolveLang(interaction) {
+  const db = require('../database/db');
+  const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
+  if (channelOwner && channelOwner.language) return channelOwner.language;
+  // Fallback: use the clicker's saved language
   const user = userRepo.findByDiscordId(interaction.user.id);
-  if (!user) {
-    return interaction.reply({
-      content: 'You need to complete onboarding first.',
-      ephemeral: true,
-    });
-  }
-
-  const wallet = walletRepo.findByUserId(user.id);
-  if (!wallet) {
-    return interaction.reply({
-      content: 'Your wallet has not been set up yet. Please contact an administrator.',
-      ephemeral: true,
-    });
-  }
-
-  const embed = walletEmbed(wallet, interaction.user);
-  // Show SOL balance too
-  const solBalance = await walletManager.getSolBalance(wallet.solana_address).catch(() => '0');
-  const solFormatted = (Number(solBalance) / 1_000_000_000).toFixed(8);
-
-  const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('wallet_copy_address')
-      .setLabel('Copy Address')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId('wallet_deposit')
-      .setLabel('Deposit Info')
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId('wallet_withdraw')
-      .setLabel('Withdraw USDC')
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId('wallet_withdraw_sol')
-      .setLabel('Withdraw SOL')
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId('wallet_history')
-      .setLabel('History')
-      .setStyle(ButtonStyle.Secondary),
-  );
-
-  embed.addFields({ name: 'SOL (for gas)', value: `${solFormatted} SOL`, inline: true });
-
-  return interaction.reply({ embeds: [embed], components: [row1], ephemeral: true });
+  return (user && user.language) || 'en';
 }
 
 /**
- * Handle wallet sub-buttons (deposit, withdraw, history).
+ * Handle wallet sub-buttons (deposit info, withdraw, history, copy address).
+ * Wallet channel ephemerals are kept (not auto-deleted) so users can review them.
  */
 async function handleWalletSubButton(interaction) {
   const id = interaction.customId;
+  const lang = resolveLang(interaction);
+
   // Look up wallet owner by channel (admins can view other users' wallet channels)
   const db = require('../database/db');
   const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
   const user = channelOwner || userRepo.findByDiscordId(interaction.user.id);
   if (!user) {
-    return interaction.reply({ content: 'User not found.', ephemeral: true });
+    return interaction.reply({ content: t('common.user_not_found', lang), ephemeral: true });
   }
 
   const wallet = walletRepo.findByUserId(user.id);
   if (!wallet) {
-    return interaction.reply({ content: 'Wallet not found.', ephemeral: true });
+    return interaction.reply({ content: t('common.wallet_not_found', lang), ephemeral: true });
   }
 
   if (id === 'wallet_deposit') {
     return interaction.reply({
-      content: `**Your Solana Deposit Address:**\n\n${wallet.solana_address}\n\n**To fund your wager wallet:**\n1. Send **USDC** (SPL token) to this address for wagers\n2. Send a small amount of **SOL** (~$0.50) for transaction fees — lasts ~100 wagers\n\nDeposits are detected automatically every 30 seconds.`,
+      content: t('wallet.deposit_info', lang, { address: wallet.solana_address }),
       ephemeral: true,
     });
   }
@@ -104,12 +67,12 @@ async function handleWalletSubButton(interaction) {
   if (id === 'wallet_withdraw_sol') {
     const modal = new ModalBuilder()
       .setCustomId('wallet_withdraw_sol_modal')
-      .setTitle('Withdraw SOL');
+      .setTitle(t('wallet.withdraw_modal_title_sol', lang));
 
     const addressInput = new TextInputBuilder()
       .setCustomId('withdraw_address')
-      .setLabel('Destination Solana address')
-      .setPlaceholder('e.g. 7xKXt...')
+      .setLabel(t('wallet.withdraw_address_label', lang))
+      .setPlaceholder(t('wallet.withdraw_address_placeholder', lang))
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setMinLength(32)
@@ -117,8 +80,8 @@ async function handleWalletSubButton(interaction) {
 
     const amountInput = new TextInputBuilder()
       .setCustomId('withdraw_amount')
-      .setLabel('Amount in SOL (e.g. 0.5)')
-      .setPlaceholder('e.g. 0.5')
+      .setLabel(t('wallet.withdraw_amount_label_sol', lang))
+      .setPlaceholder(t('wallet.withdraw_amount_placeholder_sol', lang))
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setMinLength(1)
@@ -135,12 +98,12 @@ async function handleWalletSubButton(interaction) {
   if (id === 'wallet_withdraw') {
     const modal = new ModalBuilder()
       .setCustomId('wallet_withdraw_modal')
-      .setTitle('Withdraw USDC');
+      .setTitle(t('wallet.withdraw_modal_title_usdc', lang));
 
     const addressInput = new TextInputBuilder()
       .setCustomId('withdraw_address')
-      .setLabel('Destination Solana address')
-      .setPlaceholder('e.g. 7xKXt...')
+      .setLabel(t('wallet.withdraw_address_label', lang))
+      .setPlaceholder(t('wallet.withdraw_address_placeholder', lang))
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setMinLength(32)
@@ -148,8 +111,8 @@ async function handleWalletSubButton(interaction) {
 
     const amountInput = new TextInputBuilder()
       .setCustomId('withdraw_amount')
-      .setLabel('Amount in USDC (e.g. 10.50)')
-      .setPlaceholder('e.g. 10.50')
+      .setLabel(t('wallet.withdraw_amount_label_usdc', lang))
+      .setPlaceholder(t('wallet.withdraw_amount_placeholder_usdc', lang))
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setMinLength(1)
@@ -176,7 +139,7 @@ async function handleWalletSubButton(interaction) {
     if (page >= totalPages) page = totalPages - 1;
 
     if (transactions.length === 0) {
-      return interaction.reply({ content: 'No transactions found.', ephemeral: true });
+      return interaction.reply({ content: t('wallet.history_empty', lang), ephemeral: true });
     }
 
     const pageItems = transactions.slice(page * pageSize, (page + 1) * pageSize);
@@ -184,25 +147,27 @@ async function handleWalletSubButton(interaction) {
       const num = page * pageSize + i + 1;
       const amountUsdc = (Number(tx.amount_usdc) / USDC_PER_UNIT).toFixed(2);
       const date = tx.created_at ? tx.created_at.slice(0, 10) : 'N/A';
-      const icon = tx.type === 'deposit' ? '📥' : tx.type === 'withdrawal' ? '📤' : '🔄';
-      return `${num}. ${icon} **${tx.type}** — $${amountUsdc} USDC — ${tx.status} — ${date}`;
+      const icon = tx.type === 'deposit' ? '📥' : tx.type === 'withdrawal' || tx.type === 'sol_withdrawal' ? '📤' : '🔄';
+      // User-friendly translated label, e.g. "escrow_in" → "Match Entry"
+      const typeLabel = t(`tx_type.${tx.type}`, lang);
+      return `${num}. ${icon} **${typeLabel}** — $${amountUsdc} USDC — ${date}`;
     });
 
-    const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
     const navRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`wallet_history_page_${page - 1}`)
-        .setLabel('Previous')
+        .setLabel(t('common.previous', lang))
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(page === 0),
       new ButtonBuilder()
         .setCustomId(`wallet_history_page_${page + 1}`)
-        .setLabel('Next')
+        .setLabel(t('common.next', lang))
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(page >= totalPages - 1),
     );
 
-    const content = `**Transactions (Page ${page + 1}/${totalPages} — ${transactions.length} total)**\n\n${lines.join('\n')}`;
+    const header = `**${t('wallet.history_title', lang)}** (${t('wallet.history_page', lang, { page: page + 1, total: totalPages, count: transactions.length })})`;
+    const content = `${header}\n\n${lines.join('\n')}`;
 
     if (id === 'wallet_history') {
       return interaction.reply({ content, components: [navRow], ephemeral: true });
@@ -213,17 +178,18 @@ async function handleWalletSubButton(interaction) {
 }
 
 /**
- * Handle the withdraw modal submission.
+ * Handle the USDC withdraw modal submission.
  */
 async function handleWithdrawModal(interaction) {
+  const lang = resolveLang(interaction);
   const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) {
-    return interaction.reply({ content: 'You need to complete onboarding first.', ephemeral: true });
+    return interaction.reply({ content: t('common.onboarding_required', lang), ephemeral: true });
   }
 
   const wallet = walletRepo.findByUserId(user.id);
   if (!wallet) {
-    return interaction.reply({ content: 'Wallet not found.', ephemeral: true });
+    return interaction.reply({ content: t('common.wallet_not_found', lang), ephemeral: true });
   }
 
   const address = interaction.fields.getTextInputValue('withdraw_address').trim();
@@ -231,11 +197,11 @@ async function handleWithdrawModal(interaction) {
   const amountUsdc = parseFloat(amountStr);
 
   if (!walletManager.isAddressValid(address)) {
-    return interaction.reply({ content: 'Invalid Solana address.', ephemeral: true });
+    return interaction.reply({ content: t('common.invalid_address', lang), ephemeral: true });
   }
 
   if (isNaN(amountUsdc) || amountUsdc <= 0) {
-    return interaction.reply({ content: 'Amount must be greater than 0.', ephemeral: true });
+    return interaction.reply({ content: t('common.amount_must_be_positive', lang), ephemeral: true });
   }
 
   const amountSmallest = Math.floor(amountUsdc * USDC_PER_UNIT);
@@ -244,25 +210,24 @@ async function handleWithdrawModal(interaction) {
   if (amountSmallest > availableSmallest) {
     const availableFormatted = (availableSmallest / USDC_PER_UNIT).toFixed(2);
     return interaction.reply({
-      content: `Insufficient balance. You have **$${availableFormatted} USDC** available.`,
+      content: t('common.insufficient_balance', lang, { available: availableFormatted }),
       ephemeral: true,
     });
   }
 
   await interaction.deferReply({ ephemeral: true });
 
-  // Acquire wallet lock to prevent concurrent operations
   if (!walletRepo.acquireLock(user.id)) {
-    return interaction.editReply({ content: 'Please wait, another transaction is in progress.' });
+    return interaction.editReply({ content: t('common.please_wait', lang) });
   }
 
   try {
-    // Re-fetch wallet inside lock to get fresh balance
     const freshWallet = walletRepo.findByUserId(user.id);
     const freshAvailable = Number(freshWallet.balance_available);
     if (amountSmallest > freshAvailable) {
       walletRepo.releaseLock(user.id);
-      return interaction.editReply({ content: 'Insufficient balance.' });
+      const availableFormatted = (freshAvailable / USDC_PER_UNIT).toFixed(2);
+      return interaction.editReply({ content: t('common.insufficient_balance', lang, { available: availableFormatted }) });
     }
 
     const senderKeypair = walletManager.getKeypairFromEncrypted(
@@ -295,18 +260,17 @@ async function handleWithdrawModal(interaction) {
       memo: `Withdrawal of $${amountUsdc} USDC`,
     });
 
-    // Post to admin transaction feed
     const { postTransaction } = require('../utils/transactionFeed');
     postTransaction({ type: 'withdrawal', username: user.server_username, discordId: user.discord_id, amount: `$${amountUsdc.toFixed(2)}`, currency: 'USDC', fromAddress: freshWallet.solana_address, toAddress: address, signature, memo: `Withdrawal of $${amountUsdc.toFixed(2)} USDC` });
 
     walletRepo.releaseLock(user.id);
     return interaction.editReply({
-      content: `**Withdrawal successful!**\n\nSent **$${amountUsdc.toFixed(2)} USDC** to \`${address}\`\nSignature: \`${signature}\``,
+      content: t('wallet.withdraw_success_usdc', lang, { amount: amountUsdc.toFixed(2), address, signature }),
     });
   } catch (err) {
     walletRepo.releaseLock(user.id);
     console.error('[Wallet] Withdrawal error:', err);
-    return interaction.editReply({ content: 'Withdrawal failed. Please try again later.' });
+    return interaction.editReply({ content: t('wallet.withdraw_failed', lang) });
   }
 }
 
@@ -314,14 +278,15 @@ async function handleWithdrawModal(interaction) {
  * Handle the SOL withdraw modal submission.
  */
 async function handleWithdrawSolModal(interaction) {
+  const lang = resolveLang(interaction);
   const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) {
-    return interaction.reply({ content: 'You need to complete onboarding first.', ephemeral: true });
+    return interaction.reply({ content: t('common.onboarding_required', lang), ephemeral: true });
   }
 
   const wallet = walletRepo.findByUserId(user.id);
   if (!wallet) {
-    return interaction.reply({ content: 'Wallet not found.', ephemeral: true });
+    return interaction.reply({ content: t('common.wallet_not_found', lang), ephemeral: true });
   }
 
   const address = interaction.fields.getTextInputValue('withdraw_address').trim();
@@ -329,11 +294,11 @@ async function handleWithdrawSolModal(interaction) {
   const amountSol = parseFloat(amountStr);
 
   if (!walletManager.isAddressValid(address)) {
-    return interaction.reply({ content: 'Invalid Solana address.', ephemeral: true });
+    return interaction.reply({ content: t('common.invalid_address', lang), ephemeral: true });
   }
 
   if (isNaN(amountSol) || amountSol <= 0) {
-    return interaction.reply({ content: 'Amount must be greater than 0.', ephemeral: true });
+    return interaction.reply({ content: t('common.amount_must_be_positive', lang), ephemeral: true });
   }
 
   const lamports = Math.floor(amountSol * 1_000_000_000);
@@ -341,14 +306,12 @@ async function handleWithdrawSolModal(interaction) {
   await interaction.deferReply({ ephemeral: true });
 
   try {
-    // Check SOL balance
     const solBalance = Number(await walletManager.getSolBalance(wallet.solana_address));
-    // Keep ~0.005 SOL for rent/fees
     const reserveLamports = 5_000_000;
     if (lamports > solBalance - reserveLamports) {
       const availSol = ((solBalance - reserveLamports) / 1_000_000_000).toFixed(8);
       return interaction.editReply({
-        content: `Insufficient SOL. You have ~**${availSol} SOL** available after reserves.`,
+        content: t('common.insufficient_sol', lang, { available: availSol }),
       });
     }
 
@@ -361,7 +324,6 @@ async function handleWithdrawSolModal(interaction) {
 
     const { signature } = await transactionService.transferSol(senderKeypair, address, lamports);
 
-    // Log SOL withdrawal
     transactionRepo.create({
       type: 'sol_withdrawal',
       userId: user.id,
@@ -373,17 +335,16 @@ async function handleWithdrawSolModal(interaction) {
       memo: `SOL withdrawal: ${amountSol} SOL (${lamports} lamports)`,
     });
 
-    // Post to admin transaction feed
     const { postTransaction } = require('../utils/transactionFeed');
     postTransaction({ type: 'sol_withdrawal', username: user.server_username, discordId: user.discord_id, amount: `${amountSol}`, currency: 'SOL', fromAddress: wallet.solana_address, toAddress: address, signature, memo: `SOL withdrawal: ${amountSol} SOL` });
 
     return interaction.editReply({
-      content: `**SOL Withdrawal successful!**\n\nSent **${amountSol} SOL** to \`${address}\`\nSignature: \`${signature}\``,
+      content: t('wallet.withdraw_success_sol', lang, { amount: amountSol, address, signature }),
     });
   } catch (err) {
     console.error('[Wallet] SOL withdrawal error:', err);
-    return interaction.editReply({ content: 'SOL withdrawal failed. Please try again later.' });
+    return interaction.editReply({ content: t('wallet.withdraw_failed', lang) });
   }
 }
 
-module.exports = { handleWalletButton, handleWalletSubButton, handleWithdrawModal, handleWithdrawSolModal };
+module.exports = { handleWalletSubButton, handleWithdrawModal, handleWithdrawSolModal };
