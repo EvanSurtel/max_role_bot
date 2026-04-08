@@ -6,15 +6,33 @@ function buildHowItWorksPanel() {
     .setColor(0x3498db)
     .setDescription('Welcome to Rank $! Here\'s everything you need to know to get started with wager matches and XP matches.');
 
+  const walletExplainEmbed = new EmbedBuilder()
+    .setTitle('Step 1: Your Wallet')
+    .setColor(0x2ecc71)
+    .setDescription([
+      'You have a private **wallet channel** in this server. Only you can see it and use it.',
+      '',
+      'Your wallet holds two things:',
+      '• **USDC** — a crypto coin that represents the US dollar. 1 USDC = $1 USD. This is what you wager with. It doesn\'t go up or down in value — $10 USDC is always worth $10.',
+      '• **SOL** — a tiny amount needed to process transactions, like a small service fee. ~$0.50 worth of SOL lasts about 100 wagers.',
+      '',
+      '**Wallet Buttons:**',
+      '• **Copy Address** — get your wallet address to receive USDC and SOL',
+      '• **Refresh Balance** — check your current balance',
+      '• **Withdraw USDC** — send USDC out to an external wallet or exchange',
+      '• **Withdraw SOL** — send SOL out to an external wallet',
+      '• **History** — view all your transactions',
+      '',
+      '**Balance types:**',
+      '• **Available** — what you can use for wagers or withdraw',
+      '• **Held** — locked in an active wager (returned to you when the match is decided)',
+    ].join('\n'));
+
   const cryptoEmbed = new EmbedBuilder()
-    .setTitle('Step 1: Fund Your Wallet (Wagers Only)')
+    .setTitle('Step 2: Fund Your Wallet (Wagers Only)')
     .setColor(0xf1c40f)
     .setDescription([
       '*Skip this step if you only want to play XP matches — they\'re free!*',
-      '',
-      '**What you need:**',
-      '• **USDC** — a crypto coin that represents the US dollar. 1 USDC = $1 USD. This is what you wager with.',
-      '• **SOL** — a tiny amount needed to process transactions, like a small fee. ~$0.50 worth lasts about 100 wagers.',
       '',
       '**How to get USDC and SOL:**',
       '',
@@ -42,58 +60,53 @@ function buildHowItWorksPanel() {
       'USDC represents the US dollar — $10 USDC = $10 USD, it doesn\'t go up or down in value.',
     ].join('\n'));
 
-  const walletEmbed = new EmbedBuilder()
-    .setTitle('Your Wallet')
-    .setColor(0x2ecc71)
-    .setDescription([
-      'After registering, you get a private **#wallet** channel. Only you can see it.',
-      '',
-      '**Buttons:**',
-      '• **Copy Address** — get your deposit address to receive USDC and SOL',
-      '• **Refresh Balance** — check your current balance',
-      '• **Withdraw USDC** — send USDC to an external wallet or exchange',
-      '• **Withdraw SOL** — send SOL to an external wallet',
-      '• **History** — view all your transactions',
-      '',
-      '**Balance types:**',
-      '• **Available** — what you can use for wagers or withdraw',
-      '• **Held** — locked in an active wager (released when match is decided)',
-    ].join('\n'));
+  // walletEmbed moved to walletExplainEmbed above cryptoEmbed
 
   const wagerEmbed = new EmbedBuilder()
     .setTitle('How Wager Matches Work')
     .setColor(0xf1c40f)
     .setDescription([
       '**Creating a wager:**',
-      '1. Go to the **wager lobby** channel',
-      '2. Click **Create Wager**',
-      '3. Choose: team size → teammates (if team) → game mode → series → visibility → entry amount',
-      '4. Confirm and create',
-      '5. Your entry amount is held from your wallet',
-      '6. Your challenge appears on the challenge board',
+      '1. Go to the **wager lobby** channel and click **Create Wager**',
+      '2. Choose your **team size** (1v1, 2v2, 3v3, 4v4, or 5v5)',
+      '3. Pick your **teammates** (if team match — they\'ll get a notification to accept)',
+      '4. Choose the **game mode** (HP, S&D, Control, or mixed rotations)',
+      '5. Choose the **series length** (Best of 1, 3, 5, or 7)',
+      '6. Choose **visibility** — this means whether other players can see who created the challenge or if it stays anonymous. Anonymous means opponents won\'t know who they\'re up against until they accept.',
+      '7. Enter your **wager amount** — this is how much each player puts in (e.g. $5 means each player risks $5)',
+      '8. Confirm and create',
+      '9. Your entry amount is held from your wallet (you can\'t spend it until the match is over)',
+      '10. Your challenge gets posted to the **challenge board** channel where other players can see it and accept it',
       '',
       '**Accepting a wager:**',
-      '1. Go to the **wager challenges** channel',
-      '2. Click **Accept Challenge** on a challenge you want to play',
-      '3. Choose teammates (if team match)',
-      '4. Confirm — your entry is held from your wallet',
-      '5. Match channels are created automatically',
+      '1. Go to the **wager challenges** channel — this is where all open challenges are posted',
+      '2. Find a challenge you want to play and click **Accept Challenge**',
+      '3. Pick your teammates (if it\'s a team match)',
+      '4. Review the full match details and confirm — your entry is held from your wallet',
+      '5. Match channels are created automatically for both teams',
       '',
-      '**Playing the match:**',
-      '1. Join your team\'s voice channel',
-      '2. The bot randomly selects maps for each game',
-      '3. Play your matches in CODM',
+      '**What happens when a match starts:**',
+      'The bot creates a private set of channels just for your match:',
+      '• **Team 1 text & voice** — only your team can see and talk here',
+      '• **Team 2 text & voice** — only the other team',
+      '• **Shared chat & voice** — both teams can talk here',
+      '• **Vote channel** — where captains report who won after the match',
       '',
-      '**Reporting results:**',
-      '1. After the match, go to the **vote** channel',
-      '2. Both captains click **We Won** or **We Lost**',
-      '3. If both agree → winner gets paid automatically',
-      '4. If they disagree → dispute (staff reviews evidence)',
+      'The bot will randomly pick maps for each game in the series. Both teams can see the map picks in the shared channel.',
       '',
-      '**Payouts:**',
-      '• Winners split the full pot equally',
-      '• Winnings go directly to your wallet balance',
-      '• You can withdraw anytime from your wallet channel',
+      '**You must join a voice channel within 15 minutes or you will be forfeited.** The bot will remind you at 5 and 10 minutes if you haven\'t joined.',
+      '',
+      '**After the match — reporting results:**',
+      '1. Go to the **vote** channel in your match',
+      '2. Both team captains must report the result by clicking **We Won** or **We Lost**',
+      '3. You\'ll get a confirmation screen to make sure you didn\'t misclick',
+      '4. If both captains agree on who won → the match is resolved instantly and the winner gets paid',
+      '5. If the captains disagree → the match goes to **dispute** and staff will review evidence to decide the winner',
+      '',
+      '**How payouts work:**',
+      '• The full pot (everyone\'s entry combined) is split equally among the winning team',
+      '• Example: 2v2 with $5 entry each = $20 pot. Winning team of 2 gets $10 each (their $5 back + $5 profit)',
+      '• Winnings go directly into your wallet — you can withdraw to your exchange anytime',
     ].join('\n'));
 
   const xpEmbed = new EmbedBuilder()
@@ -144,7 +157,7 @@ function buildHowItWorksPanel() {
       'A: Coinbase, Crypto.com, Binance, Kraken, or any exchange that supports USDC on Solana.',
     ].join('\n'));
 
-  return { embeds: [introEmbed, cryptoEmbed, walletEmbed, wagerEmbed, xpEmbed, tipsEmbed] };
+  return { embeds: [introEmbed, walletExplainEmbed, cryptoEmbed, wagerEmbed, xpEmbed, tipsEmbed] };
 }
 
 async function postHowItWorksPanel(client) {
