@@ -115,7 +115,7 @@ function buildRulesPanel() {
       '• No-show = forfeit — opponent wins by default',
       '• Same XP outcome as losing (winners gain XP, forfeiter loses XP)',
       '',
-      '**NeatQueue Matches:** 7.5 minutes to show up',
+      '**XP Queue Matches:** 7.5 minutes to show up',
       '• No-show = **-200 XP penalty**',
       '',
       '**How no-shows are verified:**',
