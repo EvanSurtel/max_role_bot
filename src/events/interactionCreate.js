@@ -175,11 +175,17 @@ module.exports = {
         return;
       }
 
-      // String select menus (leaderboard dropdowns + wallet language picker)
+      // String select menus (leaderboard dropdowns + welcome master language picker + wallet language picker)
       if (interaction.isStringSelectMenu()) {
         const id = interaction.customId;
         if (id.startsWith('xplb_') || id.startsWith('earnlb_')) {
           return await leaderboardPanel.handleLeaderboardSelect(interaction);
+        }
+        if (id === 'welcome_lang_master') {
+          return await onboarding.handleWelcomeLanguageMaster(interaction);
+        }
+        if (id === 'language_panel_select') {
+          return await onboarding.handleLanguagePanelSelect(interaction);
         }
         if (id === 'wallet_lang_select') {
           return await onboarding.handleWalletLanguageSelect(interaction);

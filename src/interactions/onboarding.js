@@ -465,6 +465,78 @@ async function handleWalletLanguageSelect(interaction) {
   return interaction.update(view);
 }
 
+/**
+ * MASTER language switch — fired when a user picks a language from the
+ * welcome panel's select menu. Saves the choice as the user's bot-wide
+ * language preference and re-renders the welcome panel in that language
+ * (the panel is shared, so everyone sees the new language too).
+ */
+async function handleWelcomeLanguageMaster(interaction) {
+  const { SUPPORTED_LANGUAGES } = require('../locales');
+  const { buildWelcomePanel } = require('../panels/welcomePanel');
+
+  const newLang = interaction.values[0];
+  if (!SUPPORTED_LANGUAGES[newLang]) {
+    return interaction.reply({ content: 'Unknown language.', ephemeral: true });
+  }
+
+  // Save the user's language preference, creating a user row if they don't have one yet
+  // (they may not have accepted TOS yet but they can still pick a language).
+  const discordId = interaction.user.id;
+  let user = userRepo.findByDiscordId(discordId);
+  if (!user) {
+    user = userRepo.create(discordId);
+  }
+  userRepo.setLanguage(discordId, newLang);
+
+  // Re-render the welcome panel in the new language for everyone.
+  // (Discord can't show different content per-viewer in a single shared message,
+  // so the panel reflects whoever picked a language most recently. The user's
+  // saved preference is what controls their personal interactions.)
+  const view = buildWelcomePanel(newLang);
+  await interaction.update(view);
+
+  // Send an ephemeral confirmation in the user's chosen language so they
+  // know the master switch worked. Auto-deletes after 5 min like other
+  // ephemerals (see installEphemeralAutoDelete in interactionCreate.js).
+  const langName = SUPPORTED_LANGUAGES[newLang].nativeName;
+  await interaction.followUp({
+    content: t('onboarding.language_saved', newLang, { language: langName }),
+    ephemeral: true,
+  });
+}
+
+/**
+ * Handler for the dedicated language channel select menu. Same behaviour
+ * as handleWelcomeLanguageMaster — saves the user's language preference
+ * and re-renders the panel in the new language.
+ */
+async function handleLanguagePanelSelect(interaction) {
+  const { SUPPORTED_LANGUAGES } = require('../locales');
+  const { buildLanguagePanel } = require('../panels/languagePanel');
+
+  const newLang = interaction.values[0];
+  if (!SUPPORTED_LANGUAGES[newLang]) {
+    return interaction.reply({ content: 'Unknown language.', ephemeral: true });
+  }
+
+  const discordId = interaction.user.id;
+  let user = userRepo.findByDiscordId(discordId);
+  if (!user) {
+    user = userRepo.create(discordId);
+  }
+  userRepo.setLanguage(discordId, newLang);
+
+  const view = buildLanguagePanel(newLang);
+  await interaction.update(view);
+
+  const langName = SUPPORTED_LANGUAGES[newLang].nativeName;
+  await interaction.followUp({
+    content: t('onboarding.language_saved', newLang, { language: langName }),
+    ephemeral: true,
+  });
+}
+
 module.exports = {
   handleButton,
   handleRegistrationModal,
@@ -473,4 +545,6 @@ module.exports = {
   handleWalletLanguageButton,
   handleWalletLanguageCancel,
   handleWalletLanguageSelect,
+  handleWelcomeLanguageMaster,
+  handleLanguagePanelSelect,
 };

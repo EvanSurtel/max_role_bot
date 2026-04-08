@@ -93,6 +93,9 @@ client.once('ready', async () => {
     const { postHowItWorksPanel } = require('./panels/howItWorksPanel');
     await postHowItWorksPanel(client);
 
+    const { postLanguagePanel } = require('./panels/languagePanel');
+    await postLanguagePanel(client);
+
     console.log('[Boot] All systems ready');
   } catch (err) {
     console.error('[Boot] Startup error:', err);

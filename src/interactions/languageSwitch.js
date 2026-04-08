@@ -15,8 +15,42 @@ async function handleButton(interaction) {
 
   try {
     if (panel === 'howItWorks') {
+      const { _packEmbeds } = require('../panels/howItWorksPanel');
       const embeds = buildHowItWorksEmbeds(lang);
-      return interaction.update({ embeds, components: [buildLanguageRow('howItWorks')] });
+      const langRow = [buildLanguageRow('howItWorks')];
+
+      // How It Works gets greedily packed into N messages so each fits
+      // Discord's 6000-char per-message limit. The number of messages can
+      // change per language. We need to: (1) acknowledge the clicked
+      // interaction, then (2) update all of the bot's How It Works messages
+      // in the channel.
+      const groups = _packEmbeds(embeds);
+
+      // Find ALL bot messages around the clicked message — both before AND
+      // after — and pair them with the new groups in channel order.
+      const channel = interaction.channel;
+      const before = await channel.messages.fetch({ limit: 20, before: interaction.message.id });
+      const after = await channel.messages.fetch({ limit: 20, after: interaction.message.id });
+
+      const botBefore = [...before.values()].filter(m => m.author.id === interaction.client.user.id).reverse(); // oldest → newest
+      const botAfter = [...after.values()].filter(m => m.author.id === interaction.client.user.id).reverse();
+
+      // Channel order (oldest → newest): [...before, clicked, ...after]
+      const allMessages = [...botBefore, interaction.message, ...botAfter];
+
+      // Pair up to groups.length messages with the new content
+      const updates = [];
+      for (let i = 0; i < groups.length && i < allMessages.length; i++) {
+        const msg = allMessages[i];
+        const payload = { embeds: groups[i], components: langRow };
+        if (msg.id === interaction.message.id) {
+          updates.push(interaction.update(payload));
+        } else {
+          updates.push(msg.edit(payload).catch(() => {}));
+        }
+      }
+      await Promise.all(updates);
+      return;
     }
 
     if (panel === 'welcome') {

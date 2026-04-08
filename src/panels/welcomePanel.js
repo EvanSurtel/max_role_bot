@@ -1,12 +1,13 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const { t } = require('../locales/i18n');
-const { buildLanguageRow } = require('../locales');
+const { SUPPORTED_LANGUAGES } = require('../locales');
 
 /**
  * Build the welcome/TOS panel for the static welcome channel.
- * The panel renders in the requested language. The actual TOS contents (regional
- * restrictions, prohibited countries) stay in English because they reference
- * specific legal jurisdictions which we don't translate to avoid ambiguity.
+ * The panel renders entirely in the requested language, including the
+ * full Terms of Service body. This is the bot's MASTER language switch
+ * — picking a language here saves it as the user's preference for the
+ * entire bot.
  */
 function buildWelcomePanel(lang = 'en') {
   const welcomeEmbed = new EmbedBuilder()
@@ -14,68 +15,16 @@ function buildWelcomePanel(lang = 'en') {
     .setColor(0x3498db)
     .setDescription(t('onboarding.welcome_desc', lang));
 
-  // The TOS itself stays in English — translating legal language is risky
-  // and the regional restrictions reference specific places by name.
+  // TOS sections 1-5
   const tos1Embed = new EmbedBuilder()
     .setTitle(t('onboarding.tos_title', lang))
     .setColor(0x3498db)
-    .setDescription([
-      '**1. ELIGIBILITY**',
-      'You must be at least 18 years old to participate in wagers. By accepting, you confirm you meet this age requirement. We reserve the right to request age verification at any time.',
-      '',
-      '**2. REGIONAL RESTRICTIONS**',
-      'Skill-based wagering is prohibited in certain jurisdictions. You confirm you are NOT located in:',
-      '- **US States:** Arizona, Arkansas, Connecticut, Hawaii, Iowa, Louisiana, Mississippi, Montana, Nevada, South Carolina, South Dakota, Tennessee, Utah',
-      '- **Countries:** China, Japan, South Korea, Saudi Arabia, UAE, Qatar, Kuwait, Bahrain, Oman, Iran, Iraq, Afghanistan, Pakistan, North Korea, Vietnam',
-      '- **Indian States:** Andhra Pradesh, Telangana, Tamil Nadu, Kerala',
-      '',
-      '**3. ACCOUNT RESPONSIBILITY**',
-      '- One account per person — no alts, smurfs, or shared accounts',
-      '- You are responsible for all activity on your account',
-      '- Your registered COD Mobile UID must be YOUR account',
-      '- Playing on someone else\'s behalf is prohibited and results in permanent ban and forfeiture of funds',
-      '',
-      '**4. WALLET & FUNDS**',
-      '- Your deposits are stored securely in a wallet managed by the platform',
-      '- Withdrawals are processed to your specified Solana wallet address',
-      '- Minimum withdrawal: $0.50 USDC',
-      '- You are responsible for providing correct withdrawal addresses — we cannot reverse blockchain transactions',
-      '- Funds locked during active matches cannot be withdrawn until the match is over',
-      '',
-      '**5. WAGERS & MATCHES**',
-      '- All wagers are final once both parties accept',
-      '- You must use your registered COD Mobile account for all matches',
-      '- Match results are determined by in-game outcome',
-      '- Both teams must report results honestly — false reporting results in bans',
-    ].join('\n'));
+    .setDescription(t('onboarding.tos_body', lang));
 
+  // TOS sections 6-9
   const tos2Embed = new EmbedBuilder()
     .setColor(0x3498db)
-    .setDescription([
-      '**6. DISPUTES**',
-      '- Either team may dispute a match result within the reporting window',
-      '- Disputes require screenshot/video evidence showing the match result and player UIDs',
-      '- Admin decisions on disputes are final',
-      '- Providing falsified evidence results in permanent ban and forfeiture of funds',
-      '',
-      '**7. PROHIBITED CONDUCT**',
-      '- Cheating, hacking, exploiting, or using unauthorized software',
-      '- Win trading, match fixing, or collusion',
-      '- Harassment, threats, or abuse toward other players or staff',
-      '- Attempting to manipulate or exploit the platform',
-      '- Creating multiple accounts to circumvent bans',
-      '',
-      '**8. DISCLAIMERS**',
-      '- We are not responsible for losses due to your own gameplay',
-      '- We do not guarantee server uptime or availability',
-      '- Blockchain transactions are irreversible — verify all addresses',
-      '- We reserve the right to suspend accounts, void matches, or withhold funds in cases of suspected fraud or rule violations',
-      '',
-      '**9. MODIFICATIONS**',
-      '- We may update these terms at any time',
-      '- Continued use of the platform constitutes acceptance of updated terms',
-      '- Major changes will be announced in the server',
-    ].join('\n'));
+    .setDescription(t('onboarding.tos_body_2', lang));
 
   const verifyEmbed = new EmbedBuilder()
     .setTitle(t('onboarding.verify_title', lang))
@@ -93,9 +42,27 @@ function buildWelcomePanel(lang = 'en') {
       .setStyle(ButtonStyle.Danger),
   );
 
+  // Master language picker — StringSelectMenu showing ALL 20 languages.
+  // Picking a language here saves it as the user's preference for the
+  // entire bot, not just this panel.
+  const langOptions = Object.entries(SUPPORTED_LANGUAGES).map(([code, { label, nativeName, emoji }]) => ({
+    label: nativeName,
+    description: label,
+    value: code,
+    emoji,
+    default: code === lang,
+  }));
+
+  const langRow = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('welcome_lang_master')
+      .setPlaceholder(t('onboarding.language_picker_placeholder', lang))
+      .addOptions(langOptions),
+  );
+
   return {
     embeds: [welcomeEmbed, tos1Embed, tos2Embed, verifyEmbed],
-    components: [actionRow, buildLanguageRow('welcome')],
+    components: [actionRow, langRow],
   };
 }
 

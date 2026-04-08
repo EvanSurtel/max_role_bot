@@ -1,6 +1,39 @@
 const { EmbedBuilder } = require('discord.js');
 const { getLocale, buildLanguageRow } = require('../locales');
 
+// How It Works has 6 embeds totaling ~8000 characters in English and up to
+// ~9500 in some languages (French, German, Dutch, Filipino). Discord caps a
+// single message at 6000 chars across all embeds. We pack embeds greedily
+// into as many messages as needed so each message stays under the cap.
+const DISCORD_MESSAGE_CHAR_CAP = 5500; // 500-char headroom under Discord's 6000 limit
+
+function _embedChars(embed) {
+  return (embed.data.title || '').length + (embed.data.description || '').length;
+}
+
+/**
+ * Greedily pack embeds into the minimum number of messages such that each
+ * message stays under DISCORD_MESSAGE_CHAR_CAP. Returns an array of arrays,
+ * one per message.
+ */
+function _packEmbeds(embeds) {
+  const groups = [];
+  let current = [];
+  let currentChars = 0;
+  for (const e of embeds) {
+    const ec = _embedChars(e);
+    if (current.length > 0 && currentChars + ec > DISCORD_MESSAGE_CHAR_CAP) {
+      groups.push(current);
+      current = [];
+      currentChars = 0;
+    }
+    current.push(e);
+    currentChars += ec;
+  }
+  if (current.length > 0) groups.push(current);
+  return groups;
+}
+
 function buildHowItWorksEmbeds(lang = 'en') {
   const t = getLocale('howItWorks', lang);
 
@@ -60,11 +93,19 @@ async function postHowItWorksPanel(client) {
     for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
 
     const panel = buildHowItWorksPanel();
-    await channel.send(panel);
-    console.log('[Panel] Posted how it works panel');
+    const langRow = panel.components;
+
+    // Greedily pack embeds into messages so each stays under Discord's
+    // 6000-char per-message limit. All messages get the language buttons
+    // so users can switch from any part of the panel.
+    const groups = _packEmbeds(panel.embeds);
+    for (const group of groups) {
+      await channel.send({ embeds: group, components: langRow });
+    }
+    console.log(`[Panel] Posted how it works panel (${groups.length} messages: ${groups.map(g => g.length).join('+')} embeds)`);
   } catch (err) {
     console.error('[Panel] Failed to post how it works panel:', err.message);
   }
 }
 
-module.exports = { buildHowItWorksEmbeds, buildHowItWorksPanel, postHowItWorksPanel };
+module.exports = { buildHowItWorksEmbeds, buildHowItWorksPanel, postHowItWorksPanel, _packEmbeds };
