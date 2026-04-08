@@ -1,29 +1,25 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { t } = require('../locales/i18n');
+const { buildLanguageRow } = require('../locales');
 
 /**
  * Build the XP match panel.
  */
-function buildXpMatchPanel() {
+function buildXpMatchPanel(lang = 'en') {
   const embed = new EmbedBuilder()
-    .setTitle('XP Matches')
+    .setTitle(t('xp_panel.title', lang))
     .setColor(0x3498db)
-    .setDescription(
-      [
-        'Compete for **XP** against other players. No money involved.',
-        '',
-        'XP is calculated using an ELO system — beat stronger teams for more XP.',
-      ].join('\n'),
-    )
-    .setFooter({ text: 'XP synced with NeatQueue' });
+    .setDescription(t('xp_panel.description', lang))
+    .setFooter({ text: t('xp_panel.footer', lang) });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('wager_type_xp')
-      .setLabel('Create XP Match')
+      .setLabel(t('xp_panel.btn_create_xp', lang))
       .setStyle(ButtonStyle.Primary),
   );
 
-  return { embeds: [embed], components: [row] };
+  return { embeds: [embed], components: [row, buildLanguageRow('xpPanel')] };
 }
 
 /**

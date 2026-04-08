@@ -1,20 +1,23 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { t } = require('../locales/i18n');
+const { buildLanguageRow } = require('../locales');
 
 /**
  * Build the welcome/TOS panel for the static welcome channel.
+ * The panel renders in the requested language. The actual TOS contents (regional
+ * restrictions, prohibited countries) stay in English because they reference
+ * specific legal jurisdictions which we don't translate to avoid ambiguity.
  */
-function buildWelcomePanel() {
+function buildWelcomePanel(lang = 'en') {
   const welcomeEmbed = new EmbedBuilder()
-    .setTitle('Welcome to Rank $ - Call of Duty Mobile Wagers and XP Matches')
+    .setTitle(t('onboarding.welcome_title', lang))
     .setColor(0x3498db)
-    .setDescription(
-      'Before you can access the server, you must read and agree to our Terms of Service and verify your eligibility.\n\n' +
-      'This is a skill-based competition platform for COD Mobile. Players can wager on their own matches against other players. ' +
-      'This is **NOT gambling** — outcomes are determined by player skill, not chance.'
-    );
+    .setDescription(t('onboarding.welcome_desc', lang));
 
+  // The TOS itself stays in English — translating legal language is risky
+  // and the regional restrictions reference specific places by name.
   const tos1Embed = new EmbedBuilder()
-    .setTitle('Terms of Service')
+    .setTitle(t('onboarding.tos_title', lang))
     .setColor(0x3498db)
     .setDescription([
       '**1. ELIGIBILITY**',
@@ -75,32 +78,25 @@ function buildWelcomePanel() {
     ].join('\n'));
 
   const verifyEmbed = new EmbedBuilder()
-    .setTitle('Verification Required')
+    .setTitle(t('onboarding.verify_title', lang))
     .setColor(0x2ecc71)
-    .setDescription([
-      'By clicking **Accept**, you confirm **ALL** of the following:',
-      '',
-      '> I am 18 years of age or older',
-      '> I am NOT located in any restricted US state or country listed above',
-      '> I have read and agree to the Terms of Service above',
-      '> I understand this platform involves real money wagering on my own skill-based gameplay',
-      '',
-      '**FALSE VERIFICATION IS PROHIBITED**',
-      'If you falsely verify your age or location, your account will be permanently banned and any funds may be forfeited.',
-    ].join('\n'));
+    .setDescription(t('onboarding.verify_desc', lang));
 
-  const row = new ActionRowBuilder().addComponents(
+  const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('tos_accept')
-      .setLabel('I Accept & Verify')
+      .setLabel(t('onboarding.btn_accept', lang))
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('tos_decline')
-      .setLabel('Decline')
+      .setLabel(t('onboarding.btn_decline', lang))
       .setStyle(ButtonStyle.Danger),
   );
 
-  return { embeds: [welcomeEmbed, tos1Embed, tos2Embed, verifyEmbed], components: [row] };
+  return {
+    embeds: [welcomeEmbed, tos1Embed, tos2Embed, verifyEmbed],
+    components: [actionRow, buildLanguageRow('welcome')],
+  };
 }
 
 /**
@@ -131,17 +127,14 @@ async function postWelcomePanel(client) {
     const panel = buildWelcomePanel();
 
     if (existingPanel) {
-      // Delete any OTHER bot messages (duplicates from past restarts)
       for (const [, m] of botMessages) {
         if (m.id !== existingPanel.id) {
           try { await m.delete(); } catch { /* */ }
         }
       }
-      // Edit the one existing panel in place
       await existingPanel.edit(panel);
       console.log('[Panel] Updated existing welcome panel');
     } else {
-      // No panel exists — clean up any stale bot messages and post fresh
       for (const [, m] of botMessages) {
         try { await m.delete(); } catch { /* */ }
       }

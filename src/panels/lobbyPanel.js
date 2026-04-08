@@ -1,33 +1,30 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { t } = require('../locales/i18n');
+const { buildLanguageRow } = require('../locales');
 
 /**
  * Build the main lobby panel — wager creation only.
+ * The panel renders in the requested language and includes language toggle buttons.
  */
-function buildLobbyPanel() {
+function buildLobbyPanel(lang = 'en') {
   const embed = new EmbedBuilder()
-    .setTitle('CODM Wager Bot')
+    .setTitle(t('lobby.title', lang))
     .setColor(0xf1c40f)
-    .setDescription(
-      [
-        'Wager **USDC** on Call of Duty Mobile matches.',
-        '',
-        'Click **Create Wager** to challenge other players.',
-      ].join('\n'),
-    )
-    .setFooter({ text: 'Powered by Solana' });
+    .setDescription(t('lobby.description', lang))
+    .setFooter({ text: t('lobby.footer', lang) });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('wager_type_wager')
-      .setLabel('Create Wager')
+      .setLabel(t('lobby.btn_create_wager', lang))
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('create_dispute')
-      .setLabel('Create Dispute')
+      .setLabel(t('lobby.btn_create_dispute', lang))
       .setStyle(ButtonStyle.Danger),
   );
 
-  return { embeds: [embed], components: [row] };
+  return { embeds: [embed], components: [row, buildLanguageRow('lobby')] };
 }
 
 /**

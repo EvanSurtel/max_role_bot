@@ -12,6 +12,7 @@ const walletRepo = require('../database/repositories/walletRepo');
 const walletManager = require('../solana/walletManager');
 const channelService = require('../services/channelService');
 const neatqueueService = require('../services/neatqueueService');
+const { t, langFor } = require('../locales/i18n');
 
 // Map server/region input to leaderboard region
 const SERVER_TO_REGION = {
@@ -30,26 +31,26 @@ async function handleButton(interaction) {
 
   if (id === 'tos_accept') {
     const discordId = interaction.user.id;
+    const lang = langFor(interaction);
 
     // Check if already registered
     const existingUser = userRepo.findByDiscordId(discordId);
     if (existingUser && existingUser.accepted_tos === 1) {
-      const r = await interaction.reply({ content: 'You\'re already registered!', ephemeral: true });
-      setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 15000);
+      await interaction.reply({ content: t('onboarding.already_registered', lang), ephemeral: true });
       return;
     }
 
-    // Show registration modal
+    // Show registration modal in the user's language
     const modal = new ModalBuilder()
       .setCustomId('registration_modal')
-      .setTitle('Complete Your Registration');
+      .setTitle(t('onboarding.modal_title', lang));
 
     modal.addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('reg_display_name')
-          .setLabel('Server Display Name')
-          .setPlaceholder('How you want to be known in this server')
+          .setLabel(t('onboarding.modal_display_name_label', lang))
+          .setPlaceholder(t('onboarding.modal_display_name_placeholder', lang))
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMinLength(1)
@@ -58,8 +59,8 @@ async function handleButton(interaction) {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('reg_cod_ign')
-          .setLabel('COD Mobile In-Game Name')
-          .setPlaceholder('Your exact in-game name')
+          .setLabel(t('onboarding.modal_cod_ign_label', lang))
+          .setPlaceholder(t('onboarding.modal_cod_ign_placeholder', lang))
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMinLength(1)
@@ -68,8 +69,8 @@ async function handleButton(interaction) {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('reg_cod_uid')
-          .setLabel('COD Mobile UID')
-          .setPlaceholder('Numeric player ID from your CODM profile')
+          .setLabel(t('onboarding.modal_cod_uid_label', lang))
+          .setPlaceholder(t('onboarding.modal_cod_uid_placeholder', lang))
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMinLength(5)
@@ -78,8 +79,8 @@ async function handleButton(interaction) {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('reg_server')
-          .setLabel('Server/Region (Global, Garena, NA, EU, etc.)')
-          .setPlaceholder('e.g. Global')
+          .setLabel(t('onboarding.modal_server_label', lang))
+          .setPlaceholder(t('onboarding.modal_server_placeholder', lang))
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMinLength(1)
@@ -88,8 +89,8 @@ async function handleButton(interaction) {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('reg_country')
-          .setLabel('Country (for flag display)')
-          .setPlaceholder('e.g. US, BR, DE, PH or flag emoji')
+          .setLabel(t('onboarding.modal_country_label', lang))
+          .setPlaceholder(t('onboarding.modal_country_placeholder', lang))
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMinLength(1)
@@ -101,17 +102,16 @@ async function handleButton(interaction) {
   }
 
   if (id === 'tos_decline') {
+    const lang = langFor(interaction);
     const existingUser = userRepo.findByDiscordId(interaction.user.id);
     if (existingUser && existingUser.accepted_tos === 1) {
-      await interaction.reply({
-        content: 'You are already accepted and verified. You cannot decline after registering.',
+      return interaction.reply({
+        content: t('onboarding.cannot_decline_after', lang),
         ephemeral: true,
       });
-      setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 15000);
-      return;
     }
     return interaction.reply({
-      content: 'You must accept the Terms of Service to access this server. Click Accept when you\'re ready.',
+      content: t('onboarding.must_accept_tos', lang),
       ephemeral: true,
     });
   }
@@ -133,6 +133,7 @@ async function handleButton(interaction) {
  */
 async function handleRegistrationModal(interaction) {
   const discordId = interaction.user.id;
+  const lang = langFor(interaction);
 
   const displayName = interaction.fields.getTextInputValue('reg_display_name').trim();
   const codIgn = interaction.fields.getTextInputValue('reg_cod_ign').trim();
@@ -146,7 +147,7 @@ async function handleRegistrationModal(interaction) {
   // - Must start with valid year prefix (67-75 for 2019-2027)
   if (!/^\d{13,19}$/.test(codUid)) {
     return interaction.reply({
-      content: 'Invalid COD Mobile UID. It must be a 13-19 digit number.\n\n**How to find your UID:** Open CODM → tap your profile picture (top left) → your UID is the number below your avatar.',
+      content: t('onboarding.invalid_uid_format', lang),
       ephemeral: true,
     });
   }
@@ -154,7 +155,7 @@ async function handleRegistrationModal(interaction) {
   const uidPrefix = parseInt(codUid.substring(0, 2), 10);
   if (uidPrefix < 67 || uidPrefix > 75) {
     return interaction.reply({
-      content: `Invalid COD Mobile UID. The UID \`${codUid}\` doesn't match a valid CODM account format.\n\n**How to find your UID:** Open CODM → tap your profile picture (top left) → your UID is the number below your avatar.`,
+      content: t('onboarding.invalid_uid_account', lang, { uid: codUid }),
       ephemeral: true,
     });
   }
@@ -164,7 +165,7 @@ async function handleRegistrationModal(interaction) {
   const existingUid = db.prepare('SELECT discord_id FROM users WHERE cod_uid = ? AND discord_id != ?').get(codUid, discordId);
   if (existingUid) {
     return interaction.reply({
-      content: 'This COD Mobile UID is already registered to another account. Each UID can only be used once.',
+      content: t('onboarding.uid_already_registered', lang),
       ephemeral: true,
     });
   }
@@ -175,7 +176,7 @@ async function handleRegistrationModal(interaction) {
   const validRegions = ['na', 'latam', 'eu', 'asia'];
   if (!region || !validRegions.includes(region)) {
     return interaction.reply({
-      content: 'Invalid server/region. Please enter one of: **Global**, **Garena**, **NA**, **LATAM**, **EU**, or **Asia**.',
+      content: t('onboarding.invalid_region', lang),
       ephemeral: true,
     });
   }
@@ -190,7 +191,7 @@ async function handleRegistrationModal(interaction) {
     }
 
     if (user.accepted_tos === 1) {
-      return interaction.editReply({ content: 'You\'re already registered!' });
+      return interaction.editReply({ content: t('onboarding.already_registered', lang) });
     }
 
     // Accept TOS and store profile
@@ -261,30 +262,30 @@ async function handleRegistrationModal(interaction) {
     const freshUser = userRepo.findById(user.id);
     await sendWalletPanel(walletChannel, wallet, freshUser);
 
-    // Send registration complete embed
+    // Send registration complete embed in the user's language
     const completeEmbed = new EmbedBuilder()
-      .setTitle('Registration Complete!')
+      .setTitle(t('onboarding.complete_title', lang))
       .setColor(0x2ecc71)
       .setDescription([
-        `Welcome, **${displayName}**!`,
+        t('onboarding.complete_welcome', lang, { name: displayName }),
         '',
-        'Your account has been set up:',
+        t('onboarding.complete_set_up', lang),
         '',
-        `**Display Name:** ${displayName}`,
-        `**COD Mobile IGN:** ${codIgn}`,
-        `**COD Mobile UID:** ${codUid}`,
-        `**Region:** ${serverInput}`,
+        `**${t('onboarding.complete_field_name', lang)}:** ${displayName}`,
+        `**${t('onboarding.complete_field_ign', lang)}:** ${codIgn}`,
+        `**${t('onboarding.complete_field_uid', lang)}:** ${codUid}`,
+        `**${t('onboarding.complete_field_region', lang)}:** ${serverInput}`,
         '',
-        '**Your Wallet**',
-        `A USDC wallet has been created for you. Check <#${walletChannel.id}> to view your deposit address and manage funds.`,
+        `**${t('onboarding.complete_wallet_header', lang)}**`,
+        t('onboarding.complete_wallet_text', lang, { channel: `<#${walletChannel.id}>` }),
         '',
-        '**Getting Started**',
-        '1. Deposit **USDC** to your wallet address for wagers',
-        '2. Deposit a tiny amount of **SOL** (~$0.50) for transaction fees — lasts ~100 wagers',
-        '3. Head to the wager lobby channel',
-        '4. Click **Create Wager** to challenge others or browse open challenges',
+        `**${t('onboarding.complete_started_header', lang)}**`,
+        `1. ${t('onboarding.complete_started_1', lang)}`,
+        `2. ${t('onboarding.complete_started_2', lang)}`,
+        `3. ${t('onboarding.complete_started_3', lang)}`,
+        `4. ${t('onboarding.complete_started_4', lang)}`,
         '',
-        'Good luck and have fun!',
+        t('onboarding.complete_good_luck', lang),
       ].join('\n'));
 
     await interaction.editReply({ embeds: [completeEmbed] });
@@ -322,7 +323,7 @@ async function handleRegistrationModal(interaction) {
   } catch (err) {
     console.error('[Onboarding] Error during registration:', err);
     await interaction.editReply({
-      content: 'Something went wrong during registration. Please contact an administrator.',
+      content: t('onboarding.registration_failed', lang),
     });
   }
 }
@@ -379,10 +380,10 @@ async function handleWalletRefresh(interaction) {
   const db = require('../database/db');
   const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
   const user = channelOwner || userRepo.findByDiscordId(interaction.user.id);
-  if (!user) return interaction.reply({ content: 'User not found.', ephemeral: true });
+  if (!user) return interaction.reply({ content: t('common.user_not_found', langFor(interaction)), ephemeral: true });
 
   const wallet = walletRepo.findByUserId(user.id);
-  if (!wallet) return interaction.reply({ content: 'Wallet not found.', ephemeral: true });
+  if (!wallet) return interaction.reply({ content: t('common.wallet_not_found', langFor(interaction)), ephemeral: true });
 
   await interaction.deferUpdate();
 
@@ -403,7 +404,7 @@ async function handleWalletLanguageButton(interaction) {
   const db = require('../database/db');
   const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
   const user = channelOwner || userRepo.findByDiscordId(interaction.user.id);
-  if (!user) return interaction.reply({ content: 'User not found.', ephemeral: true });
+  if (!user) return interaction.reply({ content: t('common.user_not_found', langFor(interaction)), ephemeral: true });
 
   const lang = user.language || 'en';
   const view = buildLanguagePickerView(lang);
@@ -419,10 +420,10 @@ async function handleWalletLanguageCancel(interaction) {
   const db = require('../database/db');
   const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
   const user = channelOwner || userRepo.findByDiscordId(interaction.user.id);
-  if (!user) return interaction.reply({ content: 'User not found.', ephemeral: true });
+  if (!user) return interaction.reply({ content: t('common.user_not_found', langFor(interaction)), ephemeral: true });
 
   const wallet = walletRepo.findByUserId(user.id);
-  if (!wallet) return interaction.reply({ content: 'Wallet not found.', ephemeral: true });
+  if (!wallet) return interaction.reply({ content: t('common.wallet_not_found', langFor(interaction)), ephemeral: true });
 
   let solBalance = '0';
   try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }

@@ -2,7 +2,8 @@ const { buildHowItWorksEmbeds } = require('../panels/howItWorksPanel');
 const { buildRulesEmbeds } = require('../panels/rulesPanel');
 const { buildLanguageRow, SUPPORTED_LANGUAGES } = require('../locales');
 
-// customId format: lang_<panel>_<code>  (e.g., lang_howItWorks_es, lang_rules_pt)
+// customId format: lang_<panel>_<code>
+// Supports: howItWorks, rules, welcome, lobby, xpPanel
 async function handleButton(interaction) {
   const parts = interaction.customId.split('_');
   const panel = parts[1];
@@ -16,6 +17,24 @@ async function handleButton(interaction) {
     if (panel === 'howItWorks') {
       const embeds = buildHowItWorksEmbeds(lang);
       return interaction.update({ embeds, components: [buildLanguageRow('howItWorks')] });
+    }
+
+    if (panel === 'welcome') {
+      const { buildWelcomePanel } = require('../panels/welcomePanel');
+      const view = buildWelcomePanel(lang);
+      return interaction.update(view);
+    }
+
+    if (panel === 'lobby') {
+      const { buildLobbyPanel } = require('../panels/lobbyPanel');
+      const view = buildLobbyPanel(lang);
+      return interaction.update(view);
+    }
+
+    if (panel === 'xpPanel') {
+      const { buildXpMatchPanel } = require('../panels/xpMatchPanel');
+      const view = buildXpMatchPanel(lang);
+      return interaction.update(view);
     }
 
     if (panel === 'rules') {

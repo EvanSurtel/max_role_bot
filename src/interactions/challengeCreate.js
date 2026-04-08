@@ -16,27 +16,28 @@ const {
   USDC_PER_UNIT,
 } = require('../config/constants');
 const channelService = require('../services/channelService');
+const { t, langFor } = require('../locales/i18n');
 
-// Navigation row — Previous + Cancel on every step
-function navRow(step) {
+// Navigation row — Previous + Cancel on every step. Labels in user's language.
+function navRow(step, lang = 'en') {
   const buttons = [];
   if (step > 1) {
     buttons.push(
       new ButtonBuilder()
         .setCustomId('wager_prev')
-        .setLabel('Previous')
+        .setLabel(t('common.previous', lang))
         .setStyle(ButtonStyle.Secondary),
     );
   }
   buttons.push(
     new ButtonBuilder()
       .setCustomId('wager_cancel_flow')
-      .setLabel('Cancel')
+      .setLabel(t('common.cancel', lang))
       .setStyle(ButtonStyle.Danger),
   );
   return new ActionRowBuilder().addComponents(...buttons);
 }
-function cancelRow() { return navRow(1); }
+function cancelRow(lang = 'en') { return navRow(1, lang); }
 
 // Track each user's in-progress challenge creation state
 // discordUserId -> { type, teamSize, teammates, gameMode, series, anonymous, channelId }
@@ -50,12 +51,13 @@ const finalizingUsers = new Set();
 async function handleButton(interaction) {
   const id = interaction.customId;
   const userId = interaction.user.id;
+  const lang = langFor(interaction);
 
   // Confirm & Create challenge
   if (id === 'wager_confirm_create') {
     const flow = activeFlows.get(userId);
     if (!flow) {
-      await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
       setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
       return;
     }
@@ -66,7 +68,7 @@ async function handleButton(interaction) {
   if (id === 'wager_prev') {
     const flow = activeFlows.get(userId);
     if (!flow) {
-      await interaction.reply({ content: 'Session expired. This channel will be deleted.', ephemeral: true });
+      await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
       setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
       return;
     }
@@ -74,7 +76,7 @@ async function handleButton(interaction) {
     let prevStep = flow.step - 1;
     // Skip teammate step for 1v1
     if (prevStep === 2 && flow.teamSize === 1) prevStep = 1;
-    if (prevStep < 1) return interaction.reply({ content: 'Already at the first step.', ephemeral: true });
+    if (prevStep < 1) return interaction.reply({ content: t('challenge_create.already_first_step', lang), ephemeral: true });
 
     // Reconstruct the previous step UI
     if (prevStep === 1) {
@@ -85,8 +87,8 @@ async function handleButton(interaction) {
           new ButtonBuilder().setCustomId(`wager_teamsize_${size}`).setLabel(`${size}v${size}`).setStyle(ButtonStyle.Secondary),
         ),
       );
-      const typeLabel = flow.type === CHALLENGE_TYPE.WAGER ? 'Wager' : 'XP Match';
-      return interaction.update({ content: `**Setting up ${typeLabel}**\n\n**Select team size:**`, components: [row, navRow(1)] });
+      const stepKey = flow.type === CHALLENGE_TYPE.WAGER ? 'challenge_create.setting_up_wager' : 'challenge_create.setting_up_xp';
+      return interaction.update({ content: t(stepKey, lang), components: [row, navRow(1, lang)] });
     }
 
     if (prevStep === 2) {
@@ -95,11 +97,11 @@ async function handleButton(interaction) {
       const selectRow = new ActionRowBuilder().addComponents(
         new UserSelectMenuBuilder()
           .setCustomId('select_teammates')
-          .setPlaceholder(`Select ${flow.teamSize - 1} teammate(s)`)
+          .setPlaceholder(t('challenge_create.select_teammates_placeholder', lang, { count: flow.teamSize - 1 }))
           .setMinValues(flow.teamSize - 1)
           .setMaxValues(flow.teamSize - 1),
       );
-      return interaction.update({ content: `**Select your teammates:**\n\nTeam size: **${flow.teamSize}v${flow.teamSize}**`, components: [selectRow, navRow(2)] });
+      return interaction.update({ content: t('challenge_create.select_teammates_short', lang, { size: flow.teamSize }), components: [selectRow, navRow(2, lang)] });
     }
 
     if (prevStep === 3) {
@@ -112,13 +114,13 @@ async function handleButton(interaction) {
       flow.step = 4;
       const row = new ActionRowBuilder().addComponents(
         ...SERIES_LENGTHS.map(len =>
-          new ButtonBuilder().setCustomId(`wager_series_${len}`).setLabel(`Best of ${len}`).setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`wager_series_${len}`).setLabel(t('challenge_create.series_label', lang, { n: len })).setStyle(ButtonStyle.Secondary),
         ),
       );
-      return interaction.update({ content: `**Select series length:**\n\nMode: **${GAME_MODES[flow.gameMode]?.label || flow.gameMode}**`, components: [row, navRow(4)] });
+      return interaction.update({ content: t('challenge_create.select_series', lang, { mode: GAME_MODES[flow.gameMode]?.label || flow.gameMode }), components: [row, navRow(4, lang)] });
     }
 
-    return interaction.reply({ content: 'Cannot go back further.', ephemeral: true });
+    return interaction.reply({ content: t('challenge_create.cannot_go_back', lang), ephemeral: true });
   }
 
   // Cancel challenge creation — delete setup channel
@@ -126,7 +128,7 @@ async function handleButton(interaction) {
     const flow = activeFlows.get(userId);
     activeFlows.delete(userId);
     finalizingUsers.delete(userId);
-    await interaction.update({ content: 'Challenge creation cancelled. This channel will be deleted.', embeds: [], components: [] });
+    await interaction.update({ content: t('challenge_create.cancelled_msg', lang), embeds: [], components: [] });
     if (flow?.channelId) {
       setTimeout(async () => {
         try {
@@ -144,7 +146,7 @@ async function handleButton(interaction) {
     const { isMatchesPaused } = require('../panels/seasonPanel');
     if (isMatchesPaused()) {
       return interaction.reply({
-        content: 'Match creation is currently paused for a season transition. Please wait for the new season to begin.',
+        content: t('common.matches_paused', lang),
         ephemeral: true,
       });
     }
@@ -154,7 +156,7 @@ async function handleButton(interaction) {
     const dbUser = userRepo.findByDiscordId(userId);
     if (!dbUser || !dbUser.cod_uid) {
       return interaction.reply({
-        content: 'You must complete registration with your COD Mobile UID before creating challenges.',
+        content: t('common.not_registered', lang),
         ephemeral: true,
       });
     }
@@ -170,7 +172,7 @@ async function handleButton(interaction) {
     const existing = activeFlows.get(userId);
     if (existing && existing.channelId) {
       return interaction.reply({
-        content: `You already have a wager setup in progress. Check <#${existing.channelId}>.`,
+        content: t('common.you_already_have_setup', lang, { channel: `<#${existing.channelId}>` }),
         ephemeral: true,
       });
     }

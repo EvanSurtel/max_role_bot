@@ -10,11 +10,55 @@ const leaderboardPanel = require('../panels/leaderboardPanel');
 const seasonPanel = require('../panels/seasonPanel');
 const escrowPanel = require('../panels/escrowPanel');
 const languageSwitch = require('../interactions/languageSwitch');
+const { isWalletChannel, AUTO_DELETE_MS } = require('../utils/ephemeralReply');
+
+/**
+ * Monkey-patch interaction.reply / deferReply / followUp so any ephemeral
+ * message they produce auto-deletes after 5 minutes. Skipped for wallet
+ * channels — users want to keep their wallet history visible there.
+ *
+ * Doing this once at the router level beats sprinkling timeouts across the
+ * 100+ ephemeral reply call sites in the rest of the codebase.
+ */
+function installEphemeralAutoDelete(interaction) {
+  if (isWalletChannel(interaction)) return; // Wallet channels keep their messages
+
+  const origReply = interaction.reply.bind(interaction);
+  const origDeferReply = interaction.deferReply.bind(interaction);
+  const origFollowUp = interaction.followUp.bind(interaction);
+
+  interaction.reply = async function patchedReply(opts) {
+    const result = await origReply(opts);
+    if (opts && (opts.ephemeral || (opts.flags && (opts.flags & 64)))) {
+      setTimeout(() => interaction.deleteReply().catch(() => {}), AUTO_DELETE_MS);
+    }
+    return result;
+  };
+
+  interaction.deferReply = async function patchedDeferReply(opts) {
+    const result = await origDeferReply(opts);
+    if (opts && (opts.ephemeral || (opts.flags && (opts.flags & 64)))) {
+      setTimeout(() => interaction.deleteReply().catch(() => {}), AUTO_DELETE_MS);
+    }
+    return result;
+  };
+
+  interaction.followUp = async function patchedFollowUp(opts) {
+    const msg = await origFollowUp(opts);
+    if (opts && (opts.ephemeral || (opts.flags && (opts.flags & 64))) && msg && typeof msg.delete === 'function') {
+      setTimeout(() => msg.delete().catch(() => {}), AUTO_DELETE_MS);
+    }
+    return msg;
+  };
+}
 
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction) {
     try {
+      // Auto-clean ephemeral replies after 5 min (skips wallet channels)
+      installEphemeralAutoDelete(interaction);
+
       // Button interactions
       if (interaction.isButton()) {
         const id = interaction.customId;
