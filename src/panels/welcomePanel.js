@@ -3,11 +3,42 @@ const { t } = require('../locales/i18n');
 const { SUPPORTED_LANGUAGES } = require('../locales');
 
 /**
- * Build the welcome/TOS panel for the static welcome channel.
- * The panel renders entirely in the requested language, including the
- * full Terms of Service body. This is the bot's MASTER language switch
- * — picking a language here saves it as the user's preference for the
- * entire bot.
+ * Build the standalone language picker for the welcome channel.
+ *
+ * Posted as the FIRST message in the welcome channel so it sits at the top
+ * — users see it immediately when they enter the channel and can pick their
+ * language before reading the TOS below it.
+ *
+ * @param {string} lang - the language to render the picker itself in
+ */
+function buildWelcomeLanguagePicker(lang = 'en') {
+  const embed = new EmbedBuilder()
+    .setTitle('🌐 Language / Idioma / Idioma / Sprache / Langue / 言語 / 语言')
+    .setColor(0x3498db)
+    .setDescription(t('language_panel.description', lang));
+
+  const options = Object.entries(SUPPORTED_LANGUAGES).map(([code, { label, nativeName, emoji }]) => ({
+    label: nativeName,
+    description: label,
+    value: code,
+    emoji,
+    default: code === lang,
+  }));
+
+  const selectRow = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('welcome_lang_master')
+      .setPlaceholder(t('onboarding.language_picker_placeholder', lang))
+      .addOptions(options),
+  );
+
+  return { embeds: [embed], components: [selectRow] };
+}
+
+/**
+ * Build the welcome/TOS panel — embeds + Accept/Decline buttons only.
+ * The language picker is sent as a separate message above this one (see
+ * `postWelcomePanel`), so users see it first when they enter the channel.
  */
 function buildWelcomePanel(lang = 'en') {
   const welcomeEmbed = new EmbedBuilder()
@@ -42,32 +73,20 @@ function buildWelcomePanel(lang = 'en') {
       .setStyle(ButtonStyle.Danger),
   );
 
-  // Master language picker — StringSelectMenu showing ALL 20 languages.
-  // Picking a language here saves it as the user's preference for the
-  // entire bot, not just this panel.
-  const langOptions = Object.entries(SUPPORTED_LANGUAGES).map(([code, { label, nativeName, emoji }]) => ({
-    label: nativeName,
-    description: label,
-    value: code,
-    emoji,
-    default: code === lang,
-  }));
-
-  const langRow = new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId('welcome_lang_master')
-      .setPlaceholder(t('onboarding.language_picker_placeholder', lang))
-      .addOptions(langOptions),
-  );
-
   return {
     embeds: [welcomeEmbed, tos1Embed, tos2Embed, verifyEmbed],
-    components: [actionRow, langRow],
+    components: [actionRow],
   };
 }
 
 /**
- * Post (or refresh) the welcome panel in the static welcome channel.
+ * Post (or refresh) the welcome channel.
+ *
+ * Sends TWO messages:
+ *   1. Language picker (top of channel — posted first, oldest)
+ *   2. Welcome panel + TOS + Accept/Decline (below — posted second)
+ *
+ * On startup we wipe any old bot messages first so we don't accumulate.
  */
 async function postWelcomePanel(client) {
   const channelId = process.env.WELCOME_CHANNEL_ID;
@@ -83,34 +102,25 @@ async function postWelcomePanel(client) {
   }
 
   try {
+    // Wipe any old bot messages — we always re-post fresh so the language
+    // picker stays at the top (oldest message) and the welcome panel below.
     const messages = await channel.messages.fetch({ limit: 50 });
-    const botMessages = messages.filter(m => m.author.id === client.user.id);
-
-    // Find existing welcome panel (if any)
-    const existingPanel = botMessages.find(
-      m => m.embeds.length > 0 && (m.embeds[0]?.title?.includes('Rank $') || m.embeds[0]?.title?.includes('Welcome')),
-    );
-
-    const panel = buildWelcomePanel();
-
-    if (existingPanel) {
-      for (const [, m] of botMessages) {
-        if (m.id !== existingPanel.id) {
-          try { await m.delete(); } catch { /* */ }
-        }
-      }
-      await existingPanel.edit(panel);
-      console.log('[Panel] Updated existing welcome panel');
-    } else {
-      for (const [, m] of botMessages) {
+    for (const [, m] of messages) {
+      if (m.author.id === client.user.id) {
         try { await m.delete(); } catch { /* */ }
       }
-      await channel.send(panel);
-      console.log('[Panel] Posted new welcome panel');
     }
+
+    // Post language picker FIRST (it'll be at the top of the channel)
+    await channel.send(buildWelcomeLanguagePicker());
+
+    // Post welcome panel SECOND (it'll appear below the language picker)
+    await channel.send(buildWelcomePanel());
+
+    console.log('[Panel] Posted welcome panel + language picker');
   } catch (err) {
     console.error('[Panel] Failed to post welcome panel:', err.message);
   }
 }
 
-module.exports = { buildWelcomePanel, postWelcomePanel };
+module.exports = { buildWelcomePanel, buildWelcomeLanguagePicker, postWelcomePanel };

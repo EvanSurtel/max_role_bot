@@ -392,13 +392,14 @@ async function handleWalletRefresh(interaction) {
 
 /**
  * MASTER language switch — fired when a user picks a language from the
- * welcome panel's select menu. Saves the choice as the user's bot-wide
- * language preference and re-renders the welcome panel in that language
- * (the panel is shared, so everyone sees the new language too).
+ * welcome channel's language picker (the dedicated message at the top of
+ * the channel). Saves the user's bot-wide language preference and updates
+ * BOTH the language picker AND the welcome/TOS panel below it to the new
+ * language.
  */
 async function handleWelcomeLanguageMaster(interaction) {
   const { SUPPORTED_LANGUAGES } = require('../locales');
-  const { buildWelcomePanel } = require('../panels/welcomePanel');
+  const { buildWelcomePanel, buildWelcomeLanguagePicker } = require('../panels/welcomePanel');
 
   const newLang = interaction.values[0];
   if (!SUPPORTED_LANGUAGES[newLang]) {
@@ -414,16 +415,25 @@ async function handleWelcomeLanguageMaster(interaction) {
   }
   userRepo.setLanguage(discordId, newLang);
 
-  // Re-render the welcome panel in the new language for everyone.
-  // (Discord can't show different content per-viewer in a single shared message,
-  // so the panel reflects whoever picked a language most recently. The user's
-  // saved preference is what controls their personal interactions.)
-  const view = buildWelcomePanel(newLang);
-  await interaction.update(view);
+  // Update the language picker message (the one the user clicked) in place
+  await interaction.update(buildWelcomeLanguagePicker(newLang));
+
+  // Then find the welcome/TOS panel below it (the next bot message in the
+  // channel) and update it too — so users immediately see the TOS in their
+  // chosen language.
+  try {
+    const channel = interaction.channel;
+    const after = await channel.messages.fetch({ limit: 5, after: interaction.message.id });
+    const welcomePanelMsg = after.find(m => m.author.id === interaction.client.user.id);
+    if (welcomePanelMsg) {
+      await welcomePanelMsg.edit(buildWelcomePanel(newLang));
+    }
+  } catch (err) {
+    console.error('[Welcome] Failed to update welcome panel after language switch:', err.message);
+  }
 
   // Send an ephemeral confirmation in the user's chosen language so they
-  // know the master switch worked. Auto-deletes after 5 min like other
-  // ephemerals (see installEphemeralAutoDelete in interactionCreate.js).
+  // know the master switch worked. Auto-deletes after 5 min.
   const langName = SUPPORTED_LANGUAGES[newLang].nativeName;
   await interaction.followUp({
     content: t('onboarding.language_saved', newLang, { language: langName }),
