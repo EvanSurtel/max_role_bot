@@ -432,6 +432,14 @@ async function handleWelcomeLanguageMaster(interaction) {
     console.error('[Welcome] Failed to update welcome panel after language switch:', err.message);
   }
 
+  // Apply the language change everywhere — refresh the user's wallet channel
+  // (private) and the shared lobby + XP match panels so the user immediately
+  // sees the new language without having to manually click refresh anywhere.
+  const { applyLanguageChange } = require('../utils/languageRefresh');
+  applyLanguageChange(interaction.client, discordId, newLang).catch(err => {
+    console.error('[Welcome] Background language refresh failed:', err.message);
+  });
+
   // Send an ephemeral confirmation in the user's chosen language so they
   // know the master switch worked. Auto-deletes after 5 min.
   const langName = SUPPORTED_LANGUAGES[newLang].nativeName;
@@ -464,6 +472,13 @@ async function handleLanguagePanelSelect(interaction) {
 
   const view = buildLanguagePanel(newLang);
   await interaction.update(view);
+
+  // Apply the language change everywhere — refresh the user's wallet channel
+  // and the shared lobby + XP match panels so the change is immediately visible.
+  const { applyLanguageChange } = require('../utils/languageRefresh');
+  applyLanguageChange(interaction.client, discordId, newLang).catch(err => {
+    console.error('[LanguagePanel] Background language refresh failed:', err.message);
+  });
 
   const langName = SUPPORTED_LANGUAGES[newLang].nativeName;
   await interaction.followUp({
