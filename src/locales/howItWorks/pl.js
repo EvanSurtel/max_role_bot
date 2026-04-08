@@ -10,7 +10,7 @@ module.exports = {
       'Masz prywatny **kanał portfela** na tym serwerze. Tylko ty go widzisz i możesz używać.',
       '',
       'W twoim portfelu są dwie rzeczy:',
-      '• **USDC** — krypto-moneta powiązana z dolarem amerykańskim. 1 USDC = $1 USD. Tym obstawiasz. Kurs nie skacze — $10 USDC zawsze jest warte $10.',
+      '• **USDC** — krypto-moneta powiązana z dolarem amerykańskim. 1 USDC = $1 USD. Tym obstawiasz. Kurs nie skacze jak Bitcoin — $10 USDC zawsze jest warte $10.',
       '• **SOL** — maleńka ilość potrzebna do przetwarzania transakcji, taka mała prowizja. SOL za jakieś $0.50 wystarczy na około 100 zakładów.',
       '',
       '**Co to jest adres portfela?**',

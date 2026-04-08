@@ -10,7 +10,7 @@ module.exports = {
       'Você tem um **canal de carteira** privado neste servidor. Só você pode ver e usar.',
       '',
       'Sua carteira guarda duas coisas:',
-      '• **USDC** — uma moeda crypto que representa o dólar. 1 USDC = $1 USD. É com isso que você aposta. Não sobe nem desce de valor — $10 USDC sempre vale $10.',
+      '• **USDC** — uma moeda crypto que representa o dólar. 1 USDC = $1 USD. É com isso que você aposta. Não sobe nem desce de valor como o Bitcoin — $10 USDC sempre vale $10.',
       '• **SOL** — uma quantia pequena necessária para processar transações, tipo uma taxa mínima. ~$0.50 de SOL dura umas 100 apostas.',
       '',
       '**O que é um endereço de carteira?**',

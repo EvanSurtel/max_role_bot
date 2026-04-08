@@ -10,7 +10,7 @@ module.exports = {
       'Kamu ada **wallet channel** peribadi dalam server ni. Hanya kamu je yang boleh nampak dan guna.',
       '',
       'Wallet kamu ada dua benda:',
-      '• **USDC** — coin crypto yang mewakili dolar US. 1 USDC = $1 USD. Ni yang kamu guna untuk wager. Nilai dia tak naik turun — $10 USDC memang selalu $10.',
+      '• **USDC** — coin crypto yang mewakili dolar US. 1 USDC = $1 USD. Ni yang kamu guna untuk wager. Nilai dia tak naik turun seperti Bitcoin — $10 USDC memang selalu $10.',
       '• **SOL** — jumlah sikit je untuk process transaction, macam service fee kecik. Dalam $0.50 SOL boleh tahan untuk kira-kira 100 wager.',
       '',
       '**Apa itu wallet address?**',

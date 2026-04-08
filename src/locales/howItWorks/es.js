@@ -10,7 +10,7 @@ module.exports = {
       'Tienes un **canal de billetera** privado en este servidor. Solo tú puedes verlo y usarlo.',
       '',
       'Tu billetera tiene dos cosas:',
-      '• **USDC** — una moneda crypto que representa el dólar. 1 USDC = $1 USD. Con esto haces tus apuestas. No sube ni baja de valor — $10 USDC siempre vale $10.',
+      '• **USDC** — una moneda crypto que representa el dólar. 1 USDC = $1 USD. Con esto haces tus apuestas. No sube ni baja de valor como Bitcoin — $10 USDC siempre vale $10.',
       '• **SOL** — una cantidad pequeña que se necesita para procesar transacciones, como una comisión mínima. ~$0.50 de SOL te alcanza para unas 100 apuestas.',
       '',
       '**¿Qué es una dirección de billetera?**',

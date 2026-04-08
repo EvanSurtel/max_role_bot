@@ -10,7 +10,7 @@ module.exports = {
       'Du hast ein privates **Wallet-Channel** auf diesem Server. Nur du kannst es sehen und nutzen.',
       '',
       'Dein Wallet enthält zwei Dinge:',
-      '• **USDC** — ein Krypto-Coin, der den US-Dollar abbildet. 1 USDC = 1 $ USD. Damit wettest du. Der Wert geht weder rauf noch runter — 10 $ USDC sind immer 10 $ wert.',
+      '• **USDC** — ein Krypto-Coin, der den US-Dollar abbildet. 1 USDC = 1 $ USD. Damit wettest du. Der Wert geht weder rauf noch runter wie bei Bitcoin — 10 $ USDC sind immer 10 $ wert.',
       '• **SOL** — eine kleine Menge, die nötig ist, um Transaktionen zu verarbeiten, sowas wie eine kleine Servicegebühr. ~0,50 $ SOL reichen für ungefähr 100 Wetten.',
       '',
       '**Was ist eine Wallet-Adresse?**',

@@ -10,7 +10,7 @@ module.exports = {
       'Je hebt een prive **wallet channel** op deze server. Alleen jij kan het zien en gebruiken.',
       '',
       'Je wallet heeft twee dingen:',
-      '• **USDC** — een crypto coin die de Amerikaanse dollar vertegenwoordigt. 1 USDC = $1 USD. Hiermee zet je in. De waarde schommelt niet — $10 USDC is altijd $10 waard.',
+      '• **USDC** — een crypto coin die de Amerikaanse dollar vertegenwoordigt. 1 USDC = $1 USD. Hiermee zet je in. De waarde schommelt niet zoals Bitcoin — $10 USDC is altijd $10 waard.',
       '• **SOL** — een klein beetje nodig om transacties te verwerken, net zoiets als een kleine servicekosten. Voor ongeveer $0.50 aan SOL kom je zo\'n 100 wagers ver.',
       '',
       '**Wat is een wallet adres?**',

@@ -10,7 +10,7 @@ module.exports = {
       'Bạn có một **wallet channel** riêng trong server này. Chỉ bạn mới thấy và dùng được.',
       '',
       'Ví của bạn chứa hai thứ:',
-      '• **USDC** — một loại coin crypto đại diện cho đô la Mỹ. 1 USDC = $1 USD. Đây là thứ bạn dùng để wager. Giá trị không tăng không giảm — $10 USDC luôn bằng $10.',
+      '• **USDC** — một loại coin crypto đại diện cho đô la Mỹ. 1 USDC = $1 USD. Đây là thứ bạn dùng để wager. Giá trị không tăng không giảm như Bitcoin — $10 USDC luôn bằng $10.',
       '• **SOL** — một lượng nhỏ để xử lý giao dịch, giống như phí dịch vụ nhỏ. Khoảng $0.50 SOL đủ cho khoảng 100 wager.',
       '',
       '**Địa chỉ ví là gì?**',

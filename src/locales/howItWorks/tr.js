@@ -10,7 +10,7 @@ module.exports = {
       'Bu sunucuda sana özel bir **cüzdan kanalın** var. Sadece sen görebilir ve kullanabilirsin.',
       '',
       'Cüzdanında iki şey bulunuyor:',
-      '• **USDC** — Amerikan dolarını temsil eden bir kripto para. 1 USDC = $1 USD. Wager yaparken bunu kullanıyorsun. Değeri oynamıyor — $10 USDC her zaman $10 eder.',
+      '• **USDC** — Amerikan dolarını temsil eden bir kripto para. 1 USDC = $1 USD. Wager yaparken bunu kullanıyorsun. Bitcoin gibi değeri oynamıyor — $10 USDC her zaman $10 eder.',
       '• **SOL** — İşlemleri işlemek için gereken ufak bir miktar, ufak bir hizmet bedeli gibi düşün. ~$0.50 değerinde SOL yaklaşık 100 wager\'a yeter.',
       '',
       '**Cüzdan adresi nedir?**',
