@@ -34,7 +34,9 @@ async function handleButton(interaction) {
     // Check if already registered
     const existingUser = userRepo.findByDiscordId(discordId);
     if (existingUser && existingUser.accepted_tos === 1) {
-      return interaction.reply({ content: 'You\'re already registered!', ephemeral: true });
+      const r = await interaction.reply({ content: 'You\'re already registered!', ephemeral: true });
+      setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 15000);
+      return;
     }
 
     // Show registration modal
@@ -101,10 +103,12 @@ async function handleButton(interaction) {
   if (id === 'tos_decline') {
     const existingUser = userRepo.findByDiscordId(interaction.user.id);
     if (existingUser && existingUser.accepted_tos === 1) {
-      return interaction.reply({
+      await interaction.reply({
         content: 'You are already accepted and verified. You cannot decline after registering.',
         ephemeral: true,
       });
+      setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 15000);
+      return;
     }
     return interaction.reply({
       content: 'You must accept the Terms of Service to access this server. Click Accept when you\'re ready.',

@@ -220,9 +220,12 @@ async function handleButton(interaction) {
       components: [row, cancelRow()],
     });
 
-    return interaction.editReply({
+    await interaction.editReply({
       content: `Your ${typeLabel.toLowerCase()} setup channel has been created: <#${channel.id}>`,
     });
+    // Auto-delete this ephemeral message after 30 seconds
+    setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 30000);
+    return;
   }
 
   // Step 2: Team size selection

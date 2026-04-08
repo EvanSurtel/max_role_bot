@@ -164,6 +164,8 @@ module.exports = {
         } else {
           await interaction.reply(reply);
         }
+        // Auto-delete error messages after 15 seconds
+        setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 15000);
       } catch (replyErr) {
         console.error('[Interaction] Failed to send error reply:', replyErr);
       }
