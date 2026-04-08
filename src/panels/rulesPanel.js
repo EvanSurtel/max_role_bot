@@ -124,18 +124,21 @@ function buildRulesPanel() {
       '• Staff makes the final call on forfeit',
     ].join('\n'));
 
-  const matchRulesEmbed = new EmbedBuilder()
-    .setTitle('Match & Dispute Rules')
-    .setColor(0x9b59b6)
+  const wagerMatchRulesEmbed = new EmbedBuilder()
+    .setTitle('Wager Match Rules')
+    .setColor(0xf1c40f)
     .setDescription([
-      '**Match Rules:**',
-      '• Must use your registered COD Mobile account (matching UID)',
-      '• All matches are final once both parties accept',
+      '**Account:**',
+      '• You MUST use your registered COD Mobile account (matching your registered UID)',
+      '• Playing on a different account = forfeit + potential ban',
+      '',
+      '**Match:**',
+      '• All wagers are final once both parties accept',
       '• Both captains must report results honestly',
       '• Disconnections are not grounds for restart unless both teams agree',
       '• Maps are randomly selected by the bot — no changes after match starts',
       '',
-      '**Wager Specifics:**',
+      '**Funds:**',
       '• Entry: $0.50–$100 USDC per player',
       '• Funds locked from your account during match, released when decided',
       '• Winners receive the full pot split equally',
@@ -146,11 +149,36 @@ function buildRulesPanel() {
       '• Staff decisions are final',
       '• Falsified evidence = permanent ban + fund forfeiture',
       '',
-      '**Prohibited:** Cheating, win trading, DDoS, multiple accounts, match fixing, XP boosting, impersonating staff. All result in permanent ban.',
+      '**Prohibited:** Cheating, win trading, DDoS, multiple accounts, match fixing, impersonating staff. All result in permanent ban + forfeiture of funds.',
+    ].join('\n'));
+
+  const xpMatchRulesEmbed = new EmbedBuilder()
+    .setTitle('XP Match & XP Queue Rules')
+    .setColor(0x3498db)
+    .setDescription([
+      '**Account:**',
+      '• You may use any COD Mobile account for XP matches',
+      '• Your registered UID is not required for XP matches',
+      '',
+      '**Match:**',
+      '• All XP matches are final once both parties accept',
+      '• Both captains must report results honestly',
+      '• Disconnections are not grounds for restart unless both teams agree',
+      '• Maps are randomly selected by the bot — no changes after match starts',
+      '',
+      '**XP:**',
+      '• XP is calculated using an ELO system — beating stronger teams earns more XP',
+      '• XP synced across challenges and queue matches',
+      '',
+      '**Disputes:**',
+      '• Post evidence (screenshots/video) in the match shared channel',
+      '• Staff decisions are final',
+      '',
+      '**Prohibited:** Cheating, win trading, XP boosting, match fixing. Results in ban.',
     ].join('\n'))
     .setFooter({ text: 'Source: callofduty.com/mobile/esports/esports-settings' });
 
-  return { embeds: [generalEmbed, gameSettingsEmbed, bannedWeaponsEmbed, bannedAttachmentsEmbed, bannedUtilityEmbed, allowedEmbed, cosmeticsEmbed, weaponRolesEmbed, noShowEmbed, matchRulesEmbed] };
+  return { embeds: [generalEmbed, gameSettingsEmbed, bannedWeaponsEmbed, bannedAttachmentsEmbed, bannedUtilityEmbed, allowedEmbed, cosmeticsEmbed, weaponRolesEmbed, noShowEmbed, wagerMatchRulesEmbed, xpMatchRulesEmbed] };
 }
 
 async function postRulesPanel(client) {
