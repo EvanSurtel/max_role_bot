@@ -250,7 +250,7 @@ module.exports = {
     cancelling: 'Annullamento sfida...',
     failed_cancel: 'Impossibile annullare la sfida. Riprova.',
     only_creator: 'Solo il creatore della sfida può annullarla.',
-    cancel_aborted: 'Annullamento abortito.',
+    cancel_aborted: 'Annullamento interrotto.',
   },
 
   teammate: {

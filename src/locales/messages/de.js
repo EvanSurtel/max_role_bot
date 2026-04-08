@@ -343,7 +343,7 @@ module.exports = {
     losers_team: '**Verlierer (Team {team}):**',
     btn_confirm_team_wins: 'Team {team} Gewinnt Bestätigen',
     resolved_msg: '{user} hat den Streit aufgelöst. **Team {team} gewinnt!**',
-    no_winner_resolved_msg: '{user} hat **keinen Gewinner** für Match #{matchId} erklärt. Erstatte allen Spielern.',
+    no_winner_resolved_msg: '{user} hat **keinen Gewinner** für Match #{matchId} erklärt. Alle Spieler werden erstattet.',
     staff_panel_title: '**Staff-Panel** — Beweise prüfen und auflösen:',
     staff_panel_review: '**Staff-Panel** — Beweise prüfen, dann auflösen:',
   },

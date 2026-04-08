@@ -75,7 +75,7 @@ module.exports = {
       '   → Klick auf **Copy Address**, um deine Einzahlungsadresse zu bekommen',
       '   → Zurück in der Exchange-App, geh auf **Abheben** oder **Senden**',
       '   → Wähl **USDC**',
-      '   → ⚠️ **Du MUSST das Solana-Netzwerk wählen** — wenn du das falsche Netzwerk wählst (Ethereum, BSC, etc.) ist dein Geld **FÜR IMMER WEG** und kann nicht wiederhergestellt werden',
+      '   → ⚠️ **Du MUSST das Solana-Netzwerk wählen** — wenn du das falsche Netzwerk wählst (Ethereum, BSC, etc.) ist dein Geld **FÜR IMMER VERLOREN** und kann nicht wiederhergestellt werden',
       '   → **Überprüf deine Wallet-Adresse doppelt** — füg sie direkt aus deinem Wallet-Channel ein. Krypto-Überweisungen **können nicht rückgängig gemacht werden**.',
       '   → Bestätige und sende',
       '   → Dann mach dasselbe für **SOL** — wähl **SOL**, dann **Solana-Netzwerk**, füg deine Wallet-Adresse ein, bestätige und sende',
