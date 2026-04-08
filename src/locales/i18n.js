@@ -47,8 +47,13 @@ function t(key, lang = DEFAULT_LANGUAGE, vars = {}) {
     value = _lookup(_loadBundle(DEFAULT_LANGUAGE), key);
   }
 
-  // Last resort: return the key so missing translations are visible
-  if (value === undefined) return key;
+  // Last resort: log a warning so missing keys are visible during development,
+  // and return the key. Returning the key (rather than empty string) makes the
+  // bug obvious in Discord rather than silently rendering blank embeds.
+  if (value === undefined) {
+    console.warn(`[i18n] Missing translation key: ${key} (lang=${lang})`);
+    return key;
+  }
 
   return _interpolate(value, vars);
 }
