@@ -25,7 +25,7 @@ const MAP_POOLS = {
 // Estimated duration per map in minutes (for match timers)
 const MAP_DURATION_MINUTES = {
   HP: 12,
-  'S&D': 18,  // CODM: first to 5 wins, max 9 rounds (~2 min/round)
+  'S&D': 35,  // CODM: first to 9 wins, max 17 rounds (~2 min/round), overtime 20 rounds
   CTRL: 12,
 };
 
