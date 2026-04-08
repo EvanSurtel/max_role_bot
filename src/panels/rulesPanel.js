@@ -93,7 +93,8 @@ async function postRulesPanel(client) {
     if (panel.embeds.length <= 10) {
       await channel.send(panel);
     } else {
-      await channel.send({ embeds: panel.embeds.slice(0, 10) });
+      // Put language buttons on BOTH messages so users can switch from either
+      await channel.send({ embeds: panel.embeds.slice(0, 10), components: panel.components });
       await channel.send({ embeds: panel.embeds.slice(10), components: panel.components });
     }
     console.log('[Panel] Posted rules panel');
