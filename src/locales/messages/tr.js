@@ -51,7 +51,7 @@ module.exports = {
     withdrawal: 'Çekim',
     sol_withdrawal: 'SOL Çekimi',
     hold: 'Bahis Kilitli',
-    release: 'Bahis İade',
+    release: 'Bahis Serbest',
     escrow_in: 'Maç Girişi',
     escrow_out: 'Maç İadesi',
     disbursement: 'Maç Kazancı',

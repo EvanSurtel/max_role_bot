@@ -190,7 +190,7 @@ module.exports = {
       'S: Instant. Pag na-confirm na ng parehong captains ang result, nasa wallet mo na yung winnings.',
       '',
       '**T: Pwede bang i-cancel ang wager?**',
-      'S: Only before someone accepts it. Kapag na-accept na, kailangang laruin ang match.',
+      'S: Bago pa lang ito i-accept ng iba. Pag na-accept na, kailangang laruin ang match.',
       '',
       '**T: Paano kung hindi sumipot yung kalaban ko?**',
       'S: Mag-report ng no-show after 15 minutes. Ive-verify ng staff at mananalo ka by forfeit.',
