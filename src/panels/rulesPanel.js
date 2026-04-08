@@ -107,11 +107,21 @@ function buildRulesPanel() {
     .setTitle('No-Show Rules')
     .setColor(0xf39c12)
     .setDescription([
-      '**Wager Matches:** 15 minutes to show up — auto forfeit if no-show',
-      '**XP Matches:** 15 minutes to show up — -300 XP penalty for no-show',
-      '**NeatQueue:** 5 minutes per NeatQueue rules',
+      '**Wager Matches:** 15 minutes to show up',
+      '• No-show = forfeit — opponent wins by default',
+      '• Same outcome as losing the match (opponent gets the pot)',
       '',
-      'Staff verifies no-shows by checking voice channel join activity.',
+      '**XP Challenge Matches:** 15 minutes to show up',
+      '• No-show = forfeit — opponent wins by default',
+      '• Same XP outcome as losing (winners gain XP, forfeiter loses XP)',
+      '',
+      '**NeatQueue Matches:** 7.5 minutes to show up',
+      '• No-show = **-200 XP penalty**',
+      '',
+      '**How no-shows are verified:**',
+      '• Bot checks if players joined any match voice channel (team or shared)',
+      '• Reminders sent at 5 and 10 minutes if not in voice',
+      '• Staff makes the final call on forfeit',
     ].join('\n'));
 
   const matchRulesEmbed = new EmbedBuilder()
