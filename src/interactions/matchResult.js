@@ -86,10 +86,11 @@ async function handleNoShowReport(interaction) {
     // Check 10 min has passed since match creation
     const matchCreatedAt = new Date(match.created_at).getTime();
     const elapsedMinutes = (Date.now() - matchCreatedAt) / 60000;
-    if (elapsedMinutes < 10) {
-      const remaining = Math.ceil(10 - elapsedMinutes);
+    const noShowMinutes = 15; // CMG standard
+    if (elapsedMinutes < noShowMinutes) {
+      const remaining = Math.ceil(noShowMinutes - elapsedMinutes);
       return interaction.reply({
-        content: `You can only report a no-show after **10 minutes** from match start. **${remaining} minute(s) remaining.**`,
+        content: `You can only report a no-show after **${noShowMinutes} minutes** from match start. **${remaining} minute(s) remaining.**`,
         ephemeral: true,
       });
     }

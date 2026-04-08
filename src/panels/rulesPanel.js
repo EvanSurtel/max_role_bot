@@ -107,8 +107,8 @@ function buildRulesPanel() {
     .setTitle('No-Show Rules')
     .setColor(0xf39c12)
     .setDescription([
-      '**Wager Matches:** 10 minutes to show up — auto forfeit if no-show',
-      '**XP Matches:** 5 minutes to show up — -300 XP penalty for no-show',
+      '**Wager Matches:** 15 minutes to show up — auto forfeit if no-show',
+      '**XP Matches:** 15 minutes to show up — -300 XP penalty for no-show',
       '**NeatQueue:** 5 minutes per NeatQueue rules',
       '',
       'Staff verifies no-shows by checking voice channel join activity.',

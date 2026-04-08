@@ -31,7 +31,7 @@ const MAP_DURATION_MINUTES = {
 
 // Match timer settings (in minutes)
 const MATCH_TIMERS = {
-  NO_SHOW: 10,          // Minutes to show up after match creation
+  NO_SHOW: 15,          // Minutes to show up after match creation (CMG standard)
   NO_SHOW_WARNING: 5,   // Extra minutes after no-show alert
   REPORT_WINDOW: 10,    // Minutes to report after estimated match end
   REPORT_BUFFER: 30,    // Minutes after estimate + window before auto-dispute
