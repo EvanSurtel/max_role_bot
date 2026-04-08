@@ -20,21 +20,22 @@ async function updateNickname(client, userId) {
     const member = await guild.members.fetch(user.discord_id).catch(() => null);
     if (!member) return;
 
+    const flag = user.country_flag || '';
     const displayName = user.server_username || member.user.username;
     const xp = user.xp_points || 0;
     const earnings = Number(user.total_earnings_usdc || 0) / USDC_PER_UNIT;
 
-    let nickname = `${displayName} [${xp}]`;
+    let nickname = `${flag} ${displayName} [${xp}]`.trim();
     if (earnings > 0) {
       nickname += ` [$${earnings.toFixed(2)}]`;
     }
 
     // Discord nickname max is 32 chars — truncate display name if needed
     if (nickname.length > 32) {
-      const statsLength = nickname.length - displayName.length;
-      const maxName = 32 - statsLength;
-      nickname = `${displayName.slice(0, maxName)} [${xp}]`;
-      if (earnings > 0) nickname += ` [$${earnings.toFixed(2)}]`;
+      const prefix = flag ? `${flag} ` : '';
+      const suffix = earnings > 0 ? ` [${xp}] [$${earnings.toFixed(2)}]` : ` [${xp}]`;
+      const maxName = 32 - prefix.length - suffix.length;
+      nickname = `${prefix}${displayName.slice(0, Math.max(1, maxName))}${suffix}`;
     }
 
     await member.setNickname(nickname).catch(err => {

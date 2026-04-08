@@ -224,7 +224,7 @@ async function handleRegistrationModal(interaction) {
     // Set nickname to display name
     try {
       const member = await guild.members.fetch(discordId);
-      await member.setNickname(`${displayName} [500]`);
+      await member.setNickname(`${country} ${displayName} [500]`);
     } catch (err) {
       console.warn(`[Onboarding] Could not set nickname:`, err.message);
     }
