@@ -317,6 +317,14 @@ module.exports = {
     cancelled: 'Спор отменён.',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 Язык',
+    description: 'Выбери свой язык. Бот будет использовать этот язык для **всего**, что тебе отправляет — твой кошелёк, каналы матчей, уведомления, ошибки, вообще всё.\n\nЭто главный переключатель языка. Меняешь здесь — меняется язык везде в боте для тебя.',
+    footer: 'Твой выбор языка сохраняется во всём боте',
+    placeholder: '🌐 Выбери свой язык',
+  },
+
   admin_resolve: {
     btn_team1_wins: 'Команда 1 Побеждает',
     btn_team2_wins: 'Команда 2 Побеждает',

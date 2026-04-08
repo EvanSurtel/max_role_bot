@@ -73,7 +73,7 @@ module.exports = {
   },
 
   cosmetics: {
-    title: 'Hadangan Cosmetic',
+    title: 'Sekatan Cosmetic',
     fields: [
       { name: 'Utility Skins', value: 'Semua Legendary Utility Skins dihadkan' },
       { name: 'Emotes', value: 'Semua Emotes dihadkan semasa match' },

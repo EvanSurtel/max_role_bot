@@ -316,6 +316,14 @@ module.exports = {
     cancelled: 'Đã hủy dispute.',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 Ngôn ngữ',
+    description: 'Chọn ngôn ngữ của bạn. Bot sẽ dùng ngôn ngữ này cho **mọi thứ** gửi tới bạn — ví của bạn, kênh match, thông báo, lỗi, tất cả luôn.\n\nĐây là công tắc ngôn ngữ chính. Đổi ở đây là đổi ngôn ngữ ở khắp nơi trong bot cho bạn.',
+    footer: 'Lựa chọn ngôn ngữ của bạn được lưu trên toàn bộ bot',
+    placeholder: '🌐 Chọn ngôn ngữ của bạn',
+  },
+
   admin_resolve: {
     btn_team1_wins: 'Đội 1 Thắng',
     btn_team2_wins: 'Đội 2 Thắng',

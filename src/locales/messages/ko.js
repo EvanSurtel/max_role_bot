@@ -316,6 +316,14 @@ module.exports = {
     cancelled: '분쟁이 취소되었어요.',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 언어',
+    description: '언어를 선택하세요. 봇이 보내는 **모든 것**에 이 언어가 사용돼요 — 지갑, 매치 채널, 알림, 오류 메시지, 전부 다요.\n\n이건 언어 마스터 스위치예요. 여기서 바꾸면 봇 전체의 언어가 바뀌어요.',
+    footer: '언어 설정은 봇 전체에 저장돼요',
+    placeholder: '🌐 언어를 선택하세요',
+  },
+
   admin_resolve: {
     btn_team1_wins: '팀 1 승리',
     btn_team2_wins: '팀 2 승리',

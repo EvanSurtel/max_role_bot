@@ -316,6 +316,14 @@ module.exports = {
     cancelled: 'Disputa cancelada.',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 Idioma',
+    description: 'Escolha seu idioma. O bot vai usar esse idioma para **tudo** que enviar para você — sua carteira, canais de partida, notificações, erros, tudo.\n\nEsse é o interruptor principal de idioma. Mudar aqui muda o idioma em todo o bot pra você.',
+    footer: 'Sua preferência de idioma fica salva em todo o bot',
+    placeholder: '🌐 Escolha seu idioma',
+  },
+
   admin_resolve: {
     btn_team1_wins: 'Time 1 Vence',
     btn_team2_wins: 'Time 2 Vence',

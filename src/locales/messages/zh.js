@@ -316,6 +316,14 @@ module.exports = {
     cancelled: '申诉已取消。',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 语言',
+    description: '选择你的语言。机器人发送给你的**所有内容**都会使用这个语言——你的钱包、比赛频道、通知、错误提示,全部都是。\n\n这是语言总开关。在这里修改,机器人里所有地方的语言都会跟着变。',
+    footer: '你的语言偏好会在整个机器人中保存',
+    placeholder: '🌐 选择你的语言',
+  },
+
   admin_resolve: {
     btn_team1_wins: '队伍 1 获胜',
     btn_team2_wins: '队伍 2 获胜',

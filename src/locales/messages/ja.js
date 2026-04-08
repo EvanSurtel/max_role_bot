@@ -316,6 +316,14 @@ module.exports = {
     cancelled: '異議申立をキャンセルしました。',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 言語',
+    description: '言語を選んでください。ボットからあなたに送られる**すべて**でこの言語が使われます — ウォレット、マッチチャンネル、通知、エラー、そのすべてです。\n\nこれが言語のメインスイッチです。ここで変更すると、ボット内のどこでもあなたの言語が変わります。',
+    footer: '言語設定はボット全体で保存されます',
+    placeholder: '🌐 言語を選択',
+  },
+
   admin_resolve: {
     btn_team1_wins: 'チーム1の勝利',
     btn_team2_wins: 'チーム2の勝利',

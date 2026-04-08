@@ -316,6 +316,14 @@ module.exports = {
     cancelled: 'ยกเลิก dispute แล้ว',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 ภาษา',
+    description: 'เลือกภาษาของคุณ บอทจะใช้ภาษานี้กับ**ทุกอย่าง**ที่ส่งถึงคุณ — wallet ของคุณ, ช่อง match, การแจ้งเตือน, error, ทุกอย่างเลย\n\nนี่คือสวิตช์ภาษาหลัก เปลี่ยนที่นี่แล้วภาษาในบอททุกที่ก็จะเปลี่ยนตามให้คุณ',
+    footer: 'การตั้งค่าภาษาของคุณจะถูกบันทึกไว้ทั่วทั้งบอท',
+    placeholder: '🌐 เลือกภาษาของคุณ',
+  },
+
   admin_resolve: {
     btn_team1_wins: 'Team 1 ชนะ',
     btn_team2_wins: 'Team 2 ชนะ',

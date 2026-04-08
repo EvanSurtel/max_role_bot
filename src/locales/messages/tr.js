@@ -317,6 +317,14 @@ module.exports = {
     cancelled: 'İtiraz iptal edildi.',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 Dil',
+    description: 'Dilini seç. Bot sana gönderdiği **her şey** için bu dili kullanacak — cüzdanın, maç kanalları, bildirimler, hatalar, hepsi.\n\nBu ana dil ayarı. Burada değiştirince botun her yerindeki dil senin için değişir.',
+    footer: 'Dil tercihin botun tamamında kaydediliyor',
+    placeholder: '🌐 Dilini seç',
+  },
+
   admin_resolve: {
     btn_team1_wins: 'Takım 1 Kazanır',
     btn_team2_wins: 'Takım 2 Kazanır',

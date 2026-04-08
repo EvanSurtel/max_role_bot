@@ -260,13 +260,13 @@ module.exports = {
     btn_yes_join: 'Oo, Sumali sa Team',
     btn_decline: 'I-decline',
     confirm_decline_title: 'Kumpirmahin ang Pag-decline',
-    confirm_decline_q: 'Sigurado ka bang gusto mong **i-decline** ang invite para sa {type} #{num}?\n\n**Ka-cancel nito ang buong {type_lower}**{refund_notice}.',
+    confirm_decline_q: 'Sigurado ka bang gusto mong **i-decline** ang invite para sa {type} #{num}?\n\n**Mako-cancel ang buong {type_lower}**{refund_notice}.',
     refund_notice_wager: ' at ire-refund lahat ng naka-lock na funds sa lahat ng players',
     btn_yes_decline: 'Oo, I-decline',
     btn_go_back: 'Bumalik',
     accept_msg_wager: '**Tinanggap** mo na ang invitation para sa {type} #{num}! Naka-lock na ang funds mo.',
     accept_msg_xp: '**Tinanggap** mo na ang invitation para sa {type} #{num}!',
-    decline_msg: '**Tinanggihan** mo na ang invitation para sa {type} #{num}. Ka-cancel na ang {type_lower}.',
+    decline_msg: '**Tinanggihan** mo na ang invitation para sa {type} #{num}. Ica-cancel na ang {type_lower}.',
     not_in_challenge: 'Hindi ka kasali sa challenge na ito.',
     not_waiting_teammates: 'Hindi na naghihintay ng teammates ang challenge na ito.',
     already_responded: 'Nag-respond ka na sa invitation na ito.',
@@ -314,6 +314,14 @@ module.exports = {
     not_a_player: 'Hindi ka player sa match na ito.',
     created: 'Nagawa na ang dispute. Tingnan ang match shared channel.',
     cancelled: 'Kinansela ang dispute.',
+  },
+
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 Language',
+    description: 'Piliin ang language mo. Gagamitin ng bot ang language na ito para sa **lahat** ng ipapadala sa\'yo — ang wallet mo, match channels, notifications, errors, lahat na.\n\nIto ang master language switch. Kapag pinalitan mo dito, magbabago ang language sa buong bot para sa\'yo.',
+    footer: 'Naka-save ang language preference mo sa buong bot',
+    placeholder: '🌐 Piliin ang language mo',
   },
 
   admin_resolve: {

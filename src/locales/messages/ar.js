@@ -316,6 +316,14 @@ module.exports = {
     cancelled: 'تم إلغاء النزاع.',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 اللغة',
+    description: 'اختر لغتك. البوت راح يستخدم هذي اللغة في **كل شي** يرسله لك — محفظتك، قنوات المباريات، الإشعارات، الأخطاء، كل شي.\n\nهذا المفتاح الرئيسي للغة. لما تغيّره هنا تتغير اللغة في كل مكان في البوت بالنسبة لك.',
+    footer: 'تفضيل اللغة محفوظ في البوت كله',
+    placeholder: '🌐 اختر لغتك',
+  },
+
   admin_resolve: {
     btn_team1_wins: 'الفريق 1 يفوز',
     btn_team2_wins: 'الفريق 2 يفوز',

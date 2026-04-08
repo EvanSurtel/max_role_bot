@@ -316,6 +316,14 @@ module.exports = {
     cancelled: 'Litige annulé.',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 Langue',
+    description: 'Choisissez votre langue. Le bot utilisera cette langue pour **tout** ce qu\'il vous envoie — votre portefeuille, les salons de match, les notifications, les erreurs, absolument tout.\n\nC\'est le réglage principal de langue. Le changer ici change la langue partout dans le bot pour vous.',
+    footer: 'Votre préférence de langue est enregistrée dans tout le bot',
+    placeholder: '🌐 Choisissez votre langue',
+  },
+
   admin_resolve: {
     btn_team1_wins: 'Équipe 1 Gagne',
     btn_team2_wins: 'Équipe 2 Gagne',

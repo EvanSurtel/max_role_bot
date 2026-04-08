@@ -316,6 +316,14 @@ module.exports = {
     cancelled: 'Dispute dibatalkan.',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 Bahasa',
+    description: 'Pilih bahasa kamu. Bot akan guna bahasa ini untuk **semua** yang dihantar kepada kamu — wallet kamu, channel match, notifikasi, error, semuanya.\n\nIni master switch bahasa. Tukar kat sini bermakna bahasa kat seluruh bot akan berubah untuk kamu.',
+    footer: 'Pilihan bahasa kamu disimpan di seluruh bot',
+    placeholder: '🌐 Pilih bahasa kamu',
+  },
+
   admin_resolve: {
     btn_team1_wins: 'Pasukan 1 Menang',
     btn_team2_wins: 'Pasukan 2 Menang',

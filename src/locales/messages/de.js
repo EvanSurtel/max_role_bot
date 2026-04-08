@@ -316,6 +316,14 @@ module.exports = {
     cancelled: 'Streit abgebrochen.',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 Sprache',
+    description: 'Wähl deine Sprache. Der Bot nutzt diese Sprache für **alles**, was er dir schickt — dein Wallet, Match-Channels, Benachrichtigungen, Fehler, einfach alles.\n\nDas ist der Haupt-Sprachschalter. Wenn du ihn hier änderst, ändert sich die Sprache überall im Bot für dich.',
+    footer: 'Deine Spracheinstellung wird im gesamten Bot gespeichert',
+    placeholder: '🌐 Wähl deine Sprache',
+  },
+
   admin_resolve: {
     btn_team1_wins: 'Team 1 Gewinnt',
     btn_team2_wins: 'Team 2 Gewinnt',

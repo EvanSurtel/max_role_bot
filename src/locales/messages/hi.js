@@ -316,6 +316,14 @@ module.exports = {
     cancelled: 'Dispute cancel हो गया।',
   },
 
+  // Dedicated language channel panel — explains the master language switch
+  language_panel: {
+    title: '🌐 Language',
+    description: 'अपनी language चुनो। Bot तुम्हें जो कुछ भी भेजेगा उस **सब चीज़** के लिए यही language use करेगा — तुम्हारा wallet, match channels, notifications, errors, सब कुछ।\n\nयह master language switch है। यहाँ change करोगे तो bot में हर जगह तुम्हारे लिए language बदल जाएगी।',
+    footer: 'तुम्हारी language preference पूरे bot में save रहती है',
+    placeholder: '🌐 अपनी language चुनो',
+  },
+
   admin_resolve: {
     btn_team1_wins: 'Team 1 जीती',
     btn_team2_wins: 'Team 2 जीती',
