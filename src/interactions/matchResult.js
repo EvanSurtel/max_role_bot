@@ -13,6 +13,7 @@ const challengePlayerRepo = require('../database/repositories/challengePlayerRep
 const userRepo = require('../database/repositories/userRepo');
 const matchService = require('../services/matchService');
 const { MATCH_STATUS, CHALLENGE_STATUS, PLAYER_ROLE } = require('../config/constants');
+const { t, langFor } = require('../locales/i18n');
 
 /**
  * Check if a member has dispute resolution permissions (admin or wager staff).
@@ -46,10 +47,11 @@ async function handleButton(interaction) {
 
   // Cancel report
   if (id === 'report_cancel') {
+    const lang = langFor(interaction);
     try {
-      return await interaction.update({ content: 'Report cancelled.', embeds: [], components: [] });
+      return await interaction.update({ content: t('match_result.report_cancelled', lang), embeds: [], components: [] });
     } catch {
-      return interaction.reply({ content: 'Report cancelled.', ephemeral: true });
+      return interaction.reply({ content: t('match_result.report_cancelled', lang), ephemeral: true });
     }
   }
 
@@ -194,14 +196,15 @@ async function handleNoShowReport(interaction) {
 // ─── Report Confirmation ─────────────────────────────────────────
 
 async function showReportConfirm(interaction, outcome) {
+  const lang = langFor(interaction);
   const matchId = parseInt(interaction.customId.replace(`report_${outcome}_`, ''), 10);
-  if (isNaN(matchId)) return interaction.reply({ content: 'Invalid match.', ephemeral: true });
+  if (isNaN(matchId)) return interaction.reply({ content: t('match_result.invalid_match', lang), ephemeral: true });
 
   const match = matchRepo.findById(matchId);
-  if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
+  if (!match) return interaction.reply({ content: t('common.match_not_found', lang), ephemeral: true });
 
   if (match.status !== MATCH_STATUS.ACTIVE && match.status !== MATCH_STATUS.VOTING) {
-    return interaction.reply({ content: 'This match is no longer accepting reports.', ephemeral: true });
+    return interaction.reply({ content: t('match_result.no_longer_reports', lang), ephemeral: true });
   }
 
   // Check minimum time before reporting
@@ -214,13 +217,13 @@ async function showReportConfirm(interaction, outcome) {
   if (elapsedMinutes < minMinutes) {
     const remaining = Math.ceil(minMinutes - elapsedMinutes);
     return interaction.reply({
-      content: `You can't report yet. Minimum **${minMinutes} minutes** must pass for a Best of ${challenge?.series_length || '?'} match. **${remaining} minute(s) remaining.**`,
+      content: t('match_result.cant_report_yet', lang, { minutes: minMinutes, series: challenge?.series_length || '?', remaining }),
       ephemeral: true,
     });
   }
 
   const user = userRepo.findByDiscordId(interaction.user.id);
-  if (!user) return interaction.reply({ content: 'Not registered.', ephemeral: true });
+  if (!user) return interaction.reply({ content: t('common.not_registered_simple', lang), ephemeral: true });
 
   const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
   let captainTeam = null;
@@ -231,35 +234,35 @@ async function showReportConfirm(interaction, outcome) {
     }
   }
   if (!captainTeam) {
-    return interaction.reply({ content: 'Only team captains can report results.', ephemeral: true });
+    return interaction.reply({ content: t('common.only_captains', lang), ephemeral: true });
   }
 
   if (captainTeam === 1 && match.captain1_vote !== null) {
-    return interaction.reply({ content: 'You already reported.', ephemeral: true });
+    return interaction.reply({ content: t('match_result.you_already_reported', lang), ephemeral: true });
   }
   if (captainTeam === 2 && match.captain2_vote !== null) {
-    return interaction.reply({ content: 'You already reported.', ephemeral: true });
+    return interaction.reply({ content: t('match_result.you_already_reported', lang), ephemeral: true });
   }
 
   const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
   const confirmEmbed = new EmbedBuilder()
-    .setTitle('Confirm Report')
+    .setTitle(t('match_result.confirm_report_title', lang))
     .setColor(outcome === 'won' ? 0x2ecc71 : 0xe74c3c)
     .setDescription(
       outcome === 'won'
-        ? `You are reporting that **your team (Team ${captainTeam}) WON** Match #${matchId}.\n\nAre you sure?`
-        : `You are reporting that **your team (Team ${captainTeam}) LOST** Match #${matchId}.\n\nAre you sure?`
+        ? t('match_result.confirm_won', lang, { team: captainTeam, matchId })
+        : t('match_result.confirm_lost', lang, { team: captainTeam, matchId })
     );
 
   const confirmRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`confirm_${outcome}_${matchId}`)
-      .setLabel(outcome === 'won' ? 'Yes, We Won' : 'Yes, We Lost')
+      .setLabel(outcome === 'won' ? t('match_result.btn_yes_we_won', lang) : t('match_result.btn_yes_we_lost', lang))
       .setStyle(outcome === 'won' ? ButtonStyle.Success : ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId('report_cancel')
-      .setLabel('Cancel')
+      .setLabel(t('common.cancel', lang))
       .setStyle(ButtonStyle.Secondary),
   );
 

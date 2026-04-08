@@ -7,6 +7,7 @@ const matchService = require('../services/matchService');
 const challengeService = require('../services/challengeService');
 const { CHALLENGE_STATUS, PLAYER_STATUS, PLAYER_ROLE, CHALLENGE_TYPE } = require('../config/constants');
 const { challengeEmbed, formatUsdc } = require('../utils/embeds');
+const { t, langFor } = require('../locales/i18n');
 
 // Track in-progress acceptance flows for team games
 const acceptFlows = new Map(); // discordUserId -> { challengeId, teammates: [] }
@@ -17,20 +18,21 @@ const acceptFlows = new Map(); // discordUserId -> { challengeId, teammates: [] 
  */
 async function handleButton(interaction) {
   const customId = interaction.customId;
+  const lang = langFor(interaction);
   const challengeId = parseInt(customId.replace('challenge_accept_', ''), 10);
 
   if (isNaN(challengeId)) {
-    return interaction.reply({ content: 'Invalid challenge.', ephemeral: true });
+    return interaction.reply({ content: t('common.invalid_challenge', lang), ephemeral: true });
   }
 
   // Find the challenge
   const challenge = challengeRepo.findById(challengeId);
   if (!challenge) {
-    return interaction.reply({ content: 'Challenge not found.', ephemeral: true });
+    return interaction.reply({ content: t('common.challenge_not_found', lang), ephemeral: true });
   }
 
   if (challenge.status !== CHALLENGE_STATUS.OPEN) {
-    return interaction.reply({ content: 'This challenge is no longer available.', ephemeral: true });
+    return interaction.reply({ content: t('common.challenge_not_available', lang), ephemeral: true });
   }
 
   // Find or create the user in DB
@@ -38,7 +40,7 @@ async function handleButton(interaction) {
   let user = userRepo.findByDiscordId(discordId);
   if (!user || !user.cod_uid) {
     return interaction.reply({
-      content: 'You must complete registration with your COD Mobile UID before accepting wagers.',
+      content: t('common.not_registered', lang),
       ephemeral: true,
     });
   }
@@ -47,7 +49,7 @@ async function handleButton(interaction) {
   const existingPlayer = challengePlayerRepo.findByChallengeAndUser(challengeId, user.id);
   if (existingPlayer) {
     return interaction.reply({
-      content: 'You are already part of this challenge. You cannot accept your own challenge.',
+      content: t('common.you_already_in_challenge', lang),
       ephemeral: true,
     });
   }
@@ -57,42 +59,45 @@ async function handleButton(interaction) {
 
   // Prevent accepting own challenge
   if (challenge.creator_user_id === user.id) {
-    return interaction.reply({ content: 'You cannot accept your own challenge.', ephemeral: true });
+    return interaction.reply({ content: t('common.cannot_accept_own', lang), ephemeral: true });
   }
 
   const { GAME_MODES } = require('../config/constants');
+  const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+  const displayNum = challenge.display_number || challengeId;
 
   // 1v1: show confirmation directly
   if (challenge.team_size === 1) {
     const modeInfo = GAME_MODES[challenge.game_modes];
     const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
-    const entryText = isWager ? `\n**Entry:** ${formatUsdc(entryUsdc)} USDC per player` : '';
+    const entryAmountFormatted = (Number(entryUsdc) / 1_000_000).toFixed(2);
+    const entryText = isWager ? `\n**${t('challenge_create.confirm_field_entry', lang)}:** $${entryAmountFormatted} USDC` : '';
 
     const confirmEmbed = new EmbedBuilder()
-      .setTitle('Confirm Accept')
+      .setTitle(t('challenge_accept.confirm_title', lang))
       .setColor(0xe67e22)
       .setDescription([
-        `You are about to accept **${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId}**`,
+        t('challenge_accept.confirm_about_to_accept', lang, { type: typeLabel, num: displayNum }),
         '',
-        `**Type:** ${isWager ? 'Wager' : 'XP Match'}`,
-        `**Team Size:** 1v1`,
-        `**Mode:** ${modeLabel}`,
-        `**Series:** Best of ${challenge.series_length}`,
+        `**${t('challenge_create.confirm_field_type', lang)}:** ${typeLabel}`,
+        `**${t('challenge_create.confirm_field_team_size', lang)}:** 1v1`,
+        `**${t('challenge_create.confirm_field_mode', lang)}:** ${modeLabel}`,
+        `**${t('challenge_create.confirm_field_series', lang)}:** ${t('challenge_create.series_label', lang, { n: challenge.series_length })}`,
         entryText,
         '',
-        isWager ? `Your **${formatUsdc(entryUsdc)} USDC** will be held from your wallet.` : '',
+        isWager ? t('challenge_accept.confirm_held_notice', lang, { amount: entryAmountFormatted }) : '',
         '',
-        'Are you sure?',
+        t('challenge_accept.confirm_question', lang),
       ].join('\n'));
 
     const confirmRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`challenge_confirm_${challengeId}`)
-        .setLabel('Yes, Accept')
+        .setLabel(t('challenge_accept.btn_yes_accept', lang))
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId(`challenge_nevermind_${challengeId}`)
-        .setLabel('Nevermind')
+        .setLabel(t('challenge_accept.btn_nevermind', lang))
         .setStyle(ButtonStyle.Secondary),
     );
 
@@ -106,13 +111,13 @@ async function handleButton(interaction) {
   const selectRow = new ActionRowBuilder().addComponents(
     new UserSelectMenuBuilder()
       .setCustomId(`select_opponents_${challengeId}`)
-      .setPlaceholder(`Select ${teammatesNeeded} teammate(s)`)
+      .setPlaceholder(t('challenge_create.select_teammates_placeholder', lang, { count: teammatesNeeded }))
       .setMinValues(teammatesNeeded)
       .setMaxValues(teammatesNeeded),
   );
 
   return interaction.reply({
-    content: `**Select your teammates for ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId}:**\n\nTeam size: **${challenge.team_size}v${challenge.team_size}** — Pick **${teammatesNeeded}** teammate(s).`,
+    content: t('challenge_accept.select_opponents_header', lang, { type: typeLabel, num: displayNum, size: challenge.team_size, count: teammatesNeeded }),
     components: [selectRow],
     ephemeral: true,
   });
@@ -122,20 +127,21 @@ async function handleButton(interaction) {
  * Handle the confirmed acceptance after the user clicks "Yes, Accept".
  */
 async function handleConfirmedAccept(interaction) {
+  const lang = langFor(interaction);
   const challengeId = parseInt(interaction.customId.replace('challenge_confirm_', ''), 10);
   if (isNaN(challengeId)) {
-    return interaction.reply({ content: 'Invalid challenge.', ephemeral: true });
+    return interaction.reply({ content: t('common.invalid_challenge', lang), ephemeral: true });
   }
 
   const challenge = challengeRepo.findById(challengeId);
   if (!challenge || challenge.status !== CHALLENGE_STATUS.OPEN) {
-    return interaction.reply({ content: 'This challenge is no longer available.', ephemeral: true });
+    return interaction.reply({ content: t('common.challenge_not_available', lang), ephemeral: true });
   }
 
   const discordId = interaction.user.id;
   const user = userRepo.findByDiscordId(discordId);
   if (!user || !user.cod_uid) {
-    return interaction.reply({ content: 'Registration required.', ephemeral: true });
+    return interaction.reply({ content: t('common.not_registered', lang), ephemeral: true });
   }
 
   // Check if acceptor is busy
@@ -156,21 +162,22 @@ async function handleConfirmedAccept(interaction) {
       // Atomically claim the challenge — prevents double-accept race condition
       const claimed = challengeRepo.atomicStatusTransition(challengeId, CHALLENGE_STATUS.OPEN, CHALLENGE_STATUS.IN_PROGRESS);
       if (!claimed) {
-        return interaction.editReply({ content: 'This challenge has already been accepted by someone else.' });
+        return interaction.editReply({ content: t('challenge_accept.already_accepted', lang) });
       }
 
       // Check balance and hold funds (if wager)
       if (isWager && Number(entryUsdc) > 0) {
+        const entryAmount = (Number(entryUsdc) / 1_000_000).toFixed(2);
         if (!escrowManager.canAfford(user.id, entryUsdc)) {
           return interaction.editReply({
-            content: `Insufficient balance. You need **${formatUsdc(entryUsdc)} USDC** to accept this wager.`,
+            content: t('challenge_accept.insufficient_accept', lang, { amount: entryAmount }),
           });
         }
 
         const held = escrowManager.holdFunds(user.id, entryUsdc, challengeId);
         if (!held) {
           return interaction.editReply({
-            content: 'Failed to hold funds. Please try again.',
+            content: t('challenge_create.failed_hold_funds', lang),
           });
         }
       }
@@ -212,8 +219,9 @@ async function handleConfirmedAccept(interaction) {
       const { postTransaction } = require('../utils/transactionFeed');
       postTransaction({ type: 'challenge_accepted', username: user.server_username, discordId: discordId, challengeId, memo: `${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId} accepted by ${user.server_username} (1v1)` });
 
+      const typeLabelDone = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
       return interaction.editReply({
-        content: `You have accepted ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId}! Match channels have been created. Good luck!`,
+        content: t('challenge_accept.accepted_msg', lang, { type: typeLabelDone, num: challenge.display_number || challengeId }),
       });
     } catch (err) {
       console.error(`[ChallengeAccept] Error accepting 1v1 challenge #${challengeId}:`, err);
@@ -221,7 +229,7 @@ async function handleConfirmedAccept(interaction) {
       try { escrowManager.refundAll(challengeId); } catch { /* */ }
       challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.OPEN);
       return interaction.editReply({
-        content: 'Something went wrong accepting the challenge. Your funds have been refunded. Please try again.',
+        content: t('challenge_accept.failed_to_accept', lang),
       });
     }
   }

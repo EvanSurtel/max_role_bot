@@ -6,6 +6,7 @@ const challengeService = require('../services/challengeService');
 const matchService = require('../services/matchService');
 const channelService = require('../services/channelService');
 const { CHALLENGE_STATUS, PLAYER_STATUS, CHALLENGE_TYPE } = require('../config/constants');
+const { t, langFor } = require('../locales/i18n');
 
 /**
  * Handle button interactions for teammate accept/decline responses.
@@ -34,8 +35,9 @@ async function handleButton(interaction) {
     return;
   }
 
+  const lang = langFor(interaction);
   if (isNaN(challengeId)) {
-    return interaction.reply({ content: 'Invalid challenge reference.', ephemeral: true });
+    return interaction.reply({ content: t('teammate.invalid_reference', lang), ephemeral: true });
   }
 
   const discordId = interaction.user.id;
@@ -44,7 +46,7 @@ async function handleButton(interaction) {
   const user = userRepo.findByDiscordId(discordId);
   if (!user) {
     return interaction.reply({
-      content: 'You need to complete onboarding first. Use `/onboard` to get started.',
+      content: t('common.onboarding_required', lang),
       ephemeral: true,
     });
   }
@@ -52,20 +54,20 @@ async function handleButton(interaction) {
   // Find the challenge
   const challenge = challengeRepo.findById(challengeId);
   if (!challenge) {
-    return interaction.reply({ content: 'This challenge no longer exists.', ephemeral: true });
+    return interaction.reply({ content: t('teammate.challenge_no_longer_exists', lang), ephemeral: true });
   }
 
   // Find the challenge_player record for this user
   const player = challengePlayerRepo.findByChallengeAndUser(challengeId, user.id);
   if (!player) {
-    return interaction.reply({ content: 'You are not part of this challenge.', ephemeral: true });
+    return interaction.reply({ content: t('teammate.not_in_challenge', lang), ephemeral: true });
   }
 
   // Validate challenge status — team 1 uses 'pending_teammates', team 2 uses 'accepted'
   const validStatuses = [CHALLENGE_STATUS.PENDING_TEAMMATES, CHALLENGE_STATUS.ACCEPTED];
   if (!validStatuses.includes(challenge.status)) {
     return interaction.reply({
-      content: 'This challenge is no longer waiting for teammates.',
+      content: t('teammate.not_waiting_teammates', lang),
       ephemeral: true,
     });
   }
@@ -73,7 +75,7 @@ async function handleButton(interaction) {
   // Validate player status
   if (player.status !== PLAYER_STATUS.PENDING) {
     return interaction.reply({
-      content: 'You have already responded to this invitation.',
+      content: t('teammate.already_responded', lang),
       ephemeral: true,
     });
   }
@@ -102,41 +104,42 @@ async function handleButton(interaction) {
 async function showAcceptConfirm(interaction, challenge, player, user) {
   const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
   const { GAME_MODES, CHALLENGE_TYPE } = require('../config/constants');
-  const { formatUsdc } = require('../utils/embeds');
 
+  const lang = langFor(interaction);
   const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
   const modeInfo = GAME_MODES[challenge.game_modes];
   const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
+  const entryAmount = (Number(challenge.entry_amount_usdc) / 1_000_000).toFixed(2);
   const entryText = isWager && Number(challenge.entry_amount_usdc) > 0
-    ? `\n**Entry:** ${formatUsdc(challenge.entry_amount_usdc)} USDC will be held from your wallet.`
+    ? '\n' + t('teammate.confirm_entry_held', lang, { amount: entryAmount })
     : '';
 
-  const typeLabel = isWager ? 'Wager' : 'XP Match';
+  const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
   const displayNum = challenge.display_number || challenge.id;
 
   const confirmEmbed = new EmbedBuilder()
-    .setTitle('Confirm Accept')
+    .setTitle(t('teammate.confirm_accept_title', lang))
     .setColor(0x2ecc71)
     .setDescription([
-      `You are joining **${typeLabel} #${displayNum}**`,
+      t('teammate.confirm_accept_intro', lang, { type: typeLabel, num: displayNum }),
       '',
-      `**Type:** ${typeLabel}`,
-      `**Team Size:** ${challenge.team_size}v${challenge.team_size}`,
-      `**Mode:** ${modeLabel}`,
-      `**Series:** Best of ${challenge.series_length}`,
+      `**${t('challenge_create.confirm_field_type', lang)}:** ${typeLabel}`,
+      `**${t('challenge_create.confirm_field_team_size', lang)}:** ${challenge.team_size}v${challenge.team_size}`,
+      `**${t('challenge_create.confirm_field_mode', lang)}:** ${modeLabel}`,
+      `**${t('challenge_create.confirm_field_series', lang)}:** ${t('challenge_create.series_label', lang, { n: challenge.series_length })}`,
       entryText,
       '',
-      'Are you sure?',
+      t('teammate.confirm_question', lang),
     ].join('\n'));
 
   const confirmRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`teammate_confirm_accept_${challenge.id}`)
-      .setLabel('Yes, Join Team')
+      .setLabel(t('teammate.btn_yes_join', lang))
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`teammate_decline_${challenge.id}`)
-      .setLabel('Decline')
+      .setLabel(t('teammate.btn_decline', lang))
       .setStyle(ButtonStyle.Danger),
   );
 
@@ -148,20 +151,31 @@ async function showAcceptConfirm(interaction, challenge, player, user) {
  */
 async function showDeclineConfirm(interaction, challenge, player, user) {
   const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+  const lang = langFor(interaction);
+
+  const isWager = challenge.type === 'wager';
+  const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+  const typeLowerLabel = typeLabel.toLowerCase();
+  const refundNotice = isWager ? t('teammate.refund_notice_wager', lang) : '';
 
   const confirmEmbed = new EmbedBuilder()
-    .setTitle('Confirm Decline')
+    .setTitle(t('teammate.confirm_decline_title', lang))
     .setColor(0xe74c3c)
-    .setDescription(`Are you sure you want to **decline** the invite for ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id}?\n\n**This will cancel the entire ${challenge.type === 'wager' ? 'wager' : 'XP match'}**${challenge.type === 'wager' ? ' and refund all held funds to all players' : ''}.`);
+    .setDescription(t('teammate.confirm_decline_q', lang, {
+      type: typeLabel,
+      type_lower: typeLowerLabel,
+      num: challenge.display_number || challenge.id,
+      refund_notice: refundNotice,
+    }));
 
   const confirmRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`teammate_confirm_decline_${challenge.id}`)
-      .setLabel('Yes, Decline')
+      .setLabel(t('teammate.btn_yes_decline', lang))
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId(`teammate_accept_${challenge.id}`)
-      .setLabel('Go Back')
+      .setLabel(t('teammate.btn_go_back', lang))
       .setStyle(ButtonStyle.Secondary),
   );
 
@@ -172,14 +186,16 @@ async function showDeclineConfirm(interaction, challenge, player, user) {
  * Handle a teammate accepting the challenge invitation.
  */
 async function handleAccept(interaction, challenge, player, user) {
+  const lang = langFor(interaction);
+
   // For wager challenges, check balance and hold funds
   if (challenge.type === CHALLENGE_TYPE.WAGER && Number(challenge.entry_amount_usdc) > 0) {
     const entryUsdc = challenge.entry_amount_usdc.toString();
 
     if (!escrowManager.canAfford(user.id, entryUsdc)) {
-      const { formatUsdc } = require('../utils/embeds');
+      const entryAmount = (Number(entryUsdc) / 1_000_000).toFixed(2);
       return interaction.reply({
-        content: `You don't have enough USDC to join this wager. You need **${formatUsdc(entryUsdc)} USDC**. Please deposit funds and try again, or decline the invitation.`,
+        content: t('teammate.not_enough_funds', lang, { amount: entryAmount }),
         ephemeral: true,
       });
     }
@@ -187,7 +203,7 @@ async function handleAccept(interaction, challenge, player, user) {
     const held = escrowManager.holdFunds(user.id, entryUsdc, challenge.id);
     if (!held) {
       return interaction.reply({
-        content: 'Failed to hold your funds. Please try again.',
+        content: t('teammate.failed_hold', lang),
         ephemeral: true,
       });
     }
@@ -200,15 +216,14 @@ async function handleAccept(interaction, challenge, player, user) {
   challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.ACCEPTED);
 
   const { postTransaction } = require('../utils/transactionFeed');
-  const tl = challenge.type === 'wager' ? 'Wager' : 'XP Match';
+  const isWager = challenge.type === 'wager';
+  const tl = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
   const dn = challenge.display_number || challenge.id;
   postTransaction({ type: 'teammate_accepted', username: user.server_username, discordId: user.discord_id, challengeId: challenge.id, memo: `Joined team for ${tl} #${dn}` });
 
-  // Reply confirming acceptance
-  const acceptMsg = challenge.type === 'wager'
-    ? `You have **accepted** the invitation for ${tl} #${dn}! Your funds have been held.`
-    : `You have **accepted** the invitation for ${tl} #${dn}!`;
-  await interaction.reply({ content: acceptMsg });
+  // Reply confirming acceptance — wager wording mentions held funds, XP doesn't
+  const acceptKey = isWager ? 'teammate.accept_msg_wager' : 'teammate.accept_msg_xp';
+  await interaction.reply({ content: t(acceptKey, lang, { type: tl, num: dn }) });
 
   // Check if all players are now accepted
   const pendingCount = challengePlayerRepo.countPendingByChallenge(challenge.id);
@@ -242,16 +257,19 @@ async function handleAccept(interaction, challenge, player, user) {
  * Handle a teammate declining the challenge invitation.
  */
 async function handleDecline(interaction, challenge, player, user) {
+  const lang = langFor(interaction);
+
   // Update player status to declined
   challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.DECLINED);
 
   const { postTransaction } = require('../utils/transactionFeed');
-  const dtl = challenge.type === 'wager' ? 'Wager' : 'XP Match';
+  const isWager = challenge.type === 'wager';
+  const dtl = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
   const ddn = challenge.display_number || challenge.id;
   postTransaction({ type: 'teammate_declined', username: user.server_username, discordId: user.discord_id, challengeId: challenge.id, memo: `Declined team invite for ${dtl} #${ddn}` });
 
   await interaction.reply({
-    content: `You have **declined** the invitation for ${dtl} #${ddn}. The ${dtl.toLowerCase()} will be cancelled.`,
+    content: t('teammate.decline_msg', lang, { type: dtl, type_lower: dtl.toLowerCase(), num: ddn }),
   });
 
   // Notify the creator
