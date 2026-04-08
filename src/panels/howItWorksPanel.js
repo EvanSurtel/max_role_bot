@@ -144,7 +144,7 @@ function buildHowItWorksPanel() {
       'A: Coinbase, Crypto.com, Binance, Kraken, or any exchange that supports USDC on Solana.',
     ].join('\n'));
 
-  return { embeds: [introEmbed, registrationEmbed, cryptoEmbed, walletEmbed, wagerEmbed, xpEmbed, tipsEmbed] };
+  return { embeds: [introEmbed, cryptoEmbed, walletEmbed, wagerEmbed, xpEmbed, tipsEmbed] };
 }
 
 async function postHowItWorksPanel(client) {
