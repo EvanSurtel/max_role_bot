@@ -134,7 +134,7 @@ function buildHowItWorksPanel() {
       '• Win: +100 XP',
       '• Loss: -60 XP',
       '',
-      '**Wager wins** also give XP scaled to how much you wagered — bigger wager = more XP. If you lose a wager, you don\'t lose any XP — you already lost money so there\'s no XP penalty on top of that.',
+      '**Wager wins** also give XP — the more you wager, the more XP you earn for winning. If you lose a wager, you don\'t lose any XP — you already lost money so there\'s no XP penalty on top of that.',
       '',
       'Everyone starts at **500 XP** each season.',
     ].join('\n'));
