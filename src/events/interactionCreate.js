@@ -9,7 +9,6 @@ const walletPanel = require('../panels/walletPanel');
 const leaderboardPanel = require('../panels/leaderboardPanel');
 const seasonPanel = require('../panels/seasonPanel');
 const escrowPanel = require('../panels/escrowPanel');
-const languageSwitch = require('../interactions/languageSwitch');
 const { isWalletChannel, AUTO_DELETE_MS } = require('../utils/ephemeralReply');
 
 /**
@@ -119,8 +118,8 @@ module.exports = {
         if (id === 'dispute_nevermind') {
           return interaction.update({ content: 'Dispute cancelled.', embeds: [], components: [] });
         }
-        // Onboarding TOS buttons + wallet channel main panel buttons (refresh, lang)
-        if (id.startsWith('tos_') || id === 'wallet_refresh' || id === 'wallet_lang' || id === 'wallet_lang_cancel') {
+        // Onboarding TOS buttons + wallet refresh button
+        if (id.startsWith('tos_') || id === 'wallet_refresh') {
           return await onboarding.handleButton(interaction);
         }
         // Wallet action buttons (copy, withdraw, history) — in wallet channel
@@ -134,10 +133,6 @@ module.exports = {
         // Season management buttons
         if (id.startsWith('season_')) {
           return await seasonPanel.handleSeasonButton(interaction);
-        }
-        // Language switch buttons (rules/howItWorks panels)
-        if (id.startsWith('lang_')) {
-          return await languageSwitch.handleButton(interaction);
         }
         // Leaderboard admin buttons
         if (id.startsWith('lb_admin_')) {
@@ -186,9 +181,6 @@ module.exports = {
         }
         if (id === 'language_panel_select') {
           return await onboarding.handleLanguagePanelSelect(interaction);
-        }
-        if (id === 'wallet_lang_select') {
-          return await onboarding.handleWalletLanguageSelect(interaction);
         }
         console.warn(`[Interaction] Unhandled string select customId: ${id}`);
         return;

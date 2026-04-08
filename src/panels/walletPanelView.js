@@ -2,9 +2,8 @@
 // Both the onboarding flow (initial post) and the wallet refresh handler use
 // this so the wallet message stays in sync with the user's chosen language.
 
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { t } = require('../locales/i18n');
-const { SUPPORTED_LANGUAGES } = require('../locales');
 const { USDC_PER_UNIT } = require('../config/constants');
 
 /**
@@ -36,6 +35,8 @@ function buildWalletView(wallet, user, lang, solLamports = null) {
     .setFooter({ text: t('wallet_embed.footer', lang) })
     .setTimestamp();
 
+  // Language picker is in the welcome panel and dedicated language channel,
+  // not here. The wallet panel still renders in the user's saved language.
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('wallet_copy_address').setLabel(t('wallet.btn_copy_address', lang)).setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('wallet_refresh').setLabel('🔄').setStyle(ButtonStyle.Primary),
@@ -44,50 +45,7 @@ function buildWalletView(wallet, user, lang, solLamports = null) {
     new ButtonBuilder().setCustomId('wallet_history').setLabel(t('wallet.btn_history', lang)).setStyle(ButtonStyle.Secondary),
   );
 
-  const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('wallet_lang').setLabel(`🌐 ${t('wallet.btn_language', lang)}`).setStyle(ButtonStyle.Secondary),
-  );
-
-  return { embeds: [embed], components: [row1, row2] };
+  return { embeds: [embed], components: [row1] };
 }
 
-/**
- * Build the language picker view shown when a user clicks the Language button
- * inside their wallet channel. Renders an ephemeral-feeling embed plus a
- * StringSelectMenu listing every supported language.
- */
-function buildLanguagePickerView(currentLang) {
-  const lang = currentLang;
-
-  const embed = new EmbedBuilder()
-    .setTitle(t('wallet.language_picker_title', lang))
-    .setColor(0x3498db)
-    .setDescription(t('wallet.language_picker_desc', lang));
-
-  const options = Object.entries(SUPPORTED_LANGUAGES).slice(0, 25).map(([code, { label, nativeName, emoji }]) => ({
-    label: nativeName,
-    description: label,
-    value: code,
-    emoji,
-    default: code === lang,
-  }));
-
-  const select = new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId('wallet_lang_select')
-      .setPlaceholder('🌐 Language / Idioma / Idioma')
-      .addOptions(options)
-  );
-
-  // Cancel button to go back to the wallet view
-  const cancelRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('wallet_lang_cancel')
-      .setLabel(t('common.cancel', lang))
-      .setStyle(ButtonStyle.Secondary),
-  );
-
-  return { embeds: [embed], components: [select, cancelRow] };
-}
-
-module.exports = { buildWalletView, buildLanguagePickerView };
+module.exports = { buildWalletView };

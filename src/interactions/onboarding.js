@@ -116,15 +116,10 @@ async function handleButton(interaction) {
     });
   }
 
-  // Wallet channel buttons
+  // Wallet channel buttons (refresh only — language picker lives in welcome
+  // panel and dedicated language channel, not here)
   if (id === 'wallet_refresh') {
     return handleWalletRefresh(interaction);
-  }
-  if (id === 'wallet_lang') {
-    return handleWalletLanguageButton(interaction);
-  }
-  if (id === 'wallet_lang_cancel') {
-    return handleWalletLanguageCancel(interaction);
   }
 }
 
@@ -396,76 +391,6 @@ async function handleWalletRefresh(interaction) {
 }
 
 /**
- * Show the language picker — replaces the wallet view with a language select menu.
- */
-async function handleWalletLanguageButton(interaction) {
-  const { buildLanguagePickerView } = require('../panels/walletPanelView');
-
-  const db = require('../database/db');
-  const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
-  const user = channelOwner || userRepo.findByDiscordId(interaction.user.id);
-  if (!user) return interaction.reply({ content: t('common.user_not_found', langFor(interaction)), ephemeral: true });
-
-  const lang = user.language || 'en';
-  const view = buildLanguagePickerView(lang);
-  return interaction.update(view);
-}
-
-/**
- * Cancel the language picker and go back to the wallet view.
- */
-async function handleWalletLanguageCancel(interaction) {
-  const { buildWalletView } = require('../panels/walletPanelView');
-
-  const db = require('../database/db');
-  const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
-  const user = channelOwner || userRepo.findByDiscordId(interaction.user.id);
-  if (!user) return interaction.reply({ content: t('common.user_not_found', langFor(interaction)), ephemeral: true });
-
-  const wallet = walletRepo.findByUserId(user.id);
-  if (!wallet) return interaction.reply({ content: t('common.wallet_not_found', langFor(interaction)), ephemeral: true });
-
-  let solBalance = '0';
-  try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
-
-  const lang = user.language || 'en';
-  const view = buildWalletView(wallet, user, lang, solBalance);
-  return interaction.update(view);
-}
-
-/**
- * Save selected language and re-render the wallet panel in the new language.
- */
-async function handleWalletLanguageSelect(interaction) {
-  const { buildWalletView } = require('../panels/walletPanelView');
-  const { SUPPORTED_LANGUAGES } = require('../locales');
-
-  const newLang = interaction.values[0];
-  if (!SUPPORTED_LANGUAGES[newLang]) {
-    return interaction.reply({ content: 'Unknown language.', ephemeral: true });
-  }
-
-  // Save preference for the channel owner (admins viewing other users' channels
-  // should not be able to change someone else's language)
-  const db = require('../database/db');
-  const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
-  if (!channelOwner) return interaction.reply({ content: 'Wallet channel owner not found.', ephemeral: true });
-  if (channelOwner.discord_id !== interaction.user.id) {
-    return interaction.reply({ content: 'Only the wallet owner can change the language.', ephemeral: true });
-  }
-
-  userRepo.setLanguage(channelOwner.discord_id, newLang);
-
-  const wallet = walletRepo.findByUserId(channelOwner.id);
-  let solBalance = '0';
-  try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
-
-  const freshUser = userRepo.findById(channelOwner.id);
-  const view = buildWalletView(wallet, freshUser, newLang, solBalance);
-  return interaction.update(view);
-}
-
-/**
  * MASTER language switch — fired when a user picks a language from the
  * welcome panel's select menu. Saves the choice as the user's bot-wide
  * language preference and re-renders the welcome panel in that language
@@ -542,9 +467,6 @@ module.exports = {
   handleRegistrationModal,
   sendWalletPanel,
   handleWalletRefresh,
-  handleWalletLanguageButton,
-  handleWalletLanguageCancel,
-  handleWalletLanguageSelect,
   handleWelcomeLanguageMaster,
   handleLanguagePanelSelect,
 };
