@@ -90,6 +90,9 @@ client.once('ready', async () => {
     const { postRulesPanel } = require('./panels/rulesPanel');
     await postRulesPanel(client);
 
+    const { postHowItWorksPanel } = require('./panels/howItWorksPanel');
+    await postHowItWorksPanel(client);
+
     console.log('[Boot] All systems ready');
   } catch (err) {
     console.error('[Boot] Startup error:', err);
