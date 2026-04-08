@@ -6,51 +6,40 @@ function buildHowItWorksPanel() {
     .setColor(0x3498db)
     .setDescription('Welcome to Rank $! Here\'s everything you need to know to get started with wager matches and XP matches.');
 
-  const registrationEmbed = new EmbedBuilder()
-    .setTitle('Step 1: Register')
-    .setColor(0x2ecc71)
-    .setDescription([
-      '1. Go to the **#welcome** channel',
-      '2. Read the Terms of Service',
-      '3. Click **I Accept & Verify**',
-      '4. Fill in your info: Display Name, COD Mobile IGN, COD Mobile UID, Region, Country',
-      '5. Your wallet and profile are created automatically',
-      '',
-      '**Finding your COD Mobile UID:**',
-      'Open CODM → Tap your profile picture (top left) → Your UID is the number below your avatar',
-    ].join('\n'));
-
   const cryptoEmbed = new EmbedBuilder()
-    .setTitle('Step 2: Fund Your Wallet (Wagers Only)')
+    .setTitle('Step 1: Fund Your Wallet (Wagers Only)')
     .setColor(0xf1c40f)
     .setDescription([
       '*Skip this step if you only want to play XP matches — they\'re free!*',
       '',
       '**What you need:**',
-      '• **USDC** — a stablecoin worth $1 each (this is what you wager with)',
-      '• **SOL** — a tiny amount for transaction fees (~$0.50 lasts ~100 wagers)',
+      '• **USDC** — a crypto coin that represents the US dollar. 1 USDC = $1 USD. This is what you wager with.',
+      '• **SOL** — a tiny amount needed to process transactions, like a small fee. ~$0.50 worth lasts about 100 wagers.',
       '',
       '**How to get USDC and SOL:**',
       '',
       '**Option 1: Buy on an exchange (easiest)**',
       '1. Download **Coinbase**, **Crypto.com**, or **Binance** on your phone',
       '2. Create an account and verify your identity',
-      '3. Buy **USDC** (however much you want to wager)',
-      '4. Buy a tiny amount of **SOL** (~$0.50–$1)',
-      '5. Go to your wallet channel in this server',
-      '6. Click **Copy Address** to get your deposit address',
-      '7. In your exchange app, go to **Withdraw/Send**',
-      '8. Select **USDC**, choose **Solana network**, paste your address, and send',
-      '9. Do the same for **SOL**',
-      '10. Wait 30 seconds — the bot detects your deposit automatically',
+      '3. Add money to your exchange account using your **bank account, debit card, or Apple/Google Pay**',
+      '4. Once your money is in the exchange, buy **USDC** (however much you want to wager)',
+      '5. Also buy a tiny amount of **SOL** (~$0.50–$1 worth)',
+      '6. Now you need to send the USDC and SOL to your server wallet:',
+      '   → Go to your **wallet channel** in this Discord server',
+      '   → Click **Copy Address** to get your deposit address',
+      '   → Back in your exchange app, go to **Withdraw** or **Send**',
+      '   → Select **USDC**, choose **Solana network**, paste your address, and send',
+      '   → Do the same for **SOL**',
+      '7. Wait about 30 seconds — the bot detects your deposit automatically',
+      '8. Click **Refresh Balance** in your wallet channel to confirm it arrived',
       '',
       '**Option 2: Get from a friend**',
       'Have someone send USDC and SOL directly to your wallet address on the Solana network.',
       '',
-      '**Important:**',
-      '• Always select **Solana network** when sending — NOT Ethereum, NOT BSC',
-      '• Double-check the address before sending — crypto transfers cannot be reversed',
-      '• USDC is a stablecoin — $10 USDC = $10 USD, it doesn\'t go up or down in value',
+      '**⚠️ IMPORTANT — READ BEFORE SENDING:**',
+      '• **ALWAYS select Solana network** when withdrawing/sending from the exchange. If you choose the wrong network (Ethereum, BSC, etc.) your funds **WILL BE LOST** and cannot be recovered.',
+      '• **Double-check your wallet address** before sending — copy it directly from your wallet channel. Crypto transfers **cannot be reversed**.',
+      '• USDC represents the US dollar — $10 USDC = $10 USD, it doesn\'t go up or down in value.',
     ].join('\n'));
 
   const walletEmbed = new EmbedBuilder()
@@ -134,10 +123,10 @@ function buildHowItWorksPanel() {
     .setColor(0x95a5a6)
     .setDescription([
       '**Q: What is USDC?**',
-      'A: USDC is a digital dollar. 1 USDC = $1 USD. It doesn\'t change in value like Bitcoin.',
+      'A: USDC is a crypto coin that represents the US dollar. 1 USDC = $1 USD. Unlike Bitcoin, USDC doesn\'t go up or down in value — $10 USDC is always worth $10.',
       '',
       '**Q: What is SOL?**',
-      'A: SOL is the currency used to pay tiny transaction fees on Solana (~$0.001 per transaction). You only need ~$0.50 worth.',
+      'A: SOL is what pays the small processing fees when you send or receive money. Think of it like a tiny service fee. ~$0.50 worth of SOL lasts about 100 wagers.',
       '',
       '**Q: Can I lose more than my entry?**',
       'A: No. You only risk your entry amount. Winners get their entry back plus the loser\'s entry.',
