@@ -75,7 +75,7 @@ function buildRulesPanel(lang = 'en') {
   };
 }
 
-async function postRulesPanel(client) {
+async function postRulesPanel(client, lang = 'en') {
   const channelId = process.env.RULES_CHANNEL_ID;
   if (!channelId) {
     console.warn('[Panel] RULES_CHANNEL_ID not set — skipping rules panel');
@@ -90,7 +90,7 @@ async function postRulesPanel(client) {
     const botMessages = messages.filter(m => m.author.id === client.user.id);
     for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
 
-    const panel = buildRulesPanel();
+    const panel = buildRulesPanel(lang);
     // Discord max 10 embeds per message — split if needed
     if (panel.embeds.length <= 10) {
       await channel.send(panel);
@@ -98,7 +98,7 @@ async function postRulesPanel(client) {
       await channel.send({ embeds: panel.embeds.slice(0, 10) });
       await channel.send({ embeds: panel.embeds.slice(10) });
     }
-    console.log('[Panel] Posted rules panel');
+    console.log(`[Panel] Posted rules panel (${lang})`);
   } catch (err) {
     console.error('[Panel] Failed to post rules panel:', err.message);
   }

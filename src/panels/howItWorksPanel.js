@@ -79,7 +79,7 @@ function buildHowItWorksPanel(lang = 'en') {
   };
 }
 
-async function postHowItWorksPanel(client) {
+async function postHowItWorksPanel(client, lang = 'en') {
   const channelId = process.env.HOW_IT_WORKS_CHANNEL_ID;
   if (!channelId) {
     console.warn('[Panel] HOW_IT_WORKS_CHANNEL_ID not set — skipping');
@@ -94,7 +94,7 @@ async function postHowItWorksPanel(client) {
     const botMessages = messages.filter(m => m.author.id === client.user.id);
     for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
 
-    const panel = buildHowItWorksPanel();
+    const panel = buildHowItWorksPanel(lang);
 
     // Greedily pack embeds into messages so each stays under Discord's
     // 6000-char per-message limit.
@@ -102,7 +102,7 @@ async function postHowItWorksPanel(client) {
     for (const group of groups) {
       await channel.send({ embeds: group });
     }
-    console.log(`[Panel] Posted how it works panel (${groups.length} messages: ${groups.map(g => g.length).join('+')} embeds)`);
+    console.log(`[Panel] Posted how it works panel (${lang}, ${groups.length} messages)`);
   } catch (err) {
     console.error('[Panel] Failed to post how it works panel:', err.message);
   }

@@ -88,7 +88,7 @@ function buildWelcomePanel(lang = 'en') {
  *
  * On startup we wipe any old bot messages first so we don't accumulate.
  */
-async function postWelcomePanel(client) {
+async function postWelcomePanel(client, lang = 'en') {
   const channelId = process.env.WELCOME_CHANNEL_ID;
   if (!channelId) {
     console.warn('[Panel] WELCOME_CHANNEL_ID not set — skipping welcome panel');
@@ -112,12 +112,12 @@ async function postWelcomePanel(client) {
     }
 
     // Post language picker FIRST (it'll be at the top of the channel)
-    await channel.send(buildWelcomeLanguagePicker());
+    await channel.send(buildWelcomeLanguagePicker(lang));
 
     // Post welcome panel SECOND (it'll appear below the language picker)
-    await channel.send(buildWelcomePanel());
+    await channel.send(buildWelcomePanel(lang));
 
-    console.log('[Panel] Posted welcome panel + language picker');
+    console.log(`[Panel] Posted welcome panel + language picker (${lang})`);
   } catch (err) {
     console.error('[Panel] Failed to post welcome panel:', err.message);
   }

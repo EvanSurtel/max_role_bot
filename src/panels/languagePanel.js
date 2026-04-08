@@ -44,7 +44,7 @@ function buildLanguagePanel(lang = 'en') {
 /**
  * Post (or refresh) the dedicated language panel in LANGUAGE_CHANNEL_ID.
  */
-async function postLanguagePanel(client) {
+async function postLanguagePanel(client, lang = 'en') {
   const channelId = process.env.LANGUAGE_CHANNEL_ID;
   if (!channelId) {
     console.warn('[Panel] LANGUAGE_CHANNEL_ID not set — skipping language panel');
@@ -61,16 +61,16 @@ async function postLanguagePanel(client) {
     const messages = await channel.messages.fetch({ limit: 50 });
     const botMessages = messages.filter(m => m.author.id === client.user.id);
     const existingPanel = botMessages.find(m => m.embeds.length > 0);
-    const panel = buildLanguagePanel();
+    const panel = buildLanguagePanel(lang);
 
     if (existingPanel) {
       for (const [, m] of botMessages) { if (m.id !== existingPanel.id) try { await m.delete(); } catch { /* */ } }
       await existingPanel.edit(panel);
-      console.log('[Panel] Updated existing language panel');
+      console.log(`[Panel] Updated existing language panel (${lang})`);
     } else {
       for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
       await channel.send(panel);
-      console.log('[Panel] Posted new language panel');
+      console.log(`[Panel] Posted new language panel (${lang})`);
     }
   } catch (err) {
     console.error('[Panel] Failed to post language panel:', err.message);
