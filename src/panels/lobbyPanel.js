@@ -1,6 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { t } = require('../locales/i18n');
-const { buildLanguageRow } = require('../locales');
 
 /**
  * Build the main lobby panel — wager creation only.
@@ -24,7 +23,9 @@ function buildLobbyPanel(lang = 'en') {
       .setStyle(ButtonStyle.Danger),
   );
 
-  return { embeds: [embed], components: [row, buildLanguageRow('lobby')] };
+  // No language toggle here — the welcome panel and dedicated language
+  // channel are the only places to switch languages.
+  return { embeds: [embed], components: [row] };
 }
 
 /**

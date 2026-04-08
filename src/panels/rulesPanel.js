@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { getLocale, buildLanguageRow } = require('../locales');
+const { getLocale } = require('../locales');
 
 function buildRulesEmbeds(lang = 'en') {
   const t = getLocale('rules', lang);
@@ -67,9 +67,11 @@ function buildRulesEmbeds(lang = 'en') {
 }
 
 function buildRulesPanel(lang = 'en') {
+  // No language toggle here — the welcome panel and dedicated language
+  // channel are the only places to switch languages.
   return {
     embeds: buildRulesEmbeds(lang),
-    components: [buildLanguageRow('rules')],
+    components: [],
   };
 }
 
@@ -93,9 +95,8 @@ async function postRulesPanel(client) {
     if (panel.embeds.length <= 10) {
       await channel.send(panel);
     } else {
-      // Put language buttons on BOTH messages so users can switch from either
-      await channel.send({ embeds: panel.embeds.slice(0, 10), components: panel.components });
-      await channel.send({ embeds: panel.embeds.slice(10), components: panel.components });
+      await channel.send({ embeds: panel.embeds.slice(0, 10) });
+      await channel.send({ embeds: panel.embeds.slice(10) });
     }
     console.log('[Panel] Posted rules panel');
   } catch (err) {
