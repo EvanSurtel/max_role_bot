@@ -10,7 +10,7 @@ module.exports = {
       'You have a private **wallet channel** in this server. Only you can see it and use it.',
       '',
       'Your wallet holds two things:',
-      '• **USDC** — a crypto coin that represents the US dollar. 1 USDC = $1 USD. This is what you wager with. It doesn\'t go up or down in value — $10 USDC is always worth $10.',
+      '• **USDC** — a crypto coin that represents the US dollar. 1 USDC = $1 USD. This is what you wager with. It doesn\'t go up or down in value like Bitcoin — $10 USDC is always worth $10.',
       '• **SOL** — a tiny amount needed to process transactions, like a small service fee. ~$0.50 worth of SOL lasts about 100 wagers.',
       '',
       '**What is a wallet address?**',
