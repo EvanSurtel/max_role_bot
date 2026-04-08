@@ -308,6 +308,13 @@ async function startMatch(client, challengeId) {
   const { postTransaction } = require('../utils/transactionFeed');
   postTransaction({ type: 'match_started', challengeId, memo: `Match #${match.id} started | ${challenge.team_size}v${challenge.team_size} | ${challenge.game_modes} | Bo${challenge.series_length}${challenge.type === 'wager' ? ` | Pot: $${(Number(challenge.total_pot_usdc) / 1000000).toFixed(2)}` : ' | XP Match'}` });
 
+  // Start no-show reminder pings at 5min and 10min
+  const playerDiscordIds = allPlayers.map(p => {
+    const u = userRepo.findById(p.user_id);
+    return u?.discord_id;
+  }).filter(Boolean);
+  startNoShowReminders(client, match, playerDiscordIds);
+
   console.log(`[MatchService] Match #${match.id} started for challenge #${challengeId}`);
   return match;
 }
@@ -645,6 +652,72 @@ async function cleanupChannels(client, matchId) {
   }
 
   console.log(`[MatchService] Cleaned up channels for match #${matchId}`);
+}
+
+/**
+ * Check which players are NOT in any of the match voice channels.
+ */
+function getPlayersNotInVoice(client, match, playerDiscordIds) {
+  const voiceChannelIds = [match.team1_voice_id, match.team2_voice_id, match.shared_voice_id].filter(Boolean);
+  const inVoice = new Set();
+
+  for (const vcId of voiceChannelIds) {
+    const vc = client.channels.cache.get(vcId);
+    if (vc && vc.members) {
+      for (const [memberId] of vc.members) {
+        inVoice.add(memberId);
+      }
+    }
+  }
+
+  return playerDiscordIds.filter(id => !inVoice.has(id));
+}
+
+/**
+ * Start no-show reminder pings at 5min and 10min after match creation.
+ * Checks if players have joined any match voice channel.
+ */
+function startNoShowReminders(client, match, playerDiscordIds) {
+  const sharedChannelId = match.shared_text_id;
+  if (!sharedChannelId) return;
+
+  // 5 minute reminder
+  setTimeout(async () => {
+    try {
+      const currentMatch = matchRepo.findById(match.id);
+      if (!currentMatch || currentMatch.status !== MATCH_STATUS.ACTIVE) return;
+
+      const notInVoice = getPlayersNotInVoice(client, currentMatch, playerDiscordIds);
+      if (notInVoice.length === 0) return;
+
+      const ch = client.channels.cache.get(sharedChannelId);
+      if (ch) {
+        const pings = notInVoice.map(id => `<@${id}>`).join(' ');
+        await ch.send({ content: `${pings}\n\n**You must join your team's voice channel or the shared voice channel within 10 minutes or you will be forfeited.** Time remaining: **10 minutes**.` });
+      }
+    } catch (err) {
+      console.error(`[MatchService] No-show reminder (5min) failed:`, err.message);
+    }
+  }, 5 * 60 * 1000);
+
+  // 10 minute reminder
+  setTimeout(async () => {
+    try {
+      const currentMatch = matchRepo.findById(match.id);
+      if (!currentMatch || currentMatch.status !== MATCH_STATUS.ACTIVE) return;
+
+      const notInVoice = getPlayersNotInVoice(client, currentMatch, playerDiscordIds);
+      if (notInVoice.length === 0) return;
+
+      const ch = client.channels.cache.get(sharedChannelId);
+      if (ch) {
+        const pings = notInVoice.map(id => `<@${id}>`).join(' ');
+        await ch.send({ content: `${pings}\n\n**FINAL WARNING — You have 5 minutes to join a voice channel or you will be forfeited.** Time remaining: **5 minutes**.` });
+      }
+    } catch (err) {
+      console.error(`[MatchService] No-show reminder (10min) failed:`, err.message);
+    }
+  }, 10 * 60 * 1000);
 }
 
 module.exports = { createMatchChannels, startMatch, resolveMatch, cleanupChannels };
