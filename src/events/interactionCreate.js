@@ -9,6 +9,7 @@ const walletPanel = require('../panels/walletPanel');
 const leaderboardPanel = require('../panels/leaderboardPanel');
 const seasonPanel = require('../panels/seasonPanel');
 const escrowPanel = require('../panels/escrowPanel');
+const languageSwitch = require('../interactions/languageSwitch');
 
 module.exports = {
   name: 'interactionCreate',
@@ -89,6 +90,10 @@ module.exports = {
         // Season management buttons
         if (id.startsWith('season_')) {
           return await seasonPanel.handleSeasonButton(interaction);
+        }
+        // Language switch buttons (rules/howItWorks panels)
+        if (id.startsWith('lang_')) {
+          return await languageSwitch.handleButton(interaction);
         }
         // Leaderboard admin buttons
         if (id.startsWith('lb_admin_')) {
