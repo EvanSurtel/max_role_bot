@@ -14,19 +14,52 @@ const seasonPanel = require('../panels/seasonPanel');
 const escrowPanel = require('../panels/escrowPanel');
 const { isWalletChannel, AUTO_DELETE_MS } = require('../utils/ephemeralReply');
 
+// Per-user "current live ephemeral" tracking. When the user triggers a
+// new ephemeral reply (Create Wager, View My Wallet, language picker,
+// etc.), we delete their previous one so the user only ever sees ONE
+// bot ephemeral at a time. interaction.update() doesn't open a new
+// ephemeral so it just refreshes the tracked interaction.
+//
+// We track the interaction object rather than message IDs because
+// discord.js's interaction.deleteReply() handles all the webhook /
+// token plumbing automatically. Discord interaction tokens are valid
+// for 15 minutes; after that deleteReply() throws and we silently
+// ignore it (the ephemeral has likely already been dismissed or
+// expired client-side anyway).
+//
+// We do NOT auto-replace inside the WALLET ephemeral context — i.e.
+// when the user clicks Copy Address / Withdraw / History / Refresh
+// inside their wallet view, those are sub-actions on the SAME
+// ephemeral and shouldn't kill it.
+const userLastEphemeral = new Map(); // discordUserId → interaction
+
+async function _deletePreviousEphemeral(userId) {
+  const prev = userLastEphemeral.get(userId);
+  if (!prev) return;
+  userLastEphemeral.delete(userId);
+  try {
+    await prev.deleteReply();
+  } catch {
+    // interaction expired or already deleted — ignore
+  }
+}
+
 /**
- * Monkey-patch interaction.reply / deferReply / followUp so any ephemeral
- * message they produce auto-deletes after 5 minutes.
+ * Monkey-patch interaction.reply / deferReply / followUp / update so:
  *
- * Exemptions from auto-delete:
- *  - Callers that set `_persist: true` in their options object. This is
- *    used for "interface" ephemerals the user needs to keep interacting
- *    with (wallet view, language picker, rules display, howItWorks display).
- *    Error/warning ephemerals don't set this flag and auto-delete normally.
- *  - Legacy per-user wallet channels (will be migrated away in a follow-up).
+ * 1. Any new ephemeral REPLY auto-deletes the user's previous tracked
+ *    ephemeral first, so they only ever see one bot ephemeral at a time.
+ * 2. Non-persistent ephemerals still auto-delete after 5 minutes if the
+ *    user hasn't dismissed them.
+ * 3. interaction.update() refreshes the tracked interaction so deletes
+ *    of the "current ephemeral" continue to work after multi-step flows.
  *
- * The `_persist` flag is stripped from the options before they're passed
- * to Discord, since Discord doesn't know about it.
+ * Exemptions:
+ *  - `_persist: true` opts → no 5-min auto-delete (still replaceable)
+ *  - Legacy per-user wallet channels → no patching at all
+ *
+ * The `_persist` flag is stripped from the options before they're
+ * passed to Discord, since Discord doesn't know about it.
  */
 function installEphemeralAutoDelete(interaction) {
   if (isWalletChannel(interaction)) return; // Legacy: old per-user wallet channels
@@ -34,6 +67,9 @@ function installEphemeralAutoDelete(interaction) {
   const origReply = interaction.reply.bind(interaction);
   const origDeferReply = interaction.deferReply.bind(interaction);
   const origFollowUp = interaction.followUp.bind(interaction);
+  const origUpdate = interaction.update ? interaction.update.bind(interaction) : null;
+  const origDeferUpdate = interaction.deferUpdate ? interaction.deferUpdate.bind(interaction) : null;
+  const userId = interaction.user?.id;
 
   function splitPersist(opts) {
     if (!opts || typeof opts !== 'object') return { clean: opts, persist: false };
@@ -43,8 +79,18 @@ function installEphemeralAutoDelete(interaction) {
 
   interaction.reply = async function patchedReply(opts) {
     const { clean, persist } = splitPersist(opts);
-    const result = await origReply(clean);
     const isEphemeral = clean && (clean.ephemeral || (clean.flags && (clean.flags & 64)));
+
+    // Replace previous ephemeral so only ONE bot ephemeral is visible at a time
+    if (isEphemeral && userId) {
+      await _deletePreviousEphemeral(userId);
+    }
+
+    const result = await origReply(clean);
+
+    if (isEphemeral && userId) {
+      userLastEphemeral.set(userId, interaction);
+    }
     if (isEphemeral && !persist) {
       setTimeout(() => interaction.deleteReply().catch(() => {}), AUTO_DELETE_MS);
     }
@@ -53,8 +99,17 @@ function installEphemeralAutoDelete(interaction) {
 
   interaction.deferReply = async function patchedDeferReply(opts) {
     const { clean, persist } = splitPersist(opts);
-    const result = await origDeferReply(clean);
     const isEphemeral = clean && (clean.ephemeral || (clean.flags && (clean.flags & 64)));
+
+    if (isEphemeral && userId) {
+      await _deletePreviousEphemeral(userId);
+    }
+
+    const result = await origDeferReply(clean);
+
+    if (isEphemeral && userId) {
+      userLastEphemeral.set(userId, interaction);
+    }
     if (isEphemeral && !persist) {
       setTimeout(() => interaction.deleteReply().catch(() => {}), AUTO_DELETE_MS);
     }
@@ -65,11 +120,37 @@ function installEphemeralAutoDelete(interaction) {
     const { clean, persist } = splitPersist(opts);
     const msg = await origFollowUp(clean);
     const isEphemeral = clean && (clean.ephemeral || (clean.flags && (clean.flags & 64)));
+    // Followups don't replace the original (they're additional ephemerals
+    // tied to the same interaction). They still auto-delete normally.
     if (isEphemeral && !persist && msg && typeof msg.delete === 'function') {
       setTimeout(() => msg.delete().catch(() => {}), AUTO_DELETE_MS);
     }
     return msg;
   };
+
+  // interaction.update() — used by component interactions to update the
+  // existing ephemeral they were triggered from. The new interaction
+  // becomes the owner of the message, so we re-track it.
+  if (origUpdate) {
+    interaction.update = async function patchedUpdate(opts) {
+      const { clean } = splitPersist(opts);
+      const result = await origUpdate(clean);
+      if (userId) {
+        userLastEphemeral.set(userId, interaction);
+      }
+      return result;
+    };
+  }
+
+  if (origDeferUpdate) {
+    interaction.deferUpdate = async function patchedDeferUpdate(opts) {
+      const result = await origDeferUpdate(opts);
+      if (userId) {
+        userLastEphemeral.set(userId, interaction);
+      }
+      return result;
+    };
+  }
 }
 
 module.exports = {
