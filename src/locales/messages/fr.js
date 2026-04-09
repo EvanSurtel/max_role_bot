@@ -149,12 +149,9 @@ module.exports = {
 
   lobby: {
     title: 'Rank $ — Lobby de Paris',
-    description: 'Pariez de l\'**USDC** sur des matchs Call of Duty Mobile.\n\nCliquez sur **Créer un Pari** pour défier d\'autres joueurs.\n\nCliquez sur **Règles**, **Comment ça marche** ou **Langue** ci-dessous pour les voir dans votre propre langue.',
+    description: 'Pariez de l\'**USDC** sur des matchs Call of Duty Mobile.\n\nCliquez sur **Créer un Pari** pour défier d\'autres joueurs.',
     btn_create_wager: 'Créer un Pari',
     btn_create_dispute: 'Créer un Litige',
-    btn_rules: 'Règles',
-    btn_howitworks: 'Comment ça marche',
-    btn_language: 'Langue',
     footer: 'Propulsé par Solana',
   },
 

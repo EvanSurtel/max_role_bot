@@ -149,12 +149,9 @@ module.exports = {
 
   lobby: {
     title: 'Rank $ — 投注大厅',
-    description: '在 Call of Duty Mobile 比赛上投注 **USDC**。\n\n点击**创建投注**挑战其他玩家。\n\n点击下方的**规则**、**使用方法**或**语言**，即可用你自己的语言查看。',
+    description: '在 Call of Duty Mobile 比赛上投注 **USDC**。\n\n点击**创建投注**挑战其他玩家。',
     btn_create_wager: '创建投注',
     btn_create_dispute: '发起申诉',
-    btn_rules: '规则',
-    btn_howitworks: '使用方法',
-    btn_language: '语言',
     footer: 'Powered by Solana',
   },
 

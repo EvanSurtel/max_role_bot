@@ -149,12 +149,9 @@ module.exports = {
 
   lobby: {
     title: 'Rank $ — Lobby de Apuestas',
-    description: 'Apuesta **USDC** en partidas de Call of Duty Mobile.\n\nHaz clic en **Crear Apuesta** para retar a otros jugadores.\n\nHaz clic en **Reglas**, **Cómo Funciona** o **Idioma** abajo para verlos en tu propio idioma.',
+    description: 'Apuesta **USDC** en partidas de Call of Duty Mobile.\n\nHaz clic en **Crear Apuesta** para retar a otros jugadores.',
     btn_create_wager: 'Crear Apuesta',
     btn_create_dispute: 'Crear Disputa',
-    btn_rules: 'Reglas',
-    btn_howitworks: 'Cómo Funciona',
-    btn_language: 'Idioma',
     footer: 'Funciona con Solana',
   },
 

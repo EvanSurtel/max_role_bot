@@ -149,12 +149,9 @@ module.exports = {
 
   lobby: {
     title: 'Rank $ — 베팅 로비',
-    description: 'Call of Duty Mobile 매치에 **USDC**를 베팅하세요.\n\n**베팅 만들기**를 클릭해 다른 플레이어에게 도전하세요.\n\n아래의 **규칙**, **사용법**, **언어**를 클릭하면 자신의 언어로 볼 수 있어요.',
+    description: 'Call of Duty Mobile 매치에 **USDC**를 베팅하세요.\n\n**베팅 만들기**를 클릭해 다른 플레이어에게 도전하세요.',
     btn_create_wager: '베팅 만들기',
     btn_create_dispute: '분쟁 신청',
-    btn_rules: '규칙',
-    btn_howitworks: '사용법',
-    btn_language: '언어',
     footer: 'Powered by Solana',
   },
 

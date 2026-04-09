@@ -149,12 +149,9 @@ module.exports = {
 
   lobby: {
     title: 'Rank $ — لوبي الرهانات',
-    description: 'راهن بـ **USDC** على مباريات Call of Duty Mobile.\n\nاضغط **إنشاء رهان** لتحدي لاعبين آخرين.\n\nاضغط **القواعد** أو **كيف يعمل** أو **اللغة** بالأسفل لرؤيتها بلغتك.',
+    description: 'راهن بـ **USDC** على مباريات Call of Duty Mobile.\n\nاضغط **إنشاء رهان** لتحدي لاعبين آخرين.',
     btn_create_wager: 'إنشاء رهان',
     btn_create_dispute: 'فتح نزاع',
-    btn_rules: 'القواعد',
-    btn_howitworks: 'كيف يعمل',
-    btn_language: 'اللغة',
     footer: 'مدعوم من Solana',
   },
 

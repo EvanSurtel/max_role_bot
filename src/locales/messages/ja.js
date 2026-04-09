@@ -149,12 +149,9 @@ module.exports = {
 
   lobby: {
     title: 'Rank $ — ベットロビー',
-    description: 'Call of Duty Mobile のマッチに **USDC** をベット。\n\n**ベット作成**をクリックして他のプレイヤーにチャレンジ。\n\n下の**ルール**、**使い方**、**言語**をクリックすると自分の言語で表示されます。',
+    description: 'Call of Duty Mobile のマッチに **USDC** をベット。\n\n**ベット作成**をクリックして他のプレイヤーにチャレンジ。',
     btn_create_wager: 'ベット作成',
     btn_create_dispute: '異議申立',
-    btn_rules: 'ルール',
-    btn_howitworks: '使い方',
-    btn_language: '言語',
     footer: 'Powered by Solana',
   },
 

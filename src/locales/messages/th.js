@@ -149,12 +149,9 @@ module.exports = {
 
   lobby: {
     title: 'Rank $ — Wager Lobby',
-    description: 'Wager **USDC** บนแมตช์ Call of Duty Mobile\n\nคลิก **Create Wager** เพื่อท้าทายผู้เล่นคนอื่น\n\nคลิก **กฎ**, **วิธีใช้งาน** หรือ **ภาษา** ด้านล่างเพื่อดูในภาษาของคุณ',
+    description: 'Wager **USDC** บนแมตช์ Call of Duty Mobile\n\nคลิก **Create Wager** เพื่อท้าทายผู้เล่นคนอื่น',
     btn_create_wager: 'สร้าง Wager',
     btn_create_dispute: 'สร้าง Dispute',
-    btn_rules: 'กฎ',
-    btn_howitworks: 'วิธีใช้งาน',
-    btn_language: 'ภาษา',
     footer: 'Powered by Solana',
   },
 
