@@ -1,5 +1,6 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder } = require('discord.js');
 const { getLocale } = require('../locales');
+const { buildLanguageButton } = require('../utils/languageButtonHelper');
 
 function buildRulesEmbeds(lang = 'en') {
   const t = getLocale('rules', lang);
@@ -91,12 +92,15 @@ async function postRulesPanel(client, lang = 'en') {
     for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
 
     const panel = buildRulesPanel(lang);
+    // Language button on the LAST message so users always find it here too
+    const langRow = new ActionRowBuilder().addComponents(buildLanguageButton(lang));
+
     // Discord max 10 embeds per message — split if needed
     if (panel.embeds.length <= 10) {
-      await channel.send(panel);
+      await channel.send({ embeds: panel.embeds, components: [langRow] });
     } else {
       await channel.send({ embeds: panel.embeds.slice(0, 10) });
-      await channel.send({ embeds: panel.embeds.slice(10) });
+      await channel.send({ embeds: panel.embeds.slice(10), components: [langRow] });
     }
     console.log(`[Panel] Posted rules panel (${lang})`);
   } catch (err) {

@@ -51,7 +51,7 @@ client.once('ready', async () => {
 
     // Start deposit detection polling
     const depositService = require('./services/depositService');
-    depositService.startPolling();
+    depositService.startPolling(client);
 
     // Start periodic balance reconciliation
     const reconciliationService = require('./services/reconciliationService');
@@ -73,6 +73,16 @@ client.once('ready', async () => {
     const { getBotDisplayLanguage } = require('./utils/languageRefresh');
     const displayLang = getBotDisplayLanguage();
     console.log(`[Boot] Bot display language: ${displayLang}`);
+
+    // One-time migration: delete legacy per-user wallet channels. This is
+    // idempotent — it only does work if any old wallet_channel_id rows
+    // still exist. Wallet DB data is preserved; only the channels go away.
+    try {
+      const { migratePerUserWalletChannels } = require('./services/walletChannelMigration');
+      await migratePerUserWalletChannels(client);
+    } catch (err) {
+      console.error('[Boot] Wallet channel migration error:', err.message);
+    }
 
     // Post panels in their channels
     const { postWelcomePanel } = require('./panels/welcomePanel');

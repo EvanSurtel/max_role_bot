@@ -1,5 +1,6 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder } = require('discord.js');
 const { getLocale } = require('../locales');
+const { buildLanguageButton } = require('../utils/languageButtonHelper');
 
 // How It Works has 6 embeds totaling ~8000 characters in English and up to
 // ~9500 in some languages (French, German, Dutch, Filipino). Discord caps a
@@ -97,10 +98,16 @@ async function postHowItWorksPanel(client, lang = 'en') {
     const panel = buildHowItWorksPanel(lang);
 
     // Greedily pack embeds into messages so each stays under Discord's
-    // 6000-char per-message limit.
+    // 6000-char per-message limit. Add a Language button to the LAST
+    // message so users always have a way to switch from this channel too.
     const groups = _packEmbeds(panel.embeds);
-    for (const group of groups) {
-      await channel.send({ embeds: group });
+    const langRow = new ActionRowBuilder().addComponents(buildLanguageButton(lang));
+    for (let i = 0; i < groups.length; i++) {
+      const isLast = i === groups.length - 1;
+      await channel.send({
+        embeds: groups[i],
+        components: isLast ? [langRow] : [],
+      });
     }
     console.log(`[Panel] Posted how it works panel (${lang}, ${groups.length} messages)`);
   } catch (err) {

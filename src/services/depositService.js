@@ -2,13 +2,16 @@ const walletRepo = require('../database/repositories/walletRepo');
 const transactionRepo = require('../database/repositories/transactionRepo');
 const walletManager = require('../solana/walletManager');
 const { USDC_PER_UNIT, TRANSACTION_TYPE, TIMERS } = require('../config/constants');
+const { t } = require('../locales/i18n');
 
 let pollInterval = null;
+let botClient = null;
 
 /**
  * Start the deposit detection polling loop.
  */
-function startPolling() {
+function startPolling(client = null) {
+  if (client) botClient = client;
   if (pollInterval) {
     console.warn('[Deposits] Polling already running');
     return;
@@ -100,6 +103,27 @@ async function checkDeposits() {
         `[Deposits] Detected deposit of $${depositUsdc} USDC (${depositAmount.toString()} units) ` +
         `for user ${wallet.user_id} at ${wallet.solana_address}`
       );
+
+      // DM the user so they know their deposit landed. Silent failure if
+      // they have DMs from server members disabled — they'll see the
+      // updated balance next time they click View My Wallet.
+      if (botClient && userRecord?.discord_id) {
+        try {
+          const discordUser = await botClient.users.fetch(userRecord.discord_id);
+          const lang = userRecord.language || 'en';
+          await discordUser.send({
+            content: t('deposit_dm.received', lang, {
+              amount: depositUsdc,
+              new_balance: (Number(newAvailable) / USDC_PER_UNIT).toFixed(2),
+            }),
+          });
+        } catch (dmErr) {
+          // User probably has DMs disabled — not an error, just log it
+          console.log(
+            `[Deposits] Could not DM user ${userRecord.discord_id} about deposit (DMs likely disabled): ${dmErr.message}`
+          );
+        }
+      }
     } catch (err) {
       console.error(
         `[Deposits] Error checking wallet ${wallet.solana_address} (user ${wallet.user_id}):`,

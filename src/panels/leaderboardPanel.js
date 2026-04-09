@@ -2,6 +2,7 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelect
 const userRepo = require('../database/repositories/userRepo');
 const { USDC_PER_UNIT } = require('../config/constants');
 const { t, langFor } = require('../locales/i18n');
+const { buildLanguageButton } = require('../utils/languageButtonHelper');
 
 const REGIONS = ['global', 'na', 'latam', 'eu', 'asia'];
 // English fallback labels — used in code paths that need to identify a region
@@ -122,6 +123,7 @@ async function buildXpPanel(region = 'global', view = 'season', seasonOverride =
   const row3 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('lb_admin_adjust_xp').setLabel(t('leaderboard_panel.btn_adjust_xp', lang)).setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('lb_admin_adjust_wl').setLabel(t('leaderboard_panel.btn_adjust_wl', lang)).setStyle(ButtonStyle.Danger),
+    buildLanguageButton(lang),
   );
 
   return { embeds: [embed], components: [row1, row2, row3] };
@@ -162,6 +164,7 @@ async function buildEarningsPanel(region = 'global', lang = 'en') {
   const row1 = new ActionRowBuilder().addComponents(regionMenu);
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('lb_admin_adjust_earnings').setLabel(t('leaderboard_panel.btn_adjust_earnings', lang)).setStyle(ButtonStyle.Danger),
+    buildLanguageButton(lang),
   );
 
   return { embeds: [embed], components: [row1, row2] };

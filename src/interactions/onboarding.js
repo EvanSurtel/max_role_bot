@@ -240,24 +240,14 @@ async function handleRegistrationModal(interaction) {
       }
     }
 
-    // Create permanent wallet channel — only user and admins can see (not staff)
-    const walletChannelName = `wallet-${displayName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-    const walletCategoryId = process.env.WALLET_CATEGORY_ID || null;
-    const walletChannel = await channelService.createPrivateChannel(
-      guild,
-      walletChannelName,
-      [discordId],
-      walletCategoryId,
-      { adminOnly: true, readOnly: true },
-    );
-
-    db.prepare('UPDATE users SET wallet_channel_id = ? WHERE id = ?').run(walletChannel.id, user.id);
-
-    // Send wallet panel in the wallet channel (in user's language if set)
-    const freshUser = userRepo.findById(user.id);
-    await sendWalletPanel(walletChannel, wallet, freshUser);
+    // NO per-user wallet channel anymore. The public #wallet channel serves
+    // all users — they click "View My Wallet" there to see their balance and
+    // manage their funds as an ephemeral in their own language.
 
     // Send registration complete embed in the user's language
+    const walletChannelMention = process.env.WALLET_CHANNEL_ID
+      ? `<#${process.env.WALLET_CHANNEL_ID}>`
+      : '**#wallet**';
     const completeEmbed = new EmbedBuilder()
       .setTitle(t('onboarding.complete_title', lang))
       .setColor(0x2ecc71)
@@ -272,7 +262,7 @@ async function handleRegistrationModal(interaction) {
         `**${t('onboarding.complete_field_region', lang)}:** ${serverInput}`,
         '',
         `**${t('onboarding.complete_wallet_header', lang)}**`,
-        t('onboarding.complete_wallet_text', lang, { channel: `<#${walletChannel.id}>` }),
+        t('onboarding.complete_wallet_text', lang, { channel: walletChannelMention }),
         '',
         `**${t('onboarding.complete_started_header', lang)}**`,
         `1. ${t('onboarding.complete_started_1', lang)}`,

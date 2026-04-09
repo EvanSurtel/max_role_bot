@@ -1,5 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { t } = require('../locales/i18n');
+const { buildLanguageButton } = require('../utils/languageButtonHelper');
 
 /**
  * Build the XP match panel.
@@ -16,10 +17,9 @@ function buildXpMatchPanel(lang = 'en') {
       .setCustomId('wager_type_xp')
       .setLabel(t('xp_panel.btn_create_xp', lang))
       .setStyle(ButtonStyle.Primary),
+    buildLanguageButton(lang),
   );
 
-  // No language toggle here — the welcome panel and dedicated language
-  // channel are the only places to switch languages.
   return { embeds: [embed], components: [row] };
 }
 

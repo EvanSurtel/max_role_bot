@@ -73,6 +73,13 @@ module.exports = {
     btn_view_wallet: 'View My Wallet',
   },
 
+  // Direct messages from the bot to a user (currently only used for deposit
+  // notifications — bots can DM users who share a server with them, as long
+  // as the user has DMs from server members enabled).
+  deposit_dm: {
+    received: '💰 **Deposit received!**\n\nYou received **${amount} USDC**. Your new available balance is **${new_balance} USDC**.\n\nClick **View My Wallet** in the wallet channel to see the details.',
+  },
+
   // User-friendly transaction type labels (replaces escrow_in / disbursement / etc)
   tx_type: {
     deposit: 'Deposit',

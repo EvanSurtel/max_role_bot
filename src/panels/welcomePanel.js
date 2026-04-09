@@ -1,6 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const { t } = require('../locales/i18n');
 const { SUPPORTED_LANGUAGES } = require('../locales');
+const { buildLanguageButton } = require('../utils/languageButtonHelper');
 
 /**
  * Build the standalone language picker for the welcome channel.
@@ -71,6 +72,7 @@ function buildWelcomePanel(lang = 'en') {
       .setCustomId('tos_decline')
       .setLabel(t('onboarding.btn_decline', lang))
       .setStyle(ButtonStyle.Danger),
+    buildLanguageButton(lang),
   );
 
   return {
