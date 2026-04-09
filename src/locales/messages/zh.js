@@ -226,6 +226,32 @@ module.exports = {
     type_xp_match: 'XP 比赛',
     visibility_anonymous: '匿名',
     visibility_named: '显示名字',
+    per_player: '每位玩家',
+    challenger: '挑战者',
+    created_by_user: '由用户 #{id} 创建',
+    btn_accept_challenge: '接受挑战',
+    btn_cancel_challenge: '取消',
+  },
+
+  // Per-message language switcher (challenges + results)
+  per_message_lang: {
+    btn_label: '使用我的语言查看',
+    not_found: '此项目不再可用。',
+  },
+
+  // Match result embed (posted to results channels)
+  match_result_embed: {
+    title: '{type} #{matchId} — 结果',
+    winners: '获胜者',
+    losers: '失败者',
+    title_pot: '**队伍 {team} 获胜!奖池: {amount} USDC**',
+    title_no_pot: '**队伍 {team} 获胜!**',
+    field_mode: '模式',
+    field_series: '系列',
+    field_team_size: '队伍人数',
+    field_entry: '入场费',
+    series_format: 'Best of {n}',
+    entry_per_player: '每位玩家 {amount}',
   },
 
   challenge_accept: {

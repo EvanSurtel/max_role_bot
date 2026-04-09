@@ -227,6 +227,32 @@ module.exports = {
     type_xp_match: 'XP Maçı',
     visibility_anonymous: 'Anonim',
     visibility_named: 'İsimli',
+    per_player: 'oyuncu başına',
+    challenger: 'Meydan Okuyan',
+    created_by_user: 'Kullanıcı #{id} tarafından oluşturuldu',
+    btn_accept_challenge: 'Meydan Okumayı Kabul Et',
+    btn_cancel_challenge: 'İptal',
+  },
+
+  // Mesaj başına dil değiştirici (meydan okumalar + sonuçlar)
+  per_message_lang: {
+    btn_label: 'Kendi Dilimde Görüntüle',
+    not_found: 'Bu öğe artık mevcut değil.',
+  },
+
+  // Maç sonucu embed\'i (sonuç kanallarına gönderilir)
+  match_result_embed: {
+    title: '{type} #{matchId} — Sonuç',
+    winners: 'Kazananlar',
+    losers: 'Kaybedenler',
+    title_pot: '**Takım {team} kazandı! Pot: {amount} USDC**',
+    title_no_pot: '**Takım {team} kazandı!**',
+    field_mode: 'Mod',
+    field_series: 'Seri',
+    field_team_size: 'Takım Boyutu',
+    field_entry: 'Giriş',
+    series_format: 'Best of {n}',
+    entry_per_player: 'Oyuncu başına {amount}',
   },
 
   challenge_accept: {

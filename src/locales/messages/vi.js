@@ -226,6 +226,32 @@ module.exports = {
     type_xp_match: 'Trận XP',
     visibility_anonymous: 'Anonymous',
     visibility_named: 'Có Tên',
+    per_player: 'mỗi người chơi',
+    challenger: 'Người Thách Đấu',
+    created_by_user: 'Tạo bởi người dùng #{id}',
+    btn_accept_challenge: 'Chấp Nhận Challenge',
+    btn_cancel_challenge: 'Hủy',
+  },
+
+  // Per-message language switcher (challenges + results)
+  per_message_lang: {
+    btn_label: 'Xem Bằng Ngôn Ngữ Của Tôi',
+    not_found: 'Mục này không còn khả dụng.',
+  },
+
+  // Match result embed (posted to results channels)
+  match_result_embed: {
+    title: '{type} #{matchId} — Kết Quả',
+    winners: 'Người Thắng',
+    losers: 'Người Thua',
+    title_pot: '**Đội {team} thắng! Pot: {amount} USDC**',
+    title_no_pot: '**Đội {team} thắng!**',
+    field_mode: 'Mode',
+    field_series: 'Series',
+    field_team_size: 'Kích Thước Đội',
+    field_entry: 'Entry',
+    series_format: 'Best of {n}',
+    entry_per_player: '{amount} mỗi người',
   },
 
   challenge_accept: {

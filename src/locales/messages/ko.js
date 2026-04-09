@@ -226,6 +226,32 @@ module.exports = {
     type_xp_match: 'XP 매치',
     visibility_anonymous: '익명',
     visibility_named: '이름 표시',
+    per_player: '플레이어당',
+    challenger: '도전자',
+    created_by_user: '사용자 #{id}이(가) 생성',
+    btn_accept_challenge: '챌린지 수락',
+    btn_cancel_challenge: '취소',
+  },
+
+  // 메시지별 언어 전환기 (챌린지 + 결과)
+  per_message_lang: {
+    btn_label: '내 언어로 보기',
+    not_found: '이 항목은 더 이상 사용할 수 없어요.',
+  },
+
+  // 매치 결과 임베드 (결과 채널에 게시)
+  match_result_embed: {
+    title: '{type} #{matchId} — 결과',
+    winners: '승자',
+    losers: '패자',
+    title_pot: '**팀 {team} 승리! 상금: {amount} USDC**',
+    title_no_pot: '**팀 {team} 승리!**',
+    field_mode: '모드',
+    field_series: '시리즈',
+    field_team_size: '팀 크기',
+    field_entry: '참가비',
+    series_format: 'Best of {n}',
+    entry_per_player: '플레이어당 {amount}',
   },
 
   challenge_accept: {

@@ -226,6 +226,32 @@ module.exports = {
     type_xp_match: 'XP-Match',
     visibility_anonymous: 'Anonym',
     visibility_named: 'Mit Namen',
+    per_player: 'pro Spieler',
+    challenger: 'Herausforderer',
+    created_by_user: 'Erstellt von Benutzer #{id}',
+    btn_accept_challenge: 'Wette Annehmen',
+    btn_cancel_challenge: 'Abbrechen',
+  },
+
+  // Nachrichtenweise Sprachumschalter (Herausforderungen + Ergebnisse)
+  per_message_lang: {
+    btn_label: 'In Meiner Sprache Anzeigen',
+    not_found: 'Dieser Eintrag ist nicht mehr verfügbar.',
+  },
+
+  // Match-Ergebnis-Embed (in Ergebniskanälen gepostet)
+  match_result_embed: {
+    title: '{type} #{matchId} — Ergebnis',
+    winners: 'Gewinner',
+    losers: 'Verlierer',
+    title_pot: '**Team {team} gewinnt! Pot: {amount} USDC**',
+    title_no_pot: '**Team {team} gewinnt!**',
+    field_mode: 'Modus',
+    field_series: 'Serie',
+    field_team_size: 'Teamgröße',
+    field_entry: 'Einsatz',
+    series_format: 'Best of {n}',
+    entry_per_player: '{amount} pro Spieler',
   },
 
   challenge_accept: {

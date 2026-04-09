@@ -226,6 +226,32 @@ module.exports = {
     type_xp_match: 'XP Match',
     visibility_anonymous: 'Anonymous',
     visibility_named: 'Named',
+    per_player: 'kada player',
+    challenger: 'Challenger',
+    created_by_user: 'Ginawa ng user #{id}',
+    btn_accept_challenge: 'Tatanggapin ang Challenge',
+    btn_cancel_challenge: 'Kanselahin',
+  },
+
+  // Per-message language switcher (challenges + results)
+  per_message_lang: {
+    btn_label: 'Titingnan sa Aking Wika',
+    not_found: 'Hindi na available ang item na ito.',
+  },
+
+  // Match result embed (posted to results channels)
+  match_result_embed: {
+    title: '{type} #{matchId} — Resulta',
+    winners: 'Mga Nanalo',
+    losers: 'Mga Natalo',
+    title_pot: '**Nanalo ang Team {team}! Pot: {amount} USDC**',
+    title_no_pot: '**Nanalo ang Team {team}!**',
+    field_mode: 'Mode',
+    field_series: 'Series',
+    field_team_size: 'Team Size',
+    field_entry: 'Entry',
+    series_format: 'Best of {n}',
+    entry_per_player: '{amount} kada player',
   },
 
   challenge_accept: {

@@ -227,6 +227,32 @@ module.exports = {
     type_xp_match: 'Match XP',
     visibility_anonymous: 'Anonimo',
     visibility_named: 'Con Nome',
+    per_player: 'per giocatore',
+    challenger: 'Sfidante',
+    created_by_user: 'Creato dall\'utente #{id}',
+    btn_accept_challenge: 'Accetta Sfida',
+    btn_cancel_challenge: 'Annulla',
+  },
+
+  // Selettore lingua per messaggio (sfide + risultati)
+  per_message_lang: {
+    btn_label: 'Visualizza nella Mia Lingua',
+    not_found: 'Questo elemento non è più disponibile.',
+  },
+
+  // Embed del risultato del match (pubblicato nei canali dei risultati)
+  match_result_embed: {
+    title: '{type} #{matchId} — Risultato',
+    winners: 'Vincitori',
+    losers: 'Perdenti',
+    title_pot: '**Squadra {team} vince! Montepremi: {amount} USDC**',
+    title_no_pot: '**Squadra {team} vince!**',
+    field_mode: 'Modalità',
+    field_series: 'Serie',
+    field_team_size: 'Dimensione Squadra',
+    field_entry: 'Iscrizione',
+    series_format: 'Best of {n}',
+    entry_per_player: '{amount} per giocatore',
   },
 
   challenge_accept: {

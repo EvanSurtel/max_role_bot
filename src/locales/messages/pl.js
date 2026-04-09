@@ -227,6 +227,32 @@ module.exports = {
     type_xp_match: 'Mecz XP',
     visibility_anonymous: 'Anonimowo',
     visibility_named: 'Z Imionami',
+    per_player: 'na gracza',
+    challenger: 'Wyzywający',
+    created_by_user: 'Stworzone przez użytkownika #{id}',
+    btn_accept_challenge: 'Przyjmij Wyzwanie',
+    btn_cancel_challenge: 'Anuluj',
+  },
+
+  // Per-message language switcher (challenges + results)
+  per_message_lang: {
+    btn_label: 'Wyświetl w Moim Języku',
+    not_found: 'Ta pozycja nie jest już dostępna.',
+  },
+
+  // Match result embed (posted to results channels)
+  match_result_embed: {
+    title: '{type} #{matchId} — Wynik',
+    winners: 'Zwycięzcy',
+    losers: 'Przegrani',
+    title_pot: '**Drużyna {team} wygrywa! Pula: {amount} USDC**',
+    title_no_pot: '**Drużyna {team} wygrywa!**',
+    field_mode: 'Tryb',
+    field_series: 'Seria',
+    field_team_size: 'Rozmiar Drużyny',
+    field_entry: 'Wpisowe',
+    series_format: 'Best of {n}',
+    entry_per_player: '{amount} na gracza',
   },
 
   challenge_accept: {

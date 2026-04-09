@@ -226,6 +226,32 @@ module.exports = {
     type_xp_match: 'XP Match',
     visibility_anonymous: 'Anonymous',
     visibility_named: 'มีชื่อ',
+    per_player: 'ต่อผู้เล่น',
+    challenger: 'ผู้ท้าทาย',
+    created_by_user: 'สร้างโดยผู้ใช้ #{id}',
+    btn_accept_challenge: 'รับ Challenge',
+    btn_cancel_challenge: 'ยกเลิก',
+  },
+
+  // Per-message language switcher (challenges + results)
+  per_message_lang: {
+    btn_label: 'ดูในภาษาของฉัน',
+    not_found: 'รายการนี้ไม่สามารถใช้งานได้แล้ว',
+  },
+
+  // Match result embed (posted to results channels)
+  match_result_embed: {
+    title: '{type} #{matchId} — ผลลัพธ์',
+    winners: 'ผู้ชนะ',
+    losers: 'ผู้แพ้',
+    title_pot: '**ทีม {team} ชนะ! Pot: {amount} USDC**',
+    title_no_pot: '**ทีม {team} ชนะ!**',
+    field_mode: 'Mode',
+    field_series: 'Series',
+    field_team_size: 'ขนาดทีม',
+    field_entry: 'Entry',
+    series_format: 'Best of {n}',
+    entry_per_player: '{amount} ต่อผู้เล่น',
   },
 
   challenge_accept: {

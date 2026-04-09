@@ -227,6 +227,32 @@ module.exports = {
     type_xp_match: 'XP Матч',
     visibility_anonymous: 'Анонимно',
     visibility_named: 'С Именами',
+    per_player: 'на игрока',
+    challenger: 'Челленджер',
+    created_by_user: 'Создано пользователем #{id}',
+    btn_accept_challenge: 'Принять Челлендж',
+    btn_cancel_challenge: 'Отмена',
+  },
+
+  // Переключатель языка на сообщение (челленджи + результаты)
+  per_message_lang: {
+    btn_label: 'Показать На Моём Языке',
+    not_found: 'Этот элемент больше недоступен.',
+  },
+
+  // Эмбед результата матча (публикуется в каналах результатов)
+  match_result_embed: {
+    title: '{type} #{matchId} — Результат',
+    winners: 'Победители',
+    losers: 'Проигравшие',
+    title_pot: '**Команда {team} побеждает! Банк: {amount} USDC**',
+    title_no_pot: '**Команда {team} побеждает!**',
+    field_mode: 'Режим',
+    field_series: 'Серия',
+    field_team_size: 'Размер Команды',
+    field_entry: 'Вход',
+    series_format: 'Best of {n}',
+    entry_per_player: '{amount} на игрока',
   },
 
   challenge_accept: {

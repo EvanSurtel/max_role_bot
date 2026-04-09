@@ -226,6 +226,32 @@ module.exports = {
     type_xp_match: 'Partida XP',
     visibility_anonymous: 'Anônimo',
     visibility_named: 'Com Nome',
+    per_player: 'por jogador',
+    challenger: 'Desafiante',
+    created_by_user: 'Criado pelo usuário #{id}',
+    btn_accept_challenge: 'Aceitar Desafio',
+    btn_cancel_challenge: 'Cancelar',
+  },
+
+  // Seletor de idioma por mensagem (desafios + resultados)
+  per_message_lang: {
+    btn_label: 'Ver no Meu Idioma',
+    not_found: 'Este item não está mais disponível.',
+  },
+
+  // Embed de resultado da partida (postado nos canais de resultados)
+  match_result_embed: {
+    title: '{type} #{matchId} — Resultado',
+    winners: 'Vencedores',
+    losers: 'Perdedores',
+    title_pot: '**Time {team} venceu! Bolada: {amount} USDC**',
+    title_no_pot: '**Time {team} venceu!**',
+    field_mode: 'Modo',
+    field_series: 'Série',
+    field_team_size: 'Tamanho do Time',
+    field_entry: 'Entrada',
+    series_format: 'Best of {n}',
+    entry_per_player: '{amount} por jogador',
   },
 
   challenge_accept: {

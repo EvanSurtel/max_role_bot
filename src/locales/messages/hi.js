@@ -226,6 +226,32 @@ module.exports = {
     type_xp_match: 'XP Match',
     visibility_anonymous: 'Anonymous',
     visibility_named: 'Named',
+    per_player: 'प्रति player',
+    challenger: 'Challenger',
+    created_by_user: 'User #{id} द्वारा बनाया गया',
+    btn_accept_challenge: 'Challenge Accept करो',
+    btn_cancel_challenge: 'Cancel',
+  },
+
+  // Per-message language switcher (challenges + results)
+  per_message_lang: {
+    btn_label: 'मेरी Language में देखो',
+    not_found: 'यह item अब available नहीं है।',
+  },
+
+  // Match result embed (posted to results channels)
+  match_result_embed: {
+    title: '{type} #{matchId} — Result',
+    winners: 'Winners',
+    losers: 'Losers',
+    title_pot: '**Team {team} जीत गई! Pot: {amount} USDC**',
+    title_no_pot: '**Team {team} जीत गई!**',
+    field_mode: 'Mode',
+    field_series: 'Series',
+    field_team_size: 'Team Size',
+    field_entry: 'Entry',
+    series_format: 'Best of {n}',
+    entry_per_player: '{amount} प्रति player',
   },
 
   challenge_accept: {

@@ -226,6 +226,32 @@ module.exports = {
     type_xp_match: 'XP Match',
     visibility_anonymous: 'Anonymous',
     visibility_named: 'Bernama',
+    per_player: 'per pemain',
+    challenger: 'Challenger',
+    created_by_user: 'Dibuat oleh user #{id}',
+    btn_accept_challenge: 'Accept Challenge',
+    btn_cancel_challenge: 'Batal',
+  },
+
+  // Per-message language switcher (challenges + results)
+  per_message_lang: {
+    btn_label: 'Lihat dalam Bahasa Saya',
+    not_found: 'Item ini sudah tidak tersedia.',
+  },
+
+  // Match result embed (posted to results channels)
+  match_result_embed: {
+    title: '{type} #{matchId} — Hasil',
+    winners: 'Pemenang',
+    losers: 'Yang Kalah',
+    title_pot: '**Tim {team} menang! Pot: {amount} USDC**',
+    title_no_pot: '**Tim {team} menang!**',
+    field_mode: 'Mode',
+    field_series: 'Series',
+    field_team_size: 'Ukuran Tim',
+    field_entry: 'Entry',
+    series_format: 'Best of {n}',
+    entry_per_player: '{amount} per pemain',
   },
 
   challenge_accept: {

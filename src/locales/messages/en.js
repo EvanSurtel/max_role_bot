@@ -276,21 +276,6 @@ module.exports = {
     not_found: 'This item is no longer available.',
   },
 
-  // Match result embed (posted to results channels)
-  match_result_embed: {
-    title: '{type} #{matchId} — Result',
-    winners: 'Winners',
-    losers: 'Losers',
-    title_pot: '**Team {team} wins! Pot: {amount} USDC**',
-    title_no_pot: '**Team {team} wins!**',
-    field_mode: 'Mode',
-    field_series: 'Series',
-    field_team_size: 'Team Size',
-    field_entry: 'Entry',
-    series_format: 'Best of {n}',
-    entry_per_player: '{amount} per player',
-  },
-
   challenge_accept: {
     confirm_title: 'Confirm Accept',
     confirm_about_to_accept: 'You are about to accept **{type} #{num}**',

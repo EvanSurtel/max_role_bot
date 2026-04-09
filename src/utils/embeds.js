@@ -211,8 +211,8 @@ function matchResultEmbed(match, challenge, winningPlayers, losingPlayers, userR
   }
 
   const titleLine = isWagerMatch
-    ? t('match_result_embed.title_pot', lang, { team: winningTeam, amount: formatUsdc(totalPot).replace('$', '') })
-    : t('match_result_embed.title_no_pot', lang, { team: winningTeam });
+    ? t('match_result_embed.title_winner_pot', lang, { team: winningTeam, amount: (totalPot / USDC_PER_UNIT).toFixed(2) })
+    : t('match_result_embed.title_winner', lang, { team: winningTeam });
 
   const embed = new EmbedBuilder()
     .setTitle(t('match_result_embed.title', lang, { type: matchTypeLabel, matchId: match.id }))
@@ -220,15 +220,15 @@ function matchResultEmbed(match, challenge, winningPlayers, losingPlayers, userR
     .setDescription([
       titleLine,
       '',
-      `**${t('match_result_embed.winners', lang)}**`,
+      t('match_result_embed.winners_header', lang),
       ...winnerLines,
       '',
-      `**${t('match_result_embed.losers', lang)}**`,
+      t('match_result_embed.losers_header', lang),
       ...loserLines,
     ].join('\n'))
     .addFields(
       { name: t('match_result_embed.field_mode', lang), value: modeLabel, inline: true },
-      { name: t('match_result_embed.field_series', lang), value: t('match_result_embed.series_format', lang, { n: challenge.series_length }), inline: true },
+      { name: t('match_result_embed.field_series', lang), value: t('challenge_create.series_label', lang, { n: challenge.series_length }), inline: true },
       { name: t('match_result_embed.field_team_size', lang), value: `${challenge.team_size}v${challenge.team_size}`, inline: true },
     )
     .setTimestamp();
@@ -236,7 +236,7 @@ function matchResultEmbed(match, challenge, winningPlayers, losingPlayers, userR
   if (isWagerMatch) {
     embed.addFields({
       name: t('match_result_embed.field_entry', lang),
-      value: t('match_result_embed.entry_per_player', lang, { amount: formatUsdc(entryAmount) }),
+      value: t('match_result_embed.entry_per_player_short', lang, { amount: (entryAmount / USDC_PER_UNIT).toFixed(2) }),
       inline: true,
     });
   }

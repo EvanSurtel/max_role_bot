@@ -226,6 +226,32 @@ module.exports = {
     type_xp_match: 'XPマッチ',
     visibility_anonymous: '匿名',
     visibility_named: '名前あり',
+    per_player: 'プレイヤーごと',
+    challenger: 'チャレンジャー',
+    created_by_user: 'ユーザー #{id} が作成',
+    btn_accept_challenge: 'チャレンジを受ける',
+    btn_cancel_challenge: 'キャンセル',
+  },
+
+  // メッセージごとの言語切替（チャレンジ + 結果）
+  per_message_lang: {
+    btn_label: '自分の言語で表示',
+    not_found: 'このアイテムはもう利用できません。',
+  },
+
+  // マッチ結果の埋め込み（結果チャンネルに投稿）
+  match_result_embed: {
+    title: '{type} #{matchId} — 結果',
+    winners: '勝者',
+    losers: '敗者',
+    title_pot: '**チーム {team} の勝利！ポット：{amount} USDC**',
+    title_no_pot: '**チーム {team} の勝利！**',
+    field_mode: 'モード',
+    field_series: 'シリーズ',
+    field_team_size: 'チームサイズ',
+    field_entry: 'エントリー',
+    series_format: 'Best of {n}',
+    entry_per_player: 'プレイヤーごとに {amount}',
   },
 
   challenge_accept: {
