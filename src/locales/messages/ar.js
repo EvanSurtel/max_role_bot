@@ -231,6 +231,13 @@ module.exports = {
     created_by_user: 'أنشأه المستخدم #{id}',
     btn_accept_challenge: 'قبول التحدي',
     btn_cancel_challenge: 'إلغاء',
+    teammates_review_title: '**الزملاء المختارون ({current}/{required}):**',
+    teammates_need_more: 'اختر **{n}** زميل/زملاء إضافيين للمتابعة.',
+    teammates_already_full: 'لديك بالفعل كل الزملاء الذين تحتاجهم.',
+    add_more_teammates_prompt: 'اختر **{n}** زميل/زملاء إضافيين.',
+    need_exact_teammates: 'تحتاج إلى **{n}** زميل/زملاء بالضبط قبل المتابعة.',
+    btn_add_more_teammates: '+ إضافة المزيد',
+    btn_continue: 'متابعة',
   },
 
   // مبدّل اللغة لكل رسالة (التحديات + النتائج)

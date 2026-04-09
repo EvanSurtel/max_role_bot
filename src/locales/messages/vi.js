@@ -231,6 +231,13 @@ module.exports = {
     created_by_user: 'Tạo bởi người dùng #{id}',
     btn_accept_challenge: 'Chấp Nhận Challenge',
     btn_cancel_challenge: 'Hủy',
+    teammates_review_title: '**Đồng đội đã chọn ({current}/{required}):**',
+    teammates_need_more: 'Chọn thêm **{n}** đồng đội để tiếp tục.',
+    teammates_already_full: 'Bạn đã có đủ tất cả đồng đội cần thiết.',
+    add_more_teammates_prompt: 'Chọn thêm **{n}** đồng đội.',
+    need_exact_teammates: 'Bạn cần chính xác **{n}** đồng đội trước khi tiếp tục.',
+    btn_add_more_teammates: '+ Thêm',
+    btn_continue: 'Tiếp Tục',
   },
 
   // Per-message language switcher (challenges + results)

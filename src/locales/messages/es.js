@@ -231,6 +231,13 @@ module.exports = {
     created_by_user: 'Creado por usuario #{id}',
     btn_accept_challenge: 'Aceptar Reto',
     btn_cancel_challenge: 'Cancelar',
+    teammates_review_title: '**Compañeros seleccionados ({current}/{required}):**',
+    teammates_need_more: 'Elige **{n}** compañero(s) más para continuar.',
+    teammates_already_full: 'Ya tienes todos los compañeros que necesitas.',
+    add_more_teammates_prompt: 'Elige **{n}** compañero(s) más.',
+    need_exact_teammates: 'Necesitas exactamente **{n}** compañero(s) antes de continuar.',
+    btn_add_more_teammates: '+ Añadir Más',
+    btn_continue: 'Continuar',
   },
 
   // Selector de idioma por mensaje (retos + resultados)

@@ -231,6 +231,13 @@ module.exports = {
     created_by_user: '사용자 #{id}이(가) 생성',
     btn_accept_challenge: '챌린지 수락',
     btn_cancel_challenge: '취소',
+    teammates_review_title: '**선택된 팀원 ({current}/{required}):**',
+    teammates_need_more: '계속하려면 **{n}**명의 팀원을 더 선택하세요.',
+    teammates_already_full: '필요한 팀원을 모두 선택했습니다.',
+    add_more_teammates_prompt: '**{n}**명의 팀원을 더 선택하세요.',
+    need_exact_teammates: '계속하기 전에 정확히 **{n}**명의 팀원이 필요합니다.',
+    btn_add_more_teammates: '+ 더 추가',
+    btn_continue: '계속',
   },
 
   // 메시지별 언어 전환기 (챌린지 + 결과)

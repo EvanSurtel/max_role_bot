@@ -232,6 +232,13 @@ module.exports = {
     created_by_user: 'Creato dall\'utente #{id}',
     btn_accept_challenge: 'Accetta Sfida',
     btn_cancel_challenge: 'Annulla',
+    teammates_review_title: '**Compagni di squadra selezionati ({current}/{required}):**',
+    teammates_need_more: 'Scegli altri **{n}** compagno/i per continuare.',
+    teammates_already_full: 'Hai già tutti i compagni di squadra di cui hai bisogno.',
+    add_more_teammates_prompt: 'Scegli altri **{n}** compagno/i.',
+    need_exact_teammates: 'Ti servono esattamente **{n}** compagno/i prima di continuare.',
+    btn_add_more_teammates: '+ Aggiungi',
+    btn_continue: 'Continua',
   },
 
   // Selettore lingua per messaggio (sfide + risultati)

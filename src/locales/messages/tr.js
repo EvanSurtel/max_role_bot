@@ -232,6 +232,13 @@ module.exports = {
     created_by_user: 'Kullanıcı #{id} tarafından oluşturuldu',
     btn_accept_challenge: 'Meydan Okumayı Kabul Et',
     btn_cancel_challenge: 'İptal',
+    teammates_review_title: '**Seçilen takım arkadaşları ({current}/{required}):**',
+    teammates_need_more: 'Devam etmek için **{n}** takım arkadaşı daha seç.',
+    teammates_already_full: 'İhtiyacın olan tüm takım arkadaşlarına zaten sahipsin.',
+    add_more_teammates_prompt: '**{n}** takım arkadaşı daha seç.',
+    need_exact_teammates: 'Devam etmeden önce tam olarak **{n}** takım arkadaşına ihtiyacın var.',
+    btn_add_more_teammates: '+ Daha Ekle',
+    btn_continue: 'Devam Et',
   },
 
   // Mesaj başına dil değiştirici (meydan okumalar + sonuçlar)

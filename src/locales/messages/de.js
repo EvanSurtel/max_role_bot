@@ -231,6 +231,13 @@ module.exports = {
     created_by_user: 'Erstellt von Benutzer #{id}',
     btn_accept_challenge: 'Wette Annehmen',
     btn_cancel_challenge: 'Abbrechen',
+    teammates_review_title: '**Ausgewählte Teamkollegen ({current}/{required}):**',
+    teammates_need_more: 'Wähl **{n}** weitere(n) Teamkollege(n), um fortzufahren.',
+    teammates_already_full: 'Du hast bereits alle Teamkollegen, die du brauchst.',
+    add_more_teammates_prompt: 'Wähl **{n}** weitere(n) Teamkollege(n).',
+    need_exact_teammates: 'Du brauchst genau **{n}** Teamkollege(n), bevor du fortfahren kannst.',
+    btn_add_more_teammates: '+ Mehr Hinzufügen',
+    btn_continue: 'Weiter',
   },
 
   // Nachrichtenweise Sprachumschalter (Herausforderungen + Ergebnisse)

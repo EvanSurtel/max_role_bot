@@ -232,6 +232,13 @@ module.exports = {
     created_by_user: 'Создано пользователем #{id}',
     btn_accept_challenge: 'Принять Челлендж',
     btn_cancel_challenge: 'Отмена',
+    teammates_review_title: '**Выбранные тиммейты ({current}/{required}):**',
+    teammates_need_more: 'Выбери ещё **{n}** тиммейт(ов), чтобы продолжить.',
+    teammates_already_full: 'У тебя уже есть все нужные тиммейты.',
+    add_more_teammates_prompt: 'Выбери ещё **{n}** тиммейт(ов).',
+    need_exact_teammates: 'Тебе нужно ровно **{n}** тиммейт(ов), прежде чем продолжить.',
+    btn_add_more_teammates: '+ Добавить',
+    btn_continue: 'Продолжить',
   },
 
   // Переключатель языка на сообщение (челленджи + результаты)

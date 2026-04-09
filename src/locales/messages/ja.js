@@ -231,6 +231,13 @@ module.exports = {
     created_by_user: 'ユーザー #{id} が作成',
     btn_accept_challenge: 'チャレンジを受ける',
     btn_cancel_challenge: 'キャンセル',
+    teammates_review_title: '**選択したチームメイト ({current}/{required}):**',
+    teammates_need_more: '続けるには **{n}** 人のチームメイトを追加で選択してください。',
+    teammates_already_full: '必要なチームメイトはすでに全員揃っています。',
+    add_more_teammates_prompt: '**{n}** 人のチームメイトを追加で選択してください。',
+    need_exact_teammates: '続ける前に正確に **{n}** 人のチームメイトが必要です。',
+    btn_add_more_teammates: '+ 追加',
+    btn_continue: '続ける',
   },
 
   // メッセージごとの言語切替（チャレンジ + 結果）

@@ -231,6 +231,13 @@ module.exports = {
     created_by_user: 'Créé par l\'utilisateur #{id}',
     btn_accept_challenge: 'Accepter le Défi',
     btn_cancel_challenge: 'Annuler',
+    teammates_review_title: '**Coéquipiers sélectionnés ({current}/{required}) :**',
+    teammates_need_more: 'Choisissez **{n}** coéquipier(s) de plus pour continuer.',
+    teammates_already_full: 'Vous avez déjà tous les coéquipiers dont vous avez besoin.',
+    add_more_teammates_prompt: 'Choisissez **{n}** coéquipier(s) de plus.',
+    need_exact_teammates: 'Vous devez avoir exactement **{n}** coéquipier(s) avant de continuer.',
+    btn_add_more_teammates: '+ Ajouter',
+    btn_continue: 'Continuer',
   },
 
   // Sélecteur de langue par message (défis + résultats)

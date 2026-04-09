@@ -232,6 +232,13 @@ module.exports = {
     created_by_user: 'Aangemaakt door gebruiker #{id}',
     btn_accept_challenge: 'Uitdaging Accepteren',
     btn_cancel_challenge: 'Annuleren',
+    teammates_review_title: '**Geselecteerde teammates ({current}/{required}):**',
+    teammates_need_more: 'Kies **{n}** teammate(s) meer om door te gaan.',
+    teammates_already_full: 'Je hebt al alle teammates die je nodig hebt.',
+    add_more_teammates_prompt: 'Kies **{n}** teammate(s) meer.',
+    need_exact_teammates: 'Je hebt precies **{n}** teammate(s) nodig voordat je verder kunt.',
+    btn_add_more_teammates: '+ Toevoegen',
+    btn_continue: 'Doorgaan',
   },
 
   // Per-message language switcher (challenges + results)

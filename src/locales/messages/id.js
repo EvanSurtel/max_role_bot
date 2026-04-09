@@ -231,6 +231,13 @@ module.exports = {
     created_by_user: 'Dibuat oleh user #{id}',
     btn_accept_challenge: 'Accept Challenge',
     btn_cancel_challenge: 'Batal',
+    teammates_review_title: '**Teammate terpilih ({current}/{required}):**',
+    teammates_need_more: 'Pilih **{n}** teammate lagi untuk lanjut.',
+    teammates_already_full: 'Kamu sudah punya semua teammate yang dibutuhkan.',
+    add_more_teammates_prompt: 'Pilih **{n}** teammate lagi.',
+    need_exact_teammates: 'Kamu butuh tepat **{n}** teammate sebelum lanjut.',
+    btn_add_more_teammates: '+ Tambah Lagi',
+    btn_continue: 'Lanjut',
   },
 
   // Per-message language switcher (challenges + results)

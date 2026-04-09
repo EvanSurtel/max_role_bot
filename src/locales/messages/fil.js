@@ -231,6 +231,13 @@ module.exports = {
     created_by_user: 'Ginawa ng user #{id}',
     btn_accept_challenge: 'Tatanggapin ang Challenge',
     btn_cancel_challenge: 'Kanselahin',
+    teammates_review_title: '**Napiling teammates ({current}/{required}):**',
+    teammates_need_more: 'Pumili ng **{n}** pang teammate(s) para magpatuloy.',
+    teammates_already_full: 'Meron ka nang lahat ng teammates na kailangan mo.',
+    add_more_teammates_prompt: 'Pumili ng **{n}** pang teammate(s).',
+    need_exact_teammates: 'Kailangan mo ng eksaktong **{n}** teammate(s) bago magpatuloy.',
+    btn_add_more_teammates: '+ Magdagdag Pa',
+    btn_continue: 'Magpatuloy',
   },
 
   // Per-message language switcher (challenges + results)

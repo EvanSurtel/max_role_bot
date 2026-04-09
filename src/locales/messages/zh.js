@@ -231,6 +231,13 @@ module.exports = {
     created_by_user: '由用户 #{id} 创建',
     btn_accept_challenge: '接受挑战',
     btn_cancel_challenge: '取消',
+    teammates_review_title: '**已选择的队友 ({current}/{required}):**',
+    teammates_need_more: '再选择 **{n}** 名队友以继续。',
+    teammates_already_full: '你已经拥有所需的所有队友。',
+    add_more_teammates_prompt: '再选择 **{n}** 名队友。',
+    need_exact_teammates: '你需要恰好 **{n}** 名队友才能继续。',
+    btn_add_more_teammates: '+ 添加',
+    btn_continue: '继续',
   },
 
   // Per-message language switcher (challenges + results)

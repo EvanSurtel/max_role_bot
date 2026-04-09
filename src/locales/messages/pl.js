@@ -232,6 +232,13 @@ module.exports = {
     created_by_user: 'Stworzone przez użytkownika #{id}',
     btn_accept_challenge: 'Przyjmij Wyzwanie',
     btn_cancel_challenge: 'Anuluj',
+    teammates_review_title: '**Wybrani koledzy z drużyny ({current}/{required}):**',
+    teammates_need_more: 'Wybierz jeszcze **{n}** kolegę/kolegów, aby kontynuować.',
+    teammates_already_full: 'Masz już wszystkich potrzebnych kolegów z drużyny.',
+    add_more_teammates_prompt: 'Wybierz jeszcze **{n}** kolegę/kolegów.',
+    need_exact_teammates: 'Potrzebujesz dokładnie **{n}** kolegi/kolegów przed kontynuowaniem.',
+    btn_add_more_teammates: '+ Dodaj',
+    btn_continue: 'Kontynuuj',
   },
 
   // Per-message language switcher (challenges + results)

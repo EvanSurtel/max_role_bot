@@ -231,6 +231,13 @@ module.exports = {
     created_by_user: 'สร้างโดยผู้ใช้ #{id}',
     btn_accept_challenge: 'รับ Challenge',
     btn_cancel_challenge: 'ยกเลิก',
+    teammates_review_title: '**Teammates ที่เลือก ({current}/{required}):**',
+    teammates_need_more: 'เลือก teammate(s) เพิ่มอีก **{n}** คนเพื่อดำเนินการต่อ',
+    teammates_already_full: 'คุณมี teammates ครบทุกคนที่ต้องการแล้ว',
+    add_more_teammates_prompt: 'เลือก teammate(s) เพิ่มอีก **{n}** คน',
+    need_exact_teammates: 'คุณต้องมี teammate(s) ครบ **{n}** คนก่อนจะดำเนินการต่อ',
+    btn_add_more_teammates: '+ เพิ่ม',
+    btn_continue: 'ต่อไป',
   },
 
   // Per-message language switcher (challenges + results)
