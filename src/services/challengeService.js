@@ -170,6 +170,12 @@ async function postToBoard(client, challenge) {
     return;
   }
 
+  // The board is shared, so the embed itself is in the bot display
+  // language. Each user can click 🌐 to see this specific challenge
+  // re-rendered in their own language as a personal ephemeral.
+  const { getBotDisplayLanguage } = require('../utils/languageRefresh');
+  const displayLang = getBotDisplayLanguage();
+
   // Build the embed — include team player names if not anonymous
   let teamPlayers = null;
   if (!challenge.is_anonymous) {
@@ -179,18 +185,21 @@ async function postToBoard(client, challenge) {
       return u ? { discord_id: u.discord_id, cod_ign: u.cod_ign } : null;
     }).filter(Boolean);
   }
-  const embed = challengeEmbed(challenge, !!challenge.is_anonymous, teamPlayers);
+  const embed = challengeEmbed(challenge, !!challenge.is_anonymous, teamPlayers, displayLang);
 
-  // Build the accept + cancel buttons
+  // Build the accept + cancel + language buttons
+  const { buildChallengeLanguageButton } = require('../interactions/perMessageLanguage');
+  const { t } = require('../locales/i18n');
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`challenge_accept_${challenge.id}`)
-      .setLabel('Accept Challenge')
+      .setLabel(t('challenge_create.btn_accept_challenge', displayLang))
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`challenge_cancel_${challenge.id}`)
-      .setLabel('Cancel')
+      .setLabel(t('challenge_create.btn_cancel_challenge', displayLang))
       .setStyle(ButtonStyle.Danger),
+    buildChallengeLanguageButton(challenge.id, displayLang),
   );
 
   const message = await channel.send({

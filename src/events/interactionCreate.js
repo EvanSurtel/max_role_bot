@@ -6,6 +6,7 @@ const matchResult = require('../interactions/matchResult');
 const disputeCreate = require('../interactions/disputeCreate');
 const onboarding = require('../interactions/onboarding');
 const languageSwitcher = require('../interactions/languageSwitcher');
+const perMessageLanguage = require('../interactions/perMessageLanguage');
 const adminWalletViewer = require('../interactions/adminWalletViewer');
 const walletPanel = require('../panels/walletPanel');
 const leaderboardPanel = require('../panels/leaderboardPanel');
@@ -134,6 +135,13 @@ module.exports = {
         if (id === 'show_language_picker') {
           return await languageSwitcher.handleShowLanguagePicker(interaction);
         }
+        // Per-message language buttons (each individual challenge / result)
+        if (id.startsWith('pml_show_ch_')) {
+          return await perMessageLanguage.handleShowLangForChallenge(interaction);
+        }
+        if (id.startsWith('pml_show_res_')) {
+          return await perMessageLanguage.handleShowLangForResult(interaction);
+        }
         // Dispute match selection
         if (id.startsWith('dispute_select_')) {
           return await disputeCreate.handleDisputeSelect(interaction);
@@ -213,6 +221,13 @@ module.exports = {
         // Ephemeral language picker (from any panel's 🌐 Language button)
         if (id === 'lang_picker_select') {
           return await languageSwitcher.handleLanguagePickerSelect(interaction);
+        }
+        // Per-message language picks (challenge / result specific)
+        if (id.startsWith('pml_pick_ch_')) {
+          return await perMessageLanguage.handlePickLangForChallenge(interaction);
+        }
+        if (id.startsWith('pml_pick_res_')) {
+          return await perMessageLanguage.handlePickLangForResult(interaction);
         }
         console.warn(`[Interaction] Unhandled string select customId: ${id}`);
         return;

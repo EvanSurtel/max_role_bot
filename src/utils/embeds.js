@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const { GAME_MODES, CHALLENGE_TYPE, USDC_PER_UNIT } = require('../config/constants');
+const { t } = require('../locales/i18n');
 
 /**
  * Format a USDC smallest-unit amount as a human-readable dollar string.
@@ -14,19 +15,27 @@ function formatUsdc(amount) {
 
 /**
  * Build an embed for the public challenge board.
+ *
+ * @param {object} challenge
+ * @param {boolean} isAnonymous
+ * @param {object[]|null} teamPlayers
+ * @param {string} lang - language code (defaults to bot display language)
  */
-function challengeEmbed(challenge, isAnonymous, teamPlayers) {
+function challengeEmbed(challenge, isAnonymous, teamPlayers, lang = 'en') {
   const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
   const modeInfo = GAME_MODES[challenge.game_modes];
   const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
+  const typeLabel = isWager
+    ? t('challenge_create.type_wager', lang)
+    : t('challenge_create.type_xp_match', lang);
 
   const embed = new EmbedBuilder()
-    .setTitle(`${isWager ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id}`)
+    .setTitle(`${typeLabel} #${challenge.display_number || challenge.id}`)
     .setColor(isWager ? 0xf1c40f : 0x3498db)
     .addFields(
-      { name: 'Team Size', value: `${challenge.team_size}v${challenge.team_size}`, inline: true },
-      { name: 'Game Mode', value: modeLabel, inline: true },
-      { name: 'Series', value: `Best of ${challenge.series_length}`, inline: true },
+      { name: t('challenge_create.confirm_field_team_size', lang), value: `${challenge.team_size}v${challenge.team_size}`, inline: true },
+      { name: t('challenge_create.confirm_field_mode', lang), value: modeLabel, inline: true },
+      { name: t('challenge_create.confirm_field_series', lang), value: t('challenge_create.series_label', lang, { n: challenge.series_length }), inline: true },
     )
     .setTimestamp();
 
@@ -34,18 +43,18 @@ function challengeEmbed(challenge, isAnonymous, teamPlayers) {
     const entry = formatUsdc(challenge.entry_amount_usdc);
     const pot = formatUsdc(challenge.total_pot_usdc);
     embed.addFields(
-      { name: 'Entry', value: `${entry} USDC per player`, inline: true },
-      { name: 'Total Pot', value: `${pot} USDC`, inline: true },
+      { name: t('challenge_create.confirm_field_entry', lang), value: `${entry} USDC ${t('challenge_create.per_player', lang)}`, inline: true },
+      { name: t('challenge_create.confirm_field_pot', lang), value: `${pot} USDC`, inline: true },
     );
   }
 
   if (!isAnonymous && teamPlayers && teamPlayers.length > 0) {
     const playerList = teamPlayers.map(p => `<@${p.discord_id}>${p.cod_ign ? ` (${p.cod_ign})` : ''}`).join('\n');
-    embed.addFields({ name: 'Challenger', value: playerList });
+    embed.addFields({ name: t('challenge_create.challenger', lang), value: playerList });
   } else if (!isAnonymous) {
-    embed.setFooter({ text: `Created by user #${challenge.creator_user_id}` });
+    embed.setFooter({ text: t('challenge_create.created_by_user', lang, { id: challenge.creator_user_id }) });
   } else {
-    embed.setFooter({ text: 'Anonymous challenge' });
+    embed.setFooter({ text: t('challenge_create.visibility_anonymous', lang) });
   }
 
   return embed;
@@ -156,9 +165,89 @@ function voteEmbed(matchId) {
     .setFooter({ text: 'You have 2 hours from the first vote to submit yours.' });
 }
 
+/**
+ * Build a localized result embed for a finished match. Used both for
+ * the initial post to the results channels and for the per-message
+ * "View in My Language" ephemeral.
+ *
+ * @param {object} match - match DB row
+ * @param {object} challenge - challenge DB row
+ * @param {object[]} winningPlayers - challenge_player rows for the winning team
+ * @param {object[]} losingPlayers - challenge_player rows for the losing team
+ * @param {object} userRepo - userRepo module (passed to avoid circular requires)
+ * @param {number} winXp
+ * @param {number} loseXp
+ * @param {number} winningTeam - 1 or 2
+ * @param {string} lang - language code
+ */
+function matchResultEmbed(match, challenge, winningPlayers, losingPlayers, userRepo, winXp, loseXp, winningTeam, lang = 'en') {
+  const isWagerMatch = challenge.type === CHALLENGE_TYPE.WAGER;
+  const modeInfo = GAME_MODES[challenge.game_modes];
+  const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
+  const totalPot = Number(challenge.total_pot_usdc);
+  const entryAmount = Number(challenge.entry_amount_usdc);
+  const perPlayerPayout = totalPot > 0 && winningPlayers.length > 0 ? totalPot / winningPlayers.length : 0;
+  const perPlayerProfit = perPlayerPayout - entryAmount;
+  const matchTypeLabel = isWagerMatch
+    ? t('challenge_create.type_wager', lang)
+    : t('challenge_create.type_xp_match', lang);
+
+  const winnerLines = [];
+  for (const p of winningPlayers) {
+    const u = userRepo.findById(p.user_id);
+    if (!u) continue;
+    const ign = u.cod_ign ? `(${u.cod_ign})` : '';
+    const moneyText = isWagerMatch ? `**+${formatUsdc(perPlayerProfit)} USDC** ` : '';
+    winnerLines.push(`<@${u.discord_id}> ${ign} — ${moneyText}+${winXp} XP`);
+  }
+  const loserLines = [];
+  for (const p of losingPlayers) {
+    const u = userRepo.findById(p.user_id);
+    if (!u) continue;
+    const ign = u.cod_ign ? `(${u.cod_ign})` : '';
+    const moneyText = isWagerMatch ? `**-${formatUsdc(entryAmount)} USDC** ` : '';
+    const xpText = loseXp > 0 ? `-${loseXp} XP` : '';
+    loserLines.push(`<@${u.discord_id}> ${ign} — ${moneyText}${xpText}`);
+  }
+
+  const titleLine = isWagerMatch
+    ? t('match_result_embed.title_pot', lang, { team: winningTeam, amount: formatUsdc(totalPot).replace('$', '') })
+    : t('match_result_embed.title_no_pot', lang, { team: winningTeam });
+
+  const embed = new EmbedBuilder()
+    .setTitle(t('match_result_embed.title', lang, { type: matchTypeLabel, matchId: match.id }))
+    .setColor(isWagerMatch ? 0xf1c40f : 0x3498db)
+    .setDescription([
+      titleLine,
+      '',
+      `**${t('match_result_embed.winners', lang)}**`,
+      ...winnerLines,
+      '',
+      `**${t('match_result_embed.losers', lang)}**`,
+      ...loserLines,
+    ].join('\n'))
+    .addFields(
+      { name: t('match_result_embed.field_mode', lang), value: modeLabel, inline: true },
+      { name: t('match_result_embed.field_series', lang), value: t('match_result_embed.series_format', lang, { n: challenge.series_length }), inline: true },
+      { name: t('match_result_embed.field_team_size', lang), value: `${challenge.team_size}v${challenge.team_size}`, inline: true },
+    )
+    .setTimestamp();
+
+  if (isWagerMatch) {
+    embed.addFields({
+      name: t('match_result_embed.field_entry', lang),
+      value: t('match_result_embed.entry_per_player', lang, { amount: formatUsdc(entryAmount) }),
+      inline: true,
+    });
+  }
+
+  return embed;
+}
+
 module.exports = {
   formatUsdc,
   challengeEmbed,
+  matchResultEmbed,
   walletEmbed,
   onboardingEmbed,
   matchEmbed,

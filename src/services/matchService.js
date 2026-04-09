@@ -609,12 +609,22 @@ async function resolveMatch(client, matchId, winningTeam) {
     resultEmbed.addFields({ name: 'Entry', value: `${formatUsdc(entryAmount)} per player`, inline: true });
   }
 
+  // Attach a 🌐 Language button so any viewer can re-render this
+  // specific result in their own language as a personal ephemeral.
+  const { ActionRowBuilder } = require('discord.js');
+  const { buildResultLanguageButton } = require('../interactions/perMessageLanguage');
+  const { getBotDisplayLanguage } = require('../utils/languageRefresh');
+  const resultDisplayLang = getBotDisplayLanguage();
+  const langRow = new ActionRowBuilder().addComponents(
+    buildResultLanguageButton(matchId, resultDisplayLang),
+  );
+
   // Post to all-results channel (wagers + XP matches — shared with NeatQueue)
   const allResultsChannelId = process.env.RESULTS_CHANNEL_ID;
   if (allResultsChannelId) {
     try {
       const ch = client.channels.cache.get(allResultsChannelId);
-      if (ch) await ch.send({ embeds: [resultEmbed] });
+      if (ch) await ch.send({ embeds: [resultEmbed], components: [langRow] });
     } catch (err) {
       console.error(`[MatchService] Failed to post to all-results for match #${matchId}:`, err.message);
     }
@@ -626,7 +636,7 @@ async function resolveMatch(client, matchId, winningTeam) {
     if (wagerResultsChannelId) {
       try {
         const ch = client.channels.cache.get(wagerResultsChannelId);
-        if (ch) await ch.send({ embeds: [resultEmbed] });
+        if (ch) await ch.send({ embeds: [resultEmbed], components: [langRow] });
       } catch (err) {
         console.error(`[MatchService] Failed to post to wager-results for match #${matchId}:`, err.message);
       }

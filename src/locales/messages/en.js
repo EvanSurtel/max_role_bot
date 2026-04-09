@@ -263,6 +263,32 @@ module.exports = {
     type_xp_match: 'XP Match',
     visibility_anonymous: 'Anonymous',
     visibility_named: 'Named',
+    per_player: 'per player',
+    challenger: 'Challenger',
+    created_by_user: 'Created by user #{id}',
+    btn_accept_challenge: 'Accept Challenge',
+    btn_cancel_challenge: 'Cancel',
+  },
+
+  // Per-message language switcher (challenges + results)
+  per_message_lang: {
+    btn_label: 'View in My Language',
+    not_found: 'This item is no longer available.',
+  },
+
+  // Match result embed (posted to results channels)
+  match_result_embed: {
+    title: '{type} #{matchId} — Result',
+    winners: 'Winners',
+    losers: 'Losers',
+    title_pot: '**Team {team} wins! Pot: {amount} USDC**',
+    title_no_pot: '**Team {team} wins!**',
+    field_mode: 'Mode',
+    field_series: 'Series',
+    field_team_size: 'Team Size',
+    field_entry: 'Entry',
+    series_format: 'Best of {n}',
+    entry_per_player: '{amount} per player',
   },
 
   challenge_accept: {
