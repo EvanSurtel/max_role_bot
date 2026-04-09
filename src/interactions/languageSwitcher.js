@@ -57,8 +57,15 @@ async function handleShowLanguagePicker(interaction) {
 
 /**
  * Handle the language pick from the ephemeral dropdown. Saves the new
- * language to the user's DB row and updates the ephemeral message to show
- * a confirmation in the new language.
+ * language to the user's DB row and updates the ephemeral message to
+ * show a confirmation in the new language.
+ *
+ * If the user has NOT yet accepted TOS, we also send a follow-up
+ * ephemeral with the welcome/TOS content rendered in their new language
+ * — including the Accept/Decline buttons — so they can actually read
+ * what they're agreeing to before they accept. This works regardless
+ * of which channel they triggered the language switch from, but is
+ * the main UX path for the welcome channel.
  */
 async function handleLanguagePickerSelect(interaction) {
   const newLang = interaction.values[0];
@@ -79,6 +86,24 @@ async function handleLanguagePickerSelect(interaction) {
     embeds: [],
     components: [],
   });
+
+  // If the user hasn't accepted TOS yet, send the welcome/TOS panel as
+  // an ephemeral follow-up in their new language so they can read what
+  // they're about to accept. The Accept/Decline buttons are functional.
+  const freshUser = userRepo.findByDiscordId(discordId);
+  if (!freshUser || freshUser.accepted_tos !== 1) {
+    try {
+      const { buildWelcomePanel } = require('../panels/welcomePanel');
+      const welcomeView = buildWelcomePanel(newLang);
+      await interaction.followUp({
+        ...welcomeView,
+        ephemeral: true,
+        _persist: true,
+      });
+    } catch (err) {
+      console.error('[LanguageSwitcher] Failed to send welcome ephemeral:', err.message);
+    }
+  }
 }
 
 module.exports = {

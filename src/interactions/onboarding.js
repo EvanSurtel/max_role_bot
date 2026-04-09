@@ -399,47 +399,25 @@ async function handleWalletRefresh(interaction) {
  * language.
  */
 async function handleWelcomeLanguageMaster(interaction) {
-  const { SUPPORTED_LANGUAGES } = require('../locales');
-
-  const newLang = interaction.values[0];
-  if (!SUPPORTED_LANGUAGES[newLang]) {
-    return interaction.reply({ content: 'Unknown language.', ephemeral: true });
-  }
-
-  // Save the user's language preference, creating a user row if they don't have one yet
-  // (they may not have accepted TOS yet but they can still pick a language).
-  const discordId = interaction.user.id;
-  let user = userRepo.findByDiscordId(discordId);
-  if (!user) {
-    user = userRepo.create(discordId);
-  }
-  userRepo.setLanguage(discordId, newLang);
-
-  // Per-user language: do NOT modify the shared welcome language picker or
-  // the welcome/TOS panel below it — those are SHARED messages and editing
-  // them would force this user's language onto every other user in the
-  // channel. Just acknowledge the click ephemerally and refresh the user's
-  // private wallet channel in the background.
-  const langName = SUPPORTED_LANGUAGES[newLang].nativeName;
-  await interaction.reply({
-    content: t('onboarding.language_saved', newLang, { language: langName }),
-    ephemeral: true,
-  });
-
-  const { applyLanguageChange } = require('../utils/languageRefresh');
-  applyLanguageChange(interaction.client, discordId, newLang).catch(err => {
-    console.error('[Welcome] Background language refresh failed:', err.message);
-  });
+  return _handleAnyLanguageSelect(interaction, '[Welcome]');
 }
 
 /**
- * Handler for the dedicated language channel select menu. Same behaviour
- * as handleWelcomeLanguageMaster — saves the user's language preference
- * but does NOT modify the shared language picker (which is visible to
- * everyone). Per-user language only affects this user's private/personal
- * contexts (wallet, future button clicks, modals, error messages).
+ * Handler for the dedicated language channel select menu.
  */
 async function handleLanguagePanelSelect(interaction) {
+  return _handleAnyLanguageSelect(interaction, '[LanguagePanel]');
+}
+
+/**
+ * Shared logic for any language picker dropdown (welcome panel,
+ * dedicated language channel, ephemeral button picker). Saves the
+ * user's language to the DB, sends a confirmation, and — if the user
+ * has not yet accepted TOS — sends a follow-up ephemeral with the
+ * welcome/TOS panel rendered in the new language so they can read
+ * what they're agreeing to.
+ */
+async function _handleAnyLanguageSelect(interaction, logPrefix) {
   const { SUPPORTED_LANGUAGES } = require('../locales');
 
   const newLang = interaction.values[0];
@@ -447,6 +425,8 @@ async function handleLanguagePanelSelect(interaction) {
     return interaction.reply({ content: 'Unknown language.', ephemeral: true });
   }
 
+  // Save the user's language preference, creating a user row if they
+  // don't have one yet (they may not have accepted TOS yet).
   const discordId = interaction.user.id;
   let user = userRepo.findByDiscordId(discordId);
   if (!user) {
@@ -454,17 +434,32 @@ async function handleLanguagePanelSelect(interaction) {
   }
   userRepo.setLanguage(discordId, newLang);
 
-  // Acknowledge ephemerally — do NOT update the shared language panel,
-  // since that would change the visible state for every other user.
   const langName = SUPPORTED_LANGUAGES[newLang].nativeName;
   await interaction.reply({
     content: t('onboarding.language_saved', newLang, { language: langName }),
     ephemeral: true,
   });
 
+  // If user hasn't accepted TOS, send the welcome/TOS in their new
+  // language as an ephemeral follow-up so they can actually read it.
+  const freshUser = userRepo.findByDiscordId(discordId);
+  if (!freshUser || freshUser.accepted_tos !== 1) {
+    try {
+      const { buildWelcomePanel } = require('../panels/welcomePanel');
+      const welcomeView = buildWelcomePanel(newLang);
+      await interaction.followUp({
+        ...welcomeView,
+        ephemeral: true,
+        _persist: true,
+      });
+    } catch (err) {
+      console.error(`${logPrefix} Failed to send welcome ephemeral:`, err.message);
+    }
+  }
+
   const { applyLanguageChange } = require('../utils/languageRefresh');
   applyLanguageChange(interaction.client, discordId, newLang).catch(err => {
-    console.error('[LanguagePanel] Background language refresh failed:', err.message);
+    console.error(`${logPrefix} Background language refresh failed:`, err.message);
   });
 }
 
