@@ -31,7 +31,7 @@ function buildLobbyPanel(lang = 'en') {
 /**
  * Post (or refresh) the lobby panel in the configured wager channel.
  */
-async function postLobbyPanel(client) {
+async function postLobbyPanel(client, lang = 'en') {
   const channelId = process.env.WAGER_CHANNEL_ID;
   if (!channelId) {
     console.warn('[Panel] WAGER_CHANNEL_ID not set — skipping lobby panel');
@@ -48,16 +48,16 @@ async function postLobbyPanel(client) {
     const messages = await channel.messages.fetch({ limit: 50 });
     const botMessages = messages.filter(m => m.author.id === client.user.id);
     const existingPanel = botMessages.find(m => m.embeds.length > 0);
-    const panel = buildLobbyPanel();
+    const panel = buildLobbyPanel(lang);
 
     if (existingPanel) {
       for (const [, m] of botMessages) { if (m.id !== existingPanel.id) try { await m.delete(); } catch { /* */ } }
       await existingPanel.edit(panel);
-      console.log('[Panel] Updated existing lobby panel');
+      console.log(`[Panel] Updated existing lobby panel (${lang})`);
     } else {
       for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
       await channel.send(panel);
-      console.log('[Panel] Posted new lobby panel');
+      console.log(`[Panel] Posted new lobby panel (${lang})`);
     }
   } catch (err) {
     console.error('[Panel] Failed to post lobby panel:', err.message);

@@ -10,6 +10,7 @@ const {
 const { getCurrentSeason, setCurrentSeason } = require('./leaderboardPanel');
 const neatqueueService = require('../services/neatqueueService');
 const { logAdminAction } = require('../utils/adminAudit');
+const { t, langFor } = require('../locales/i18n');
 
 /**
  * Check if match creation is paused (stored in bot_settings).
@@ -49,53 +50,53 @@ function getActiveMatchCount() {
 /**
  * Build the season management panel for admin channel.
  */
-function buildSeasonPanel() {
+function buildSeasonPanel(lang = 'en') {
   const paused = isMatchesPaused();
   const activeMatches = getActiveMatchCount();
   const season = getCurrentSeason();
 
   const embed = new EmbedBuilder()
-    .setTitle('Season Management')
+    .setTitle(t('season_panel.title', lang))
     .setColor(paused ? 0xe74c3c : 0x2ecc71)
     .setDescription([
-      `**Current Season:** ${season}`,
-      `**Match Creation:** ${paused ? 'PAUSED' : 'Active'}`,
-      `**Active Matches:** ${activeMatches}`,
+      `**${t('season_panel.current_season', lang)}:** ${season}`,
+      `**${t('season_panel.match_creation', lang)}:** ${paused ? t('season_panel.status_paused', lang) : t('season_panel.status_active', lang)}`,
+      `**${t('season_panel.active_matches', lang)}:** ${activeMatches}`,
       '',
       paused
         ? activeMatches > 0
-          ? 'Waiting for active matches to finish before season can end.'
-          : 'All matches complete. Ready to end season and start a new one.'
-        : 'Matches are running normally. Pause match creation to prepare for a season transition.',
+          ? t('season_panel.waiting_for_matches', lang)
+          : t('season_panel.ready_to_end', lang)
+        : t('season_panel.running_normally', lang),
     ].join('\n'))
     .setTimestamp();
 
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('season_pause')
-      .setLabel(paused ? 'Matches Paused' : 'Pause Matches')
+      .setLabel(paused ? t('season_panel.btn_paused', lang) : t('season_panel.btn_pause', lang))
       .setStyle(paused ? ButtonStyle.Secondary : ButtonStyle.Danger)
       .setDisabled(paused),
     new ButtonBuilder()
       .setCustomId('season_resume')
-      .setLabel('Resume Matches')
+      .setLabel(t('season_panel.btn_resume', lang))
       .setStyle(ButtonStyle.Success)
       .setDisabled(!paused),
     new ButtonBuilder()
       .setCustomId('season_refresh')
-      .setLabel('Refresh')
+      .setLabel(t('season_panel.btn_refresh', lang))
       .setStyle(ButtonStyle.Primary),
   );
 
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('season_end')
-      .setLabel('End Season & Start New')
+      .setLabel(t('season_panel.btn_end_season', lang))
       .setStyle(ButtonStyle.Danger)
       .setDisabled(!paused || activeMatches > 0),
     new ButtonBuilder()
       .setCustomId('lb_admin_change_season')
-      .setLabel('Change Season Name')
+      .setLabel(t('season_panel.btn_change_name', lang))
       .setStyle(ButtonStyle.Secondary),
   );
 
@@ -103,9 +104,11 @@ function buildSeasonPanel() {
 }
 
 /**
- * Post the season panel in the admin alerts channel.
+ * Post the season panel in the admin alerts channel. Wipes any existing
+ * bot messages and reposts so the panel always reflects the requested
+ * language (title is translated, so we can't match the old one by title).
  */
-async function postSeasonPanel(client) {
+async function postSeasonPanel(client, lang = 'en') {
   const channelId = process.env.SEASON_CHANNEL_ID;
   if (!channelId) {
     console.warn('[Panel] SEASON_CHANNEL_ID not set — skipping season panel');
@@ -116,17 +119,15 @@ async function postSeasonPanel(client) {
   if (!channel) return;
 
   try {
-    const messages = await channel.messages.fetch({ limit: 10 });
-    const existing = messages.find(
-      m => m.author.id === client.user.id && m.embeds[0]?.title === 'Season Management',
-    );
-    const panel = buildSeasonPanel();
-    if (existing) {
-      await existing.edit(panel);
-    } else {
-      await channel.send(panel);
+    const messages = await channel.messages.fetch({ limit: 20 });
+    for (const [, m] of messages) {
+      if (m.author.id === client.user.id) {
+        try { await m.delete(); } catch { /* */ }
+      }
     }
-    console.log('[Panel] Posted season management panel');
+    const panel = buildSeasonPanel(lang);
+    await channel.send(panel);
+    console.log(`[Panel] Posted season management panel (${lang})`);
   } catch (err) {
     console.error('[Panel] Failed to post season panel:', err.message);
   }
@@ -137,15 +138,16 @@ async function postSeasonPanel(client) {
  */
 async function handleSeasonButton(interaction) {
   const id = interaction.customId;
+  const lang = langFor(interaction);
 
   // Check admin
   const adminRoleId = process.env.ADMIN_ROLE_ID;
   if (adminRoleId && !interaction.member.roles.cache.has(adminRoleId)) {
-    return interaction.reply({ content: 'Admin only.', ephemeral: true });
+    return interaction.reply({ content: t('season_panel.admin_only', lang), ephemeral: true });
   }
 
   if (id === 'season_refresh') {
-    const panel = buildSeasonPanel();
+    const panel = buildSeasonPanel(lang);
     return interaction.update(panel);
   }
 
@@ -163,11 +165,11 @@ async function handleSeasonButton(interaction) {
     }
 
     await interaction.reply({
-      content: '**Matches paused.** No new wagers, XP matches, or NeatQueue queues can be created. Existing matches will continue until finished.',
+      content: t('season_panel.pause_msg', lang),
       ephemeral: true,
     });
 
-    const panel = buildSeasonPanel();
+    const panel = buildSeasonPanel(lang);
     return interaction.message.edit(panel);
   }
 
@@ -185,11 +187,11 @@ async function handleSeasonButton(interaction) {
     }
 
     await interaction.reply({
-      content: '**Matches resumed.** Wagers, XP matches, and NeatQueue queues are active again.',
+      content: t('season_panel.resume_msg', lang),
       ephemeral: true,
     });
 
-    const panel = buildSeasonPanel();
+    const panel = buildSeasonPanel(lang);
     return interaction.message.edit(panel);
   }
 
@@ -197,7 +199,7 @@ async function handleSeasonButton(interaction) {
     const activeMatches = getActiveMatchCount();
     if (activeMatches > 0) {
       return interaction.reply({
-        content: `Cannot end season — ${activeMatches} match(es) still active. Wait for them to finish.`,
+        content: t('season_panel.cannot_end', lang, { n: activeMatches }),
         ephemeral: true,
       });
     }
@@ -205,14 +207,14 @@ async function handleSeasonButton(interaction) {
     // Show modal for new season name
     const modal = new ModalBuilder()
       .setCustomId('season_end_modal')
-      .setTitle('End Season & Start New');
+      .setTitle(t('season_panel.modal_title', lang));
 
     modal.addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('new_season_name')
-          .setLabel(`Ending: ${getCurrentSeason()}. New season name:`)
-          .setPlaceholder('e.g. 2026-S2')
+          .setLabel(t('season_panel.modal_label', lang, { old: getCurrentSeason() }))
+          .setPlaceholder(t('season_panel.modal_placeholder', lang))
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMinLength(1)
@@ -230,9 +232,10 @@ async function handleSeasonButton(interaction) {
 async function handleSeasonModal(interaction) {
   if (interaction.customId !== 'season_end_modal') return;
 
+  const lang = langFor(interaction);
   const adminRoleId = process.env.ADMIN_ROLE_ID;
   if (adminRoleId && !interaction.member.roles.cache.has(adminRoleId)) {
-    return interaction.reply({ content: 'Admin only.', ephemeral: true });
+    return interaction.reply({ content: t('season_panel.admin_only', lang), ephemeral: true });
   }
 
   const newSeason = interaction.fields.getTextInputValue('new_season_name').trim();
@@ -290,28 +293,30 @@ async function handleSeasonModal(interaction) {
 
     await interaction.editReply({
       content: [
-        `**Season transition complete!**`,
+        t('season_panel.season_ended_complete', lang),
         '',
-        `**${oldSeason}** has ended. All season data preserved in history.`,
-        `**${newSeason}** has started. All players reset to 500 XP, 0W-0L.`,
-        'NeatQueue stats reset and starting points applied.',
+        t('season_panel.season_ended_old', lang, { old: oldSeason }),
+        t('season_panel.season_ended_new', lang, { new: newSeason }),
+        t('season_panel.season_ended_neatqueue', lang),
         '',
-        'Match creation is now active. Good luck everyone!',
+        t('season_panel.season_ended_active', lang),
       ].join('\n'),
     });
 
-    // Update the season panel
-    const panel = buildSeasonPanel();
+    // Update the season panel — wipe + repost since the title is now translated
+    // and we can no longer match by title.
     try {
       const channelId = process.env.SEASON_CHANNEL_ID;
       if (channelId) {
         const channel = interaction.client.channels.cache.get(channelId);
         if (channel) {
-          const messages = await channel.messages.fetch({ limit: 10 });
-          const existing = messages.find(
-            m => m.author.id === interaction.client.user.id && m.embeds[0]?.title === 'Season Management',
-          );
-          if (existing) await existing.edit(panel);
+          const messages = await channel.messages.fetch({ limit: 20 });
+          for (const [, m] of messages) {
+            if (m.author.id === interaction.client.user.id) {
+              try { await m.delete(); } catch { /* */ }
+            }
+          }
+          await channel.send(buildSeasonPanel(lang));
         }
       }
     } catch { /* */ }
@@ -319,7 +324,7 @@ async function handleSeasonModal(interaction) {
     console.log(`[Season] Season ended: ${oldSeason} → ${newSeason}`);
   } catch (err) {
     console.error('[Season] Error ending season:', err);
-    await interaction.editReply({ content: 'Failed to end season. Check logs.' });
+    await interaction.editReply({ content: t('season_panel.failed_end', lang) });
   }
 }
 
@@ -376,4 +381,4 @@ async function resumeNeatQueue() {
   console.log('[NeatQueue] Queue resumed');
 }
 
-module.exports = { isMatchesPaused, postSeasonPanel, handleSeasonButton, handleSeasonModal };
+module.exports = { isMatchesPaused, buildSeasonPanel, postSeasonPanel, handleSeasonButton, handleSeasonModal };

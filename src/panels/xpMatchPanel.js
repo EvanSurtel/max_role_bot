@@ -26,7 +26,7 @@ function buildXpMatchPanel(lang = 'en') {
 /**
  * Post (or refresh) the XP match panel.
  */
-async function postXpMatchPanel(client) {
+async function postXpMatchPanel(client, lang = 'en') {
   const channelId = process.env.XP_MATCH_CHANNEL_ID;
   if (!channelId) {
     console.warn('[Panel] XP_MATCH_CHANNEL_ID not set — skipping XP match panel');
@@ -43,16 +43,16 @@ async function postXpMatchPanel(client) {
     const messages = await channel.messages.fetch({ limit: 50 });
     const botMessages = messages.filter(m => m.author.id === client.user.id);
     const existingPanel = botMessages.find(m => m.embeds.length > 0);
-    const panel = buildXpMatchPanel();
+    const panel = buildXpMatchPanel(lang);
 
     if (existingPanel) {
       for (const [, m] of botMessages) { if (m.id !== existingPanel.id) try { await m.delete(); } catch { /* */ } }
       await existingPanel.edit(panel);
-      console.log('[Panel] Updated existing XP match panel');
+      console.log(`[Panel] Updated existing XP match panel (${lang})`);
     } else {
       for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
       await channel.send(panel);
-      console.log('[Panel] Posted new XP match panel');
+      console.log(`[Panel] Posted new XP match panel (${lang})`);
     }
   } catch (err) {
     console.error('[Panel] Failed to post XP match panel:', err.message);

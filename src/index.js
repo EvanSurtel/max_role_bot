@@ -68,33 +68,39 @@ client.once('ready', async () => {
       });
     }, 24 * 60 * 60 * 1000);
 
+    // Load the bot's last-set display language so all shared panels post
+    // in that language on startup. Defaults to 'en' if never changed.
+    const { getBotDisplayLanguage } = require('./utils/languageRefresh');
+    const displayLang = getBotDisplayLanguage();
+    console.log(`[Boot] Bot display language: ${displayLang}`);
+
     // Post panels in their channels
     const { postWelcomePanel } = require('./panels/welcomePanel');
-    await postWelcomePanel(client);
+    await postWelcomePanel(client, displayLang);
 
     const { postLobbyPanel } = require('./panels/lobbyPanel');
-    await postLobbyPanel(client);
+    await postLobbyPanel(client, displayLang);
 
     const { postXpMatchPanel } = require('./panels/xpMatchPanel');
-    await postXpMatchPanel(client);
+    await postXpMatchPanel(client, displayLang);
 
     const leaderboardPanel = require('./panels/leaderboardPanel');
-    await leaderboardPanel.postAllLeaderboardPanels(client);
+    await leaderboardPanel.postAllLeaderboardPanels(client, displayLang);
 
     const { postSeasonPanel } = require('./panels/seasonPanel');
-    await postSeasonPanel(client);
+    await postSeasonPanel(client, displayLang);
 
     const { postEscrowPanel } = require('./panels/escrowPanel');
-    await postEscrowPanel(client);
+    await postEscrowPanel(client, displayLang);
 
     const { postRulesPanel } = require('./panels/rulesPanel');
-    await postRulesPanel(client);
+    await postRulesPanel(client, displayLang);
 
     const { postHowItWorksPanel } = require('./panels/howItWorksPanel');
-    await postHowItWorksPanel(client);
+    await postHowItWorksPanel(client, displayLang);
 
     const { postLanguagePanel } = require('./panels/languagePanel');
-    await postLanguagePanel(client);
+    await postLanguagePanel(client, displayLang);
 
     console.log('[Boot] All systems ready');
   } catch (err) {

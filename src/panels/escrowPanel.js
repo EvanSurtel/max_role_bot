@@ -2,6 +2,7 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 const { Keypair } = require('@solana/web3.js');
 const { getSolBalance, getUsdcBalance } = require('../solana/walletManager');
 const { LAMPORTS_PER_SOL, USDC_PER_UNIT } = require('../config/constants');
+const { t, langFor } = require('../locales/i18n');
 
 function getEscrowAddress() {
   const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
@@ -14,11 +15,11 @@ function getEscrowAddress() {
   }
 }
 
-async function buildEscrowPanel() {
+async function buildEscrowPanel(lang = 'en') {
   const address = getEscrowAddress();
   if (!address) {
     return {
-      embeds: [new EmbedBuilder().setTitle('Escrow Wallet').setColor(0xe74c3c).setDescription('ESCROW_WALLET_SECRET not configured.')],
+      embeds: [new EmbedBuilder().setTitle(t('escrow_panel.title', lang)).setColor(0xe74c3c).setDescription(t('escrow_panel.not_configured', lang))],
       components: [],
     };
   }
@@ -38,35 +39,35 @@ async function buildEscrowPanel() {
   const activatedWallets = db.prepare("SELECT COUNT(*) as c FROM wallets WHERE is_activated = 1").get()?.c || 0;
 
   const embed = new EmbedBuilder()
-    .setTitle('Escrow Wallet')
+    .setTitle(t('escrow_panel.title', lang))
     .setColor(0x2ecc71)
-    .setDescription(`**Address:**\n${address}`)
+    .setDescription(`${t('escrow_panel.address_label', lang)}\n${address}`)
     .addFields(
-      { name: 'SOL Balance', value: `${solFormatted} SOL`, inline: true },
-      { name: 'USDC Balance', value: `$${usdcFormatted} USDC`, inline: true },
+      { name: t('escrow_panel.field_sol', lang), value: `${solFormatted} SOL`, inline: true },
+      { name: t('escrow_panel.field_usdc', lang), value: `$${usdcFormatted} USDC`, inline: true },
       { name: '\u200b', value: '\u200b', inline: true },
-      { name: 'Active Matches', value: `${activeMatches}`, inline: true },
-      { name: 'Disputed Matches', value: `${disputedMatches}`, inline: true },
-      { name: 'Registered Users', value: `${totalUsers}`, inline: true },
-      { name: 'Activated Wallets', value: `${activatedWallets}`, inline: true },
+      { name: t('escrow_panel.field_active', lang), value: `${activeMatches}`, inline: true },
+      { name: t('escrow_panel.field_disputed', lang), value: `${disputedMatches}`, inline: true },
+      { name: t('escrow_panel.field_users', lang), value: `${totalUsers}`, inline: true },
+      { name: t('escrow_panel.field_wallets', lang), value: `${activatedWallets}`, inline: true },
     )
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('escrow_refresh')
-      .setLabel('Refresh')
+      .setLabel(t('escrow_panel.btn_refresh', lang))
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('escrow_copy_address')
-      .setLabel('Copy Address')
+      .setLabel(t('escrow_panel.btn_copy_address', lang))
       .setStyle(ButtonStyle.Success),
   );
 
   return { embeds: [embed], components: [row] };
 }
 
-async function postEscrowPanel(client) {
+async function postEscrowPanel(client, lang = 'en') {
   const channelId = process.env.ESCROW_CHANNEL_ID;
   if (!channelId) {
     console.warn('[Panel] ESCROW_CHANNEL_ID not set — skipping escrow panel');
@@ -83,9 +84,9 @@ async function postEscrowPanel(client) {
         try { await m.delete(); } catch { /* */ }
       }
     }
-    const panel = await buildEscrowPanel();
+    const panel = await buildEscrowPanel(lang);
     await channel.send(panel);
-    console.log('[Panel] Posted escrow panel');
+    console.log(`[Panel] Posted escrow panel (${lang})`);
   } catch (err) {
     console.error('[Panel] Failed to post escrow panel:', err.message);
   }
@@ -93,21 +94,22 @@ async function postEscrowPanel(client) {
 
 async function handleEscrowButton(interaction) {
   const id = interaction.customId;
+  const lang = langFor(interaction);
 
   // Admin only
   const adminRoleId = process.env.ADMIN_ROLE_ID;
   if (adminRoleId && !interaction.member.roles.cache.has(adminRoleId)) {
-    return interaction.reply({ content: 'Admin only.', ephemeral: true });
+    return interaction.reply({ content: t('escrow_panel.admin_only', lang), ephemeral: true });
   }
 
   if (id === 'escrow_refresh') {
-    const panel = await buildEscrowPanel();
+    const panel = await buildEscrowPanel(lang);
     return interaction.update(panel);
   }
 
   if (id === 'escrow_copy_address') {
     const address = getEscrowAddress();
-    return interaction.reply({ content: address || 'Not configured', ephemeral: true });
+    return interaction.reply({ content: address || t('escrow_panel.not_configured_short', lang), ephemeral: true });
   }
 }
 
