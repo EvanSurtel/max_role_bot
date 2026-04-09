@@ -115,8 +115,10 @@ client.once('ready', async () => {
     const { postHowItWorksPanel } = require('./panels/howItWorksPanel');
     await postHowItWorksPanel(client, displayLang);
 
-    const { postLanguagePanel } = require('./panels/languagePanel');
-    await postLanguagePanel(client, displayLang);
+    // Dedicated language channel removed — every shared panel has an
+    // inline language dropdown now, so a separate channel is redundant.
+    // The LANGUAGE_CHANNEL_ID env var is kept as legacy in case it's
+    // referenced elsewhere; the panel just isn't posted on startup.
 
     console.log('[Boot] All systems ready');
   } catch (err) {

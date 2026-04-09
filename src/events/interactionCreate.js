@@ -326,17 +326,10 @@ module.exports = {
         if (id.startsWith('xplb_') || id.startsWith('earnlb_')) {
           return await leaderboardPanel.handleLeaderboardSelect(interaction);
         }
-        if (id === 'welcome_lang_master') {
-          return await onboarding.handleWelcomeLanguageMaster(interaction);
-        }
-        if (id === 'language_panel_select') {
-          return await onboarding.handleLanguagePanelSelect(interaction);
-        }
-        // Ephemeral language picker (from any panel's 🌐 Language button — legacy)
-        if (id === 'lang_picker_select') {
-          return await languageSwitcher.handleLanguagePickerSelect(interaction);
-        }
-        // Inline language dropdown placed directly on shared panels
+        // Inline language dropdown placed directly on shared panels.
+        // The legacy welcome_lang_master / language_panel_select /
+        // lang_picker_select customIds are gone — the inline dropdown
+        // handles every case now.
         if (id === 'inline_lang_select') {
           return await languageSwitcher.handleInlineLanguageSelect(interaction);
         }

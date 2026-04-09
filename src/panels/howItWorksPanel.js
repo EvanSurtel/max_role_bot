@@ -99,14 +99,15 @@ async function postHowItWorksPanel(client, lang = 'en') {
 
     // Greedily pack embeds into messages so each stays under Discord's
     // 6000-char per-message limit. Inline language dropdown goes on the
-    // LAST message so users can switch language directly from this channel.
+    // FIRST message so users see it without scrolling through the
+    // entire how-it-works content.
     const groups = _packEmbeds(panel.embeds);
     const langRow = buildLanguageDropdownRow(lang);
     for (let i = 0; i < groups.length; i++) {
-      const isLast = i === groups.length - 1;
+      const isFirst = i === 0;
       await channel.send({
         embeds: groups[i],
-        components: isLast ? [langRow] : [],
+        components: isFirst ? [langRow] : [],
       });
     }
     console.log(`[Panel] Posted how it works panel (${lang}, ${groups.length} messages)`);

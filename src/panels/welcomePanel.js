@@ -1,6 +1,5 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { t } = require('../locales/i18n');
-const { SUPPORTED_LANGUAGES } = require('../locales');
 const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
 
 /**
@@ -8,7 +7,8 @@ const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
  *
  * Posted as the FIRST message in the welcome channel so it sits at the top
  * — users see it immediately when they enter the channel and can pick their
- * language before reading the TOS below it.
+ * language before scrolling down to read the TOS. Uses the same
+ * inline_lang_select dropdown as the rest of the bot.
  *
  * @param {string} lang - the language to render the picker itself in
  */
@@ -18,22 +18,7 @@ function buildWelcomeLanguagePicker(lang = 'en') {
     .setColor(0x3498db)
     .setDescription(t('language_panel.description', lang));
 
-  const options = Object.entries(SUPPORTED_LANGUAGES).map(([code, { label, nativeName, emoji }]) => ({
-    label: nativeName,
-    description: label,
-    value: code,
-    emoji,
-    default: code === lang,
-  }));
-
-  const selectRow = new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId('welcome_lang_master')
-      .setPlaceholder(t('onboarding.language_picker_placeholder', lang))
-      .addOptions(options),
-  );
-
-  return { embeds: [embed], components: [selectRow] };
+  return { embeds: [embed], components: [buildLanguageDropdownRow(lang)] };
 }
 
 /**
@@ -74,9 +59,12 @@ function buildWelcomePanel(lang = 'en') {
       .setStyle(ButtonStyle.Danger),
   );
 
+  // No dropdown here — the welcome channel has the dropdown at the TOP
+  // (in buildWelcomeLanguagePicker), so users don't have to scroll past
+  // the entire TOS to switch language.
   return {
     embeds: [welcomeEmbed, tos1Embed, tos2Embed, verifyEmbed],
-    components: [actionRow, buildLanguageDropdownRow(lang)],
+    components: [actionRow],
   };
 }
 
