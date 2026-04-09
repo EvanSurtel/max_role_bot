@@ -57,7 +57,7 @@ module.exports = {
     matches_paused: 'Match creation is currently paused for a season transition. Please wait for the new season to begin.',
     you_already_in_challenge: 'You are already part of this challenge. You cannot accept your own challenge.',
     cannot_accept_own: 'You cannot accept your own challenge.',
-    you_already_have_setup: 'You already have a wager setup in progress. Check {channel}.',
+    you_already_have_setup: 'You already have a wager setup in progress. Finish or cancel it first.',
     cannot_select_yourself: 'You cannot select yourself as a teammate.',
     teammate_not_registered: '{user} is not registered. They must register before joining a challenge.',
     teammate_busy: '{user} is currently busy: {reason}',
