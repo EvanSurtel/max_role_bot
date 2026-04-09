@@ -332,6 +332,15 @@ async function handleAdminModal(interaction) {
     db.prepare('INSERT INTO xp_history (user_id, match_id, match_type, xp_amount, season) VALUES (?, NULL, ?, ?, ?)').run(user.id, 'admin_adjust', xpAmount, getCurrentSeason());
     if (neatqueueService.isConfigured()) neatqueueService.addPoints(targetId, xpAmount).catch(() => {});
     logAdminAction(interaction.user.id, 'adjust_xp', 'user', user.id, { xpAmount, reason });
+    const { postTransaction } = require('../utils/transactionFeed');
+    postTransaction({
+      type: 'admin_adjust_xp',
+      username: user.server_username,
+      discordId: targetId,
+      amount: `${xpAmount > 0 ? '+' : ''}${xpAmount}`,
+      currency: 'XP',
+      memo: `Admin <@${interaction.user.id}> adjusted XP — Reason: ${reason}`,
+    });
     return interaction.reply({
       content: t('leaderboard_panel.xp_adjusted', lang, {
         user: `<@${targetId}>`,
@@ -353,6 +362,13 @@ async function handleAdminModal(interaction) {
     if (winsAdj !== 0) db.prepare('UPDATE users SET total_wins = MAX(0, total_wins + ?) WHERE id = ?').run(winsAdj, user.id);
     if (lossesAdj !== 0) db.prepare('UPDATE users SET total_losses = MAX(0, total_losses + ?) WHERE id = ?').run(lossesAdj, user.id);
     logAdminAction(interaction.user.id, 'adjust_wl', 'user', user.id, { winsAdj, lossesAdj, reason });
+    const { postTransaction } = require('../utils/transactionFeed');
+    postTransaction({
+      type: 'admin_adjust_wl',
+      username: user.server_username,
+      discordId: targetId,
+      memo: `Admin <@${interaction.user.id}> adjusted W/L: ${winsAdj >= 0 ? '+' : ''}${winsAdj}W, ${lossesAdj >= 0 ? '+' : ''}${lossesAdj}L — Reason: ${reason}`,
+    });
     return interaction.reply({
       content: t('leaderboard_panel.wl_adjusted', lang, {
         user: `<@${targetId}>`,
@@ -374,6 +390,15 @@ async function handleAdminModal(interaction) {
     const amountSmallest = Math.round(usdcAmount * USDC_PER_UNIT);
     userRepo.addEarnings(user.id, amountSmallest.toString());
     logAdminAction(interaction.user.id, 'adjust_earnings', 'user', user.id, { usdcAmount, reason });
+    const { postTransaction } = require('../utils/transactionFeed');
+    postTransaction({
+      type: 'admin_adjust_earnings',
+      username: user.server_username,
+      discordId: targetId,
+      amount: `${usdcAmount >= 0 ? '+' : ''}${usdcAmount.toFixed(2)}`,
+      currency: 'USDC',
+      memo: `Admin <@${interaction.user.id}> adjusted earnings — Reason: ${reason}`,
+    });
     return interaction.reply({
       content: t('leaderboard_panel.earnings_adjusted', lang, {
         user: `<@${targetId}>`,

@@ -172,6 +172,13 @@ async function handleSeasonButton(interaction) {
       }
     }
 
+    const { postTransaction } = require('../utils/transactionFeed');
+    postTransaction({
+      type: 'season_paused',
+      discordId: interaction.user.id,
+      memo: `Match creation paused by admin <@${interaction.user.id}> — Season: ${getCurrentSeason()}`,
+    });
+
     await interaction.reply({
       content: t('season_panel.pause_msg', lang),
       ephemeral: true,
@@ -193,6 +200,13 @@ async function handleSeasonButton(interaction) {
         console.warn('[Season] Failed to resume NeatQueue:', err.message);
       }
     }
+
+    const { postTransaction } = require('../utils/transactionFeed');
+    postTransaction({
+      type: 'season_resumed',
+      discordId: interaction.user.id,
+      memo: `Match creation resumed by admin <@${interaction.user.id}> — Season: ${getCurrentSeason()}`,
+    });
 
     await interaction.reply({
       content: t('season_panel.resume_msg', lang),
@@ -255,10 +269,17 @@ async function handleSeasonModal(interaction) {
   try {
     // 1. Save season snapshot — the xp_history table already has all data
     //    Just log the season end event
+    const totalPlayers = db.prepare('SELECT COUNT(*) as c FROM users WHERE accepted_tos = 1').get()?.c || 0;
     logAdminAction(interaction.user.id, 'end_season', 'system', 0, {
       oldSeason,
       newSeason,
-      totalPlayers: db.prepare('SELECT COUNT(*) as c FROM users WHERE accepted_tos = 1').get()?.c || 0,
+      totalPlayers,
+    });
+    const { postTransaction } = require('../utils/transactionFeed');
+    postTransaction({
+      type: 'season_ended',
+      discordId: interaction.user.id,
+      memo: `Season ended by admin <@${interaction.user.id}> — ${oldSeason} → ${newSeason} (${totalPlayers} players reset to 500 XP, 0W-0L)`,
     });
 
     // 2. Reset XP for all users to starting value (500)

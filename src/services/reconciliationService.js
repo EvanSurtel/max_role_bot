@@ -40,6 +40,26 @@ async function reconcileAll() {
           `(available=${available.toString()} + held=${held.toString()}), ` +
           `diff=${diff.toString()} USDC units`
         );
+
+        // Post the discrepancy to the admin transaction feed so admins
+        // see it without having to tail logs.
+        try {
+          const userRepo = require('../database/repositories/userRepo');
+          const { postTransaction } = require('../utils/transactionFeed');
+          const userRecord = userRepo.findById(wallet.user_id);
+          const diffUsdc = (Number(diff) / 1_000_000).toFixed(6);
+          postTransaction({
+            type: 'balance_mismatch',
+            username: userRecord?.server_username,
+            discordId: userRecord?.discord_id,
+            amount: `${diff > 0n ? '+' : ''}${diffUsdc}`,
+            currency: 'USDC',
+            toAddress: wallet.solana_address,
+            memo: `On-chain ${onChainUsdc.toString()} vs DB ${expected.toString()} (avail ${available.toString()} + held ${held.toString()}) — diff ${diff.toString()} units`,
+          });
+        } catch (feedErr) {
+          console.error('[Reconciliation] Failed to post mismatch to feed:', feedErr.message);
+        }
       }
     } catch (err) {
       console.error(

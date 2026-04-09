@@ -305,6 +305,17 @@ async function handleRegistrationModal(interaction) {
 
     console.log(`[Onboarding] ${displayName} (${discordId}) registered: IGN=${codIgn}, UID=${codUid}, region=${region}`);
 
+    // Post to admin transaction feed
+    try {
+      const { postTransaction } = require('../utils/transactionFeed');
+      postTransaction({
+        type: 'user_registered',
+        username: displayName,
+        discordId,
+        memo: `${country} ${displayName} | IGN: ${codIgn} | UID: ${codUid} | Region: ${region.toUpperCase()} | Wallet: ${wallet.solana_address}`,
+      });
+    } catch { /* */ }
+
   } catch (err) {
     console.error('[Onboarding] Error during registration:', err);
     await interaction.editReply({
