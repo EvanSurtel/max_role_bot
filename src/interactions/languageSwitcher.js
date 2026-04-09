@@ -57,15 +57,13 @@ async function handleShowLanguagePicker(interaction) {
 
 /**
  * Handle the language pick from the ephemeral dropdown. Saves the new
- * language to the user's DB row and updates the ephemeral message to
- * show a confirmation in the new language.
- *
- * If the user has NOT yet accepted TOS, we also send a follow-up
- * ephemeral with the welcome/TOS content rendered in their new language
- * — including the Accept/Decline buttons — so they can actually read
- * what they're agreeing to before they accept. This works regardless
- * of which channel they triggered the language switch from, but is
- * the main UX path for the welcome channel.
+ * language to the user's DB row, confirms the change in the new
+ * language, and then sends a follow-up ephemeral with the panel from
+ * THIS channel re-rendered in the new language. So if the user is in
+ * the lobby and switches to Spanish, they get an ephemeral lobby in
+ * Spanish with functional Create Wager / Create Dispute buttons. If
+ * they're in the welcome channel, they get the TOS in Spanish with
+ * functional Accept/Decline. Same for every channel.
  */
 async function handleLanguagePickerSelect(interaction) {
   const newLang = interaction.values[0];
@@ -87,23 +85,12 @@ async function handleLanguagePickerSelect(interaction) {
     components: [],
   });
 
-  // If the user hasn't accepted TOS yet, send the welcome/TOS panel as
-  // an ephemeral follow-up in their new language so they can read what
-  // they're about to accept. The Accept/Decline buttons are functional.
-  const freshUser = userRepo.findByDiscordId(discordId);
-  if (!freshUser || freshUser.accepted_tos !== 1) {
-    try {
-      const { buildWelcomePanel } = require('../panels/welcomePanel');
-      const welcomeView = buildWelcomePanel(newLang);
-      await interaction.followUp({
-        ...welcomeView,
-        ephemeral: true,
-        _persist: true,
-      });
-    } catch (err) {
-      console.error('[LanguageSwitcher] Failed to send welcome ephemeral:', err.message);
-    }
-  }
+  // Send an ephemeral copy of THIS channel's panel in the new language,
+  // with functional buttons. This is what makes the language change
+  // feel real — the user immediately sees the channel they're in
+  // rendered in their new language.
+  const { sendEphemeralPanelForCurrentChannel } = require('../utils/ephemeralPanelDispatcher');
+  await sendEphemeralPanelForCurrentChannel(interaction, newLang);
 }
 
 module.exports = {

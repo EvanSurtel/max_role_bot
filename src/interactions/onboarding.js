@@ -412,10 +412,9 @@ async function handleLanguagePanelSelect(interaction) {
 /**
  * Shared logic for any language picker dropdown (welcome panel,
  * dedicated language channel, ephemeral button picker). Saves the
- * user's language to the DB, sends a confirmation, and — if the user
- * has not yet accepted TOS — sends a follow-up ephemeral with the
- * welcome/TOS panel rendered in the new language so they can read
- * what they're agreeing to.
+ * user's language to the DB, sends a confirmation, and then sends
+ * a follow-up ephemeral with the panel from THIS channel re-rendered
+ * in the new language (TOS for welcome, lobby for wager, etc.).
  */
 async function _handleAnyLanguageSelect(interaction, logPrefix) {
   const { SUPPORTED_LANGUAGES } = require('../locales');
@@ -440,21 +439,13 @@ async function _handleAnyLanguageSelect(interaction, logPrefix) {
     ephemeral: true,
   });
 
-  // If user hasn't accepted TOS, send the welcome/TOS in their new
-  // language as an ephemeral follow-up so they can actually read it.
-  const freshUser = userRepo.findByDiscordId(discordId);
-  if (!freshUser || freshUser.accepted_tos !== 1) {
-    try {
-      const { buildWelcomePanel } = require('../panels/welcomePanel');
-      const welcomeView = buildWelcomePanel(newLang);
-      await interaction.followUp({
-        ...welcomeView,
-        ephemeral: true,
-        _persist: true,
-      });
-    } catch (err) {
-      console.error(`${logPrefix} Failed to send welcome ephemeral:`, err.message);
-    }
+  // Send an ephemeral copy of THIS channel's panel in the new language
+  // with functional buttons — every channel handled by the dispatcher.
+  try {
+    const { sendEphemeralPanelForCurrentChannel } = require('../utils/ephemeralPanelDispatcher');
+    await sendEphemeralPanelForCurrentChannel(interaction, newLang);
+  } catch (err) {
+    console.error(`${logPrefix} Failed to send ephemeral panel:`, err.message);
   }
 
   const { applyLanguageChange } = require('../utils/languageRefresh');
