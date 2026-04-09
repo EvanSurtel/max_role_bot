@@ -150,9 +150,12 @@ module.exports = {
 
   lobby: {
     title: 'Rank $ — Lobby Zakładów',
-    description: 'Obstawiaj **USDC** na mecze Call of Duty Mobile.\n\nKliknij **Stwórz Zakład**, aby wyzwać innych graczy.',
+    description: 'Obstawiaj **USDC** na mecze Call of Duty Mobile.\n\nKliknij **Stwórz Zakład**, aby wyzwać innych graczy.\n\nKliknij **Zasady**, **Jak to działa** lub **Język** poniżej, aby zobaczyć je w swoim języku.',
     btn_create_wager: 'Stwórz Zakład',
     btn_create_dispute: 'Stwórz Spór',
+    btn_rules: 'Zasady',
+    btn_howitworks: 'Jak to działa',
+    btn_language: 'Język',
     footer: 'Powered by Solana',
   },
 

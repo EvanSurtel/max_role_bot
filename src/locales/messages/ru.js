@@ -150,9 +150,12 @@ module.exports = {
 
   lobby: {
     title: 'Rank $ — Лобби Ставок',
-    description: 'Делай ставки **USDC** на матчи Call of Duty Mobile.\n\nНажми **Создать Ставку** чтобы вызвать других игроков.',
+    description: 'Делай ставки **USDC** на матчи Call of Duty Mobile.\n\nНажми **Создать Ставку** чтобы вызвать других игроков.\n\nНажми **Правила**, **Как это работает** или **Язык** ниже, чтобы увидеть их на своём языке.',
     btn_create_wager: 'Создать Ставку',
     btn_create_dispute: 'Создать Спор',
+    btn_rules: 'Правила',
+    btn_howitworks: 'Как это работает',
+    btn_language: 'Язык',
     footer: 'Powered by Solana',
   },
 

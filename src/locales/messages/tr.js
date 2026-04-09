@@ -150,9 +150,12 @@ module.exports = {
 
   lobby: {
     title: 'Rank $ — Bahis Lobisi',
-    description: 'Call of Duty Mobile maçlarına **USDC** bahis yap.\n\nDiğer oyunculara meydan okumak için **Bahis Oluştur**\'a tıkla.',
+    description: 'Call of Duty Mobile maçlarına **USDC** bahis yap.\n\nDiğer oyunculara meydan okumak için **Bahis Oluştur**\'a tıkla.\n\nKendi dilinde görmek için aşağıdaki **Kurallar**, **Nasıl Çalışır** veya **Dil**\'e tıkla.',
     btn_create_wager: 'Bahis Oluştur',
     btn_create_dispute: 'İtiraz Oluştur',
+    btn_rules: 'Kurallar',
+    btn_howitworks: 'Nasıl Çalışır',
+    btn_language: 'Dil',
     footer: 'Powered by Solana',
   },
 
