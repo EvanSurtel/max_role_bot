@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} ยังไม่ได้ลงทะเบียน พวกเขาต้องลงทะเบียนก่อนเข้าร่วม challenge',
     teammate_busy: '{user} กำลังยุ่งอยู่: {reason}',
     teammate_already_in: '{user} เป็นส่วนหนึ่งของ challenge นี้แล้ว',
+    btn_language: 'ภาษา',
   },
 
   tx_type: {
@@ -87,6 +88,19 @@ module.exports = {
     history_empty: 'ไม่พบธุรกรรม',
     language_picker_title: 'เลือกภาษาของคุณ',
     language_picker_desc: 'เลือกภาษาที่คุณต้องการให้บอทใช้กับคุณ',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 กระเป๋าเงิน',
+    description: 'คลิก **ดูกระเป๋าของฉัน** ด้านล่างเพื่อดูยอดเงิน ที่อยู่สำหรับฝาก ประวัติธุรกรรม และจัดการเงินของคุณ\n\nข้อมูลกระเป๋าของคุณเป็น **ส่วนตัว** — มีเพียงคุณเท่านั้นที่เห็นยอดเงินและการทำรายการของคุณ',
+    footer: 'USDC + SOL บน Solana',
+    btn_view_wallet: 'ดูกระเป๋าของฉัน',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **ได้รับเงินฝากแล้ว!**\n\nคุณได้รับ **${amount} USDC** ยอดเงินที่ใช้ได้ใหม่ของคุณคือ **${new_balance} USDC**\n\nคลิก **ดูกระเป๋าของฉัน** ในช่องกระเป๋าเงินเพื่อดูรายละเอียด',
   },
 
   wallet_embed: {

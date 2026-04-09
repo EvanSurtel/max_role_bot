@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: 'Hindi pa registered si {user}. Kailangan muna nilang magparehistro bago sumali sa challenge.',
     teammate_busy: 'Busy si {user} ngayon: {reason}',
     teammate_already_in: 'Kasali na si {user} sa challenge na ito.',
+    btn_language: 'Wika',
   },
 
   tx_type: {
@@ -87,6 +88,19 @@ module.exports = {
     history_empty: 'Walang nakitang transaksyon.',
     language_picker_title: 'Piliin ang Iyong Wika',
     language_picker_desc: 'Piliin ang wikang gusto mong gamitin ng bot sa iyo.',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 Wallet',
+    description: 'I-click ang **Tingnan ang Wallet Ko** sa baba para makita ang balanse mo, deposit address, transaction history, at i-manage ang pondo mo.\n\nPrivate ang impormasyon ng wallet mo — ikaw lang ang makakakita ng sarili mong balanse at mga aksyon.',
+    footer: 'USDC + SOL sa Solana',
+    btn_view_wallet: 'Tingnan ang Wallet Ko',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **Natanggap ang deposito!**\n\nNatanggap mo ang **${amount} USDC**. Ang bago mong available na balanse ay **${new_balance} USDC**.\n\nI-click ang **Tingnan ang Wallet Ko** sa wallet channel para makita ang mga detalye.',
   },
 
   wallet_embed: {

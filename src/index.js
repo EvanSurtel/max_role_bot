@@ -94,6 +94,9 @@ client.once('ready', async () => {
     const { postPublicWalletPanel } = require('./panels/publicWalletPanel');
     await postPublicWalletPanel(client, displayLang);
 
+    const { postAdminWalletViewerPanel } = require('./panels/adminWalletViewerPanel');
+    await postAdminWalletViewerPanel(client, displayLang);
+
     const { postXpMatchPanel } = require('./panels/xpMatchPanel');
     await postXpMatchPanel(client, displayLang);
 

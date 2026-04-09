@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} 未注册。他们必须先注册才能加入挑战。',
     teammate_busy: '{user} 当前正忙: {reason}',
     teammate_already_in: '{user} 已经是这个挑战的一部分。',
+    btn_language: '语言',
   },
 
   tx_type: {
@@ -87,6 +88,19 @@ module.exports = {
     history_empty: '未找到交易。',
     language_picker_title: '选择语言',
     language_picker_desc: '选择你希望机器人与你使用的语言。',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 钱包',
+    description: '点击下方的 **查看我的钱包** 查看余额、充值地址、交易记录并管理你的资金。\n\n你的钱包信息是**私密**的 — 只有你自己能看到你的余额和操作。',
+    footer: 'Solana 上的 USDC + SOL',
+    btn_view_wallet: '查看我的钱包',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **已收到充值!**\n\n你收到了 **${amount} USDC**。你新的可用余额是 **${new_balance} USDC**。\n\n点击钱包频道中的 **查看我的钱包** 查看详情。',
   },
 
   wallet_embed: {

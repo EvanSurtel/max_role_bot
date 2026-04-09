@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} は未登録です。チャレンジに参加する前に登録が必要です。',
     teammate_busy: '{user} は現在対応中です: {reason}',
     teammate_already_in: '{user} はすでにこのチャレンジに参加しています。',
+    btn_language: '言語',
   },
 
   tx_type: {

@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} chưa đăng ký. Họ phải đăng ký trước khi tham gia challenge.',
     teammate_busy: '{user} hiện đang bận: {reason}',
     teammate_already_in: '{user} đã là một phần của challenge này.',
+    btn_language: 'Ngôn ngữ',
   },
 
   tx_type: {
@@ -87,6 +88,19 @@ module.exports = {
     history_empty: 'Không có giao dịch.',
     language_picker_title: 'Chọn Ngôn Ngữ',
     language_picker_desc: 'Chọn ngôn ngữ bạn muốn bot dùng với bạn.',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 Ví',
+    description: 'Nhấn **Xem Ví Của Tôi** bên dưới để xem số dư, địa chỉ nạp, lịch sử giao dịch và quản lý tiền của bạn.\n\nThông tin ví của bạn là **riêng tư** — chỉ mình bạn mới có thể thấy số dư và các hành động của chính mình.',
+    footer: 'USDC + SOL trên Solana',
+    btn_view_wallet: 'Xem Ví Của Tôi',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **Đã nhận tiền nạp!**\n\nBạn đã nhận được **${amount} USDC**. Số dư khả dụng mới của bạn là **${new_balance} USDC**.\n\nNhấn **Xem Ví Của Tôi** trong kênh ví để xem chi tiết.',
   },
 
   wallet_embed: {

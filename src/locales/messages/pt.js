@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} não está registrado. Precisa se registrar antes de entrar num desafio.',
     teammate_busy: '{user} está ocupado: {reason}',
     teammate_already_in: '{user} já faz parte deste desafio.',
+    btn_language: 'Idioma',
   },
 
   tx_type: {
@@ -87,6 +88,19 @@ module.exports = {
     history_empty: 'Nenhuma transação encontrada.',
     language_picker_title: 'Escolha Seu Idioma',
     language_picker_desc: 'Escolha o idioma que você quer que o bot use com você.',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 Carteira',
+    description: 'Clique em **Ver Minha Carteira** abaixo para ver seu saldo, endereço de depósito, histórico de transações e gerenciar seus fundos.\n\nAs informações da sua carteira são **privadas** — só você pode ver seu saldo e suas ações.',
+    footer: 'USDC + SOL na Solana',
+    btn_view_wallet: 'Ver Minha Carteira',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **Depósito recebido!**\n\nVocê recebeu **${amount} USDC**. Seu novo saldo disponível é **${new_balance} USDC**.\n\nClique em **Ver Minha Carteira** no canal da carteira para ver os detalhes.',
   },
 
   wallet_embed: {

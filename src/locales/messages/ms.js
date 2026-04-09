@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} belum berdaftar. Mereka kena daftar dulu sebelum sertai challenge.',
     teammate_busy: '{user} sekarang sibuk: {reason}',
     teammate_already_in: '{user} sudah jadi sebahagian challenge ini.',
+    btn_language: 'Bahasa',
   },
 
   tx_type: {
@@ -87,6 +88,19 @@ module.exports = {
     history_empty: 'Tiada transaksi dijumpai.',
     language_picker_title: 'Pilih Bahasa Kamu',
     language_picker_desc: 'Pilih bahasa yang kamu mahu bot gunakan dengan kamu.',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 Dompet',
+    description: 'Klik **Lihat Dompet Saya** di bawah untuk lihat baki, alamat deposit, sejarah transaksi, dan urus dana kamu.\n\nMaklumat dompet kamu adalah **peribadi** — hanya kamu sahaja yang boleh lihat baki dan tindakan kamu sendiri.',
+    footer: 'USDC + SOL di Solana',
+    btn_view_wallet: 'Lihat Dompet Saya',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **Deposit diterima!**\n\nKamu telah menerima **${amount} USDC**. Baki tersedia baru kamu ialah **${new_balance} USDC**.\n\nKlik **Lihat Dompet Saya** di channel dompet untuk lihat butiran.',
   },
 
   wallet_embed: {

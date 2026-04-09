@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} kayıtlı değil. Bir meydan okumaya katılmadan önce kayıt olmalı.',
     teammate_busy: '{user} şu anda meşgul: {reason}',
     teammate_already_in: '{user} zaten bu meydan okumanın bir parçası.',
+    btn_language: 'Dil',
   },
 
   // User-friendly transaction type labels (replaces escrow_in / disbursement / etc)
@@ -88,6 +89,19 @@ module.exports = {
     history_empty: 'İşlem bulunamadı.',
     language_picker_title: 'Dilini Seç',
     language_picker_desc: 'Botun seninle kullanmasını istediğin dili seç.',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 Cüzdan',
+    description: 'Bakiyeni, yatırım adresini, işlem geçmişini görmek ve paranı yönetmek için aşağıdaki **Cüzdanımı Gör** butonuna tıkla.\n\nCüzdan bilgilerin **gizlidir** — sadece sen kendi bakiyeni ve işlemlerini görebilirsin.',
+    footer: 'Solana üzerinde USDC + SOL',
+    btn_view_wallet: 'Cüzdanımı Gör',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **Yatırım alındı!**\n\n**${amount} USDC** aldın. Yeni kullanılabilir bakiyen **${new_balance} USDC**.\n\nDetayları görmek için cüzdan kanalında **Cüzdanımı Gör** butonuna tıkla.',
   },
 
   wallet_embed: {

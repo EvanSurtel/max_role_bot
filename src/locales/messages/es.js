@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} no está registrado. Debe registrarse antes de unirse a un reto.',
     teammate_busy: '{user} está ocupado: {reason}',
     teammate_already_in: '{user} ya forma parte de este reto.',
+    btn_language: 'Idioma',
   },
 
   tx_type: {
@@ -87,6 +88,19 @@ module.exports = {
     history_empty: 'No hay transacciones.',
     language_picker_title: 'Elige Tu Idioma',
     language_picker_desc: 'Elige el idioma que quieres que use el bot contigo.',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 Billetera',
+    description: 'Haz clic en **Ver Mi Billetera** abajo para ver tu saldo, dirección de depósito, historial de transacciones y administrar tus fondos.\n\nLa información de tu billetera es **privada** — solo tú puedes ver tu saldo y tus acciones.',
+    footer: 'USDC + SOL en Solana',
+    btn_view_wallet: 'Ver Mi Billetera',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **¡Depósito recibido!**\n\nRecibiste **${amount} USDC**. Tu nuevo saldo disponible es **${new_balance} USDC**.\n\nHaz clic en **Ver Mi Billetera** en el canal de billetera para ver los detalles.',
   },
 
   wallet_embed: {

@@ -6,6 +6,7 @@ const matchResult = require('../interactions/matchResult');
 const disputeCreate = require('../interactions/disputeCreate');
 const onboarding = require('../interactions/onboarding');
 const languageSwitcher = require('../interactions/languageSwitcher');
+const adminWalletViewer = require('../interactions/adminWalletViewer');
 const walletPanel = require('../panels/walletPanel');
 const leaderboardPanel = require('../panels/leaderboardPanel');
 const seasonPanel = require('../panels/seasonPanel');
@@ -226,6 +227,10 @@ module.exports = {
         }
         if (id.startsWith('select_opponents')) {
           return await challengeAccept.handleUserSelect(interaction);
+        }
+        // Admin wallet viewer — admin picks a user, ephemeral wallet view
+        if (id === 'admin_wallet_view_select') {
+          return await adminWalletViewer.handleAdminWalletViewSelect(interaction);
         }
 
         console.warn(`[Interaction] Unhandled user select customId: ${id}`);

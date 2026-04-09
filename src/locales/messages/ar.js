@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} غير مسجّل. يجب عليه التسجيل قبل الانضمام إلى التحدي.',
     teammate_busy: '{user} مشغول حالياً: {reason}',
     teammate_already_in: '{user} هو بالفعل جزء من هذا التحدي.',
+    btn_language: 'اللغة',
   },
 
   tx_type: {
@@ -87,6 +88,19 @@ module.exports = {
     history_empty: 'لم يتم العثور على معاملات.',
     language_picker_title: 'اختر لغتك',
     language_picker_desc: 'اختر اللغة التي تريد أن يستخدمها البوت معك.',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 المحفظة',
+    description: 'اضغط على **عرض محفظتي** أدناه لرؤية رصيدك، وعنوان الإيداع، وسجل المعاملات، ولإدارة أموالك.\n\nمعلومات محفظتك **خاصة** — أنت فقط من يمكنه رؤية رصيدك وإجراءاتك.',
+    footer: 'USDC + SOL على Solana',
+    btn_view_wallet: 'عرض محفظتي',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **تم استلام الإيداع!**\n\nلقد استلمت **${amount} USDC**. رصيدك المتاح الجديد هو **${new_balance} USDC**.\n\nاضغط على **عرض محفظتي** في قناة المحفظة لرؤية التفاصيل.',
   },
 
   wallet_embed: {

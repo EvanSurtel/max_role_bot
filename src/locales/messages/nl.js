@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} is niet geregistreerd. Ze moeten registreren voordat ze meedoen aan een uitdaging.',
     teammate_busy: '{user} is momenteel bezig: {reason}',
     teammate_already_in: '{user} is al onderdeel van deze uitdaging.',
+    btn_language: 'Taal',
   },
 
   // User-friendly transaction type labels (replaces escrow_in / disbursement / etc)
@@ -88,6 +89,19 @@ module.exports = {
     history_empty: 'Geen transacties gevonden.',
     language_picker_title: 'Kies Je Taal',
     language_picker_desc: 'Kies de taal die je wilt dat de bot met jou gebruikt.',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 Wallet',
+    description: 'Klik hieronder op **Bekijk Mijn Wallet** om je saldo, stortingsadres, transactiegeschiedenis te zien en je fondsen te beheren.\n\nJe wallet info is **privé** — alleen jij kunt je eigen saldo en acties zien.',
+    footer: 'USDC + SOL op Solana',
+    btn_view_wallet: 'Bekijk Mijn Wallet',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **Storting ontvangen!**\n\nJe hebt **${amount} USDC** ontvangen. Je nieuwe beschikbare saldo is **${new_balance} USDC**.\n\nKlik op **Bekijk Mijn Wallet** in het wallet kanaal om de details te zien.',
   },
 
   wallet_embed: {

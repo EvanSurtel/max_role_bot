@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} не зарегистрирован. Он должен зарегистрироваться перед присоединением к челленджу.',
     teammate_busy: '{user} сейчас занят: {reason}',
     teammate_already_in: '{user} уже участвует в этом челлендже.',
+    btn_language: 'Язык',
   },
 
   // User-friendly transaction type labels (replaces escrow_in / disbursement / etc)
@@ -88,6 +89,19 @@ module.exports = {
     history_empty: 'Транзакции не найдены.',
     language_picker_title: 'Выбери Свой Язык',
     language_picker_desc: 'Выбери язык, который бот будет использовать с тобой.',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 Кошелёк',
+    description: 'Нажми **Мой Кошелёк** ниже, чтобы увидеть свой баланс, адрес депозита, историю транзакций и управлять средствами.\n\nИнформация о твоём кошельке **приватна** — только ты видишь свой баланс и действия.',
+    footer: 'USDC + SOL в Solana',
+    btn_view_wallet: 'Мой Кошелёк',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **Депозит получен!**\n\nТы получил **${amount} USDC**. Твой новый доступный баланс — **${new_balance} USDC**.\n\nНажми **Мой Кошелёк** в канале кошелька, чтобы увидеть детали.',
   },
 
   wallet_embed: {

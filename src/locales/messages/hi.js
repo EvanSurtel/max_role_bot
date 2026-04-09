@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} रजिस्टर्ड नहीं है। उन्हें challenge join करने से पहले रजिस्टर करना होगा।',
     teammate_busy: '{user} अभी busy है: {reason}',
     teammate_already_in: '{user} पहले से इस challenge का हिस्सा है।',
+    btn_language: 'भाषा',
   },
 
   tx_type: {
@@ -87,6 +88,19 @@ module.exports = {
     history_empty: 'कोई लेनदेन नहीं मिला।',
     language_picker_title: 'अपनी भाषा चुनो',
     language_picker_desc: 'वह भाषा चुनो जिसमें तुम बॉट से बात करना चाहते हो।',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 वॉलेट',
+    description: 'अपना बैलेंस, डिपॉज़िट पता, लेनदेन हिस्ट्री देखने और अपना फंड मैनेज करने के लिए नीचे **मेरा वॉलेट देखो** पर क्लिक करो।\n\nतुम्हारी वॉलेट जानकारी **प्राइवेट** है — केवल तुम ही अपना बैलेंस और एक्शन देख सकते हो।',
+    footer: 'Solana पर USDC + SOL',
+    btn_view_wallet: 'मेरा वॉलेट देखो',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **डिपॉज़िट मिला!**\n\nतुम्हें **${amount} USDC** मिले हैं। तुम्हारा नया उपलब्ध बैलेंस **${new_balance} USDC** है।\n\nडिटेल देखने के लिए wallet चैनल में **मेरा वॉलेट देखो** पर क्लिक करो।',
   },
 
   wallet_embed: {

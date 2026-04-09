@@ -7,7 +7,7 @@ module.exports = {
   wallet: {
     title: 'Step 1: Wallet Kamu',
     description: [
-      'Kamu ada **wallet channel** peribadi dalam server ni. Hanya kamu je yang boleh nampak dan guna.',
+      'Kamu ada wallet peribadi kamu sendiri dalam server ni. Untuk tengok, pergi ke **wallet channel** dan klik **View My Wallet** — hanya kamu je yang boleh nampak balance, address, dan transactions kamu. Semua orang guna wallet channel yang sama, tapi info wallet setiap orang adalah peribadi.',
       '',
       'Wallet kamu ada dua benda:',
       '• **USDC** — coin crypto yang mewakili dolar US. 1 USDC = $1 USD. Ni yang kamu guna untuk wager. Nilai dia tak naik turun seperti Bitcoin — $10 USDC memang selalu $10.',

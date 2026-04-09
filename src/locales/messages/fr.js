@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user} n\'est pas inscrit. Il doit s\'inscrire avant de rejoindre un défi.',
     teammate_busy: '{user} est actuellement occupé : {reason}',
     teammate_already_in: '{user} fait déjà partie de ce défi.',
+    btn_language: 'Langue',
   },
 
   tx_type: {
@@ -87,6 +88,19 @@ module.exports = {
     history_empty: 'Aucune transaction trouvée.',
     language_picker_title: 'Choisissez Votre Langue',
     language_picker_desc: 'Choisissez la langue que vous voulez que le bot utilise avec vous.',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 Portefeuille',
+    description: 'Cliquez sur **Voir Mon Portefeuille** ci-dessous pour voir votre solde, votre adresse de dépôt, votre historique de transactions et gérer vos fonds.\n\nLes infos de votre portefeuille sont **privées** — vous seul pouvez voir votre solde et vos actions.',
+    footer: 'USDC + SOL sur Solana',
+    btn_view_wallet: 'Voir Mon Portefeuille',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **Dépôt reçu !**\n\nVous avez reçu **${amount} USDC**. Votre nouveau solde disponible est de **${new_balance} USDC**.\n\nCliquez sur **Voir Mon Portefeuille** dans le salon du portefeuille pour voir les détails.',
   },
 
   wallet_embed: {

@@ -80,6 +80,21 @@ module.exports = {
     received: '💰 **Deposit received!**\n\nYou received **${amount} USDC**. Your new available balance is **${new_balance} USDC**.\n\nClick **View My Wallet** in the wallet channel to see the details.',
   },
 
+  // Admin-only wallet viewer panel — admin picks any server member from a
+  // dropdown to see that user's wallet (balance, address, transactions).
+  admin_wallet_viewer: {
+    title: '🔍 Admin Wallet Viewer',
+    description: 'Pick a user from the dropdown below to view their wallet (balance, address, transactions). The result is shown to you only as an ephemeral.\n\n**Admin only.** Selected users do NOT see this.',
+    footer: 'Admin tool — visible only to admins',
+    placeholder: 'Pick a user to view their wallet…',
+    user_wallet_title: '🔍 Wallet — {username}',
+    tx_count: 'Transactions',
+    activated: 'Activated',
+    admin_only: 'Admin only.',
+    user_not_registered: 'User <@{id}> is not registered with the bot.',
+    no_wallet: 'This user has no wallet record.',
+  },
+
   // User-friendly transaction type labels (replaces escrow_in / disbursement / etc)
   tx_type: {
     deposit: 'Deposit',
