@@ -358,24 +358,12 @@ async function handleButton(interaction) {
       return interaction.reply({ content: busy.reason, ephemeral: true });
     }
 
-    // If the user has a live in-progress flow (idle < 30 min), they
-    // probably dismissed their ephemeral and clicked Create Wager again.
-    // Resume the flow by sending a fresh ephemeral with the current step
-    // — they pick up exactly where they left off.
-    const existing = getLiveFlow(userId);
-    if (existing) {
-      const requestedType = id === 'wager_type_wager' ? CHALLENGE_TYPE.WAGER : CHALLENGE_TYPE.XP;
-      // If they're trying to start a DIFFERENT type than they had, that's
-      // ambiguous — just resume the existing flow regardless and let them
-      // cancel it if they wanted the other type.
-      touchFlow(existing);
-      const ui = buildStepUI(existing, lang);
-      return interaction.reply({
-        ...ui,
-        ephemeral: true,
-        _persist: true,
-      });
-    }
+    // If the user clicks Create Wager / XP Match while they already
+    // have an in-progress flow, treat it as "start over" — discard the
+    // existing flow and start fresh. Users who dismissed an ephemeral
+    // by accident can just click again to get a clean slate.
+    activeFlows.delete(userId);
+    finalizingUsers.delete(userId);
 
     const type = id === 'wager_type_wager' ? CHALLENGE_TYPE.WAGER : CHALLENGE_TYPE.XP;
 
