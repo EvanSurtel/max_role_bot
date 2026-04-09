@@ -67,26 +67,60 @@ async function buildEscrowPanel(lang = 'en') {
   return { embeds: [embed], components: [row] };
 }
 
+/**
+ * Helper: detect whether a bot message is the existing escrow panel by
+ * looking for the `escrow_refresh` button customId in its components.
+ * This lets the escrow panel coexist in the same channel as the admin
+ * wallet viewer panel without one wiping the other on startup.
+ */
+function _isEscrowPanel(message) {
+  if (!message.components || message.components.length === 0) return false;
+  for (const row of message.components) {
+    const comps = row.components || row.toJSON?.().components || [];
+    for (const c of comps) {
+      const id = c.customId || c.custom_id || c.data?.custom_id;
+      if (id === 'escrow_refresh') return true;
+    }
+  }
+  return false;
+}
+
 async function postEscrowPanel(client, lang = 'en') {
-  const channelId = process.env.ESCROW_CHANNEL_ID;
+  // The escrow panel now lives in the same channel as the admin wallet
+  // viewer panel — one consolidated admin wallet management channel.
+  // Falls back to the legacy ESCROW_CHANNEL_ID for backward compat if
+  // the new ADMIN_WALLET_VIEWER_CHANNEL_ID isn't set yet.
+  const channelId = process.env.ADMIN_WALLET_VIEWER_CHANNEL_ID || process.env.ESCROW_CHANNEL_ID;
   if (!channelId) {
-    console.warn('[Panel] ESCROW_CHANNEL_ID not set — skipping escrow panel');
+    console.warn('[Panel] ADMIN_WALLET_VIEWER_CHANNEL_ID not set — skipping escrow panel');
     return;
   }
 
-  const channel = client.channels.cache.get(channelId);
+  let channel = client.channels.cache.get(channelId);
+  if (!channel) {
+    try {
+      channel = await client.channels.fetch(channelId);
+    } catch (err) {
+      console.error(`[Panel] Could not fetch escrow channel ${channelId}:`, err.message);
+      return;
+    }
+  }
   if (!channel) return;
 
   try {
-    const messages = await channel.messages.fetch({ limit: 10 });
-    for (const [, m] of messages) {
-      if (m.author.id === client.user.id) {
-        try { await m.delete(); } catch { /* */ }
-      }
-    }
+    const messages = await channel.messages.fetch({ limit: 30 });
+    const existingEscrow = messages.find(m => m.author.id === client.user.id && _isEscrowPanel(m));
     const panel = await buildEscrowPanel(lang);
-    await channel.send(panel);
-    console.log(`[Panel] Posted escrow panel (${lang})`);
+
+    if (existingEscrow) {
+      // Edit only the existing escrow panel — leave other bot messages
+      // (like the admin wallet viewer panel) alone.
+      await existingEscrow.edit(panel);
+      console.log(`[Panel] Updated escrow panel (${lang})`);
+    } else {
+      await channel.send(panel);
+      console.log(`[Panel] Posted escrow panel (${lang})`);
+    }
   } catch (err) {
     console.error('[Panel] Failed to post escrow panel:', err.message);
   }

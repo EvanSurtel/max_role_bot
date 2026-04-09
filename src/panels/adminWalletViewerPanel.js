@@ -40,10 +40,31 @@ function buildAdminWalletViewerPanel(lang = 'en') {
 }
 
 /**
+ * Detect whether a bot message is the admin wallet viewer panel by
+ * looking for the `admin_wallet_view_select` UserSelectMenu customId
+ * in its components. This lets the admin wallet viewer coexist with
+ * the escrow panel in the same admin wallet channel without either
+ * one wiping the other on startup.
+ */
+function _isAdminWalletViewerPanel(message) {
+  if (!message.components || message.components.length === 0) return false;
+  for (const row of message.components) {
+    const comps = row.components || row.toJSON?.().components || [];
+    for (const c of comps) {
+      const id = c.customId || c.custom_id || c.data?.custom_id;
+      if (id === 'admin_wallet_view_select') return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Post (or refresh) the admin wallet viewer panel in
- * ADMIN_WALLET_VIEWER_CHANNEL_ID. The channel itself should be
- * configured with admin-only permissions on Discord — this code does
- * not enforce permissions on the channel, only on the interaction.
+ * ADMIN_WALLET_VIEWER_CHANNEL_ID. This channel ALSO hosts the escrow
+ * wallet panel — both coexist as separate messages identified by their
+ * component customIds. The channel should be configured with admin-only
+ * permissions on Discord — this code only enforces permissions on the
+ * interaction, not on the channel itself.
  */
 async function postAdminWalletViewerPanel(client, lang = 'en') {
   const channelId = process.env.ADMIN_WALLET_VIEWER_CHANNEL_ID;
@@ -64,21 +85,18 @@ async function postAdminWalletViewerPanel(client, lang = 'en') {
   if (!channel) return;
 
   try {
-    const messages = await channel.messages.fetch({ limit: 20 });
-    const botMessages = messages.filter(m => m.author.id === client.user.id);
-    const existingPanel = botMessages.find(m => m.embeds.length > 0);
+    const messages = await channel.messages.fetch({ limit: 30 });
+    const existingPanel = messages.find(
+      m => m.author.id === client.user.id && _isAdminWalletViewerPanel(m),
+    );
     const panel = buildAdminWalletViewerPanel(lang);
 
     if (existingPanel) {
-      for (const [, m] of botMessages) {
-        if (m.id !== existingPanel.id) {
-          try { await m.delete(); } catch { /* */ }
-        }
-      }
+      // Edit only the existing admin wallet viewer panel — leave other
+      // bot messages (like the escrow panel) alone.
       await existingPanel.edit(panel);
       console.log(`[Panel] Updated admin wallet viewer panel (${lang})`);
     } else {
-      for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
       await channel.send(panel);
       console.log(`[Panel] Posted admin wallet viewer panel (${lang})`);
     }
