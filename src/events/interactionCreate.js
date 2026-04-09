@@ -5,7 +5,6 @@ const teammateResponse = require('../interactions/teammateResponse');
 const matchResult = require('../interactions/matchResult');
 const disputeCreate = require('../interactions/disputeCreate');
 const onboarding = require('../interactions/onboarding');
-const ephemeralContent = require('../interactions/ephemeralContent');
 const walletPanel = require('../panels/walletPanel');
 const leaderboardPanel = require('../panels/leaderboardPanel');
 const seasonPanel = require('../panels/seasonPanel');
@@ -107,16 +106,6 @@ module.exports = {
         if (id === 'create_dispute') {
           return await disputeCreate.handleCreateDispute(interaction);
         }
-        // Per-user ephemeral content buttons from lobby
-        if (id === 'show_rules') {
-          return await ephemeralContent.handleShowRules(interaction);
-        }
-        if (id === 'show_howitworks') {
-          return await ephemeralContent.handleShowHowItWorks(interaction);
-        }
-        if (id === 'show_language') {
-          return await ephemeralContent.handleShowLanguage(interaction);
-        }
         // Dispute match selection
         if (id.startsWith('dispute_select_')) {
           return await disputeCreate.handleDisputeSelect(interaction);
@@ -192,10 +181,6 @@ module.exports = {
         }
         if (id === 'language_panel_select') {
           return await onboarding.handleLanguagePanelSelect(interaction);
-        }
-        // Ephemeral language picker (from the lobby 🌐 button)
-        if (id === 'ephemeral_lang_select') {
-          return await ephemeralContent.handleEphemeralLangSelect(interaction);
         }
         console.warn(`[Interaction] Unhandled string select customId: ${id}`);
         return;
