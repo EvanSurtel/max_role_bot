@@ -94,7 +94,13 @@ async function postEscrowPanel(client, lang = 'en') {
 
 async function handleEscrowButton(interaction) {
   const id = interaction.customId;
+  // The escrow panel is a SHARED admin message — when one admin clicks
+  // Refresh, the rebuilt panel must stay in the bot display language so
+  // it doesn't switch to the clicker's preferred language for everyone.
+  // Ephemeral replies still use the clicker's language (langFor).
   const lang = langFor(interaction);
+  const { getBotDisplayLanguage } = require('../utils/languageRefresh');
+  const sharedLang = getBotDisplayLanguage();
 
   // Admin only
   const adminRoleId = process.env.ADMIN_ROLE_ID;
@@ -103,7 +109,7 @@ async function handleEscrowButton(interaction) {
   }
 
   if (id === 'escrow_refresh') {
-    const panel = await buildEscrowPanel(lang);
+    const panel = await buildEscrowPanel(sharedLang);
     return interaction.update(panel);
   }
 

@@ -135,10 +135,18 @@ async function postSeasonPanel(client, lang = 'en') {
 
 /**
  * Handle season management buttons.
+ *
+ * The season panel is a SHARED admin message — panel rebuilds (refresh,
+ * pause, resume) use the bot display language so the panel doesn't switch
+ * into the clicker's preferred language for every other admin viewing it.
+ * Ephemeral replies and modals shown only to the clicker still use their
+ * personal language.
  */
 async function handleSeasonButton(interaction) {
   const id = interaction.customId;
   const lang = langFor(interaction);
+  const { getBotDisplayLanguage } = require('../utils/languageRefresh');
+  const sharedLang = getBotDisplayLanguage();
 
   // Check admin
   const adminRoleId = process.env.ADMIN_ROLE_ID;
@@ -147,7 +155,7 @@ async function handleSeasonButton(interaction) {
   }
 
   if (id === 'season_refresh') {
-    const panel = buildSeasonPanel(lang);
+    const panel = buildSeasonPanel(sharedLang);
     return interaction.update(panel);
   }
 
@@ -169,7 +177,7 @@ async function handleSeasonButton(interaction) {
       ephemeral: true,
     });
 
-    const panel = buildSeasonPanel(lang);
+    const panel = buildSeasonPanel(sharedLang);
     return interaction.message.edit(panel);
   }
 
@@ -191,7 +199,7 @@ async function handleSeasonButton(interaction) {
       ephemeral: true,
     });
 
-    const panel = buildSeasonPanel(lang);
+    const panel = buildSeasonPanel(sharedLang);
     return interaction.message.edit(panel);
   }
 
@@ -204,7 +212,7 @@ async function handleSeasonButton(interaction) {
       });
     }
 
-    // Show modal for new season name
+    // Modal is shown only to this admin, so use their personal language.
     const modal = new ModalBuilder()
       .setCustomId('season_end_modal')
       .setTitle(t('season_panel.modal_title', lang));
@@ -303,9 +311,12 @@ async function handleSeasonModal(interaction) {
       ].join('\n'),
     });
 
-    // Update the season panel — wipe + repost since the title is now translated
-    // and we can no longer match by title.
+    // Repost the season panel in the bot DISPLAY language (shared message,
+    // visible to all admins) — not the clicker's language. We wipe + repost
+    // because the translated title means we can't match the old one by title.
     try {
+      const { getBotDisplayLanguage } = require('../utils/languageRefresh');
+      const sharedLang = getBotDisplayLanguage();
       const channelId = process.env.SEASON_CHANNEL_ID;
       if (channelId) {
         const channel = interaction.client.channels.cache.get(channelId);
@@ -316,7 +327,7 @@ async function handleSeasonModal(interaction) {
               try { await m.delete(); } catch { /* */ }
             }
           }
-          await channel.send(buildSeasonPanel(lang));
+          await channel.send(buildSeasonPanel(sharedLang));
         }
       }
     } catch { /* */ }

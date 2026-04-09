@@ -215,7 +215,12 @@ async function handleLeaderboardButton(interaction) {
 async function handleLeaderboardSelect(interaction) {
   const id = interaction.customId;
   const selected = interaction.values[0];
-  const lang = langFor(interaction);
+  // Leaderboards are SHARED messages — use the bot display language so we
+  // don't switch the leaderboard into one user's preferred language for
+  // every other viewer. (langFor is still used elsewhere for ephemeral
+  // responses that only this user sees.)
+  const { getBotDisplayLanguage } = require('../utils/languageRefresh');
+  const lang = getBotDisplayLanguage();
 
   // XP leaderboard — region change
   if (id === 'xplb_region') {

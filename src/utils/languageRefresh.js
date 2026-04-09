@@ -153,24 +153,29 @@ async function refreshSharedPanels(client, lang) {
 }
 
 /**
- * Apply a language change everywhere — call this from the welcome master
- * switch handler and the dedicated language channel handler.
+ * Apply a language change for a single user — call this from the welcome
+ * master switch handler and the dedicated language channel handler.
  *
- * Updates:
- *  - Persist the new bot display language so it survives restarts
- *  - The user's private wallet channel (their language)
- *  - All shared panels (lobby, xp_match, welcome, rules, howItWorks,
- *    season, escrow, leaderboards)
+ * IMPORTANT: This is per-user. We do NOT touch shared panels here, because
+ * those are shared Discord messages that everyone sees — changing them when
+ * one user picks a language would force the new language onto every other
+ * user too. Shared panels stay in the bot's `display_language` (admin-set
+ * via bot_settings, defaults to English).
+ *
+ * What this does refresh:
+ *  - The user's private wallet channel (rebuilt in their language)
+ *
+ * What it does NOT touch:
+ *  - Lobby / XP match / welcome / rules / howItWorks / season / escrow /
+ *    leaderboard / language picker panels — all shared, all stay in
+ *    display_language.
+ *
+ * Per-user language is still applied to private/personal contexts via
+ * `langFor(interaction)` at the call sites: button click responses,
+ * modals, ephemeral replies, error messages, and notification channels.
  */
-async function applyLanguageChange(client, discordId, newLang) {
-  // Persist first so a crash mid-refresh still leaves us in the right state
-  setBotDisplayLanguage(newLang);
-
-  // Run wallet + shared panel updates in parallel
-  await Promise.all([
-    refreshWalletForUser(client, discordId),
-    refreshSharedPanels(client, newLang),
-  ]);
+async function applyLanguageChange(client, discordId, _newLang) {
+  await refreshWalletForUser(client, discordId);
 }
 
 module.exports = {

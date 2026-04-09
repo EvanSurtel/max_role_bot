@@ -399,7 +399,6 @@ async function handleWalletRefresh(interaction) {
  */
 async function handleWelcomeLanguageMaster(interaction) {
   const { SUPPORTED_LANGUAGES } = require('../locales');
-  const { buildWelcomePanel, buildWelcomeLanguagePicker } = require('../panels/welcomePanel');
 
   const newLang = interaction.values[0];
   if (!SUPPORTED_LANGUAGES[newLang]) {
@@ -415,48 +414,32 @@ async function handleWelcomeLanguageMaster(interaction) {
   }
   userRepo.setLanguage(discordId, newLang);
 
-  // Update the language picker message (the one the user clicked) in place
-  await interaction.update(buildWelcomeLanguagePicker(newLang));
+  // Per-user language: do NOT modify the shared welcome language picker or
+  // the welcome/TOS panel below it — those are SHARED messages and editing
+  // them would force this user's language onto every other user in the
+  // channel. Just acknowledge the click ephemerally and refresh the user's
+  // private wallet channel in the background.
+  const langName = SUPPORTED_LANGUAGES[newLang].nativeName;
+  await interaction.reply({
+    content: t('onboarding.language_saved', newLang, { language: langName }),
+    ephemeral: true,
+  });
 
-  // Then find the welcome/TOS panel below it (the next bot message in the
-  // channel) and update it too — so users immediately see the TOS in their
-  // chosen language.
-  try {
-    const channel = interaction.channel;
-    const after = await channel.messages.fetch({ limit: 5, after: interaction.message.id });
-    const welcomePanelMsg = after.find(m => m.author.id === interaction.client.user.id);
-    if (welcomePanelMsg) {
-      await welcomePanelMsg.edit(buildWelcomePanel(newLang));
-    }
-  } catch (err) {
-    console.error('[Welcome] Failed to update welcome panel after language switch:', err.message);
-  }
-
-  // Apply the language change everywhere — refresh the user's wallet channel
-  // (private) and the shared lobby + XP match panels so the user immediately
-  // sees the new language without having to manually click refresh anywhere.
   const { applyLanguageChange } = require('../utils/languageRefresh');
   applyLanguageChange(interaction.client, discordId, newLang).catch(err => {
     console.error('[Welcome] Background language refresh failed:', err.message);
-  });
-
-  // Send an ephemeral confirmation in the user's chosen language so they
-  // know the master switch worked. Auto-deletes after 5 min.
-  const langName = SUPPORTED_LANGUAGES[newLang].nativeName;
-  await interaction.followUp({
-    content: t('onboarding.language_saved', newLang, { language: langName }),
-    ephemeral: true,
   });
 }
 
 /**
  * Handler for the dedicated language channel select menu. Same behaviour
  * as handleWelcomeLanguageMaster — saves the user's language preference
- * and re-renders the panel in the new language.
+ * but does NOT modify the shared language picker (which is visible to
+ * everyone). Per-user language only affects this user's private/personal
+ * contexts (wallet, future button clicks, modals, error messages).
  */
 async function handleLanguagePanelSelect(interaction) {
   const { SUPPORTED_LANGUAGES } = require('../locales');
-  const { buildLanguagePanel } = require('../panels/languagePanel');
 
   const newLang = interaction.values[0];
   if (!SUPPORTED_LANGUAGES[newLang]) {
@@ -470,20 +453,17 @@ async function handleLanguagePanelSelect(interaction) {
   }
   userRepo.setLanguage(discordId, newLang);
 
-  const view = buildLanguagePanel(newLang);
-  await interaction.update(view);
+  // Acknowledge ephemerally — do NOT update the shared language panel,
+  // since that would change the visible state for every other user.
+  const langName = SUPPORTED_LANGUAGES[newLang].nativeName;
+  await interaction.reply({
+    content: t('onboarding.language_saved', newLang, { language: langName }),
+    ephemeral: true,
+  });
 
-  // Apply the language change everywhere — refresh the user's wallet channel
-  // and the shared lobby + XP match panels so the change is immediately visible.
   const { applyLanguageChange } = require('../utils/languageRefresh');
   applyLanguageChange(interaction.client, discordId, newLang).catch(err => {
     console.error('[LanguagePanel] Background language refresh failed:', err.message);
-  });
-
-  const langName = SUPPORTED_LANGUAGES[newLang].nativeName;
-  await interaction.followUp({
-    content: t('onboarding.language_saved', newLang, { language: langName }),
-    ephemeral: true,
   });
 }
 
