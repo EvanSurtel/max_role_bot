@@ -12,7 +12,7 @@ function buildLobbyPanel(lang = 'en') {
     .setDescription(t('lobby.description', lang))
     .setFooter({ text: t('lobby.footer', lang) });
 
-  const row = new ActionRowBuilder().addComponents(
+  const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('wager_type_wager')
       .setLabel(t('lobby.btn_create_wager', lang))
@@ -23,9 +23,29 @@ function buildLobbyPanel(lang = 'en') {
       .setStyle(ButtonStyle.Danger),
   );
 
-  // No language toggle here — the welcome panel and dedicated language
-  // channel are the only places to switch languages.
-  return { embeds: [embed], components: [row] };
+  // Row 2: per-user ephemeral content buttons. These show rules, how it
+  // works, and the language picker as EPHEMERAL messages only the clicker
+  // sees — which lets every user read the bot content in their own language
+  // even though the lobby message itself is shared.
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('show_rules')
+      .setEmoji('📖')
+      .setLabel(t('lobby.btn_rules', lang))
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('show_howitworks')
+      .setEmoji('❓')
+      .setLabel(t('lobby.btn_howitworks', lang))
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('show_language')
+      .setEmoji('🌐')
+      .setLabel(t('lobby.btn_language', lang))
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return { embeds: [embed], components: [row1, row2] };
 }
 
 /**
