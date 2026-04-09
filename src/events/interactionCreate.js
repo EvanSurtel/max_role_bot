@@ -107,6 +107,16 @@ module.exports = {
         if (id === 'challenge_cancel_nevermind') {
           return interaction.update({ content: 'Cancel aborted.', embeds: [], components: [] });
         }
+        // Acceptance flow teammate review buttons
+        if (id.startsWith('accept_remove_tm_')) {
+          return await challengeAccept.handleRemoveTeammate(interaction);
+        }
+        if (id.startsWith('accept_add_more_tm_')) {
+          return await challengeAccept.handleAddMoreTeammate(interaction);
+        }
+        if (id.startsWith('accept_tm_continue_')) {
+          return await challengeAccept.handleContinueTeammates(interaction);
+        }
         if (id.startsWith('challenge_cancel_') || id.startsWith('challenge_confirm_cancel_')) {
           return await challengeCancel.handleButton(interaction);
         }

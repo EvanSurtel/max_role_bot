@@ -75,6 +75,173 @@ function getLiveFlow(userId) {
 }
 
 /**
+ * Build the UI payload (content + components) for the current step of
+ * a flow. Used both for normal step transitions and for resuming a
+ * flow when the user dismissed their ephemeral and clicked Create
+ * Wager again.
+ *
+ * Returns { content, components, embeds } ready to pass to
+ * interaction.reply or interaction.update.
+ */
+function buildStepUI(flow, lang) {
+  const step = flow.step || 1;
+
+  // Step 1: team size buttons
+  if (step === 1) {
+    const row = new ActionRowBuilder().addComponents(
+      ...TEAM_SIZES.map(size =>
+        new ButtonBuilder().setCustomId(`wager_teamsize_${size}`).setLabel(`${size}v${size}`).setStyle(ButtonStyle.Secondary),
+      ),
+    );
+    const stepKey = flow.type === CHALLENGE_TYPE.WAGER ? 'challenge_create.setting_up_wager' : 'challenge_create.setting_up_xp';
+    return { content: t(stepKey, lang), embeds: [], components: [row, navRow(1, lang)] };
+  }
+
+  // Step 2: teammate selection — if some teammates already picked, show
+  // the review screen with add/remove buttons; otherwise show the picker.
+  if (step === 2) {
+    if (flow.teammates && flow.teammates.length > 0) {
+      return buildTeammateReviewUI(flow, lang);
+    }
+    const remaining = flow.teamSize - 1;
+    const selectRow = new ActionRowBuilder().addComponents(
+      new UserSelectMenuBuilder()
+        .setCustomId('select_teammates')
+        .setPlaceholder(t('challenge_create.select_teammates_placeholder', lang, { count: remaining }))
+        .setMinValues(1)
+        .setMaxValues(remaining),
+    );
+    return {
+      content: t('challenge_create.select_teammates', lang, { size: flow.teamSize, count: remaining }),
+      embeds: [],
+      components: [selectRow, navRow(2, lang)],
+    };
+  }
+
+  // Step 3: game mode buttons
+  if (step === 3) {
+    const modeKeys = Object.keys(GAME_MODES);
+    const rows = [];
+    for (let i = 0; i < modeKeys.length; i += 4) {
+      const chunk = modeKeys.slice(i, i + 4);
+      const row = new ActionRowBuilder().addComponents(
+        ...chunk.map(key =>
+          new ButtonBuilder().setCustomId(`wager_mode_${key}`).setLabel(GAME_MODES[key].label).setStyle(ButtonStyle.Secondary),
+        ),
+      );
+      rows.push(row);
+    }
+    rows.push(navRow(3, lang));
+    const content = flow.teammates && flow.teammates.length > 0
+      ? t('challenge_create.select_game_mode_with_teammates', lang, {
+          size: flow.teamSize,
+          teammates: flow.teammates.map(id => `<@${id}>`).join(', '),
+        })
+      : t('challenge_create.select_game_mode', lang, { size: flow.teamSize });
+    return { content, embeds: [], components: rows };
+  }
+
+  // Step 4: series length buttons
+  if (step === 4) {
+    const row = new ActionRowBuilder().addComponents(
+      ...SERIES_LENGTHS.map(len =>
+        new ButtonBuilder().setCustomId(`wager_series_${len}`).setLabel(t('challenge_create.series_label', lang, { n: len })).setStyle(ButtonStyle.Secondary),
+      ),
+    );
+    return {
+      content: t('challenge_create.select_series', lang, { mode: GAME_MODES[flow.gameMode]?.label || flow.gameMode }),
+      embeds: [],
+      components: [row, navRow(4, lang)],
+    };
+  }
+
+  // Step 5: visibility buttons
+  if (step === 5) {
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('wager_vis_anon').setLabel(t('challenge_create.btn_anonymous', lang)).setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('wager_vis_named').setLabel(t('challenge_create.btn_show_names', lang)).setStyle(ButtonStyle.Primary),
+    );
+    return {
+      content: [
+        t('challenge_create.visibility_title', lang),
+        '',
+        `${t('challenge_create.confirm_field_series', lang)}: **${t('challenge_create.series_label', lang, { n: flow.series })}**`,
+        '',
+        t('challenge_create.visibility_anon_desc', lang),
+        '',
+        t('challenge_create.visibility_named_desc', lang),
+      ].join('\n'),
+      embeds: [],
+      components: [row, navRow(5, lang)],
+    };
+  }
+
+  // Fallback (shouldn't happen): restart at step 1
+  flow.step = 1;
+  return buildStepUI(flow, lang);
+}
+
+/**
+ * Build the teammate review screen — shows each currently-selected
+ * teammate as a numbered line with a Remove button, plus an Add More
+ * button (if not full) and a Continue button (if full).
+ */
+function buildTeammateReviewUI(flow, lang) {
+  const required = flow.teamSize - 1;
+  const current = flow.teammates.length;
+  const isFull = current >= required;
+
+  const lines = [
+    t('challenge_create.teammates_review_title', lang, { current, required }),
+    '',
+    ...flow.teammates.map((id, i) => `${i + 1}. <@${id}>`),
+  ];
+  if (!isFull) {
+    lines.push('');
+    lines.push(t('challenge_create.teammates_need_more', lang, { n: required - current }));
+  }
+
+  // Row of remove buttons (one per teammate, max 5 per row)
+  const removeRows = [];
+  for (let i = 0; i < flow.teammates.length; i += 5) {
+    const chunk = flow.teammates.slice(i, i + 5);
+    const row = new ActionRowBuilder().addComponents(
+      ...chunk.map((discordId, j) =>
+        new ButtonBuilder()
+          .setCustomId(`wager_remove_tm_${discordId}`)
+          .setLabel(`✕ ${i + j + 1}`)
+          .setStyle(ButtonStyle.Danger),
+      ),
+    );
+    removeRows.push(row);
+  }
+
+  // Action row: Add More (if not full) + Continue (if full)
+  const actionRow = new ActionRowBuilder();
+  if (!isFull) {
+    actionRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId('wager_add_more_tm')
+        .setLabel(t('challenge_create.btn_add_more_teammates', lang))
+        .setStyle(ButtonStyle.Primary),
+    );
+  }
+  actionRow.addComponents(
+    new ButtonBuilder()
+      .setCustomId('wager_tm_continue')
+      .setLabel(t('challenge_create.btn_continue', lang))
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(!isFull),
+  );
+
+  return {
+    content: lines.join('\n'),
+    embeds: [],
+    components: [...removeRows, actionRow, navRow(2, lang)],
+  };
+}
+
+/**
  * Handle button interactions for challenge creation flow.
  *
  * The flow is fully ephemeral — every step is rendered as an ephemeral
@@ -191,19 +358,28 @@ async function handleButton(interaction) {
       return interaction.reply({ content: busy.reason, ephemeral: true });
     }
 
-    // If the user already has a live in-progress flow (idle < 30 min),
-    // tell them to finish or cancel that one first. Stale flows are
-    // auto-expired by getLiveFlow.
-    if (getLiveFlow(userId)) {
+    // If the user has a live in-progress flow (idle < 30 min), they
+    // probably dismissed their ephemeral and clicked Create Wager again.
+    // Resume the flow by sending a fresh ephemeral with the current step
+    // — they pick up exactly where they left off.
+    const existing = getLiveFlow(userId);
+    if (existing) {
+      const requestedType = id === 'wager_type_wager' ? CHALLENGE_TYPE.WAGER : CHALLENGE_TYPE.XP;
+      // If they're trying to start a DIFFERENT type than they had, that's
+      // ambiguous — just resume the existing flow regardless and let them
+      // cancel it if they wanted the other type.
+      touchFlow(existing);
+      const ui = buildStepUI(existing, lang);
       return interaction.reply({
-        content: t('challenge_create.already_in_progress', lang),
+        ...ui,
         ephemeral: true,
+        _persist: true,
       });
     }
 
     const type = id === 'wager_type_wager' ? CHALLENGE_TYPE.WAGER : CHALLENGE_TYPE.XP;
 
-    activeFlows.set(userId, {
+    const flow = {
       type,
       step: 1,
       teamSize: null,
@@ -212,29 +388,67 @@ async function handleButton(interaction) {
       series: null,
       anonymous: null,
       lastUpdated: Date.now(),
-    });
-
-    // Send team size buttons as the first ephemeral step
-    const row = new ActionRowBuilder().addComponents(
-      ...TEAM_SIZES.map(size =>
-        new ButtonBuilder()
-          .setCustomId(`wager_teamsize_${size}`)
-          .setLabel(`${size}v${size}`)
-          .setStyle(ButtonStyle.Secondary),
-      ),
-    );
-
-    const introKey = type === CHALLENGE_TYPE.WAGER
-      ? 'challenge_create.setting_up_wager'
-      : 'challenge_create.setting_up_xp';
+    };
+    activeFlows.set(userId, flow);
 
     // _persist: true — interface ephemeral, do not auto-delete
     return interaction.reply({
-      content: t(introKey, lang),
-      components: [row, navRow(1, lang)],
+      ...buildStepUI(flow, lang),
       ephemeral: true,
       _persist: true,
     });
+  }
+
+  // Teammate review: remove a specific teammate by Discord ID
+  if (id.startsWith('wager_remove_tm_')) {
+    const flow = getLiveFlow(userId);
+    if (!flow) {
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+    }
+    const removedId = id.replace('wager_remove_tm_', '');
+    flow.teammates = flow.teammates.filter(d => d !== removedId);
+    touchFlow(flow);
+    // If empty, go back to the picker; otherwise show updated review
+    flow.step = 2;
+    return interaction.update(buildStepUI(flow, lang));
+  }
+
+  // Teammate review: "Add More" — reopens the UserSelect picker for the
+  // remaining slots
+  if (id === 'wager_add_more_tm') {
+    const flow = getLiveFlow(userId);
+    if (!flow) {
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+    }
+    const remaining = (flow.teamSize - 1) - flow.teammates.length;
+    if (remaining <= 0) {
+      return interaction.reply({ content: t('challenge_create.teammates_already_full', lang), ephemeral: true });
+    }
+    const selectRow = new ActionRowBuilder().addComponents(
+      new UserSelectMenuBuilder()
+        .setCustomId('select_teammates')
+        .setPlaceholder(t('challenge_create.select_teammates_placeholder', lang, { count: remaining }))
+        .setMinValues(1)
+        .setMaxValues(remaining),
+    );
+    touchFlow(flow);
+    return interaction.update({
+      content: t('challenge_create.add_more_teammates_prompt', lang, { n: remaining }),
+      embeds: [],
+      components: [selectRow, navRow(2, lang)],
+    });
+  }
+
+  // Teammate review: "Continue" — proceed to game mode selection
+  if (id === 'wager_tm_continue') {
+    const flow = getLiveFlow(userId);
+    if (!flow) {
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+    }
+    if (flow.teammates.length !== flow.teamSize - 1) {
+      return interaction.reply({ content: t('challenge_create.need_exact_teammates', lang, { n: flow.teamSize - 1 }), ephemeral: true });
+    }
+    return showGameModes(interaction, flow);
   }
 
   // Step 2: Team size selection
@@ -246,28 +460,16 @@ async function handleButton(interaction) {
 
     const teamSize = parseInt(id.split('_')[2], 10);
     flow.teamSize = teamSize;
+    flow.teammates = []; // reset on team size change
     touchFlow(flow);
 
     // For team sizes > 1, show teammate select menu
     if (teamSize > 1) {
-      const selectRow = new ActionRowBuilder().addComponents(
-        new UserSelectMenuBuilder()
-          .setCustomId('select_teammates')
-          .setPlaceholder(t('challenge_create.select_teammates_placeholder', lang, { count: teamSize - 1 }))
-          .setMinValues(teamSize - 1)
-          .setMaxValues(teamSize - 1),
-      );
-
       flow.step = 2;
-      return interaction.update({
-        content: t('challenge_create.select_teammates', lang, { size: teamSize, count: teamSize - 1 }),
-        embeds: [],
-        components: [selectRow, navRow(2, lang)],
-      });
+      return interaction.update(buildStepUI(flow, lang));
     }
 
     // For 1v1, skip to game mode selection
-    flow.teammates = [];
     return showGameModes(interaction, flow);
   }
 
@@ -419,10 +621,18 @@ async function handleUserSelect(interaction) {
   if (interaction.customId === 'select_teammates') {
     const selectedUsers = interaction.values;
 
-    // Check each teammate is registered and not busy
+    // Reject self-selection
+    if (selectedUsers.includes(userId)) {
+      return interaction.reply({ content: t('common.cannot_select_yourself', lang), ephemeral: true });
+    }
+
+    // Check each teammate is registered, not busy, and not already in the list
     const userRepo = require('../database/repositories/userRepo');
     const { isPlayerBusy } = require('../utils/playerStatus');
     for (const teammateDiscordId of selectedUsers) {
+      if (flow.teammates.includes(teammateDiscordId)) {
+        return interaction.reply({ content: t('common.teammate_already_in', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true });
+      }
       const tmUser = userRepo.findByDiscordId(teammateDiscordId);
       if (!tmUser || !tmUser.cod_uid) {
         return interaction.reply({ content: t('common.teammate_not_registered', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true });
@@ -433,9 +643,13 @@ async function handleUserSelect(interaction) {
       }
     }
 
-    flow.teammates = selectedUsers;
+    // Merge: append new picks to existing list (no duplicates)
+    flow.teammates = [...flow.teammates, ...selectedUsers];
+    flow.step = 2;
     touchFlow(flow);
-    return showGameModes(interaction, flow);
+
+    // Show the review screen — user can remove individuals or add more
+    return interaction.update(buildStepUI(flow, lang));
   }
 }
 

@@ -268,6 +268,13 @@ module.exports = {
     created_by_user: 'Created by user #{id}',
     btn_accept_challenge: 'Accept Challenge',
     btn_cancel_challenge: 'Cancel',
+    teammates_review_title: '**Selected teammates ({current}/{required}):**',
+    teammates_need_more: 'Pick **{n}** more teammate(s) to continue.',
+    teammates_already_full: 'You already have all the teammates you need.',
+    add_more_teammates_prompt: 'Pick **{n}** more teammate(s).',
+    need_exact_teammates: 'You need exactly **{n}** teammate(s) before continuing.',
+    btn_add_more_teammates: '+ Add More',
+    btn_continue: 'Continue',
   },
 
   // Per-message language switcher (challenges + results)

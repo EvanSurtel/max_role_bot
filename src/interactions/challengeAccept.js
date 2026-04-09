@@ -254,139 +254,307 @@ async function handleConfirmedAccept(interaction) {
 }
 
 /**
+ * Build the teammate review UI for the acceptance flow — list of
+ * currently-picked teammates with Remove buttons, plus Add More /
+ * Continue actions.
+ */
+function buildAcceptTeammateReviewUI(flow, challenge, lang) {
+  const required = challenge.team_size - 1;
+  const current = flow.teammates.length;
+  const isFull = current >= required;
+  const challengeId = flow.challengeId;
+
+  const lines = [
+    t('challenge_create.teammates_review_title', lang, { current, required }),
+    '',
+    ...flow.teammates.map((id, i) => `${i + 1}. <@${id}>`),
+  ];
+  if (!isFull) {
+    lines.push('');
+    lines.push(t('challenge_create.teammates_need_more', lang, { n: required - current }));
+  }
+
+  const removeRows = [];
+  for (let i = 0; i < flow.teammates.length; i += 5) {
+    const chunk = flow.teammates.slice(i, i + 5);
+    const row = new ActionRowBuilder().addComponents(
+      ...chunk.map((discordId, j) =>
+        new ButtonBuilder()
+          .setCustomId(`accept_remove_tm_${challengeId}_${discordId}`)
+          .setLabel(`✕ ${i + j + 1}`)
+          .setStyle(ButtonStyle.Danger),
+      ),
+    );
+    removeRows.push(row);
+  }
+
+  const actionRow = new ActionRowBuilder();
+  if (!isFull) {
+    actionRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`accept_add_more_tm_${challengeId}`)
+        .setLabel(t('challenge_create.btn_add_more_teammates', lang))
+        .setStyle(ButtonStyle.Primary),
+    );
+  }
+  actionRow.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`accept_tm_continue_${challengeId}`)
+      .setLabel(t('challenge_create.btn_continue', lang))
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(!isFull),
+    new ButtonBuilder()
+      .setCustomId(`challenge_nevermind_${challengeId}`)
+      .setLabel(t('challenge_accept.btn_nevermind', lang))
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return {
+    content: lines.join('\n'),
+    embeds: [],
+    components: [...removeRows, actionRow],
+  };
+}
+
+/**
+ * Show the final acceptance confirmation embed (called when the user
+ * has selected all teammates and clicked Continue).
+ */
+async function showAcceptanceConfirmation(interaction, flow, challenge, lang) {
+  const discordId = interaction.user.id;
+  const { GAME_MODES } = require('../config/constants');
+  const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+  const entryUsdc = challenge.entry_amount_usdc;
+  const modeInfo = GAME_MODES[challenge.game_modes];
+  const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
+  const challengeId = challenge.id;
+
+  const team1Players = challengePlayerRepo.findByChallengeAndTeam(challengeId, 1);
+  const team1Lines = team1Players.map(p => {
+    const u = userRepo.findById(p.user_id);
+    return u ? `<@${u.discord_id}>${p.role === 'captain' ? ' (Captain)' : ''}` : 'Unknown';
+  });
+
+  const team2Lines = [`<@${discordId}> (Captain)`];
+  for (const tmId of flow.teammates) team2Lines.push(`<@${tmId}>`);
+
+  const entryText = isWager
+    ? `\n**${t('challenge_create.confirm_field_entry', lang)}:** ${formatUsdc(entryUsdc)} USDC ${t('challenge_create.per_player', lang)}\n**${t('challenge_create.confirm_field_pot', lang)}:** ${formatUsdc(Number(entryUsdc) * challenge.team_size * 2)} USDC`
+    : '';
+
+  const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+
+  const confirmEmbed = new EmbedBuilder()
+    .setTitle(t('challenge_accept.confirm_title', lang))
+    .setColor(0xe67e22)
+    .setDescription([
+      `**${typeLabel} #${challenge.display_number || challengeId}**`,
+      '',
+      `**${t('challenge_create.confirm_field_type', lang)}:** ${typeLabel}`,
+      `**${t('challenge_create.confirm_field_mode', lang)}:** ${modeLabel} | ${t('challenge_create.series_label', lang, { n: challenge.series_length })} | ${challenge.team_size}v${challenge.team_size}`,
+      entryText,
+      '',
+      `**Team 1:**`,
+      ...team1Lines,
+      '',
+      `**Team 2 (Your Team):**`,
+      ...team2Lines,
+      '',
+      isWager ? t('challenge_accept.confirm_held_notice', lang, { amount: formatUsdc(entryUsdc).replace('$', '') }) : '',
+      '',
+      t('challenge_accept.confirm_question_correct', lang),
+    ].join('\n'));
+
+  const confirmRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`challenge_team_confirm_${challengeId}`)
+      .setLabel(t('challenge_accept.btn_confirm_accept', lang))
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`challenge_nevermind_${challengeId}`)
+      .setLabel(t('challenge_accept.btn_nevermind', lang))
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.update({ embeds: [confirmEmbed], components: [confirmRow], content: '' });
+}
+
+/**
  * Handle user select menu interactions for opponent teammate selection.
  * customId format: select_opponents_${challengeId}
+ *
+ * Picks are merged into the existing flow.teammates list (so users can
+ * incrementally add). After every pick, the review screen is shown
+ * with Remove / Add More / Continue buttons.
  */
 async function handleUserSelect(interaction) {
   const customId = interaction.customId;
+  const lang = langFor(interaction);
   const challengeId = parseInt(customId.replace('select_opponents_', ''), 10);
   const discordId = interaction.user.id;
 
   if (isNaN(challengeId)) {
-    return interaction.reply({ content: 'Invalid challenge.', ephemeral: true });
+    return interaction.reply({ content: t('common.invalid_challenge', lang), ephemeral: true });
   }
 
-  // Get the flow from acceptFlows
   const flow = acceptFlows.get(discordId);
   if (!flow || flow.challengeId !== challengeId) {
     return interaction.reply({
-      content: 'Session expired. Please click "Accept Challenge" again.',
+      content: t('common.session_expired_simple', lang),
       ephemeral: true,
     });
   }
 
-  const selectedDiscordIds = interaction.values; // Array of Discord user IDs
-  flow.teammates = selectedDiscordIds;
-
-  await interaction.deferUpdate();
+  const selectedDiscordIds = interaction.values;
 
   try {
-    // Re-fetch the challenge to ensure it's still open
     const challenge = challengeRepo.findById(challengeId);
     if (!challenge || challenge.status !== CHALLENGE_STATUS.OPEN) {
       acceptFlows.delete(discordId);
-      return interaction.editReply({
-        content: 'This challenge is no longer available.',
+      return interaction.update({
+        content: t('common.challenge_not_available', lang),
         components: [],
+        embeds: [],
       });
     }
 
-    // Validate: none of the selected teammates are already in the challenge or busy
+    // Reject self-selection
+    if (selectedDiscordIds.includes(discordId)) {
+      return interaction.reply({ content: t('common.cannot_select_yourself', lang), ephemeral: true });
+    }
+
+    // Validate each picked teammate
     const { isPlayerBusy } = require('../utils/playerStatus');
     for (const teammateDiscordId of selectedDiscordIds) {
+      if (flow.teammates.includes(teammateDiscordId)) {
+        return interaction.reply({ content: t('common.teammate_already_in', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true });
+      }
       const teammateUser = userRepo.findByDiscordId(teammateDiscordId);
       if (!teammateUser || !teammateUser.cod_uid) {
-        acceptFlows.delete(discordId);
-        return interaction.editReply({ content: `<@${teammateDiscordId}> is not registered.`, components: [] });
+        return interaction.reply({ content: t('common.teammate_not_registered', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true });
       }
       const existing = challengePlayerRepo.findByChallengeAndUser(challengeId, teammateUser.id);
       if (existing) {
-        acceptFlows.delete(discordId);
-        return interaction.editReply({ content: `<@${teammateDiscordId}> is already part of this challenge.`, components: [] });
+        return interaction.reply({ content: t('common.teammate_already_in', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true });
       }
       const busy = isPlayerBusy(teammateUser.id);
       if (busy.busy) {
-        acceptFlows.delete(discordId);
-        return interaction.editReply({ content: `<@${teammateDiscordId}> is currently busy: ${busy.reason}`, components: [] });
+        return interaction.reply({ content: t('common.teammate_busy', lang, { user: `<@${teammateDiscordId}>`, reason: busy.reason }), ephemeral: true });
       }
     }
 
-    // Check that selected teammates are not the acceptor themselves
-    if (selectedDiscordIds.includes(discordId)) {
-      acceptFlows.delete(discordId);
-      return interaction.editReply({
-        content: 'You cannot select yourself as a teammate.',
-        components: [],
-      });
-    }
+    // Merge new picks with existing list
+    flow.teammates = [...flow.teammates, ...selectedDiscordIds];
 
     const user = userRepo.findByDiscordId(discordId);
     if (!user) {
       acceptFlows.delete(discordId);
-      return interaction.editReply({ content: 'You need to complete onboarding first.', components: [] });
+      return interaction.update({ content: t('common.onboarding_required', lang), components: [], embeds: [] });
     }
 
-    // Show full confirmation with team rosters before processing
-    const { GAME_MODES } = require('../config/constants');
-    const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
-    const entryUsdc = challenge.entry_amount_usdc;
-    const modeInfo = GAME_MODES[challenge.game_modes];
-    const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
-
-    // Get team 1 players
-    const team1Players = challengePlayerRepo.findByChallengeAndTeam(challengeId, 1);
-    const team1Lines = team1Players.map(p => {
-      const u = userRepo.findById(p.user_id);
-      return u ? `<@${u.discord_id}>${p.role === 'captain' ? ' (Captain)' : ''}` : 'Unknown';
-    });
-
-    // Team 2 = acceptor + selected teammates
-    const team2Lines = [`<@${discordId}> (Captain)`];
-    for (const tmId of selectedDiscordIds) {
-      team2Lines.push(`<@${tmId}>`);
-    }
-
-    const entryText = isWager ? `\n**Entry:** ${formatUsdc(entryUsdc)} USDC per player\n**Total Pot:** ${formatUsdc(Number(entryUsdc) * challenge.team_size * 2)} USDC` : '';
-
-    const confirmEmbed = new EmbedBuilder()
-      .setTitle('Confirm Accept')
-      .setColor(0xe67e22)
-      .setDescription([
-        `**${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId}**`,
-        '',
-        `**Type:** ${isWager ? 'Wager' : 'XP Match'}`,
-        `**Mode:** ${modeLabel} | Bo${challenge.series_length} | ${challenge.team_size}v${challenge.team_size}`,
-        entryText,
-        '',
-        `**Team 1:**`,
-        ...team1Lines,
-        '',
-        `**Team 2 (Your Team):**`,
-        ...team2Lines,
-        '',
-        isWager ? `Your **${formatUsdc(entryUsdc)} USDC** will be held from your wallet.` : '',
-        '',
-        'Does this look correct?',
-      ].join('\n'));
-
-    const confirmRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`challenge_team_confirm_${challengeId}`)
-        .setLabel('Confirm & Accept')
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId(`challenge_nevermind_${challengeId}`)
-        .setLabel('Cancel')
-        .setStyle(ButtonStyle.Secondary),
-    );
-
-    return interaction.editReply({ embeds: [confirmEmbed], components: [confirmRow] });
+    // Show the review screen — user can add/remove until they hit Continue
+    return interaction.update(buildAcceptTeammateReviewUI(flow, challenge, lang));
 
   } catch (err) {
     console.error(`[ChallengeAccept] Error in team select for challenge #${challengeId}:`, err);
-    acceptFlows.delete(discordId);
-    return interaction.editReply({ content: 'Something went wrong.', components: [] });
+    return interaction.reply({ content: t('common.error_generic', lang), ephemeral: true });
   }
+}
+
+/**
+ * Handle the Remove (✕) button on a teammate in the acceptance review.
+ * customId: accept_remove_tm_{challengeId}_{teammateDiscordId}
+ */
+async function handleRemoveTeammate(interaction) {
+  const lang = langFor(interaction);
+  const parts = interaction.customId.replace('accept_remove_tm_', '').split('_');
+  const challengeId = parseInt(parts[0], 10);
+  const removedDiscordId = parts.slice(1).join('_');
+  const discordId = interaction.user.id;
+
+  const flow = acceptFlows.get(discordId);
+  if (!flow || flow.challengeId !== challengeId) {
+    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+  }
+
+  const challenge = challengeRepo.findById(challengeId);
+  if (!challenge || challenge.status !== CHALLENGE_STATUS.OPEN) {
+    acceptFlows.delete(discordId);
+    return interaction.update({ content: t('common.challenge_not_available', lang), components: [], embeds: [] });
+  }
+
+  flow.teammates = flow.teammates.filter(d => d !== removedDiscordId);
+  return interaction.update(buildAcceptTeammateReviewUI(flow, challenge, lang));
+}
+
+/**
+ * Handle "Add More" — re-open the UserSelect picker for the remaining slots.
+ * customId: accept_add_more_tm_{challengeId}
+ */
+async function handleAddMoreTeammate(interaction) {
+  const lang = langFor(interaction);
+  const challengeId = parseInt(interaction.customId.replace('accept_add_more_tm_', ''), 10);
+  const discordId = interaction.user.id;
+
+  const flow = acceptFlows.get(discordId);
+  if (!flow || flow.challengeId !== challengeId) {
+    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+  }
+
+  const challenge = challengeRepo.findById(challengeId);
+  if (!challenge || challenge.status !== CHALLENGE_STATUS.OPEN) {
+    acceptFlows.delete(discordId);
+    return interaction.update({ content: t('common.challenge_not_available', lang), components: [], embeds: [] });
+  }
+
+  const remaining = (challenge.team_size - 1) - flow.teammates.length;
+  if (remaining <= 0) {
+    return interaction.reply({ content: t('challenge_create.teammates_already_full', lang), ephemeral: true });
+  }
+
+  const selectRow = new ActionRowBuilder().addComponents(
+    new UserSelectMenuBuilder()
+      .setCustomId(`select_opponents_${challengeId}`)
+      .setPlaceholder(t('challenge_create.select_teammates_placeholder', lang, { count: remaining }))
+      .setMinValues(1)
+      .setMaxValues(remaining),
+  );
+
+  return interaction.update({
+    content: t('challenge_create.add_more_teammates_prompt', lang, { n: remaining }),
+    components: [selectRow],
+    embeds: [],
+  });
+}
+
+/**
+ * Handle "Continue" from the teammate review — show final confirmation.
+ * customId: accept_tm_continue_{challengeId}
+ */
+async function handleContinueTeammates(interaction) {
+  const lang = langFor(interaction);
+  const challengeId = parseInt(interaction.customId.replace('accept_tm_continue_', ''), 10);
+  const discordId = interaction.user.id;
+
+  const flow = acceptFlows.get(discordId);
+  if (!flow || flow.challengeId !== challengeId) {
+    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+  }
+
+  const challenge = challengeRepo.findById(challengeId);
+  if (!challenge || challenge.status !== CHALLENGE_STATUS.OPEN) {
+    acceptFlows.delete(discordId);
+    return interaction.update({ content: t('common.challenge_not_available', lang), components: [], embeds: [] });
+  }
+
+  if (flow.teammates.length !== challenge.team_size - 1) {
+    return interaction.reply({
+      content: t('challenge_create.need_exact_teammates', lang, { n: challenge.team_size - 1 }),
+      ephemeral: true,
+    });
+  }
+
+  return showAcceptanceConfirmation(interaction, flow, challenge, lang);
 }
 
 /**
@@ -683,4 +851,12 @@ async function disableBoardMessage(client, challenge) {
   }
 }
 
-module.exports = { handleButton, handleConfirmedAccept, handleTeamConfirmedAccept, handleUserSelect };
+module.exports = {
+  handleButton,
+  handleConfirmedAccept,
+  handleTeamConfirmedAccept,
+  handleUserSelect,
+  handleRemoveTeammate,
+  handleAddMoreTeammate,
+  handleContinueTeammates,
+};
