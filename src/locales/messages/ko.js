@@ -43,6 +43,7 @@ module.exports = {
     teammate_not_registered: '{user}는 미등록 상태예요. 챌린지에 참여하려면 먼저 등록해야 해요.',
     teammate_busy: '{user}는 현재 사용 중이에요: {reason}',
     teammate_already_in: '{user}는 이미 이 챌린지에 참여 중이에요.',
+    btn_language: '언어',
   },
 
   tx_type: {
@@ -87,6 +88,19 @@ module.exports = {
     history_empty: '거래 내역이 없어요.',
     language_picker_title: '언어 선택',
     language_picker_desc: '봇이 당신과 사용할 언어를 선택하세요.',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 지갑',
+    description: '아래의 **내 지갑 보기** 버튼을 클릭하면 잔액, 입금 주소, 거래 내역을 확인하고 자금을 관리할 수 있어요.\n\n지갑 정보는 **비공개** 예요 — 본인의 잔액과 작업은 본인만 볼 수 있어요.',
+    footer: 'Solana의 USDC + SOL',
+    btn_view_wallet: '내 지갑 보기',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **입금이 도착했어요!**\n\n**${amount} USDC**를 받았어요. 새로운 사용 가능 잔액은 **${new_balance} USDC**예요.\n\n상세 내용을 확인하려면 지갑 채널에서 **내 지갑 보기** 버튼을 클릭하세요.',
   },
 
   wallet_embed: {

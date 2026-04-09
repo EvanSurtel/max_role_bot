@@ -90,6 +90,19 @@ module.exports = {
     language_picker_desc: 'ボットがあなたと話すときに使う言語を選択してください。',
   },
 
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 ウォレット',
+    description: '下の **マイウォレットを表示** をクリックすると、残高、入金アドレス、取引履歴を確認し、資金を管理できます。\n\nウォレット情報は **プライベート** です — 自分の残高と操作は自分だけが見ることができます。',
+    footer: 'Solana 上の USDC + SOL',
+    btn_view_wallet: 'マイウォレットを表示',
+  },
+
+  // Direct messages from the bot to a user (deposit notifications, etc.)
+  deposit_dm: {
+    received: '💰 **入金を受け取りました！**\n\n**${amount} USDC** を受け取りました。新しい利用可能残高は **${new_balance} USDC** です。\n\n詳細を見るには、ウォレットチャンネルで **マイウォレットを表示** をクリックしてください。',
+  },
+
   wallet_embed: {
     title: '{username} のウォレット',
     address: 'Solanaアドレス',
