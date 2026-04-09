@@ -240,21 +240,6 @@ module.exports = {
     not_found: 'Bu öğe artık mevcut değil.',
   },
 
-  // Maç sonucu embed\'i (sonuç kanallarına gönderilir)
-  match_result_embed: {
-    title: '{type} #{matchId} — Sonuç',
-    winners: 'Kazananlar',
-    losers: 'Kaybedenler',
-    title_pot: '**Takım {team} kazandı! Pot: {amount} USDC**',
-    title_no_pot: '**Takım {team} kazandı!**',
-    field_mode: 'Mod',
-    field_series: 'Seri',
-    field_team_size: 'Takım Boyutu',
-    field_entry: 'Giriş',
-    series_format: 'Best of {n}',
-    entry_per_player: 'Oyuncu başına {amount}',
-  },
-
   challenge_accept: {
     confirm_title: 'Kabulü Onayla',
     confirm_about_to_accept: '**{type} #{num}** kabul etmek üzeresin',

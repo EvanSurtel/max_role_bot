@@ -239,21 +239,6 @@ module.exports = {
     not_found: 'यह item अब available नहीं है।',
   },
 
-  // Match result embed (posted to results channels)
-  match_result_embed: {
-    title: '{type} #{matchId} — Result',
-    winners: 'Winners',
-    losers: 'Losers',
-    title_pot: '**Team {team} जीत गई! Pot: {amount} USDC**',
-    title_no_pot: '**Team {team} जीत गई!**',
-    field_mode: 'Mode',
-    field_series: 'Series',
-    field_team_size: 'Team Size',
-    field_entry: 'Entry',
-    series_format: 'Best of {n}',
-    entry_per_player: '{amount} प्रति player',
-  },
-
   challenge_accept: {
     confirm_title: 'Accept Confirm करो',
     confirm_about_to_accept: 'तुम **{type} #{num}** accept करने वाले हो',

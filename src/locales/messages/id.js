@@ -239,21 +239,6 @@ module.exports = {
     not_found: 'Item ini sudah tidak tersedia.',
   },
 
-  // Match result embed (posted to results channels)
-  match_result_embed: {
-    title: '{type} #{matchId} — Hasil',
-    winners: 'Pemenang',
-    losers: 'Yang Kalah',
-    title_pot: '**Tim {team} menang! Pot: {amount} USDC**',
-    title_no_pot: '**Tim {team} menang!**',
-    field_mode: 'Mode',
-    field_series: 'Series',
-    field_team_size: 'Ukuran Tim',
-    field_entry: 'Entry',
-    series_format: 'Best of {n}',
-    entry_per_player: '{amount} per pemain',
-  },
-
   challenge_accept: {
     confirm_title: 'Konfirmasi Accept',
     confirm_about_to_accept: 'Kamu akan menerima **{type} #{num}**',

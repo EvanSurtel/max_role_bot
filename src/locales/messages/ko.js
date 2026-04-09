@@ -239,21 +239,6 @@ module.exports = {
     not_found: '이 항목은 더 이상 사용할 수 없어요.',
   },
 
-  // 매치 결과 임베드 (결과 채널에 게시)
-  match_result_embed: {
-    title: '{type} #{matchId} — 결과',
-    winners: '승자',
-    losers: '패자',
-    title_pot: '**팀 {team} 승리! 상금: {amount} USDC**',
-    title_no_pot: '**팀 {team} 승리!**',
-    field_mode: '모드',
-    field_series: '시리즈',
-    field_team_size: '팀 크기',
-    field_entry: '참가비',
-    series_format: 'Best of {n}',
-    entry_per_player: '플레이어당 {amount}',
-  },
-
   challenge_accept: {
     confirm_title: '수락 확인',
     confirm_about_to_accept: '**{type} #{num}**을(를) 수락하려고 해요',

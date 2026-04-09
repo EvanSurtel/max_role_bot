@@ -240,21 +240,6 @@ module.exports = {
     not_found: 'Этот элемент больше недоступен.',
   },
 
-  // Эмбед результата матча (публикуется в каналах результатов)
-  match_result_embed: {
-    title: '{type} #{matchId} — Результат',
-    winners: 'Победители',
-    losers: 'Проигравшие',
-    title_pot: '**Команда {team} побеждает! Банк: {amount} USDC**',
-    title_no_pot: '**Команда {team} побеждает!**',
-    field_mode: 'Режим',
-    field_series: 'Серия',
-    field_team_size: 'Размер Команды',
-    field_entry: 'Вход',
-    series_format: 'Best of {n}',
-    entry_per_player: '{amount} на игрока',
-  },
-
   challenge_accept: {
     confirm_title: 'Подтвердить Принятие',
     confirm_about_to_accept: 'Ты собираешься принять **{type} #{num}**',

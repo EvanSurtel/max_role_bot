@@ -239,21 +239,6 @@ module.exports = {
     not_found: 'Hindi na available ang item na ito.',
   },
 
-  // Match result embed (posted to results channels)
-  match_result_embed: {
-    title: '{type} #{matchId} — Resulta',
-    winners: 'Mga Nanalo',
-    losers: 'Mga Natalo',
-    title_pot: '**Nanalo ang Team {team}! Pot: {amount} USDC**',
-    title_no_pot: '**Nanalo ang Team {team}!**',
-    field_mode: 'Mode',
-    field_series: 'Series',
-    field_team_size: 'Team Size',
-    field_entry: 'Entry',
-    series_format: 'Best of {n}',
-    entry_per_player: '{amount} kada player',
-  },
-
   challenge_accept: {
     confirm_title: 'Kumpirmahin ang Pag-accept',
     confirm_about_to_accept: 'Tatanggapin mo na ang **{type} #{num}**',

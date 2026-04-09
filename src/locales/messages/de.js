@@ -239,21 +239,6 @@ module.exports = {
     not_found: 'Dieser Eintrag ist nicht mehr verfügbar.',
   },
 
-  // Match-Ergebnis-Embed (in Ergebniskanälen gepostet)
-  match_result_embed: {
-    title: '{type} #{matchId} — Ergebnis',
-    winners: 'Gewinner',
-    losers: 'Verlierer',
-    title_pot: '**Team {team} gewinnt! Pot: {amount} USDC**',
-    title_no_pot: '**Team {team} gewinnt!**',
-    field_mode: 'Modus',
-    field_series: 'Serie',
-    field_team_size: 'Teamgröße',
-    field_entry: 'Einsatz',
-    series_format: 'Best of {n}',
-    entry_per_player: '{amount} pro Spieler',
-  },
-
   challenge_accept: {
     confirm_title: 'Annahme Bestätigen',
     confirm_about_to_accept: 'Du bist dabei, **{type} #{num}** anzunehmen',

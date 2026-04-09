@@ -239,21 +239,6 @@ module.exports = {
     not_found: 'هذا العنصر لم يعد متاحاً.',
   },
 
-  // إمبد نتيجة المباراة (يُنشر في قنوات النتائج)
-  match_result_embed: {
-    title: '{type} #{matchId} — النتيجة',
-    winners: 'الفائزون',
-    losers: 'الخاسرون',
-    title_pot: '**الفريق {team} يفوز! الجائزة: {amount} USDC**',
-    title_no_pot: '**الفريق {team} يفوز!**',
-    field_mode: 'الطور',
-    field_series: 'السلسلة',
-    field_team_size: 'حجم الفريق',
-    field_entry: 'الدخول',
-    series_format: 'أفضل من {n}',
-    entry_per_player: '{amount} لكل لاعب',
-  },
-
   challenge_accept: {
     confirm_title: 'تأكيد القبول',
     confirm_about_to_accept: 'أنت على وشك قبول **{type} #{num}**',

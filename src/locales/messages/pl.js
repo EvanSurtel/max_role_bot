@@ -240,21 +240,6 @@ module.exports = {
     not_found: 'Ta pozycja nie jest już dostępna.',
   },
 
-  // Match result embed (posted to results channels)
-  match_result_embed: {
-    title: '{type} #{matchId} — Wynik',
-    winners: 'Zwycięzcy',
-    losers: 'Przegrani',
-    title_pot: '**Drużyna {team} wygrywa! Pula: {amount} USDC**',
-    title_no_pot: '**Drużyna {team} wygrywa!**',
-    field_mode: 'Tryb',
-    field_series: 'Seria',
-    field_team_size: 'Rozmiar Drużyny',
-    field_entry: 'Wpisowe',
-    series_format: 'Best of {n}',
-    entry_per_player: '{amount} na gracza',
-  },
-
   challenge_accept: {
     confirm_title: 'Potwierdź Akceptację',
     confirm_about_to_accept: 'Zamierzasz przyjąć **{type} #{num}**',

@@ -239,21 +239,6 @@ module.exports = {
     not_found: 'Mục này không còn khả dụng.',
   },
 
-  // Match result embed (posted to results channels)
-  match_result_embed: {
-    title: '{type} #{matchId} — Kết Quả',
-    winners: 'Người Thắng',
-    losers: 'Người Thua',
-    title_pot: '**Đội {team} thắng! Pot: {amount} USDC**',
-    title_no_pot: '**Đội {team} thắng!**',
-    field_mode: 'Mode',
-    field_series: 'Series',
-    field_team_size: 'Kích Thước Đội',
-    field_entry: 'Entry',
-    series_format: 'Best of {n}',
-    entry_per_player: '{amount} mỗi người',
-  },
-
   challenge_accept: {
     confirm_title: 'Xác Nhận Chấp Nhận',
     confirm_about_to_accept: 'Bạn sắp chấp nhận **{type} #{num}**',

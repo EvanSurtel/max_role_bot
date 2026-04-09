@@ -239,21 +239,6 @@ module.exports = {
     not_found: 'このアイテムはもう利用できません。',
   },
 
-  // マッチ結果の埋め込み（結果チャンネルに投稿）
-  match_result_embed: {
-    title: '{type} #{matchId} — 結果',
-    winners: '勝者',
-    losers: '敗者',
-    title_pot: '**チーム {team} の勝利！ポット：{amount} USDC**',
-    title_no_pot: '**チーム {team} の勝利！**',
-    field_mode: 'モード',
-    field_series: 'シリーズ',
-    field_team_size: 'チームサイズ',
-    field_entry: 'エントリー',
-    series_format: 'Best of {n}',
-    entry_per_player: 'プレイヤーごとに {amount}',
-  },
-
   challenge_accept: {
     confirm_title: '受諾の確認',
     confirm_about_to_accept: '**{type} #{num}** を受けようとしています',

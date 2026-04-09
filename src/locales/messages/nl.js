@@ -240,21 +240,6 @@ module.exports = {
     not_found: 'Dit item is niet meer beschikbaar.',
   },
 
-  // Match result embed (posted to results channels)
-  match_result_embed: {
-    title: '{type} #{matchId} — Resultaat',
-    winners: 'Winnaars',
-    losers: 'Verliezers',
-    title_pot: '**Team {team} wint! Pot: {amount} USDC**',
-    title_no_pot: '**Team {team} wint!**',
-    field_mode: 'Mode',
-    field_series: 'Serie',
-    field_team_size: 'Team Grootte',
-    field_entry: 'Inschrijving',
-    series_format: 'Best of {n}',
-    entry_per_player: '{amount} per speler',
-  },
-
   challenge_accept: {
     confirm_title: 'Bevestig Accepteren',
     confirm_about_to_accept: 'Je staat op het punt **{type} #{num}** te accepteren',

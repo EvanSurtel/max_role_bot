@@ -239,21 +239,6 @@ module.exports = {
     not_found: '此项目不再可用。',
   },
 
-  // Match result embed (posted to results channels)
-  match_result_embed: {
-    title: '{type} #{matchId} — 结果',
-    winners: '获胜者',
-    losers: '失败者',
-    title_pot: '**队伍 {team} 获胜!奖池: {amount} USDC**',
-    title_no_pot: '**队伍 {team} 获胜!**',
-    field_mode: '模式',
-    field_series: '系列',
-    field_team_size: '队伍人数',
-    field_entry: '入场费',
-    series_format: 'Best of {n}',
-    entry_per_player: '每位玩家 {amount}',
-  },
-
   challenge_accept: {
     confirm_title: '确认接受',
     confirm_about_to_accept: '你即将接受 **{type} #{num}**',

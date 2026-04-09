@@ -239,21 +239,6 @@ module.exports = {
     not_found: 'Cet élément n\'est plus disponible.',
   },
 
-  // Embed de résultat de match (publié dans les salons de résultats)
-  match_result_embed: {
-    title: '{type} #{matchId} — Résultat',
-    winners: 'Gagnants',
-    losers: 'Perdants',
-    title_pot: '**L\'Équipe {team} gagne ! Cagnotte : {amount} USDC**',
-    title_no_pot: '**L\'Équipe {team} gagne !**',
-    field_mode: 'Mode',
-    field_series: 'Série',
-    field_team_size: 'Taille d\'Équipe',
-    field_entry: 'Mise',
-    series_format: 'Best of {n}',
-    entry_per_player: '{amount} par joueur',
-  },
-
   challenge_accept: {
     confirm_title: 'Confirmer l\'Acceptation',
     confirm_about_to_accept: 'Vous êtes sur le point d\'accepter **{type} #{num}**',
