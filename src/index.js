@@ -81,6 +81,9 @@ client.once('ready', async () => {
     const { postLobbyPanel } = require('./panels/lobbyPanel');
     await postLobbyPanel(client, displayLang);
 
+    const { postPublicWalletPanel } = require('./panels/publicWalletPanel');
+    await postPublicWalletPanel(client, displayLang);
+
     const { postXpMatchPanel } = require('./panels/xpMatchPanel');
     await postXpMatchPanel(client, displayLang);
 

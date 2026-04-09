@@ -12,34 +12,54 @@ const transactionRepo = require('../database/repositories/transactionRepo');
 const walletManager = require('../solana/walletManager');
 const transactionService = require('../solana/transactionService');
 const { USDC_PER_UNIT, TRANSACTION_TYPE } = require('../config/constants');
-const { t } = require('../locales/i18n');
+const { t, langFor } = require('../locales/i18n');
 
 /**
- * Resolve the language to use for a wallet-channel interaction.
- * Wallet channels are private per-user, so we look up the channel owner and
- * use their saved language preference (admins viewing don't override it).
+ * Handle the "View My Wallet" button click from the public wallet channel.
+ *
+ * Sends an ephemeral message with the clicker's wallet view (balance,
+ * address, action buttons) in their own language. Only the clicker sees it.
+ * The ephemeral is persistent (does not auto-delete) so the user can use
+ * the action buttons without the message disappearing.
  */
-function resolveLang(interaction) {
-  const db = require('../database/db');
-  const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
-  if (channelOwner && channelOwner.language) return channelOwner.language;
-  // Fallback: use the clicker's saved language
+async function handleWalletViewOpen(interaction) {
+  const lang = langFor(interaction);
   const user = userRepo.findByDiscordId(interaction.user.id);
-  return (user && user.language) || 'en';
+  if (!user) {
+    return interaction.reply({ content: t('common.onboarding_required', lang), ephemeral: true });
+  }
+
+  const wallet = walletRepo.findByUserId(user.id);
+  if (!wallet) {
+    return interaction.reply({ content: t('common.wallet_not_found', lang), ephemeral: true });
+  }
+
+  let solBalance = '0';
+  try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
+
+  const { buildWalletView } = require('./walletPanelView');
+  const view = buildWalletView(wallet, user, lang, solBalance);
+
+  // _persist: true — the wallet ephemeral must not auto-delete so the user
+  // can click Copy Address / Withdraw / History on it without losing it.
+  await interaction.reply({
+    ...view,
+    ephemeral: true,
+    _persist: true,
+  });
 }
 
 /**
- * Handle wallet sub-buttons (deposit info, withdraw, history, copy address).
- * Wallet channel ephemerals are kept (not auto-deleted) so users can review them.
+ * Handle wallet sub-buttons on the ephemeral wallet view (copy address,
+ * withdraw, history, refresh). Always resolves the user via interaction.user.id
+ * since there are no per-user wallet channels anymore — the ephemeral is
+ * already scoped to the clicker.
  */
 async function handleWalletSubButton(interaction) {
   const id = interaction.customId;
-  const lang = resolveLang(interaction);
+  const lang = langFor(interaction);
 
-  // Look up wallet owner by channel (admins can view other users' wallet channels)
-  const db = require('../database/db');
-  const channelOwner = db.prepare('SELECT * FROM users WHERE wallet_channel_id = ?').get(interaction.channel.id);
-  const user = channelOwner || userRepo.findByDiscordId(interaction.user.id);
+  const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) {
     return interaction.reply({ content: t('common.user_not_found', lang), ephemeral: true });
   }
@@ -64,6 +84,20 @@ async function handleWalletSubButton(interaction) {
       content: `\`\`\`\n${wallet.solana_address}\n\`\`\``,
       ephemeral: true,
     });
+  }
+
+  if (id === 'wallet_refresh') {
+    // Re-render the ephemeral wallet view in place with fresh balance data.
+    await interaction.deferUpdate();
+
+    let solBalance = '0';
+    try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
+
+    // Re-fetch wallet to pick up any balance changes
+    const freshWallet = walletRepo.findByUserId(user.id);
+    const { buildWalletView } = require('./walletPanelView');
+    const view = buildWalletView(freshWallet, user, lang, solBalance);
+    return interaction.editReply(view);
   }
 
   if (id === 'wallet_withdraw_sol') {
@@ -183,7 +217,7 @@ async function handleWalletSubButton(interaction) {
  * Handle the USDC withdraw modal submission.
  */
 async function handleWithdrawModal(interaction) {
-  const lang = resolveLang(interaction);
+  const lang = langFor(interaction);
   const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) {
     return interaction.reply({ content: t('common.onboarding_required', lang), ephemeral: true });
@@ -280,7 +314,7 @@ async function handleWithdrawModal(interaction) {
  * Handle the SOL withdraw modal submission.
  */
 async function handleWithdrawSolModal(interaction) {
-  const lang = resolveLang(interaction);
+  const lang = langFor(interaction);
   const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) {
     return interaction.reply({ content: t('common.onboarding_required', lang), ephemeral: true });
@@ -349,4 +383,4 @@ async function handleWithdrawSolModal(interaction) {
   }
 }
 
-module.exports = { handleWalletSubButton, handleWithdrawModal, handleWithdrawSolModal };
+module.exports = { handleWalletViewOpen, handleWalletSubButton, handleWithdrawModal, handleWithdrawSolModal };

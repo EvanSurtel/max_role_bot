@@ -62,6 +62,15 @@ module.exports = {
     teammate_not_registered: '{user} is not registered. They must register before joining a challenge.',
     teammate_busy: '{user} is currently busy: {reason}',
     teammate_already_in: '{user} is already part of this challenge.',
+    btn_language: 'Language',
+  },
+
+  // Public wallet channel panel (shared message everyone sees)
+  public_wallet: {
+    title: '💰 Wallet',
+    description: 'Click **View My Wallet** below to see your balance, deposit address, transaction history, and manage your funds.\n\nYour wallet info is **private** — only you can see your own balance and actions.',
+    footer: 'USDC + SOL on Solana',
+    btn_view_wallet: 'View My Wallet',
   },
 
   // User-friendly transaction type labels (replaces escrow_in / disbursement / etc)

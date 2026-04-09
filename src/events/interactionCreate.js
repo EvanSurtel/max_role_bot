@@ -5,6 +5,7 @@ const teammateResponse = require('../interactions/teammateResponse');
 const matchResult = require('../interactions/matchResult');
 const disputeCreate = require('../interactions/disputeCreate');
 const onboarding = require('../interactions/onboarding');
+const languageSwitcher = require('../interactions/languageSwitcher');
 const walletPanel = require('../panels/walletPanel');
 const leaderboardPanel = require('../panels/leaderboardPanel');
 const seasonPanel = require('../panels/seasonPanel');
@@ -13,38 +14,56 @@ const { isWalletChannel, AUTO_DELETE_MS } = require('../utils/ephemeralReply');
 
 /**
  * Monkey-patch interaction.reply / deferReply / followUp so any ephemeral
- * message they produce auto-deletes after 5 minutes. Skipped for wallet
- * channels — users want to keep their wallet history visible there.
+ * message they produce auto-deletes after 5 minutes.
  *
- * Doing this once at the router level beats sprinkling timeouts across the
- * 100+ ephemeral reply call sites in the rest of the codebase.
+ * Exemptions from auto-delete:
+ *  - Callers that set `_persist: true` in their options object. This is
+ *    used for "interface" ephemerals the user needs to keep interacting
+ *    with (wallet view, language picker, rules display, howItWorks display).
+ *    Error/warning ephemerals don't set this flag and auto-delete normally.
+ *  - Legacy per-user wallet channels (will be migrated away in a follow-up).
+ *
+ * The `_persist` flag is stripped from the options before they're passed
+ * to Discord, since Discord doesn't know about it.
  */
 function installEphemeralAutoDelete(interaction) {
-  if (isWalletChannel(interaction)) return; // Wallet channels keep their messages
+  if (isWalletChannel(interaction)) return; // Legacy: old per-user wallet channels
 
   const origReply = interaction.reply.bind(interaction);
   const origDeferReply = interaction.deferReply.bind(interaction);
   const origFollowUp = interaction.followUp.bind(interaction);
 
+  function splitPersist(opts) {
+    if (!opts || typeof opts !== 'object') return { clean: opts, persist: false };
+    const { _persist, ...clean } = opts;
+    return { clean, persist: _persist === true };
+  }
+
   interaction.reply = async function patchedReply(opts) {
-    const result = await origReply(opts);
-    if (opts && (opts.ephemeral || (opts.flags && (opts.flags & 64)))) {
+    const { clean, persist } = splitPersist(opts);
+    const result = await origReply(clean);
+    const isEphemeral = clean && (clean.ephemeral || (clean.flags && (clean.flags & 64)));
+    if (isEphemeral && !persist) {
       setTimeout(() => interaction.deleteReply().catch(() => {}), AUTO_DELETE_MS);
     }
     return result;
   };
 
   interaction.deferReply = async function patchedDeferReply(opts) {
-    const result = await origDeferReply(opts);
-    if (opts && (opts.ephemeral || (opts.flags && (opts.flags & 64)))) {
+    const { clean, persist } = splitPersist(opts);
+    const result = await origDeferReply(clean);
+    const isEphemeral = clean && (clean.ephemeral || (clean.flags && (clean.flags & 64)));
+    if (isEphemeral && !persist) {
       setTimeout(() => interaction.deleteReply().catch(() => {}), AUTO_DELETE_MS);
     }
     return result;
   };
 
   interaction.followUp = async function patchedFollowUp(opts) {
-    const msg = await origFollowUp(opts);
-    if (opts && (opts.ephemeral || (opts.flags && (opts.flags & 64))) && msg && typeof msg.delete === 'function') {
+    const { clean, persist } = splitPersist(opts);
+    const msg = await origFollowUp(clean);
+    const isEphemeral = clean && (clean.ephemeral || (clean.flags && (clean.flags & 64)));
+    if (isEphemeral && !persist && msg && typeof msg.delete === 'function') {
       setTimeout(() => msg.delete().catch(() => {}), AUTO_DELETE_MS);
     }
     return msg;
@@ -105,6 +124,14 @@ module.exports = {
         // Create Dispute button from lobby
         if (id === 'create_dispute') {
           return await disputeCreate.handleCreateDispute(interaction);
+        }
+        // "View My Wallet" button on the public wallet panel
+        if (id === 'wallet_view_open') {
+          return await walletPanel.handleWalletViewOpen(interaction);
+        }
+        // "🌐 Language" button — appears on every public bot panel
+        if (id === 'show_language_picker') {
+          return await languageSwitcher.handleShowLanguagePicker(interaction);
         }
         // Dispute match selection
         if (id.startsWith('dispute_select_')) {
@@ -181,6 +208,10 @@ module.exports = {
         }
         if (id === 'language_panel_select') {
           return await onboarding.handleLanguagePanelSelect(interaction);
+        }
+        // Ephemeral language picker (from any panel's 🌐 Language button)
+        if (id === 'lang_picker_select') {
+          return await languageSwitcher.handleLanguagePickerSelect(interaction);
         }
         console.warn(`[Interaction] Unhandled string select customId: ${id}`);
         return;
