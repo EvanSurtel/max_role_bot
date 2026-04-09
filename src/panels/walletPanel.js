@@ -57,9 +57,11 @@ async function handleWalletSubButton(interaction) {
   }
 
   if (id === 'wallet_copy_address') {
-    // Send ONLY the address as a plain message — easy to tap and copy on mobile
+    // Wrap the address in a triple-backtick code block. On Discord desktop
+    // this shows a built-in Copy button in the top-right of the block; on
+    // mobile the address inside can still be long-pressed to copy.
     return interaction.reply({
-      content: wallet.solana_address,
+      content: `\`\`\`\n${wallet.solana_address}\n\`\`\``,
       ephemeral: true,
     });
   }

@@ -51,15 +51,30 @@ function setBotDisplayLanguage(lang) {
 /**
  * Find the most-recent bot panel message in a channel and edit it with new content.
  * Returns true if a panel was found and updated.
+ *
+ * Falls back to fetching the channel via the API if it's not in the Discord
+ * client cache — private wallet channels often aren't cached because the bot
+ * doesn't receive regular events for them.
  */
 async function _updatePanelInChannel(client, channelId, payload) {
   if (!channelId) return false;
   try {
-    const channel = client.channels.cache.get(channelId);
+    let channel = client.channels.cache.get(channelId);
+    if (!channel) {
+      try {
+        channel = await client.channels.fetch(channelId);
+      } catch (fetchErr) {
+        console.error(`[LangRefresh] Could not fetch channel ${channelId}:`, fetchErr.message);
+        return false;
+      }
+    }
     if (!channel) return false;
     const messages = await channel.messages.fetch({ limit: 20 });
     const botMessage = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0);
-    if (!botMessage) return false;
+    if (!botMessage) {
+      console.warn(`[LangRefresh] No bot panel found in channel ${channelId}`);
+      return false;
+    }
     await botMessage.edit(payload);
     return true;
   } catch (err) {
@@ -75,10 +90,20 @@ async function _updatePanelInChannel(client, channelId, payload) {
 async function refreshWalletForUser(client, discordId) {
   try {
     const user = userRepo.findByDiscordId(discordId);
-    if (!user || !user.wallet_channel_id) return;
+    if (!user) {
+      console.warn(`[LangRefresh] User ${discordId} not found in DB`);
+      return;
+    }
+    if (!user.wallet_channel_id) {
+      console.warn(`[LangRefresh] User ${discordId} has no wallet_channel_id`);
+      return;
+    }
 
     const wallet = walletRepo.findByUserId(user.id);
-    if (!wallet) return;
+    if (!wallet) {
+      console.warn(`[LangRefresh] No wallet row for user ${discordId}`);
+      return;
+    }
 
     const lang = user.language || 'en';
     const { buildWalletView } = require('../panels/walletPanelView');
@@ -87,7 +112,10 @@ async function refreshWalletForUser(client, discordId) {
     try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
 
     const view = buildWalletView(wallet, user, lang, solBalance);
-    await _updatePanelInChannel(client, user.wallet_channel_id, view);
+    const ok = await _updatePanelInChannel(client, user.wallet_channel_id, view);
+    if (ok) {
+      console.log(`[LangRefresh] Refreshed wallet panel for ${discordId} → ${lang}`);
+    }
   } catch (err) {
     console.error(`[LangRefresh] Failed to refresh wallet for ${discordId}:`, err.message);
   }
