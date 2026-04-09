@@ -15,8 +15,12 @@ const {
   TIMERS,
   USDC_PER_UNIT,
 } = require('../config/constants');
-const channelService = require('../services/channelService');
 const { t, langFor } = require('../locales/i18n');
+
+// How long an idle in-progress wager creation flow stays in memory before
+// the user is treated as having abandoned it. Prevents activeFlows from
+// growing unbounded if users dismiss ephemerals mid-flow without cancelling.
+const FLOW_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 // Navigation row — Previous + Cancel on every step. Labels in user's language.
 function navRow(step, lang = 'en') {
@@ -37,16 +41,46 @@ function navRow(step, lang = 'en') {
   );
   return new ActionRowBuilder().addComponents(...buttons);
 }
-function cancelRow(lang = 'en') { return navRow(1, lang); }
 
-// Track each user's in-progress challenge creation state
-// discordUserId -> { type, teamSize, teammates, gameMode, series, anonymous, channelId }
+// Track each user's in-progress challenge creation state. The flow no
+// longer lives in a private setup channel — every step happens via
+// ephemeral interaction updates. Discord doesn't fire dismissal events,
+// so we use FLOW_IDLE_TIMEOUT_MS to expire stale flows on next access.
+// discordUserId -> { type, step, teamSize, teammates, gameMode, series,
+//                    anonymous, pendingAmount, lastUpdated }
 const activeFlows = new Map();
 // Prevent double-submit on finalize
 const finalizingUsers = new Set();
 
 /**
+ * Touch a flow's lastUpdated timestamp. Call this whenever a step
+ * progresses so the idle timer resets.
+ */
+function touchFlow(flow) {
+  if (flow) flow.lastUpdated = Date.now();
+}
+
+/**
+ * Look up an in-progress flow, expiring it if it's been idle longer
+ * than FLOW_IDLE_TIMEOUT_MS. Returns null if no live flow exists.
+ */
+function getLiveFlow(userId) {
+  const flow = activeFlows.get(userId);
+  if (!flow) return null;
+  if (flow.lastUpdated && Date.now() - flow.lastUpdated > FLOW_IDLE_TIMEOUT_MS) {
+    activeFlows.delete(userId);
+    return null;
+  }
+  return flow;
+}
+
+/**
  * Handle button interactions for challenge creation flow.
+ *
+ * The flow is fully ephemeral — every step is rendered as an ephemeral
+ * message visible only to the clicker. Each step uses interaction.update()
+ * to overwrite the previous step in place, so the user always sees ONE
+ * ephemeral with the current step. No private setup channels are created.
  */
 async function handleButton(interaction) {
   const id = interaction.customId;
@@ -55,22 +89,18 @@ async function handleButton(interaction) {
 
   // Confirm & Create challenge
   if (id === 'wager_confirm_create') {
-    const flow = activeFlows.get(userId);
+    const flow = getLiveFlow(userId);
     if (!flow) {
-      await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
-      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
-      return;
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
     }
     return finalizeChallengeCreation(interaction, flow, flow.pendingAmount || 0);
   }
 
   // Previous button — go back one step
   if (id === 'wager_prev') {
-    const flow = activeFlows.get(userId);
+    const flow = getLiveFlow(userId);
     if (!flow) {
-      await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
-      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
-      return;
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
     }
 
     let prevStep = flow.step - 1;
@@ -82,18 +112,20 @@ async function handleButton(interaction) {
     if (prevStep === 1) {
       // Team size
       flow.step = 1;
+      touchFlow(flow);
       const row = new ActionRowBuilder().addComponents(
         ...TEAM_SIZES.map(size =>
           new ButtonBuilder().setCustomId(`wager_teamsize_${size}`).setLabel(`${size}v${size}`).setStyle(ButtonStyle.Secondary),
         ),
       );
       const stepKey = flow.type === CHALLENGE_TYPE.WAGER ? 'challenge_create.setting_up_wager' : 'challenge_create.setting_up_xp';
-      return interaction.update({ content: t(stepKey, lang), components: [row, navRow(1, lang)] });
+      return interaction.update({ content: t(stepKey, lang), embeds: [], components: [row, navRow(1, lang)] });
     }
 
     if (prevStep === 2) {
       // Teammate select
       flow.step = 2;
+      touchFlow(flow);
       const selectRow = new ActionRowBuilder().addComponents(
         new UserSelectMenuBuilder()
           .setCustomId('select_teammates')
@@ -101,7 +133,7 @@ async function handleButton(interaction) {
           .setMinValues(flow.teamSize - 1)
           .setMaxValues(flow.teamSize - 1),
       );
-      return interaction.update({ content: t('challenge_create.select_teammates_short', lang, { size: flow.teamSize }), components: [selectRow, navRow(2, lang)] });
+      return interaction.update({ content: t('challenge_create.select_teammates_short', lang, { size: flow.teamSize }), embeds: [], components: [selectRow, navRow(2, lang)] });
     }
 
     if (prevStep === 3) {
@@ -112,35 +144,26 @@ async function handleButton(interaction) {
     if (prevStep === 4) {
       // Series length
       flow.step = 4;
+      touchFlow(flow);
       const row = new ActionRowBuilder().addComponents(
         ...SERIES_LENGTHS.map(len =>
           new ButtonBuilder().setCustomId(`wager_series_${len}`).setLabel(t('challenge_create.series_label', lang, { n: len })).setStyle(ButtonStyle.Secondary),
         ),
       );
-      return interaction.update({ content: t('challenge_create.select_series', lang, { mode: GAME_MODES[flow.gameMode]?.label || flow.gameMode }), components: [row, navRow(4, lang)] });
+      return interaction.update({ content: t('challenge_create.select_series', lang, { mode: GAME_MODES[flow.gameMode]?.label || flow.gameMode }), embeds: [], components: [row, navRow(4, lang)] });
     }
 
     return interaction.reply({ content: t('challenge_create.cannot_go_back', lang), ephemeral: true });
   }
 
-  // Cancel challenge creation — delete setup channel
+  // Cancel challenge creation — clear flow + close ephemeral
   if (id === 'wager_cancel_create' || id === 'wager_cancel_flow') {
-    const flow = activeFlows.get(userId);
     activeFlows.delete(userId);
     finalizingUsers.delete(userId);
-    await interaction.update({ content: t('challenge_create.cancelled_msg', lang), embeds: [], components: [] });
-    if (flow?.channelId) {
-      setTimeout(async () => {
-        try {
-          const ch = interaction.client.channels.cache.get(flow.channelId);
-          if (ch && ch.deletable) await ch.delete('Challenge creation cancelled');
-        } catch { /* */ }
-      }, 3000);
-    }
-    return;
+    return interaction.update({ content: t('challenge_create.cancelled_msg', lang), embeds: [], components: [] });
   }
 
-  // Step 1: Create Wager or XP Match — create a private channel for this user
+  // Step 1: Create Wager or XP Match — open the ephemeral flow
   if (id === 'wager_type_wager' || id === 'wager_type_xp') {
     // Check if matches are paused (season transition)
     const { isMatchesPaused } = require('../panels/seasonPanel');
@@ -168,32 +191,17 @@ async function handleButton(interaction) {
       return interaction.reply({ content: busy.reason, ephemeral: true });
     }
 
-    // Check if user already has an active flow
-    const existing = activeFlows.get(userId);
-    if (existing && existing.channelId) {
+    // If the user already has a live in-progress flow (idle < 30 min),
+    // tell them to finish or cancel that one first. Stale flows are
+    // auto-expired by getLiveFlow.
+    if (getLiveFlow(userId)) {
       return interaction.reply({
-        content: t('common.you_already_have_setup', lang, { channel: `<#${existing.channelId}>` }),
+        content: t('challenge_create.already_in_progress', lang),
         ephemeral: true,
       });
     }
 
-    await interaction.deferReply({ ephemeral: true });
-
     const type = id === 'wager_type_wager' ? CHALLENGE_TYPE.WAGER : CHALLENGE_TYPE.XP;
-
-    // Create a private channel for this user's setup under the right category
-    const guild = interaction.guild;
-    let username = interaction.user.username;
-    const channelPrefix = type === CHALLENGE_TYPE.WAGER ? 'wager' : 'xp-match';
-    const categoryId = type === CHALLENGE_TYPE.WAGER
-      ? (process.env.WAGER_SETUP_CATEGORY_ID || null)
-      : (process.env.XP_SETUP_CATEGORY_ID || null);
-    const channel = await channelService.createPrivateChannel(
-      guild,
-      `${channelPrefix}-${username}`,
-      [userId],
-      categoryId,
-    );
 
     activeFlows.set(userId, {
       type,
@@ -203,10 +211,10 @@ async function handleButton(interaction) {
       gameMode: null,
       series: null,
       anonymous: null,
-      channelId: channel.id,
+      lastUpdated: Date.now(),
     });
 
-    // Send team size buttons in the private channel
+    // Send team size buttons as the first ephemeral step
     const row = new ActionRowBuilder().addComponents(
       ...TEAM_SIZES.map(size =>
         new ButtonBuilder()
@@ -216,34 +224,29 @@ async function handleButton(interaction) {
       ),
     );
 
-    const typeLabel = type === CHALLENGE_TYPE.WAGER
-      ? t('challenge_create.type_wager', lang)
-      : t('challenge_create.type_xp_match', lang);
     const introKey = type === CHALLENGE_TYPE.WAGER
       ? 'challenge_create.setting_up_wager'
       : 'challenge_create.setting_up_xp';
-    await channel.send({
-      content: `<@${userId}> ${t(introKey, lang)}`,
-      components: [row, cancelRow(lang)],
-    });
 
-    await interaction.editReply({
-      content: t('challenge_create.setup_channel_created', lang, { type: typeLabel.toLowerCase(), channel: `<#${channel.id}>` }),
+    // _persist: true — interface ephemeral, do not auto-delete
+    return interaction.reply({
+      content: t(introKey, lang),
+      components: [row, navRow(1, lang)],
+      ephemeral: true,
+      _persist: true,
     });
-    return;
   }
 
   // Step 2: Team size selection
   if (id.startsWith('wager_teamsize_')) {
-    const flow = activeFlows.get(userId);
+    const flow = getLiveFlow(userId);
     if (!flow) {
-      await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
-      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
-      return;
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
     }
 
     const teamSize = parseInt(id.split('_')[2], 10);
     flow.teamSize = teamSize;
+    touchFlow(flow);
 
     // For team sizes > 1, show teammate select menu
     if (teamSize > 1) {
@@ -258,6 +261,7 @@ async function handleButton(interaction) {
       flow.step = 2;
       return interaction.update({
         content: t('challenge_create.select_teammates', lang, { size: teamSize, count: teamSize - 1 }),
+        embeds: [],
         components: [selectRow, navRow(2, lang)],
       });
     }
@@ -269,15 +273,14 @@ async function handleButton(interaction) {
 
   // Step 4: Game mode selection
   if (id.startsWith('wager_mode_')) {
-    const flow = activeFlows.get(userId);
+    const flow = getLiveFlow(userId);
     if (!flow) {
-      await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
-      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
-      return;
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
     }
 
     const mode = id.replace('wager_mode_', '');
     flow.gameMode = mode;
+    touchFlow(flow);
 
     // Show series length buttons
     const row = new ActionRowBuilder().addComponents(
@@ -292,21 +295,22 @@ async function handleButton(interaction) {
     flow.step = 4;
     return interaction.update({
       content: t('challenge_create.select_series', lang, { mode: GAME_MODES[mode]?.label || mode }),
+      embeds: [],
       components: [row, navRow(4, lang)],
     });
   }
 
   // Step 5: Series length selection
   if (id.startsWith('wager_series_')) {
-    const flow = activeFlows.get(userId);
+    const flow = getLiveFlow(userId);
     if (!flow) {
-      await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
-      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
-      return;
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
     }
 
     const series = parseInt(id.split('_')[2], 10);
     flow.series = series;
+    flow.step = 5;
+    touchFlow(flow);
 
     // Show visibility options
     const row = new ActionRowBuilder().addComponents(
@@ -330,21 +334,20 @@ async function handleButton(interaction) {
         '',
         t('challenge_create.visibility_named_desc', lang),
       ].join('\n'),
+      embeds: [],
       components: [row, navRow(5, lang)],
     });
-    flow.step = 5;
   }
 
   // Step 6: Visibility selection
   if (id === 'wager_vis_anon' || id === 'wager_vis_named') {
-    const flow = activeFlows.get(userId);
+    const flow = getLiveFlow(userId);
     if (!flow) {
-      await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
-      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
-      return;
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
     }
 
     flow.anonymous = id === 'wager_vis_anon';
+    touchFlow(flow);
 
     if (flow.type === CHALLENGE_TYPE.WAGER) {
       // Show entry amount modal for wagers in user's language
@@ -378,11 +381,9 @@ async function handleButton(interaction) {
 async function handleModal(interaction) {
   const userId = interaction.user.id;
   const lang = langFor(interaction);
-  const flow = activeFlows.get(userId);
+  const flow = getLiveFlow(userId);
   if (!flow) {
-    await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
-      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
-      return;
+    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
   }
 
   if (interaction.customId === 'entry_amount') {
@@ -399,6 +400,7 @@ async function handleModal(interaction) {
       });
     }
 
+    touchFlow(flow);
     return showChallengeConfirm(interaction, flow, amount);
   }
 }
@@ -409,11 +411,9 @@ async function handleModal(interaction) {
 async function handleUserSelect(interaction) {
   const userId = interaction.user.id;
   const lang = langFor(interaction);
-  const flow = activeFlows.get(userId);
+  const flow = getLiveFlow(userId);
   if (!flow) {
-    await interaction.reply({ content: t('common.session_expired', lang), ephemeral: true });
-      setTimeout(async () => { try { if (interaction.channel?.deletable) await interaction.channel.delete(); } catch { /* */ } }, 3000);
-      return;
+    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
   }
 
   if (interaction.customId === 'select_teammates') {
@@ -434,6 +434,7 @@ async function handleUserSelect(interaction) {
     }
 
     flow.teammates = selectedUsers;
+    touchFlow(flow);
     return showGameModes(interaction, flow);
   }
 }
@@ -488,10 +489,14 @@ async function showChallengeConfirm(interaction, flow, amountUsdc) {
       .setStyle(ButtonStyle.Danger),
   );
 
+  // Both modal-submit and component interactions can use update() to
+  // overwrite the existing ephemeral message in place. Modal submits
+  // triggered from a button on an ephemeral inherit interaction.message
+  // from that button click.
   if (interaction.isModalSubmit()) {
-    return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow] });
+    return interaction.update({ content: '', embeds: [confirmEmbed], components: [confirmRow] });
   }
-  return interaction.update({ embeds: [confirmEmbed], components: [confirmRow] });
+  return interaction.update({ content: '', embeds: [confirmEmbed], components: [confirmRow] });
 }
 
 /**
@@ -517,6 +522,7 @@ async function showGameModes(interaction, flow) {
   }
 
   flow.step = 3;
+  touchFlow(flow);
   rows.push(navRow(3, lang));
 
   const content = flow.teammates.length > 0
@@ -526,12 +532,12 @@ async function showGameModes(interaction, flow) {
       })
     : t('challenge_create.select_game_mode', lang, { size: flow.teamSize });
 
-  return interaction.update({ content, components: rows });
+  return interaction.update({ content, embeds: [], components: rows });
 }
 
 /**
- * Finalize challenge creation — validate, hold funds, create in DB, post to board.
- * Then delete the setup channel.
+ * Finalize challenge creation — validate, hold funds, create in DB, post
+ * to board. Edits the user's ephemeral with the final summary.
  */
 async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
   const userId = interaction.user.id;
@@ -543,12 +549,8 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
   }
   finalizingUsers.add(userId);
 
-  // Defer the response
-  if (interaction.isModalSubmit()) {
-    await interaction.deferReply();
-  } else {
-    await interaction.deferUpdate();
-  }
+  // Defer update — we'll edit the ephemeral with the final summary
+  await interaction.deferUpdate();
 
   try {
     const userRepo = require('../database/repositories/userRepo');
@@ -559,6 +561,8 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
 
     const user = userRepo.findByDiscordId(userId);
     if (!user) {
+      activeFlows.delete(userId);
+      finalizingUsers.delete(userId);
       return sendFlowReply(interaction, t('common.onboarding_required', lang));
     }
 
@@ -587,14 +591,16 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
     if (flow.type === CHALLENGE_TYPE.WAGER && entryUsdc > 0) {
       if (!escrowManager.canAfford(user.id, entryUsdc.toString())) {
         challengeRepo.updateStatus(challenge.id, CHALLENGE_STATUS.CANCELLED);
-        await cleanupFlowChannel(interaction.client, flow, userId);
+        activeFlows.delete(userId);
+        finalizingUsers.delete(userId);
         return sendFlowReply(interaction, t('challenge_create.insufficient_create', lang, { amount: amountUsdc }));
       }
 
       const held = escrowManager.holdFunds(user.id, entryUsdc.toString(), challenge.id);
       if (!held) {
         challengeRepo.updateStatus(challenge.id, CHALLENGE_STATUS.CANCELLED);
-        await cleanupFlowChannel(interaction.client, flow, userId);
+        activeFlows.delete(userId);
+        finalizingUsers.delete(userId);
         return sendFlowReply(interaction, t('challenge_create.failed_hold_funds', lang));
       }
     }
@@ -674,57 +680,28 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
       flow.teammates.length > 0
         ? t('challenge_create.create_summary_waiting_teammates', lang)
         : t('challenge_create.create_summary_live_board', lang),
-      '',
-      t('challenge_create.create_summary_delete_notice', lang),
     ].join('\n');
 
-    await sendFlowReply(interaction, summary);
+    activeFlows.delete(userId);
     finalizingUsers.delete(userId);
-
-    // Delete the setup channel after a short delay
-    await cleanupFlowChannel(interaction.client, flow, userId, 10000);
+    await sendFlowReply(interaction, summary);
   } catch (err) {
     console.error('[ChallengeCreate] Error finalizing challenge:', err);
+    activeFlows.delete(userId);
     finalizingUsers.delete(userId);
-    await cleanupFlowChannel(interaction.client, activeFlows.get(userId), userId);
     return sendFlowReply(interaction, t('challenge_create.error_creating', lang));
   }
 }
 
 /**
- * Clean up the private setup channel and remove the flow from activeFlows.
- */
-async function cleanupFlowChannel(client, flow, userId, delayMs = 5000) {
-  if (!flow) {
-    activeFlows.delete(userId);
-    return;
-  }
-
-  const channelId = flow.channelId;
-  activeFlows.delete(userId);
-
-  if (channelId) {
-    setTimeout(async () => {
-      try {
-        const channel = client.channels.cache.get(channelId);
-        if (channel && channel.deletable) {
-          await channel.delete('Wager setup complete');
-        }
-      } catch {
-        // Channel may already be deleted
-      }
-    }, delayMs);
-  }
-}
-
-/**
- * Send a reply depending on the interaction state.
+ * Edit the user's ephemeral with a final message and clear all components.
+ * Works whether the interaction has been deferred, replied to, or neither.
  */
 async function sendFlowReply(interaction, content) {
   if (interaction.deferred || interaction.replied) {
-    return interaction.editReply({ content, components: [] });
+    return interaction.editReply({ content, embeds: [], components: [] });
   }
-  return interaction.reply({ content });
+  return interaction.reply({ content, ephemeral: true });
 }
 
 module.exports = { handleButton, handleModal, handleUserSelect };
