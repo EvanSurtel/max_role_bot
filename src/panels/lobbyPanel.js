@@ -1,11 +1,11 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { t } = require('../locales/i18n');
-const { buildLanguageButton } = require('../utils/languageButtonHelper');
+const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
 
 /**
  * Build the main lobby panel — wager creation only.
- * The panel renders in the requested language and includes a Language
- * button so any user can switch their personal language from here.
+ * Includes an inline language dropdown so any user can switch their
+ * personal language directly from this panel.
  */
 function buildLobbyPanel(lang = 'en') {
   const embed = new EmbedBuilder()
@@ -14,7 +14,7 @@ function buildLobbyPanel(lang = 'en') {
     .setDescription(t('lobby.description', lang))
     .setFooter({ text: t('lobby.footer', lang) });
 
-  const row = new ActionRowBuilder().addComponents(
+  const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('wager_type_wager')
       .setLabel(t('lobby.btn_create_wager', lang))
@@ -23,10 +23,9 @@ function buildLobbyPanel(lang = 'en') {
       .setCustomId('create_dispute')
       .setLabel(t('lobby.btn_create_dispute', lang))
       .setStyle(ButtonStyle.Danger),
-    buildLanguageButton(lang),
   );
 
-  return { embeds: [embed], components: [row] };
+  return { embeds: [embed], components: [actionRow, buildLanguageDropdownRow(lang)] };
 }
 
 /**

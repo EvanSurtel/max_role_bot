@@ -11,7 +11,7 @@
 
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { t } = require('../locales/i18n');
-const { buildLanguageButton } = require('../utils/languageButtonHelper');
+const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
 
 /**
  * Build the public wallet channel panel.
@@ -27,16 +27,15 @@ function buildPublicWalletPanel(lang = 'en') {
     .setDescription(t('public_wallet.description', lang))
     .setFooter({ text: t('public_wallet.footer', lang) });
 
-  const row = new ActionRowBuilder().addComponents(
+  const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('wallet_view_open')
       .setEmoji('👛')
       .setLabel(t('public_wallet.btn_view_wallet', lang))
       .setStyle(ButtonStyle.Success),
-    buildLanguageButton(lang),
   );
 
-  return { embeds: [embed], components: [row] };
+  return { embeds: [embed], components: [actionRow, buildLanguageDropdownRow(lang)] };
 }
 
 /**

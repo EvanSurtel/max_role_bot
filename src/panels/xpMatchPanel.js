@@ -1,6 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { t } = require('../locales/i18n');
-const { buildLanguageButton } = require('../utils/languageButtonHelper');
+const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
 
 /**
  * Build the XP match panel.
@@ -12,15 +12,14 @@ function buildXpMatchPanel(lang = 'en') {
     .setDescription(t('xp_panel.description', lang))
     .setFooter({ text: t('xp_panel.footer', lang) });
 
-  const row = new ActionRowBuilder().addComponents(
+  const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('wager_type_xp')
       .setLabel(t('xp_panel.btn_create_xp', lang))
       .setStyle(ButtonStyle.Primary),
-    buildLanguageButton(lang),
   );
 
-  return { embeds: [embed], components: [row] };
+  return { embeds: [embed], components: [actionRow, buildLanguageDropdownRow(lang)] };
 }
 
 /**

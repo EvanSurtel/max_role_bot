@@ -52,16 +52,14 @@ function _packEmbeds(embeds) {
 
 /**
  * Send an ephemeral version of the panel that lives in the given
- * channel, rendered in the user's NEW language. Uses interaction
- * follow-ups so this can be called after another reply has already
- * been sent.
+ * channel, rendered in the user's NEW language.
  *
- * The dispatcher checks `interaction.channel.id` against every known
- * panel-hosting env var and dispatches to the matching panel builder.
- * If the channel doesn't host a known panel, nothing is sent (the
- * earlier confirmation message is enough).
+ * Caller must have already deferred the reply (via deferReply ephemeral)
+ * so we can editReply for the first chunk and followUp for additional
+ * chunks. This makes the auto-replace wrapper see ONE ephemeral session
+ * (not multiple disconnected replies).
  *
- * @param {import('discord.js').Interaction} interaction - the language picker interaction
+ * @param {import('discord.js').Interaction} interaction - the language picker interaction (already deferred ephemerally)
  * @param {string} newLang - the language the user just picked
  */
 async function sendEphemeralPanelForCurrentChannel(interaction, newLang) {
@@ -72,83 +70,89 @@ async function sendEphemeralPanelForCurrentChannel(interaction, newLang) {
     // Welcome channel → TOS + Accept/Decline buttons
     if (channelId === process.env.WELCOME_CHANNEL_ID) {
       const { buildWelcomePanel } = require('../panels/welcomePanel');
-      const view = buildWelcomePanel(newLang);
-      return _sendPersistentFollowUp(interaction, view);
+      return interaction.editReply(buildWelcomePanel(newLang));
     }
 
-    // Lobby (wager channel) → Create Wager / Create Dispute / Language buttons
+    // Lobby (wager channel)
     if (channelId === process.env.WAGER_CHANNEL_ID) {
       const { buildLobbyPanel } = require('../panels/lobbyPanel');
-      return _sendPersistentFollowUp(interaction, buildLobbyPanel(newLang));
+      return interaction.editReply(buildLobbyPanel(newLang));
     }
 
-    // XP match channel → Create XP Match button
+    // XP match channel
     if (channelId === process.env.XP_MATCH_CHANNEL_ID) {
       const { buildXpMatchPanel } = require('../panels/xpMatchPanel');
-      return _sendPersistentFollowUp(interaction, buildXpMatchPanel(newLang));
+      return interaction.editReply(buildXpMatchPanel(newLang));
     }
 
-    // Public wallet channel → View My Wallet button
+    // Public wallet channel
     if (channelId === process.env.WALLET_CHANNEL_ID) {
       const { buildPublicWalletPanel } = require('../panels/publicWalletPanel');
-      return _sendPersistentFollowUp(interaction, buildPublicWalletPanel(newLang));
+      return interaction.editReply(buildPublicWalletPanel(newLang));
     }
 
-    // Rules channel → multi-message ephemeral with all rules embeds
+    // Rules channel → multi-message ephemeral
     if (channelId === process.env.RULES_CHANNEL_ID) {
       const { buildRulesEmbeds } = require('../panels/rulesPanel');
-      const embeds = buildRulesEmbeds(newLang);
-      return _sendPackedEphemeral(interaction, embeds);
+      return _sendPackedEphemeral(interaction, buildRulesEmbeds(newLang));
     }
 
     // How It Works channel → multi-message ephemeral
     if (channelId === process.env.HOW_IT_WORKS_CHANNEL_ID) {
       const { buildHowItWorksEmbeds } = require('../panels/howItWorksPanel');
-      const embeds = buildHowItWorksEmbeds(newLang);
-      return _sendPackedEphemeral(interaction, embeds);
+      return _sendPackedEphemeral(interaction, buildHowItWorksEmbeds(newLang));
     }
 
-    // XP leaderboard channel → ephemeral leaderboard in their language
+    // XP leaderboard
     if (channelId === process.env.XP_LEADERBOARD_CHANNEL_ID) {
       const { buildXpPanel } = require('../panels/leaderboardPanel');
-      const view = await buildXpPanel('global', 'season', null, newLang);
-      return _sendPersistentFollowUp(interaction, view);
+      return interaction.editReply(await buildXpPanel('global', 'season', null, newLang));
     }
 
-    // Earnings leaderboard channel → ephemeral leaderboard
+    // Earnings leaderboard
     if (channelId === process.env.EARNINGS_LEADERBOARD_CHANNEL_ID) {
       const { buildEarningsPanel } = require('../panels/leaderboardPanel');
-      const view = await buildEarningsPanel('global', newLang);
-      return _sendPersistentFollowUp(interaction, view);
+      return interaction.editReply(await buildEarningsPanel('global', newLang));
     }
 
-    // Dedicated language channel → ephemeral language picker re-rendered
-    // (the user already picked, so just show a confirmation — handled by
-    // the caller via the original interaction.reply)
+    // Dedicated language channel — just show a generic confirmation,
+    // since the channel itself doesn't have its own content
     if (channelId === process.env.LANGUAGE_CHANNEL_ID) {
-      return; // No follow-up needed; caller already replied with confirmation
+      const { t } = require('../locales/i18n');
+      const { SUPPORTED_LANGUAGES } = require('../locales');
+      const langName = SUPPORTED_LANGUAGES[newLang]?.nativeName || newLang;
+      return interaction.editReply({
+        content: t('onboarding.language_saved', newLang, { language: langName }),
+      });
     }
+
+    // Unknown channel — just confirm the language was saved
+    const { t } = require('../locales/i18n');
+    const { SUPPORTED_LANGUAGES } = require('../locales');
+    const langName = SUPPORTED_LANGUAGES[newLang]?.nativeName || newLang;
+    return interaction.editReply({
+      content: t('onboarding.language_saved', newLang, { language: langName }),
+    });
   } catch (err) {
     console.error('[EphPanel] Failed to send ephemeral panel:', err.message);
   }
 }
 
-async function _sendPersistentFollowUp(interaction, view) {
-  return interaction.followUp({
-    ...view,
-    ephemeral: true,
-    _persist: true,
-  });
-}
-
 /**
- * Send a multi-message ephemeral by packing embeds into Discord-safe
- * chunks. Each chunk is its own follow-up. Works for rules and
- * howItWorks panels which have many embeds.
+ * Send multi-message ephemeral by packing embeds into Discord-safe
+ * chunks. First chunk goes via editReply (replacing the deferred
+ * reply); additional chunks go via followUp (which the auto-replace
+ * wrapper tracks as part of the same session).
  */
 async function _sendPackedEphemeral(interaction, embeds) {
   const groups = _packEmbeds(embeds);
-  for (let i = 0; i < groups.length; i++) {
+  if (groups.length === 0) return;
+
+  // First chunk → editReply on the deferred ephemeral
+  await interaction.editReply({ embeds: groups[0] });
+
+  // Remaining chunks → ephemeral followUps (tracked by the wrapper)
+  for (let i = 1; i < groups.length; i++) {
     await interaction.followUp({
       embeds: groups[i],
       ephemeral: true,

@@ -93,7 +93,46 @@ async function handleLanguagePickerSelect(interaction) {
   await sendEphemeralPanelForCurrentChannel(interaction, newLang);
 }
 
+/**
+ * Handle the INLINE language dropdown directly on a shared panel.
+ *
+ * The dropdown lives on the public message itself (not behind a button)
+ * so users can pick a language with one click. Discord select menu
+ * state is per-viewer client-side, so picking doesn't change anything
+ * visible to other users — they just see the dropdown unchanged.
+ *
+ * Behavior:
+ *   1. Save the user's language to the DB
+ *   2. Defer ephemeral reply (the auto-replace wrapper deletes any
+ *      previous tracked ephemeral session for this user)
+ *   3. Use the dispatcher to send the current channel's panel content
+ *      in the new language as the ephemeral reply
+ */
+async function handleInlineLanguageSelect(interaction) {
+  const newLang = interaction.values[0];
+  if (!SUPPORTED_LANGUAGES[newLang]) {
+    return interaction.reply({ content: 'Unknown language.', ephemeral: true });
+  }
+
+  const discordId = interaction.user.id;
+  let user = userRepo.findByDiscordId(discordId);
+  if (!user) {
+    user = userRepo.create(discordId);
+  }
+  userRepo.setLanguage(discordId, newLang);
+
+  // Defer with ephemeral=true. This triggers the auto-replace wrapper
+  // (deletes any previous ephemeral session for this user) and creates
+  // a new tracked session. The dispatcher then editReply / followUp's
+  // into it.
+  await interaction.deferReply({ ephemeral: true, _persist: true });
+
+  const { sendEphemeralPanelForCurrentChannel } = require('../utils/ephemeralPanelDispatcher');
+  await sendEphemeralPanelForCurrentChannel(interaction, newLang);
+}
+
 module.exports = {
   handleShowLanguagePicker,
   handleLanguagePickerSelect,
+  handleInlineLanguageSelect,
 };
