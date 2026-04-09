@@ -131,8 +131,13 @@ async function refreshSharedPanels(client, lang) {
     const { postSeasonPanel } = require('../panels/seasonPanel');
     const { postEscrowPanel } = require('../panels/escrowPanel');
     const { postAllLeaderboardPanels } = require('../panels/leaderboardPanel');
+    const { postLanguagePanel } = require('../panels/languagePanel');
 
-    // Run these in parallel since they target different channels
+    // Run these in parallel since they target different channels.
+    // postLanguagePanel updates the dedicated language channel so its
+    // selected-default indicator and embed text reflect the new language —
+    // otherwise users who change language from elsewhere would still see
+    // the old language pre-selected here.
     await Promise.all([
       postWelcomePanel(client, lang).catch(e => console.error('[LangRefresh] welcome:', e.message)),
       postRulesPanel(client, lang).catch(e => console.error('[LangRefresh] rules:', e.message)),
@@ -140,6 +145,7 @@ async function refreshSharedPanels(client, lang) {
       postSeasonPanel(client, lang).catch(e => console.error('[LangRefresh] season:', e.message)),
       postEscrowPanel(client, lang).catch(e => console.error('[LangRefresh] escrow:', e.message)),
       postAllLeaderboardPanels(client, lang).catch(e => console.error('[LangRefresh] leaderboards:', e.message)),
+      postLanguagePanel(client, lang).catch(e => console.error('[LangRefresh] languagePanel:', e.message)),
     ]);
   } catch (err) {
     console.error('[LangRefresh] Failed to refresh multi-message panels:', err.message);
