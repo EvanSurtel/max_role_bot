@@ -19,27 +19,90 @@ function setClient(client) {
   discordClient = client;
   console.log('[TxFeed] Client initialized');
 
-  // Verify the transactions channel is reachable on startup so we know
-  // immediately if it's misconfigured. Logs success or the exact reason
-  // it failed (wrong ID, missing permission, etc).
+  // Verify the transactions channel is reachable AND the bot has Send
+  // Messages permission by posting a real header message to the channel
+  // on startup. If the channel works the user sees the header. If not,
+  // they see nothing — and the bot logs the exact error so we know why.
+  // Idempotent: only posts the header if one doesn't already exist.
   const channelId = process.env.TRANSACTIONS_CHANNEL_ID;
   if (!channelId) {
     console.warn('[TxFeed] TRANSACTIONS_CHANNEL_ID is NOT set in .env — transactions feed disabled');
     return;
   }
-  client.channels.fetch(channelId)
-    .then(ch => {
-      if (!ch) {
-        console.error(`[TxFeed] TRANSACTIONS_CHANNEL_ID=${channelId} fetched but returned null`);
-        return;
-      }
-      console.log(`[TxFeed] Verified transactions channel: #${ch.name} (${channelId})`);
-    })
-    .catch(err => {
-      console.error(`[TxFeed] CANNOT REACH TRANSACTIONS_CHANNEL_ID=${channelId} — ${err.message}`);
-      console.error('[TxFeed] Transactions feed will silently fail until this is fixed.');
-      console.error('[TxFeed] Common causes: wrong channel ID, bot lacks View Channel permission, channel was deleted.');
-    });
+  _postOrRefreshHeader(client, channelId).catch(err => {
+    console.error(`[TxFeed] Header post failed: ${err.message}`);
+  });
+}
+
+/**
+ * Post a "this channel logs all bot transactions" header message at the
+ * top of the transactions channel. Idempotent — checks for an existing
+ * header by looking for the marker string in the channel's recent
+ * messages and skips posting if one is already there.
+ */
+async function _postOrRefreshHeader(client, channelId) {
+  let channel;
+  try {
+    channel = await client.channels.fetch(channelId);
+  } catch (err) {
+    console.error(`[TxFeed] CANNOT REACH TRANSACTIONS_CHANNEL_ID=${channelId} — ${err.message}`);
+    console.error('[TxFeed] Transactions feed will silently fail until this is fixed.');
+    console.error('[TxFeed] Common causes: wrong channel ID, bot lacks View Channel permission, channel was deleted.');
+    return;
+  }
+  if (!channel) {
+    console.error(`[TxFeed] TRANSACTIONS_CHANNEL_ID=${channelId} fetched but returned null`);
+    return;
+  }
+
+  console.log(`[TxFeed] Verified transactions channel: #${channel.name} (${channelId})`);
+
+  const HEADER_MARKER = '__TX_FEED_HEADER__';
+
+  // Look for an existing header in the most recent messages
+  try {
+    const messages = await channel.messages.fetch({ limit: 50 });
+    const existing = messages.find(m =>
+      m.author.id === client.user.id &&
+      m.embeds.length > 0 &&
+      (m.embeds[0].footer?.text || '').includes(HEADER_MARKER),
+    );
+    if (existing) {
+      console.log(`[TxFeed] Header message already present (id ${existing.id}) — skipping`);
+      return;
+    }
+  } catch (err) {
+    console.error(`[TxFeed] Could not fetch existing messages in #${channel.name}: ${err.message}`);
+    // Try to post anyway
+  }
+
+  // Post a fresh header
+  const headerEmbed = new EmbedBuilder()
+    .setTitle('📊 Transactions Feed')
+    .setColor(0x5865f2)
+    .setDescription([
+      'This channel logs **every transaction** that happens with the bot.',
+      '',
+      'You\'ll see:',
+      '• 📥 Deposits and 📤 withdrawals',
+      '• 🔒 Wager entries and 💰 match payouts',
+      '• 📝 Challenges created, ✅ accepted, ❌ cancelled',
+      '• 🏆 Match results and ⚠️ disputes',
+      '• 🛠️ Admin adjustments (XP, W/L, earnings)',
+      '• 🚨 Balance mismatches and other admin alerts',
+      '',
+      'Each entry shows the user, amount, and a short transaction signature.',
+    ].join('\n'))
+    .setFooter({ text: HEADER_MARKER });
+
+  try {
+    await channel.send({ embeds: [headerEmbed] });
+    console.log(`[TxFeed] Posted header message to #${channel.name}`);
+  } catch (err) {
+    console.error(`[TxFeed] FAILED TO POST HEADER to #${channel.name}: ${err.message}`);
+    console.error('[TxFeed] The bot can SEE the channel but cannot SEND messages to it.');
+    console.error('[TxFeed] Fix: grant the bot Send Messages + Embed Links permission on this channel.');
+  }
 }
 
 // Transaction types that warrant a DM to the affected user (anything
