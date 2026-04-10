@@ -115,17 +115,6 @@ async function sendEphemeralPanelForCurrentChannel(interaction, newLang) {
       return interaction.editReply(await buildEarningsPanel('global', newLang));
     }
 
-    // Dedicated language channel — just show a generic confirmation,
-    // since the channel itself doesn't have its own content
-    if (channelId === process.env.LANGUAGE_CHANNEL_ID) {
-      const { t } = require('../locales/i18n');
-      const { SUPPORTED_LANGUAGES } = require('../locales');
-      const langName = SUPPORTED_LANGUAGES[newLang]?.nativeName || newLang;
-      return interaction.editReply({
-        content: t('onboarding.language_saved', newLang, { language: langName }),
-      });
-    }
-
     // Unknown channel — just confirm the language was saved
     const { t } = require('../locales/i18n');
     const { SUPPORTED_LANGUAGES } = require('../locales');

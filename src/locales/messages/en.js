@@ -80,6 +80,22 @@ module.exports = {
     received: '💰 **Deposit received!**\n\nYou received **${amount} USDC**. Your new available balance is **${new_balance} USDC**.\n\nClick **View My Wallet** in the wallet channel to see the details.',
   },
 
+  // Per-transaction DMs sent to the user. Each key matches a transaction
+  // type from src/utils/transactionFeed.js DM_TYPES. Placeholders:
+  //   {amount}    — formatted amount (e.g. "$10.50")
+  //   {currency}  — "USDC" or "SOL"
+  //   {to}        — destination address (formatted as inline code)
+  //   {memo}      — short memo (varies per transaction)
+  transaction_dm: {
+    deposit: '✅ **Deposit successful!**\n\nYou received **{amount} {currency}** in your wallet.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
+    withdrawal: '✅ **Withdrawal successful!**\n\nYou sent **{amount} {currency}** to {to}.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
+    sol_withdrawal: '✅ **SOL withdrawal successful!**\n\nYou sent **{amount} {currency}** to {to}.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
+    disbursement: '🏆 **Match winnings received!**\n\nYou received **{amount} {currency}** from your match.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
+    release: '🔓 **Wager refunded**\n\n**{amount} {currency}** has been released back to your available balance.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
+    refund: '🔓 **Refund received**\n\nYou received **{amount} {currency}** as a refund.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
+    escrow_in: '🔐 **Wager entry confirmed**\n\nYour **{amount} {currency}** has been placed into escrow for the match.\n\nGood luck!',
+  },
+
   // Admin-only wallet viewer panel — admin picks any server member from a
   // dropdown to see that user's wallet (balance, address, transactions).
   admin_wallet_viewer: {
