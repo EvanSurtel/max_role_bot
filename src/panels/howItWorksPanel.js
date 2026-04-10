@@ -97,18 +97,20 @@ async function postHowItWorksPanel(client, lang = 'en') {
 
     const panel = buildHowItWorksPanel(lang);
 
+    // Post the language dropdown as its OWN small message at the very
+    // top of the channel. Components on an embed message render BELOW
+    // the embeds, which would push the dropdown to the bottom of the
+    // first chunk — defeating the purpose of "at the top".
+    await channel.send({
+      content: '🌐 Pick a language to view this guide in:',
+      components: [buildLanguageDropdownRow(lang)],
+    });
+
     // Greedily pack embeds into messages so each stays under Discord's
-    // 6000-char per-message limit. Inline language dropdown goes on the
-    // FIRST message so users see it without scrolling through the
-    // entire how-it-works content.
+    // 6000-char per-message limit.
     const groups = _packEmbeds(panel.embeds);
-    const langRow = buildLanguageDropdownRow(lang);
-    for (let i = 0; i < groups.length; i++) {
-      const isFirst = i === 0;
-      await channel.send({
-        embeds: groups[i],
-        components: isFirst ? [langRow] : [],
-      });
+    for (const group of groups) {
+      await channel.send({ embeds: group });
     }
     console.log(`[Panel] Posted how it works panel (${lang}, ${groups.length} messages)`);
   } catch (err) {
