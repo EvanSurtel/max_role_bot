@@ -91,9 +91,9 @@ module.exports = {
     withdrawal: '✅ **Withdrawal successful!**\n\nYou sent **{amount} {currency}** to {to}.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
     sol_withdrawal: '✅ **SOL withdrawal successful!**\n\nYou sent **{amount} {currency}** to {to}.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
     disbursement: '🏆 **Match winnings received!**\n\nYou received **{amount} {currency}** from your match.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
-    release: '🔓 **Wager refunded**\n\n**{amount} {currency}** has been released back to your available balance.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
+    release: '🔓 **Wager refunded**\n\n**{amount} {currency}** has been returned to your available balance.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
     refund: '🔓 **Refund received**\n\nYou received **{amount} {currency}** as a refund.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
-    escrow_in: '🔐 **Wager entry confirmed**\n\nYour **{amount} {currency}** has been placed into escrow for the match.\n\nGood luck!',
+    escrow_in: '🔐 **Wager entry confirmed**\n\nYour **{amount} {currency}** is now locked in for the match.\n\nGood luck!',
   },
 
   // Admin-only wallet viewer panel — admin picks any server member from a
