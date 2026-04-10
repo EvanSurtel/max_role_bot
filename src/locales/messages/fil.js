@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: 'Mag-withdraw ng SOL',
     btn_history: 'Kasaysayan',
     btn_language: 'Wika',
-    deposit_info: '**Ang iyong Solana deposit address:**\n\n{address}\n\n**Para mag-load ng wallet:**\n1. Magpadala ng **USDC** (SPL token) sa address na ito para sa pusta\n2. Magpadala ng kaunting **SOL** (~$0.50) para sa transaction fees — tatagal ng ~100 pusta\n\nNade-detect ang mga deposit kada 30 segundo.',
+    deposit_info: '**Ang iyong Solana deposit address:**\n\n```\n{address}\n```\n\n**Para mag-load ng wallet:**\n1. Magpadala ng **USDC** (SPL token) sa address na ito para sa pusta\n2. Magpadala ng kaunting **SOL** (~$0.50) para sa transaction fees — tatagal ng ~100 pusta\n\nNade-detect ang mga deposit kada 30 segundo.',
     withdraw_modal_title_usdc: 'Mag-withdraw ng USDC',
     withdraw_modal_title_sol: 'Mag-withdraw ng SOL',
     withdraw_address_label: 'Destination Solana address',

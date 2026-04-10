@@ -288,6 +288,13 @@ module.exports = {
         if (id.startsWith('lb_admin_')) {
           return await leaderboardPanel.handleLeaderboardButton(interaction);
         }
+        // Admin wallet viewer pagination + back navigation
+        if (id.startsWith('admin_wallet_history_')) {
+          return await adminWalletViewer.handleAdminWalletHistory(interaction);
+        }
+        if (id.startsWith('admin_wallet_back_')) {
+          return await adminWalletViewer.handleAdminWalletBack(interaction);
+        }
         console.warn(`[Interaction] Unhandled button customId: ${id}`);
         return;
       }

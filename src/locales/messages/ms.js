@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: 'Keluarkan SOL',
     btn_history: 'Sejarah',
     btn_language: 'Bahasa',
-    deposit_info: '**Alamat deposit Solana kamu:**\n\n{address}\n\n**Untuk mengisi dompet:**\n1. Hantar **USDC** (token SPL) ke alamat ini untuk pertaruhan\n2. Hantar sedikit **SOL** (~$0.50) untuk yuran transaksi — tahan ~100 pertaruhan\n\nDeposit dikesan secara automatik setiap 30 saat.',
+    deposit_info: '**Alamat deposit Solana kamu:**\n\n```\n{address}\n```\n\n**Untuk mengisi dompet:**\n1. Hantar **USDC** (token SPL) ke alamat ini untuk pertaruhan\n2. Hantar sedikit **SOL** (~$0.50) untuk yuran transaksi — tahan ~100 pertaruhan\n\nDeposit dikesan secara automatik setiap 30 saat.',
     withdraw_modal_title_usdc: 'Keluarkan USDC',
     withdraw_modal_title_sol: 'Keluarkan SOL',
     withdraw_address_label: 'Alamat Solana destinasi',

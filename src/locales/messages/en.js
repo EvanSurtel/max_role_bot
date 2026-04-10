@@ -109,6 +109,11 @@ module.exports = {
     admin_only: 'Admin only.',
     user_not_registered: 'User <@{id}> is not registered with the bot.',
     no_wallet: 'This user has no wallet record.',
+    btn_view_transactions: 'View Transactions',
+    btn_back_to_wallet: '← Back',
+    no_transactions: 'This user has no transactions yet.',
+    tx_history_title: '📜 Transactions — {username}',
+    tx_history_footer: 'Page {page}/{total} — {count} total',
   },
 
   // User-friendly transaction type labels (replaces escrow_in / disbursement / etc)
@@ -137,7 +142,7 @@ module.exports = {
     btn_withdraw_sol: 'Withdraw SOL',
     btn_history: 'History',
     btn_language: 'Language',
-    deposit_info: '**Your Solana Deposit Address:**\n\n{address}\n\n**To fund your wallet:**\n1. Send **USDC** (SPL token) to this address for wagers\n2. Send a small amount of **SOL** (~$0.50) for transaction fees — lasts ~100 wagers\n\nDeposits are detected automatically every 30 seconds.',
+    deposit_info: '**Your Solana Deposit Address:**\n\n```\n{address}\n```\n\n**To fund your wallet:**\n1. Send **USDC** (SPL token) to this address for wagers\n2. Send a small amount of **SOL** (~$0.50) for transaction fees — lasts ~100 wagers\n\nDeposits are detected automatically every 30 seconds.',
     withdraw_modal_title_usdc: 'Withdraw USDC',
     withdraw_modal_title_sol: 'Withdraw SOL',
     withdraw_address_label: 'Destination Solana address',

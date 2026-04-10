@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: 'Tarik SOL',
     btn_history: 'Riwayat',
     btn_language: 'Bahasa',
-    deposit_info: '**Alamat setoran Solana kamu:**\n\n{address}\n\n**Untuk mengisi wallet:**\n1. Kirim **USDC** (token SPL) ke alamat ini untuk taruhan\n2. Kirim sedikit **SOL** (~$0.50) untuk biaya transaksi — bisa untuk ~100 taruhan\n\nSetoran dideteksi otomatis setiap 30 detik.',
+    deposit_info: '**Alamat setoran Solana kamu:**\n\n```\n{address}\n```\n\n**Untuk mengisi wallet:**\n1. Kirim **USDC** (token SPL) ke alamat ini untuk taruhan\n2. Kirim sedikit **SOL** (~$0.50) untuk biaya transaksi — bisa untuk ~100 taruhan\n\nSetoran dideteksi otomatis setiap 30 detik.',
     withdraw_modal_title_usdc: 'Tarik USDC',
     withdraw_modal_title_sol: 'Tarik SOL',
     withdraw_address_label: 'Alamat Solana tujuan',

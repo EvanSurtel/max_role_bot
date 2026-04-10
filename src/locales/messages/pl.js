@@ -72,7 +72,7 @@ module.exports = {
     btn_withdraw_sol: 'Wypłać SOL',
     btn_history: 'Historia',
     btn_language: 'Język',
-    deposit_info: '**Twój adres wpłaty Solana:**\n\n{address}\n\n**Aby zasilić portfel:**\n1. Wyślij **USDC** (token SPL) na ten adres do zakładów\n2. Wyślij trochę **SOL** (~$0.50) na opłaty transakcyjne — wystarczy na ~100 zakładów\n\nWpłaty są wykrywane automatycznie co 30 sekund.',
+    deposit_info: '**Twój adres wpłaty Solana:**\n\n```\n{address}\n```\n\n**Aby zasilić portfel:**\n1. Wyślij **USDC** (token SPL) na ten adres do zakładów\n2. Wyślij trochę **SOL** (~$0.50) na opłaty transakcyjne — wystarczy na ~100 zakładów\n\nWpłaty są wykrywane automatycznie co 30 sekund.',
     withdraw_modal_title_usdc: 'Wypłać USDC',
     withdraw_modal_title_sol: 'Wypłać SOL',
     withdraw_address_label: 'Docelowy adres Solana',

@@ -72,7 +72,7 @@ module.exports = {
     btn_withdraw_sol: 'SOL Opnemen',
     btn_history: 'Geschiedenis',
     btn_language: 'Taal',
-    deposit_info: '**Je Solana stortingsadres:**\n\n{address}\n\n**Om je wallet te vullen:**\n1. Stuur **USDC** (SPL token) naar dit adres voor inzetten\n2. Stuur wat **SOL** (~$0.50) voor transactiekosten — duurt ~100 inzetten\n\nStortingen worden elke 30 seconden automatisch gedetecteerd.',
+    deposit_info: '**Je Solana stortingsadres:**\n\n```\n{address}\n```\n\n**Om je wallet te vullen:**\n1. Stuur **USDC** (SPL token) naar dit adres voor inzetten\n2. Stuur wat **SOL** (~$0.50) voor transactiekosten — duurt ~100 inzetten\n\nStortingen worden elke 30 seconden automatisch gedetecteerd.',
     withdraw_modal_title_usdc: 'USDC Opnemen',
     withdraw_modal_title_sol: 'SOL Opnemen',
     withdraw_address_label: 'Doel Solana adres',

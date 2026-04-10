@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: 'SOL出金',
     btn_history: '履歴',
     btn_language: '言語',
-    deposit_info: '**あなたのSolana入金アドレス：**\n\n{address}\n\n**ウォレットに入金するには：**\n1. このアドレスにベット用の **USDC**（SPLトークン）を送信\n2. 取引手数料用に少量の **SOL**（~$0.50）を送信 — ~100ベット分持続\n\n入金は30秒ごとに自動検出されます。',
+    deposit_info: '**あなたのSolana入金アドレス：**\n\n```\n{address}\n```\n\n**ウォレットに入金するには：**\n1. このアドレスにベット用の **USDC**（SPLトークン）を送信\n2. 取引手数料用に少量の **SOL**（~$0.50）を送信 — ~100ベット分持続\n\n入金は30秒ごとに自動検出されます。',
     withdraw_modal_title_usdc: 'USDC出金',
     withdraw_modal_title_sol: 'SOL出金',
     withdraw_address_label: '送信先Solanaアドレス',

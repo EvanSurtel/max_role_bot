@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: 'SOL Auszahlen',
     btn_history: 'Verlauf',
     btn_language: 'Sprache',
-    deposit_info: '**Deine Solana-Einzahlungsadresse:**\n\n{address}\n\n**Um deine Wallet aufzuladen:**\n1. Sende **USDC** (SPL-Token) an diese Adresse für Wetten\n2. Sende etwas **SOL** (~$0.50) für Transaktionsgebühren — reicht für ~100 Wetten\n\nEinzahlungen werden automatisch alle 30 Sekunden erkannt.',
+    deposit_info: '**Deine Solana-Einzahlungsadresse:**\n\n```\n{address}\n```\n\n**Um deine Wallet aufzuladen:**\n1. Sende **USDC** (SPL-Token) an diese Adresse für Wetten\n2. Sende etwas **SOL** (~$0.50) für Transaktionsgebühren — reicht für ~100 Wetten\n\nEinzahlungen werden automatisch alle 30 Sekunden erkannt.',
     withdraw_modal_title_usdc: 'USDC Auszahlen',
     withdraw_modal_title_sol: 'SOL Auszahlen',
     withdraw_address_label: 'Ziel-Solana-Adresse',

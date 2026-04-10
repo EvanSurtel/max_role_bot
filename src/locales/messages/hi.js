@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: 'SOL निकालो',
     btn_history: 'इतिहास',
     btn_language: 'भाषा',
-    deposit_info: '**तुम्हारा Solana जमा पता:**\n\n{address}\n\n**अपना वॉलेट भरने के लिए:**\n1. बेट के लिए इस पते पर **USDC** (SPL टोकन) भेजो\n2. ट्रांजैक्शन फीस के लिए थोड़ा **SOL** (~$0.50) भेजो — ~100 बेट तक चलेगा\n\nजमा हर 30 सेकंड में स्वतः पहचाने जाते हैं।',
+    deposit_info: '**तुम्हारा Solana जमा पता:**\n\n```\n{address}\n```\n\n**अपना वॉलेट भरने के लिए:**\n1. बेट के लिए इस पते पर **USDC** (SPL टोकन) भेजो\n2. ट्रांजैक्शन फीस के लिए थोड़ा **SOL** (~$0.50) भेजो — ~100 बेट तक चलेगा\n\nजमा हर 30 सेकंड में स्वतः पहचाने जाते हैं।',
     withdraw_modal_title_usdc: 'USDC निकालो',
     withdraw_modal_title_sol: 'SOL निकालो',
     withdraw_address_label: 'गंतव्य Solana पता',

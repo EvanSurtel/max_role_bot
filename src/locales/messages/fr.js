@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: 'Retirer SOL',
     btn_history: 'Historique',
     btn_language: 'Langue',
-    deposit_info: '**Votre adresse de dépôt Solana :**\n\n{address}\n\n**Pour approvisionner votre portefeuille :**\n1. Envoyez de l\'**USDC** (token SPL) à cette adresse pour les paris\n2. Envoyez un peu de **SOL** (~$0.50) pour les frais de transaction — dure ~100 paris\n\nLes dépôts sont détectés automatiquement toutes les 30 secondes.',
+    deposit_info: '**Votre adresse de dépôt Solana :**\n\n```\n{address}\n```\n\n**Pour approvisionner votre portefeuille :**\n1. Envoyez de l\'**USDC** (token SPL) à cette adresse pour les paris\n2. Envoyez un peu de **SOL** (~$0.50) pour les frais de transaction — dure ~100 paris\n\nLes dépôts sont détectés automatiquement toutes les 30 secondes.',
     withdraw_modal_title_usdc: 'Retirer USDC',
     withdraw_modal_title_sol: 'Retirer SOL',
     withdraw_address_label: 'Adresse Solana de destination',

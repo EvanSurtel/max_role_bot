@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: 'SOL 출금',
     btn_history: '내역',
     btn_language: '언어',
-    deposit_info: '**Solana 입금 주소:**\n\n{address}\n\n**지갑 충전 방법:**\n1. 베팅용 **USDC**(SPL 토큰)를 이 주소로 전송\n2. 거래 수수료용 **SOL**(~$0.50)을 약간 전송 — 약 100회 베팅 지속\n\n입금은 30초마다 자동으로 감지돼요.',
+    deposit_info: '**Solana 입금 주소:**\n\n```\n{address}\n```\n\n**지갑 충전 방법:**\n1. 베팅용 **USDC**(SPL 토큰)를 이 주소로 전송\n2. 거래 수수료용 **SOL**(~$0.50)을 약간 전송 — 약 100회 베팅 지속\n\n입금은 30초마다 자동으로 감지돼요.',
     withdraw_modal_title_usdc: 'USDC 출금',
     withdraw_modal_title_sol: 'SOL 출금',
     withdraw_address_label: '대상 Solana 주소',

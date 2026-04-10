@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: 'سحب SOL',
     btn_history: 'السجل',
     btn_language: 'اللغة',
-    deposit_info: '**عنوان إيداع Solana الخاص بك:**\n\n{address}\n\n**لتمويل محفظتك:**\n1. أرسل **USDC** (رمز SPL) إلى هذا العنوان للرهانات\n2. أرسل القليل من **SOL** (~$0.50) لرسوم المعاملات — يكفي لـ ~100 رهان\n\nيتم الكشف عن الإيداعات تلقائياً كل 30 ثانية.',
+    deposit_info: '**عنوان إيداع Solana الخاص بك:**\n\n```\n{address}\n```\n\n**لتمويل محفظتك:**\n1. أرسل **USDC** (رمز SPL) إلى هذا العنوان للرهانات\n2. أرسل القليل من **SOL** (~$0.50) لرسوم المعاملات — يكفي لـ ~100 رهان\n\nيتم الكشف عن الإيداعات تلقائياً كل 30 ثانية.',
     withdraw_modal_title_usdc: 'سحب USDC',
     withdraw_modal_title_sol: 'سحب SOL',
     withdraw_address_label: 'عنوان Solana الوجهة',

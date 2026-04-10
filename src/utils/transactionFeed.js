@@ -17,6 +17,29 @@ let discordClient = null;
 
 function setClient(client) {
   discordClient = client;
+  console.log('[TxFeed] Client initialized');
+
+  // Verify the transactions channel is reachable on startup so we know
+  // immediately if it's misconfigured. Logs success or the exact reason
+  // it failed (wrong ID, missing permission, etc).
+  const channelId = process.env.TRANSACTIONS_CHANNEL_ID;
+  if (!channelId) {
+    console.warn('[TxFeed] TRANSACTIONS_CHANNEL_ID is NOT set in .env — transactions feed disabled');
+    return;
+  }
+  client.channels.fetch(channelId)
+    .then(ch => {
+      if (!ch) {
+        console.error(`[TxFeed] TRANSACTIONS_CHANNEL_ID=${channelId} fetched but returned null`);
+        return;
+      }
+      console.log(`[TxFeed] Verified transactions channel: #${ch.name} (${channelId})`);
+    })
+    .catch(err => {
+      console.error(`[TxFeed] CANNOT REACH TRANSACTIONS_CHANNEL_ID=${channelId} — ${err.message}`);
+      console.error('[TxFeed] Transactions feed will silently fail until this is fixed.');
+      console.error('[TxFeed] Common causes: wrong channel ID, bot lacks View Channel permission, channel was deleted.');
+    });
 }
 
 // Transaction types that warrant a DM to the affected user (anything
@@ -101,6 +124,8 @@ const typeIcons = {
  * Call this after every on-chain or DB transaction.
  */
 async function postTransaction({ type, username, discordId, amount, currency, fromAddress, toAddress, signature, memo, challengeId }) {
+  console.log(`[TxFeed] postTransaction(${type})${discordId ? ` user=${discordId}` : ''}${amount ? ` amount=${amount}` : ''}`);
+
   if (!discordClient) {
     console.warn('[TxFeed] Discord client not initialized — skipping postTransaction');
     return;
@@ -162,8 +187,10 @@ async function _postToFeedChannel({ type, username, discordId, amount, currency,
 
   try {
     await channel.send({ embeds: [embed] });
+    console.log(`[TxFeed] Posted ${type} embed to #${channel.name}`);
   } catch (err) {
-    console.error('[TxFeed] Failed to post transaction:', err.message);
+    console.error(`[TxFeed] FAILED to send to #${channel.name} (${channelId}): ${err.message}`);
+    console.error('[TxFeed] Bot likely lacks Send Messages or Embed Links permission on the transactions channel.');
   }
 }
 

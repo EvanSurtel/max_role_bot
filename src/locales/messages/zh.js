@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: '提现 SOL',
     btn_history: '历史',
     btn_language: '语言',
-    deposit_info: '**你的 Solana 充值地址:**\n\n{address}\n\n**给钱包充值:**\n1. 发送 **USDC** (SPL 代币) 到此地址用于投注\n2. 发送少量 **SOL** (~$0.50) 用于交易手续费 — 可用约 100 次投注\n\n充值每 30 秒自动检测一次。',
+    deposit_info: '**你的 Solana 充值地址:**\n\n```\n{address}\n```\n\n**给钱包充值:**\n1. 发送 **USDC** (SPL 代币) 到此地址用于投注\n2. 发送少量 **SOL** (~$0.50) 用于交易手续费 — 可用约 100 次投注\n\n充值每 30 秒自动检测一次。',
     withdraw_modal_title_usdc: '提现 USDC',
     withdraw_modal_title_sol: '提现 SOL',
     withdraw_address_label: '目标 Solana 地址',

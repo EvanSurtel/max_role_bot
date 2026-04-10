@@ -72,7 +72,7 @@ module.exports = {
     btn_withdraw_sol: 'Preleva SOL',
     btn_history: 'Cronologia',
     btn_language: 'Lingua',
-    deposit_info: '**Il tuo indirizzo di deposito Solana:**\n\n{address}\n\n**Per finanziare il tuo wallet:**\n1. Invia **USDC** (token SPL) a questo indirizzo per le scommesse\n2. Invia un po\' di **SOL** (~$0.50) per le commissioni di transazione — dura ~100 scommesse\n\nI depositi vengono rilevati automaticamente ogni 30 secondi.',
+    deposit_info: '**Il tuo indirizzo di deposito Solana:**\n\n```\n{address}\n```\n\n**Per finanziare il tuo wallet:**\n1. Invia **USDC** (token SPL) a questo indirizzo per le scommesse\n2. Invia un po\' di **SOL** (~$0.50) per le commissioni di transazione — dura ~100 scommesse\n\nI depositi vengono rilevati automaticamente ogni 30 secondi.',
     withdraw_modal_title_usdc: 'Preleva USDC',
     withdraw_modal_title_sol: 'Preleva SOL',
     withdraw_address_label: 'Indirizzo Solana di destinazione',

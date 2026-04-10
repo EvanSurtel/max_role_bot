@@ -72,7 +72,7 @@ module.exports = {
     btn_withdraw_sol: 'SOL Çek',
     btn_history: 'Geçmiş',
     btn_language: 'Dil',
-    deposit_info: '**Solana yatırım adresin:**\n\n{address}\n\n**Cüzdanını doldurmak için:**\n1. Bahisler için bu adrese **USDC** (SPL token) gönder\n2. İşlem ücretleri için biraz **SOL** (~$0.50) gönder — ~100 bahis sürer\n\nYatırımlar her 30 saniyede otomatik olarak tespit edilir.',
+    deposit_info: '**Solana yatırım adresin:**\n\n```\n{address}\n```\n\n**Cüzdanını doldurmak için:**\n1. Bahisler için bu adrese **USDC** (SPL token) gönder\n2. İşlem ücretleri için biraz **SOL** (~$0.50) gönder — ~100 bahis sürer\n\nYatırımlar her 30 saniyede otomatik olarak tespit edilir.',
     withdraw_modal_title_usdc: 'USDC Çek',
     withdraw_modal_title_sol: 'SOL Çek',
     withdraw_address_label: 'Hedef Solana adresi',

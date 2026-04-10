@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: 'Sacar SOL',
     btn_history: 'Histórico',
     btn_language: 'Idioma',
-    deposit_info: '**Seu endereço de depósito Solana:**\n\n{address}\n\n**Pra abastecer sua carteira:**\n1. Envie **USDC** (token SPL) pra este endereço para apostas\n2. Envie um pouco de **SOL** (~$0.50) pras taxas de transação — dura ~100 apostas\n\nDepósitos são detectados automaticamente a cada 30 segundos.',
+    deposit_info: '**Seu endereço de depósito Solana:**\n\n```\n{address}\n```\n\n**Pra abastecer sua carteira:**\n1. Envie **USDC** (token SPL) pra este endereço para apostas\n2. Envie um pouco de **SOL** (~$0.50) pras taxas de transação — dura ~100 apostas\n\nDepósitos são detectados automaticamente a cada 30 segundos.',
     withdraw_modal_title_usdc: 'Sacar USDC',
     withdraw_modal_title_sol: 'Sacar SOL',
     withdraw_address_label: 'Endereço Solana de destino',

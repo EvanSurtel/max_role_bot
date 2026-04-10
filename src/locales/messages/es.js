@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: 'Retirar SOL',
     btn_history: 'Historial',
     btn_language: 'Idioma',
-    deposit_info: '**Tu dirección de depósito de Solana:**\n\n{address}\n\n**Para fondear tu billetera:**\n1. Envía **USDC** (token SPL) a esta dirección para apostar\n2. Envía un poco de **SOL** (~$0.50) para las comisiones de transacción — dura ~100 apuestas\n\nLos depósitos se detectan automáticamente cada 30 segundos.',
+    deposit_info: '**Tu dirección de depósito de Solana:**\n\n```\n{address}\n```\n\n**Para fondear tu billetera:**\n1. Envía **USDC** (token SPL) a esta dirección para apostar\n2. Envía un poco de **SOL** (~$0.50) para las comisiones de transacción — dura ~100 apuestas\n\nLos depósitos se detectan automáticamente cada 30 segundos.',
     withdraw_modal_title_usdc: 'Retirar USDC',
     withdraw_modal_title_sol: 'Retirar SOL',
     withdraw_address_label: 'Dirección de Solana de destino',

@@ -71,7 +71,7 @@ module.exports = {
     btn_withdraw_sol: 'Rút SOL',
     btn_history: 'Lịch Sử',
     btn_language: 'Ngôn Ngữ',
-    deposit_info: '**Địa chỉ nạp Solana của bạn:**\n\n{address}\n\n**Để nạp ví:**\n1. Gửi **USDC** (token SPL) đến địa chỉ này để cược\n2. Gửi một ít **SOL** (~$0.50) cho phí giao dịch — đủ cho ~100 lần cược\n\nNạp tiền được tự động phát hiện mỗi 30 giây.',
+    deposit_info: '**Địa chỉ nạp Solana của bạn:**\n\n```\n{address}\n```\n\n**Để nạp ví:**\n1. Gửi **USDC** (token SPL) đến địa chỉ này để cược\n2. Gửi một ít **SOL** (~$0.50) cho phí giao dịch — đủ cho ~100 lần cược\n\nNạp tiền được tự động phát hiện mỗi 30 giây.',
     withdraw_modal_title_usdc: 'Rút USDC',
     withdraw_modal_title_sol: 'Rút SOL',
     withdraw_address_label: 'Địa chỉ Solana đích',
