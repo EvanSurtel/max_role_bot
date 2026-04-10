@@ -5,20 +5,20 @@ const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
 /**
  * Build the standalone language picker for the welcome channel.
  *
- * Posted as the FIRST message in the welcome channel so it sits at the top
- * — users see it immediately when they enter the channel and can pick their
- * language before scrolling down to read the TOS. Uses the same
- * inline_lang_select dropdown as the rest of the bot.
+ * Posted as the FIRST message at the top of the welcome channel — a
+ * minimal title + the dropdown, no long explanatory text. Each bot
+ * channel has its own dropdown so the user doesn't need a paragraph
+ * about "master switches" here.
  *
- * @param {string} lang - the language to render the picker itself in
+ * @param {string} lang - the language to render the picker itself in (unused
+ *                        for the title since it's intentionally multi-language)
  */
-function buildWelcomeLanguagePicker(lang = 'en') {
+function buildWelcomeLanguagePicker(_lang = 'en') {
   const embed = new EmbedBuilder()
     .setTitle('🌐 Language / Idioma / Idioma / Sprache / Langue / 言語 / 语言')
-    .setColor(0x3498db)
-    .setDescription(t('language_panel.description', lang));
+    .setColor(0x3498db);
 
-  return { embeds: [embed], components: [buildLanguageDropdownRow(lang)] };
+  return { embeds: [embed], components: [buildLanguageDropdownRow(_lang)] };
 }
 
 /**
