@@ -93,7 +93,7 @@ users, wallets, challenges, challenge_players, matches, transactions, timers, ad
 ## Environment Variables
 
 See `.env.example` for full list. Key vars:
-- `BOT_TOKEN`, `GUILD_ID`, `ADMIN_ROLE_ID`
+- `BOT_TOKEN`, `GUILD_ID`, `ADMIN_ROLE_ID`, `OWNER_ROLE_ID` (owner is admin-equivalent — same permissions and alert pings)
 - `WAGER_CHANNEL_ID`, `CHALLENGES_CHANNEL_ID`, `ADMIN_ALERTS_CHANNEL_ID`
 - `SOLANA_NETWORK`, `ESCROW_WALLET_SECRET`, `ENCRYPTION_KEY`
 - `PLATFORM_FEE_PERCENT`, `MIN_WAGER_USDC`, `MAX_WAGER_USDC`, `MIN_WITHDRAWAL_USDC`

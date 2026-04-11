@@ -1,14 +1,16 @@
 const { PermissionFlagsBits } = require('discord.js');
 
 /**
- * Add staff roles (wager staff, XP staff, admin) to permission overwrites
- * so they can view and interact with match/dispute channels.
+ * Add staff roles (wager staff, XP staff, admin, owner) to permission
+ * overwrites so they can view and interact with match/dispute channels.
+ * Owner role has the same access as admin everywhere in the bot.
  */
 function addStaffOverwrites(overwrites) {
   const staffRoles = [
     process.env.WAGER_STAFF_ROLE_ID,
     process.env.XP_STAFF_ROLE_ID,
     process.env.ADMIN_ROLE_ID,
+    process.env.OWNER_ROLE_ID,
   ].filter(Boolean);
 
   for (const roleId of staffRoles) {
@@ -62,12 +64,16 @@ function privateTextOverwrites(guild, allowedUserIds, includeStaff = false, admi
 
   if (includeStaff) addStaffOverwrites(overwrites);
 
-  // Admin-only access (for wallet channels — staff cannot see these)
+  // Admin-only access (for wallet channels — staff cannot see these).
+  // Owner role is treated as admin-equivalent and gets the same access.
   if (adminOnly) {
-    const adminRoleId = process.env.ADMIN_ROLE_ID;
-    if (adminRoleId) {
+    const elevatedRoles = [
+      process.env.ADMIN_ROLE_ID,
+      process.env.OWNER_ROLE_ID,
+    ].filter(Boolean);
+    for (const roleId of elevatedRoles) {
       overwrites.push({
-        id: adminRoleId,
+        id: roleId,
         allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
       });
     }

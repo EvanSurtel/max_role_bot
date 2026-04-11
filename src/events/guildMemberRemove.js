@@ -71,7 +71,11 @@ module.exports = {
                 const sharedChannel = member.client.channels.cache.get(match.shared_text_id);
                 if (sharedChannel) {
                   const adminRoleId = process.env.ADMIN_ROLE_ID;
-                  const adminPing = adminRoleId ? `<@&${adminRoleId}>` : 'Admins';
+                  const ownerRoleId = process.env.OWNER_ROLE_ID;
+                  const pings = [];
+                  if (adminRoleId) pings.push(`<@&${adminRoleId}>`);
+                  if (ownerRoleId) pings.push(`<@&${ownerRoleId}>`);
+                  const adminPing = pings.length > 0 ? pings.join(' ') : 'Admins';
                   const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
                   const adminRow = new ActionRowBuilder().addComponents(
