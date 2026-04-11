@@ -138,19 +138,23 @@ const XP_WAGER = {
 // everything else (locale text, panel layout, inline language switch)
 // picks up the change automatically.
 const RANK_TIERS = [
-  { key: 'bronze',   minXp: 0,     color: 0xcd7f32, emblem: 'bronze.png' },
-  { key: 'silver',   minXp: 1000,  color: 0xbfc1c2, emblem: 'silver.png' },
-  { key: 'gold',     minXp: 2500,  color: 0xffd700, emblem: 'gold.png' },
-  { key: 'platinum', minXp: 5000,  color: 0x5ad1d1, emblem: 'platinum.png' },
-  { key: 'diamond',  minXp: 6000,  color: 0x66ccff, emblem: 'diamond.png' },
-  { key: 'sentinel', minXp: 6750,  color: 0xe74c3c, emblem: 'sentinal.png' },
-  { key: 'obsidian', minXp: 7500,  color: 0x2c2c54, emblem: 'obsidian.png' },
+  // Colors are sampled from the dominant accent of each emblem PNG —
+  // change a hex here to change the card background wash, top/bottom
+  // bars, and tier-name text color in one place. Any 24-bit RGB is
+  // valid (0x000000–0xffffff).
+  { key: 'bronze',   minXp: 0,     color: 0xa96d2e, emblem: 'bronze.png' },
+  { key: 'silver',   minXp: 1000,  color: 0xa8b0b5, emblem: 'silver.png' },
+  { key: 'gold',     minXp: 2500,  color: 0xd4a017, emblem: 'gold.png' },
+  { key: 'platinum', minXp: 5000,  color: 0x8cbfbd, emblem: 'platinum.png' },
+  { key: 'diamond',  minXp: 6000,  color: 0x2eaaff, emblem: 'diamond.png' },
+  { key: 'sentinel', minXp: 6750,  color: 0xd81818, emblem: 'sentinal.png' },
+  { key: 'obsidian', minXp: 7500,  color: 0x7a2db8, emblem: 'obsidian.png' },
   // Crowned is the top 10 players on the season XP leaderboard —
   // position-based, NOT an XP threshold. topN overrides the XP
   // range display on the ranks panel. The minXp is left in as a
   // fallback so the array stays sorted and future rank-sync logic
   // has something to work with if topN data isn't available.
-  { key: 'crowned',  topN: 10, minXp: 999999, color: 0xff4500, emblem: 'crowned.png' },
+  { key: 'crowned',  topN: 10, minXp: 999999, color: 0xe8a500, emblem: 'crowned.png' },
 ];
 
 // Current season identifier

@@ -220,22 +220,25 @@ async function renderRankCard(data) {
   ctx.textAlign = 'left';
   _fitText(ctx, displayName, RIGHT_X, 55, RIGHT_W, 68);
 
-  // IGN subtitle (only if different from display name, to avoid dup)
-  let subY = 130;
+  // IGN subtitle (only if different from display name, to avoid dup).
+  // Pushed well below the display name so the two lines don't kiss —
+  // canvas bounding boxes are tight and a bold 68px name sitting on a
+  // 30px subtitle looked crowded otherwise.
+  let subY = 150;
   if (ign && ign !== displayName) {
     ctx.fillStyle = '#a9a9bc';
     ctx.font = `30px "${FONT_FAMILY}"`;
     _fitText(ctx, `IGN: ${ign}`, RIGHT_X, subY, RIGHT_W, 30);
-    subY += 42;
+    subY += 50;
   }
 
   // Tier name — big, in tier color, uppercase, spaced out
   ctx.fillStyle = tierHex;
   ctx.font = `bold 56px "${FONT_FAMILY}"`;
-  ctx.fillText(rankName.toUpperCase(), RIGHT_X, Math.max(subY + 10, 175));
+  ctx.fillText(rankName.toUpperCase(), RIGHT_X, Math.max(subY + 12, 195));
 
   // Thin divider
-  const dividerY = 260;
+  const dividerY = 285;
   ctx.strokeStyle = 'rgba(255,255,255,0.18)';
   ctx.lineWidth = 2;
   ctx.beginPath();
