@@ -183,6 +183,30 @@ module.exports = {
       // Auto-clean ephemeral replies after 5 min (skips wallet channels)
       installEphemeralAutoDelete(interaction);
 
+      // Slash commands — /rank is the only one today. Every other user
+      // action uses button panels. Add new commands by dropping files in
+      // src/commands/ and running `npm run deploy-commands`.
+      if (interaction.isChatInputCommand && interaction.isChatInputCommand()) {
+        const cmdName = interaction.commandName;
+        try {
+          const command = require(`../commands/${cmdName}`);
+          if (command && typeof command.execute === 'function') {
+            return await command.execute(interaction);
+          }
+          console.warn(`[Interaction] No handler found for /${cmdName}`);
+        } catch (err) {
+          console.error(`[Interaction] Error executing /${cmdName}:`, err);
+          try {
+            if (interaction.replied || interaction.deferred) {
+              await interaction.followUp({ content: 'Command failed. Please try again.', ephemeral: true });
+            } else {
+              await interaction.reply({ content: 'Command failed. Please try again.', ephemeral: true });
+            }
+          } catch { /* give up */ }
+        }
+        return;
+      }
+
       // Button interactions
       if (interaction.isButton()) {
         const id = interaction.customId;
