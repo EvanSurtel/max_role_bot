@@ -353,6 +353,10 @@ async function syncIgnToNeatQueue(discordUserId, ign) {
   const channelId = process.env.NEATQUEUE_CHANNEL_ID;
   if (!channelId) return;
 
+  // IMPORTANT: channel_id and user_id stay as STRINGS. Discord snowflakes
+  // are 64-bit IDs that overflow JS Number precision (> 2^53), so parseInt
+  // silently corrupts the last few digits of 18–19 digit IDs. Serialize as
+  // strings so the full ID survives the round-trip to NeatQueue.
   const res = await fetch('https://api.neatqueue.com/api/v2/ign', {
     method: 'POST',
     headers: {
@@ -360,8 +364,8 @@ async function syncIgnToNeatQueue(discordUserId, ign) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      channel_id: parseInt(channelId),
-      user_id: parseInt(discordUserId),
+      channel_id: channelId,
+      user_id: String(discordUserId),
       ign: ign,
     }),
   });

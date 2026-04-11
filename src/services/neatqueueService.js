@@ -53,10 +53,10 @@ async function addPoints(discordUserId, amount) {
   return neatqueueFetch('/api/v2/add/stats', {
     method: 'POST',
     body: JSON.stringify({
-      channel_id: parseInt(getChannelId()),
+      channel_id: getChannelId(),
       stat: 'points',
       value: amount,
-      user_id: parseInt(discordUserId),
+      user_id: String(discordUserId),
     }),
   });
 }
@@ -69,10 +69,10 @@ async function addWin(discordUserId) {
   return neatqueueFetch('/api/v2/add/stats', {
     method: 'POST',
     body: JSON.stringify({
-      channel_id: parseInt(getChannelId()),
+      channel_id: getChannelId(),
       stat: 'wins',
       value: 1,
-      user_id: parseInt(discordUserId),
+      user_id: String(discordUserId),
     }),
   });
 }
@@ -85,10 +85,10 @@ async function addLoss(discordUserId) {
   return neatqueueFetch('/api/v2/add/stats', {
     method: 'POST',
     body: JSON.stringify({
-      channel_id: parseInt(getChannelId()),
+      channel_id: getChannelId(),
       stat: 'losses',
       value: 1,
-      user_id: parseInt(discordUserId),
+      user_id: String(discordUserId),
     }),
   });
 }
