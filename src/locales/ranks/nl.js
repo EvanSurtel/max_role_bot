@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ wordt gebruikt voor de hoogste rank die geen plafond heeft
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // Gebruikt voor positie-gebaseerde ranks (bijv. Gekroond = top 10)
+  range_top: 'Top {n} spelers',
 
   bronze: {
     name: 'Brons',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: 'Gekroond',
-    blurb: 'De absolute top. Het plafond van Rank $.',
+    blurb: 'De top 10 spelers van het season XP leaderboard. Een positie-gebaseerde kroon — iemand moet hem verliezen voordat jij hem kunt winnen.',
   },
 };

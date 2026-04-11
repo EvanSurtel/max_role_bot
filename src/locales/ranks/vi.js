@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ được dùng cho rank cao nhất không có trần
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // Dùng cho các rank dựa trên vị trí (ví dụ, Crowned = top 10)
+  range_top: 'Top {n} người chơi',
 
   bronze: {
     name: 'Bronze',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: 'Crowned',
-    blurb: 'Đỉnh tuyệt đối. Trần của Rank $.',
+    blurb: '10 người chơi đứng đầu bảng xếp hạng XP season. Vương miện dựa trên vị trí — phải có người mất nó thì bạn mới giành được.',
   },
 };

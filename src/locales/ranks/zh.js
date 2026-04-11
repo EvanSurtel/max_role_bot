@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ 用于没有上限的最高段位
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // 用于基于排名的段位(例如加冕 = 前 10 名)
+  range_top: '前 {n} 名玩家',
 
   bronze: {
     name: '青铜',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: '加冕',
-    blurb: '绝对巅峰。Rank $ 的天花板。',
+    blurb: '赛季 XP 排行榜前 10 名的玩家。一个基于排名的王冠 —— 得有人失去它,你才能得到它。',
   },
 };

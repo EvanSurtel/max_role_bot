@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ jest używane dla najwyższej rangi, która nie ma sufitu
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // Używane dla rang opartych na pozycji (np. Koronowany = top 10)
+  range_top: 'Top {n} graczy',
 
   bronze: {
     name: 'Brąz',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: 'Koronowany',
-    blurb: 'Absolutny szczyt. Sufit Rank $.',
+    blurb: 'Top 10 graczy z sezonowego leaderboardu XP. Korona oparta na pozycji — ktoś musi ją stracić, żebyś ty ją zdobył.',
   },
 };

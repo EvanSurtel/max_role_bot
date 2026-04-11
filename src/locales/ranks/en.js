@@ -14,9 +14,11 @@ module.exports = {
 
   rank_title: '{name} — {range}',
 
-  // {min}+ is used for the highest rank which has no ceiling
+  // {min}+ is used for XP tiers with no ceiling
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // Used for position-based tiers (e.g., Crowned = top 10)
+  range_top: 'Top {n} players',
 
   bronze: {
     name: 'Bronze',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: 'Crowned',
-    blurb: 'The absolute top. The ceiling of Rank $.',
+    blurb: 'The top 10 players on the season XP leaderboard. A position-based crown — someone has to lose it for you to gain it.',
   },
 };

@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ ay ginagamit para sa pinakamataas na rank na walang hangganan
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // Ginagamit para sa position-based ranks (hal., Crowned = top 10)
+  range_top: 'Top {n} players',
 
   bronze: {
     name: 'Bronze',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: 'Crowned',
-    blurb: 'Ang pinakatuktok. Ang kisame ng Rank $.',
+    blurb: 'Ang top 10 players sa season XP leaderboard. Isang position-based na korona — may dapat mawalan nito para makamit mo.',
   },
 };

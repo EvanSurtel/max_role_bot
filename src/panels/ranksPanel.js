@@ -19,7 +19,16 @@ const { RANK_TIERS } = require('../config/constants');
 const ASSETS_DIR = path.join(__dirname, '..', 'public', 'assets', 'emblems');
 
 function _rankRange(tier, nextTier, t) {
-  if (!nextTier) {
+  // Position-based tiers (e.g., "Top 10 players") use topN instead of
+  // an XP threshold. Fall back to English if the locale hasn't added
+  // the range_top key yet.
+  if (tier.topN) {
+    const tpl = t.range_top || 'Top {n} players';
+    return tpl.replace('{n}', tier.topN);
+  }
+  // No next tier, OR the next tier is position-based (so this tier
+  // effectively has no XP ceiling from a display standpoint)
+  if (!nextTier || nextTier.topN) {
     return t.range_open.replace('{min}', tier.minXp.toLocaleString('en-US'));
   }
   return t.range_band

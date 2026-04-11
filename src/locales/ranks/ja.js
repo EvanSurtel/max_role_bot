@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ は上限のない最高ランクで使用されます
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // 順位ベースのランクで使用されます (例: クラウンド = トップ10)
+  range_top: 'トップ{n}名',
 
   bronze: {
     name: 'ブロンズ',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: 'クラウンド',
-    blurb: '絶対的頂点。Rank $の天井。',
+    blurb: 'シーズンXPリーダーボードのトップ10プレイヤー。順位ベースの王冠 — 誰かが失わなければ、あなたが得ることはできない。',
   },
 };

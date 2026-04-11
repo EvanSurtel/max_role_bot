@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ wird für den höchsten Rang verwendet, der keine Obergrenze hat
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // Wird für positionsbasierte Ränge verwendet (z.B. Gekrönt = Top 10)
+  range_top: 'Top {n} Spieler',
 
   bronze: {
     name: 'Bronze',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: 'Gekrönt',
-    blurb: 'Die absolute Spitze. Die Decke von Rank $.',
+    blurb: 'Die Top 10 Spieler der Season-XP-Rangliste. Eine positionsbasierte Krone — jemand muss sie verlieren, damit du sie gewinnst.',
   },
 };

@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ tavanı olmayan en yüksek rütbe için kullanılır
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // Pozisyon tabanlı rütbeler için kullanılır (örn. Taçlandırılmış = top 10)
+  range_top: 'En iyi {n} oyuncu',
 
   bronze: {
     name: 'Bronz',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: 'Taçlandırılmış',
-    blurb: 'Mutlak zirve. Rank $\'ın tavanı.',
+    blurb: 'Sezon XP sıralamasındaki en iyi 10 oyuncu. Pozisyona dayalı bir taç — senin kazanman için birinin kaybetmesi gerekir.',
   },
 };

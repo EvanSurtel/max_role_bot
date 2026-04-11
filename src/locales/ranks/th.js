@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ ใช้สำหรับ rank สูงสุดที่ไม่มีเพดาน
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // ใช้สำหรับ rank ที่อิงตามตำแหน่ง (เช่น Crowned = top 10)
+  range_top: 'Top {n} ผู้เล่น',
 
   bronze: {
     name: 'Bronze',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: 'Crowned',
-    blurb: 'จุดสูงสุดสมบูรณ์แบบ เพดานของ Rank $',
+    blurb: 'ผู้เล่น 10 อันดับแรกของ XP leaderboard ประจำ season มงกุฎที่อิงตามตำแหน่ง — ต้องมีคนเสียไปก่อน คุณถึงจะได้มา',
   },
 };

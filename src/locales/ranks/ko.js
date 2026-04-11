@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ 는 상한이 없는 최상위 랭크에 사용돼요
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // 순위 기반 랭크에 사용돼요 (예: 크라운드 = 상위 10명)
+  range_top: '상위 {n}명',
 
   bronze: {
     name: '브론즈',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: '크라운드',
-    blurb: '절대 정점. Rank $의 천장.',
+    blurb: '시즌 XP 리더보드의 상위 10명 플레이어. 순위 기반의 왕관이에요 — 누군가가 잃어야 여러분이 얻을 수 있어요.',
   },
 };

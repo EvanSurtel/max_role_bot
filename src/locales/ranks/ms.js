@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ digunakan untuk rank paling tinggi yang tiada had atas
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // Digunakan untuk rank berdasarkan kedudukan (cth., Crowned = top 10)
+  range_top: 'Top {n} pemain',
 
   bronze: {
     name: 'Bronze',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: 'Crowned',
-    blurb: 'Puncak mutlak. Had atas Rank $.',
+    blurb: '10 pemain teratas dalam leaderboard XP season. Mahkota berdasarkan kedudukan — seseorang perlu hilangkannya dulu barulah kamu boleh dapat.',
   },
 };

@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ सबसे ऊंचे rank के लिए use होता है जिसकी कोई ceiling नहीं है
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // Position-based ranks के लिए use होता है (जैसे Crowned = top 10)
+  range_top: 'Top {n} players',
 
   bronze: {
     name: 'Bronze',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: 'Crowned',
-    blurb: 'एकदम top। Rank $ की ceiling।',
+    blurb: 'Season XP leaderboard के top 10 players। Position-based crown — किसी को इसे खोना पड़ेगा तभी तुम इसे पा सकते हो।',
   },
 };

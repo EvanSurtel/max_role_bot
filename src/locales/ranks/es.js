@@ -17,6 +17,8 @@ module.exports = {
   // {min}+ se usa para el rango más alto que no tiene techo
   range_open: '{min}+ XP',
   range_band: '{min} – {max} XP',
+  // Usado para rangos basados en posición (ej., Coronado = top 10)
+  range_top: 'Top {n} jugadores',
 
   bronze: {
     name: 'Bronce',
@@ -48,6 +50,6 @@ module.exports = {
   },
   crowned: {
     name: 'Coronado',
-    blurb: 'Lo más alto. El techo de Rank $.',
+    blurb: 'Los 10 mejores jugadores del leaderboard de XP de la temporada. Una corona basada en posición — alguien tiene que perderla para que tú la ganes.',
   },
 };
