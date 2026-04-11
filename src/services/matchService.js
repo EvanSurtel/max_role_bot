@@ -20,6 +20,50 @@ function _captainLang(captainDiscordIds) {
 }
 
 /**
+ * Post a result embed to the regular results channels (all-results +
+ * wager-results). Used by both the normal resolve flow AND the admin
+ * dispute-resolution flow (including no-winner) so dispute outcomes
+ * still appear in the regular results feed.
+ *
+ * Tries the channel cache first and falls back to channels.fetch(),
+ * because results channels are low-traffic admin channels that drop
+ * out of cache after restarts.
+ */
+async function postResultToChannels(client, resultEmbed, components, isWagerMatch, matchId) {
+  async function _resolve(channelId) {
+    let ch = client.channels.cache.get(channelId);
+    if (!ch) {
+      try { ch = await client.channels.fetch(channelId); } catch { ch = null; }
+    }
+    return ch;
+  }
+
+  const allResultsChannelId = process.env.RESULTS_CHANNEL_ID;
+  if (allResultsChannelId) {
+    try {
+      const ch = await _resolve(allResultsChannelId);
+      if (ch) await ch.send({ embeds: [resultEmbed], components: components || [] });
+      else console.error(`[MatchService] all-results channel ${allResultsChannelId} unreachable for match #${matchId}`);
+    } catch (err) {
+      console.error(`[MatchService] Failed to post to all-results for match #${matchId}:`, err.message);
+    }
+  }
+
+  if (isWagerMatch) {
+    const wagerResultsChannelId = process.env.WAGER_RESULTS_CHANNEL_ID;
+    if (wagerResultsChannelId) {
+      try {
+        const ch = await _resolve(wagerResultsChannelId);
+        if (ch) await ch.send({ embeds: [resultEmbed], components: components || [] });
+        else console.error(`[MatchService] wager-results channel ${wagerResultsChannelId} unreachable for match #${matchId}`);
+      } catch (err) {
+        console.error(`[MatchService] Failed to post to wager-results for match #${matchId}:`, err.message);
+      }
+    }
+  }
+}
+
+/**
  * Create match channels (team voice, team text, shared, voting) for a matched challenge.
  * @param {import('discord.js').Client} client - The Discord client.
  * @param {object} challenge - The challenge DB record.
@@ -619,29 +663,11 @@ async function resolveMatch(client, matchId, winningTeam) {
     buildResultLanguageButton(matchId, resultDisplayLang),
   );
 
-  // Post to all-results channel (wagers + XP matches — shared with NeatQueue)
-  const allResultsChannelId = process.env.RESULTS_CHANNEL_ID;
-  if (allResultsChannelId) {
-    try {
-      const ch = client.channels.cache.get(allResultsChannelId);
-      if (ch) await ch.send({ embeds: [resultEmbed], components: [langRow] });
-    } catch (err) {
-      console.error(`[MatchService] Failed to post to all-results for match #${matchId}:`, err.message);
-    }
-  }
-
-  // Post to wager-only results channel (wagers only)
-  if (isWagerMatch) {
-    const wagerResultsChannelId = process.env.WAGER_RESULTS_CHANNEL_ID;
-    if (wagerResultsChannelId) {
-      try {
-        const ch = client.channels.cache.get(wagerResultsChannelId);
-        if (ch) await ch.send({ embeds: [resultEmbed], components: [langRow] });
-      } catch (err) {
-        console.error(`[MatchService] Failed to post to wager-results for match #${matchId}:`, err.message);
-      }
-    }
-  }
+  // Post to the regular results channels (all-results + wager-results).
+  // Routed through postResultToChannels so the cache-miss / fetch fallback
+  // applies — these are low-traffic admin channels and frequently fall
+  // out of the channels cache after a restart.
+  await postResultToChannels(client, resultEmbed, [langRow], isWagerMatch, matchId);
 
   // Update nicknames with new XP and earnings
   const { updateNicknames } = require('../utils/nicknameUpdater');
@@ -786,4 +812,4 @@ function startNoShowReminders(client, match, playerDiscordIds) {
   }, 10 * 60 * 1000);
 }
 
-module.exports = { createMatchChannels, startMatch, resolveMatch, cleanupChannels };
+module.exports = { createMatchChannels, startMatch, resolveMatch, cleanupChannels, postResultToChannels };

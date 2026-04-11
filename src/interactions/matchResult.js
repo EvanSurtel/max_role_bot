@@ -670,8 +670,63 @@ async function handleAdminConfirmNoWinner(interaction) {
 
     // No XP changes for anyone
 
-    // Post dispute result to permanent channel
+    // Post dispute result to permanent dispute-results channel
     await postDisputeResult(interaction.client, matchId, 0, interaction.user.id);
+
+    // Also post to the regular results channels — a no-winner dispute
+    // resolution is still the official result of a match, so it belongs
+    // in the same feed everyone watches for normal results.
+    try {
+      const { GAME_MODES } = require('../config/constants');
+      const { formatUsdc } = require('../utils/embeds');
+      const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
+      const isWagerMatch = challenge && challenge.type === 'wager' && Number(challenge.total_pot_usdc) > 0;
+      const matchTypeLabel = isWagerMatch ? 'Wager' : 'XP Match';
+      const modeInfo = challenge ? GAME_MODES[challenge.game_modes] : null;
+      const modeLabel = modeInfo ? modeInfo.label : (challenge?.game_modes || 'N/A');
+
+      const team1Lines = allPlayers.filter(p => p.team === 1).map(p => {
+        const u = userRepo.findById(p.user_id);
+        if (!u) return null;
+        const ign = u.cod_ign ? `(${u.cod_ign})` : '';
+        return `<@${u.discord_id}> ${ign}`;
+      }).filter(Boolean);
+      const team2Lines = allPlayers.filter(p => p.team === 2).map(p => {
+        const u = userRepo.findById(p.user_id);
+        if (!u) return null;
+        const ign = u.cod_ign ? `(${u.cod_ign})` : '';
+        return `<@${u.discord_id}> ${ign}`;
+      }).filter(Boolean);
+
+      const refundText = isWagerMatch
+        ? `**No Winner — ${formatUsdc(challenge.total_pot_usdc)} USDC refunded to all players**`
+        : '**No Winner — match cancelled**';
+
+      const noWinnerEmbed = new EmbedBuilder()
+        .setTitle(`${matchTypeLabel} #${matchId} — Result`)
+        .setColor(0x95a5a6)
+        .setDescription([
+          refundText,
+          '',
+          `Resolved by <@${interaction.user.id}>`,
+          '',
+          '**Team 1**',
+          ...team1Lines,
+          '',
+          '**Team 2**',
+          ...team2Lines,
+        ].join('\n'))
+        .addFields(
+          { name: 'Mode', value: modeLabel, inline: true },
+          { name: 'Series', value: `Best of ${challenge?.series_length || '?'}`, inline: true },
+          { name: 'Team Size', value: `${challenge?.team_size || '?'}v${challenge?.team_size || '?'}`, inline: true },
+        )
+        .setTimestamp();
+
+      await matchService.postResultToChannels(interaction.client, noWinnerEmbed, [], isWagerMatch, matchId);
+    } catch (err) {
+      console.error(`[MatchResult] Failed to post no-winner result to results channels for match #${matchId}:`, err.message);
+    }
 
     // Cleanup dispute channels
     const { cleanupDisputeChannels } = require('./disputeCreate');
@@ -696,8 +751,17 @@ async function postDisputeResult(client, matchId, winningTeam, resolverDiscordId
   const channelId = process.env.DISPUTE_RESULTS_CHANNEL_ID;
   if (!channelId) return;
 
-  const ch = client.channels.cache.get(channelId);
-  if (!ch) return;
+  // Try cache first, fall back to fetch — same cache-miss problem the
+  // transactions channel had: low-traffic admin channels drop out of
+  // the channel cache after a restart.
+  let ch = client.channels.cache.get(channelId);
+  if (!ch) {
+    try { ch = await client.channels.fetch(channelId); } catch { ch = null; }
+  }
+  if (!ch) {
+    console.error(`[MatchResult] DISPUTE_RESULTS_CHANNEL_ID=${channelId} unreachable for match #${matchId}`);
+    return;
+  }
 
   try {
     const match = matchRepo.findById(matchId);
