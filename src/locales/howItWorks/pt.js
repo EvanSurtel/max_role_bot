@@ -178,8 +178,8 @@ module.exports = {
       '**🔄 A cada nova temporada todo mundo reseta pra 500 XP, 0W–0L.** Seu XP da temporada e W/L começam do zero, mas suas ganhos totais e stats históricas continuam.',
       '',
       '**Por que dois leaderboards?**',
-      '• **XP Leaderboard** — rankeia os jogadores pelo XP da temporada (fila + desafios de XP + vitórias em apostas, tudo junto)',
-      '• **Earnings Leaderboard** — rankeia os jogadores pelo total de USDC ganho em apostas nesta temporada',
+      '• **XP Leaderboard** — rankeia os jogadores pelo **XP da temporada** (fila + desafios de XP + vitórias em apostas, tudo junto). Reseta a cada temporada.',
+      '• **Earnings Leaderboard** — rankeia os jogadores pelo **total de USDC ganho desde sempre** em vitórias de apostas. Nunca reseta — cada dólar que você ganha fica no seu total histórico.',
     ].join('\n'),
   },
 

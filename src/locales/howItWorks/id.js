@@ -177,8 +177,8 @@ module.exports = {
       '**🔄 Tiap season baru semua orang direset ke 500 XP, 0W–0L.** XP season dan W/L kamu mulai dari nol, tapi total earnings dan stats sepanjang masa tetep kesimpen.',
       '',
       '**Kenapa ada dua leaderboard?**',
-      '• **XP Leaderboard** — ranking pemain berdasarkan XP season (queue + XP challenge + menang wager, semua digabung)',
-      '• **Earnings Leaderboard** — ranking pemain berdasarkan total USDC yang didapet dari menang wager di season ini',
+      '• **XP Leaderboard** — ranking pemain berdasarkan **XP season** (queue + XP challenge + menang wager, semua digabung). Reset tiap season.',
+      '• **Earnings Leaderboard** — ranking pemain berdasarkan **total USDC sepanjang masa** yang didapet dari menang wager. Nggak pernah direset — tiap dolar yang kamu menangin nempel permanen di total lifetime kamu.',
     ].join('\n'),
   },
 

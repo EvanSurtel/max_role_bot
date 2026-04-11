@@ -177,8 +177,8 @@ module.exports = {
       '**🔄 每个新赛季所有人都重置为 500 XP、0W–0L。** 你的赛季 XP 和 W/L 重新开始,但累计收益和生涯统计会保留。',
       '',
       '**为什么有两个 leaderboard?**',
-      '• **XP Leaderboard** — 根据赛季 XP 排名(队列 + XP 挑战 + 押注获胜,全部合并)',
-      '• **Earnings Leaderboard** — 根据本赛季押注获胜赚到的 USDC 总额排名',
+      '• **XP Leaderboard** — 根据**赛季 XP** 排名(队列 + XP 挑战 + 押注获胜,全部合并)。每个赛季都会重置。',
+      '• **Earnings Leaderboard** — 根据押注获胜赚到的**历来累计 USDC** 总额排名。永远不会重置 — 你赢到的每一美元都会永久留在你的生涯总额里。',
     ].join('\n'),
   },
 

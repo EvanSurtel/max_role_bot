@@ -177,8 +177,8 @@ module.exports = {
       '**🔄 A ogni nuova stagione tutti ripartono da 500 XP, 0W–0L.** Il tuo XP di stagione e il tuo W/L ricominciano da zero, ma i guadagni totali e le stats di sempre restano.',
       '',
       '**Perché due classifiche?**',
-      '• **XP Leaderboard** — rankare i giocatori per XP di stagione (coda + sfide XP + vittorie di puntata, tutto combinato)',
-      '• **Earnings Leaderboard** — rankare i giocatori per totale USDC guadagnato dalle puntate vinte in questa stagione',
+      '• **XP Leaderboard** — classifica i giocatori per **XP di stagione** (coda + sfide XP + vittorie di puntata, tutto combinato). Si resetta a ogni stagione.',
+      '• **Earnings Leaderboard** — classifica i giocatori per **USDC totale guadagnato di sempre** dalle puntate vinte. Non si resetta mai — ogni dollaro vinto resta nel tuo totale a vita.',
     ].join('\n'),
   },
 

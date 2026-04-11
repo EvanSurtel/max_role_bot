@@ -177,8 +177,8 @@ module.exports = {
       '**🔄 Jede neue Season setzen alle auf 500 XP, 0W–0L zurück.** Deine Season-XP und W/L fangen von vorne an, aber deine All-Time-Gewinne und Lifetime-Stats bleiben erhalten.',
       '',
       '**Warum zwei Leaderboards?**',
-      '• **XP Leaderboard** — rankt Spieler nach Season-XP (Queue + XP-Challenges + Wetten-Siege alle kombiniert)',
-      '• **Earnings Leaderboard** — rankt Spieler nach insgesamt verdientem USDC aus Wetten-Siegen diese Season',
+      '• **XP Leaderboard** — rankt Spieler nach **Season-XP** (Queue + XP-Challenges + Wetten-Siege alle kombiniert). Wird jede Season zurückgesetzt.',
+      '• **Earnings Leaderboard** — rankt Spieler nach **All-Time verdientem USDC** aus Wetten-Siegen. Wird nie zurückgesetzt — jeder gewonnene Dollar bleibt in deiner Lifetime-Summe.',
     ].join('\n'),
   },
 

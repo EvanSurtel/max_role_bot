@@ -177,8 +177,8 @@ module.exports = {
       '**🔄 हर नए season में सब 500 XP, 0W–0L पर reset होते हैं।** तुम्हारा season XP और W/L fresh से start होते हैं, लेकिन तुम्हारे all-time earnings और lifetime stats carry over होते हैं।',
       '',
       '**दो leaderboards क्यों?**',
-      '• **XP Leaderboard** — players को season XP से rank करता है (queue + XP challenges + wager wins सब combined)',
-      '• **Earnings Leaderboard** — इस season wager wins से total USDC कमाए के हिसाब से players को rank करता है',
+      '• **XP Leaderboard** — players को **season XP** से rank करता है (queue + XP challenges + wager wins सब combined)। हर season reset होता है।',
+      '• **Earnings Leaderboard** — players को wager wins से **all-time कमाए गए USDC** के हिसाब से rank करता है। कभी reset नहीं होता — तुम जो भी dollar जीतते हो वो तुम्हारे lifetime total में हमेशा के लिए जुड़ा रहता है।',
     ].join('\n'),
   },
 

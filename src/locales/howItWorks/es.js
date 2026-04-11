@@ -178,8 +178,8 @@ module.exports = {
       '**🔄 Cada temporada nueva todos reinician a 500 XP, 0W–0L.** Tu XP de temporada y tu W/L arrancan de cero, pero tus ganancias totales y estadísticas de por vida se mantienen.',
       '',
       '**¿Por qué dos leaderboards?**',
-      '• **XP Leaderboard** — rankea a los jugadores por XP de temporada (queue + retos de XP + victorias en apuestas, todo combinado)',
-      '• **Earnings Leaderboard** — rankea a los jugadores por total de USDC ganado en apuestas esta temporada',
+      '• **XP Leaderboard** — rankea a los jugadores por **XP de temporada** (queue + retos de XP + victorias en apuestas, todo combinado). Se reinicia cada temporada.',
+      '• **Earnings Leaderboard** — rankea a los jugadores por **USDC total ganado de por vida** en victorias de apuestas. Nunca se reinicia — cada dólar que ganes se queda en tu total de por vida.',
     ].join('\n'),
   },
 

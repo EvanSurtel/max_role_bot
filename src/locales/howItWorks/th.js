@@ -177,8 +177,8 @@ module.exports = {
       '**🔄 ทุก season ใหม่ทุกคนจะ reset กลับเป็น 500 XP, 0W–0L** XP ของ season และ W/L จะเริ่มใหม่ แต่ earnings รวมตลอดกาลและ stats ทั้งชีวิตยังอยู่',
       '',
       '**ทำไมถึงมี leaderboard สอง?**',
-      '• **XP Leaderboard** — จัดอันดับผู้เล่นตาม XP ของ season (queue + XP challenges + ชนะ wager รวมทั้งหมด)',
-      '• **Earnings Leaderboard** — จัดอันดับผู้เล่นตาม USDC รวมที่ได้จากการชนะ wager ใน season นี้',
+      '• **XP Leaderboard** — จัดอันดับผู้เล่นตาม **XP ของ season** (queue + XP challenges + ชนะ wager รวมทั้งหมด) รีเซ็ตทุก season',
+      '• **Earnings Leaderboard** — จัดอันดับผู้เล่นตาม **USDC ที่ได้รับรวมตลอดกาล** จากการชนะ wager ไม่มีการรีเซ็ต — ทุกดอลลาร์ที่คุณชนะจะอยู่ในยอดรวมทั้งชีวิตของคุณตลอดไป',
     ].join('\n'),
   },
 

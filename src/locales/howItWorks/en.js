@@ -178,8 +178,8 @@ module.exports = {
       '**🔄 Each new season everyone resets to 500 XP, 0W–0L.** Your season XP and W/L start fresh, but your all-time earnings and lifetime stats carry over.',
       '',
       '**Why two leaderboards?**',
-      '• **XP Leaderboard** — ranks players by season XP (queue + XP challenges + wager wins all combined)',
-      '• **Earnings Leaderboard** — ranks players by total USDC earned from wager wins this season',
+      '• **XP Leaderboard** — ranks players by **season XP** (queue + XP challenges + wager wins all combined). Resets every season.',
+      '• **Earnings Leaderboard** — ranks players by **all-time USDC earned** from wager wins. Never resets — every dollar you win sticks on your lifetime total.',
     ].join('\n'),
   },
 

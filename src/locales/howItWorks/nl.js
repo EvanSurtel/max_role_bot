@@ -177,8 +177,8 @@ module.exports = {
       '**🔄 Elk nieuw seizoen reset iedereen naar 500 XP, 0W–0L.** Je season XP en W/L beginnen opnieuw, maar je all-time verdiensten en lifetime stats blijven staan.',
       '',
       '**Waarom twee leaderboards?**',
-      '• **XP Leaderboard** — rankt spelers op season XP (queue + XP challenges + wager winsten allemaal samen)',
-      '• **Earnings Leaderboard** — rankt spelers op totaal USDC verdiend uit wager winsten dit seizoen',
+      '• **XP Leaderboard** — rankt spelers op **season XP** (queue + XP challenges + wager winsten allemaal samen). Reset elk seizoen.',
+      '• **Earnings Leaderboard** — rankt spelers op **all-time verdiend USDC** uit wager winsten. Reset nooit — elke dollar die je wint blijft staan op je lifetime totaal.',
     ].join('\n'),
   },
 

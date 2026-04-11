@@ -177,8 +177,8 @@ module.exports = {
       '**🔄 Her yeni sezon herkes 500 XP, 0W–0L\'e sıfırlanır.** Sezon XP\'n ve W/L\'n sıfırdan başlar, ama tüm zaman kazançların ve ömür boyu statistiklerin devam eder.',
       '',
       '**Neden iki leaderboard var?**',
-      '• **XP Leaderboard** — oyuncuları sezon XP\'sine göre sıralar (queue + XP challenge\'lar + wager zaferleri, hepsi birlikte)',
-      '• **Earnings Leaderboard** — oyuncuları bu sezon wager zaferlerinden kazandıkları toplam USDC\'ye göre sıralar',
+      '• **XP Leaderboard** — oyuncuları **sezon XP**\'sine göre sıralar (queue + XP challenge\'lar + wager zaferleri, hepsi birlikte). Her sezon sıfırlanır.',
+      '• **Earnings Leaderboard** — oyuncuları wager zaferlerinden **tüm zamanların kazanılan USDC**\'sine göre sıralar. Asla sıfırlanmaz — kazandığın her dolar ömür boyu toplamında kalır.',
     ].join('\n'),
   },
 

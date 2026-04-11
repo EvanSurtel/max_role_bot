@@ -177,8 +177,8 @@ module.exports = {
       '**🔄 Każdy nowy sezon wszyscy resetują się do 500 XP, 0W–0L.** Twoje XP sezonu i W/L startują od zera, ale twoje zarobki z całego życia i statystyki na zawsze zostają.',
       '',
       '**Dlaczego są dwa leaderboardy?**',
-      '• **XP Leaderboard** — rankuje graczy według XP sezonu (kolejka + wyzwania XP + wygrane zakłady, wszystko razem)',
-      '• **Earnings Leaderboard** — rankuje graczy według sumy USDC zarobionej z wygranych zakładów w tym sezonie',
+      '• **XP Leaderboard** — rankuje graczy według **XP sezonu** (kolejka + wyzwania XP + wygrane zakłady, wszystko razem). Resetuje się co sezon.',
+      '• **Earnings Leaderboard** — rankuje graczy według **łącznego USDC zarobionego w całej karierze** z wygranych zakładów. Nigdy się nie resetuje — każdy wygrany dolar zostaje w twoim totalu na całe życie.',
     ].join('\n'),
   },
 

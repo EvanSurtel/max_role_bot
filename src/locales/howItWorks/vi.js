@@ -177,8 +177,8 @@ module.exports = {
       '**🔄 Mỗi season mới mọi người đều reset về 500 XP, 0W–0L.** XP season và W/L của bạn bắt đầu lại từ đầu, nhưng tổng thu nhập và stats toàn thời gian được giữ lại.',
       '',
       '**Tại sao có hai leaderboard?**',
-      '• **XP Leaderboard** — xếp hạng người chơi theo XP season (queue + XP challenge + thắng wager, tất cả gộp lại)',
-      '• **Earnings Leaderboard** — xếp hạng người chơi theo tổng USDC kiếm được từ thắng wager trong season này',
+      '• **XP Leaderboard** — xếp hạng người chơi theo **XP season** (queue + XP challenge + thắng wager, tất cả gộp lại). Reset mỗi season.',
+      '• **Earnings Leaderboard** — xếp hạng người chơi theo **tổng USDC kiếm được mọi thời đại** từ thắng wager. Không bao giờ reset — từng đô la bạn thắng được đều ở lại vĩnh viễn trong tổng cả đời của bạn.',
     ].join('\n'),
   },
 

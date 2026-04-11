@@ -177,8 +177,8 @@ module.exports = {
       '**🔄 Bawat bagong season ay magre-reset ang lahat sa 500 XP, 0W–0L.** Magsisimula ulit sa simula ang season XP at W/L mo, pero ang all-time earnings at lifetime stats mo ay mananatili.',
       '',
       '**Bakit may dalawang leaderboard?**',
-      '• **XP Leaderboard** — nagra-rank ng players base sa season XP (queue + XP challenges + panalong wagers lahat pinagsama)',
-      '• **Earnings Leaderboard** — nagra-rank ng players base sa total USDC na kinita mula sa panalong wagers ngayong season',
+      '• **XP Leaderboard** — nagra-rank ng players base sa **season XP** (queue + XP challenges + panalong wagers lahat pinagsama). Nagre-reset bawat season.',
+      '• **Earnings Leaderboard** — nagra-rank ng players base sa **all-time USDC na kinita** mula sa panalong wagers. Hindi kailanman nagre-reset — bawat dolyar na napapanalunan mo ay permanenteng nananatili sa lifetime total mo.',
     ].join('\n'),
   },
 

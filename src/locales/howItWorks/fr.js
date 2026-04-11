@@ -178,8 +178,8 @@ module.exports = {
       '**🔄 À chaque nouvelle saison, tout le monde repart à 500 XP, 0W–0L.** Votre XP de saison et votre W/L repartent à zéro, mais vos gains totaux et stats à vie sont conservés.',
       '',
       '**Pourquoi deux classements ?**',
-      '• **XP Leaderboard** — classe les joueurs par XP de saison (file + défis XP + victoires en mise, tout combiné)',
-      '• **Earnings Leaderboard** — classe les joueurs par total d\'USDC gagné en mises cette saison',
+      '• **XP Leaderboard** — classe les joueurs par **XP de saison** (file + défis XP + victoires en mise, tout combiné). Se réinitialise à chaque saison.',
+      '• **Earnings Leaderboard** — classe les joueurs par **USDC total gagné à vie** sur les victoires en mise. Ne se réinitialise jamais — chaque dollar gagné reste dans votre total à vie.',
     ].join('\n'),
   },
 
