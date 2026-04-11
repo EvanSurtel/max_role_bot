@@ -197,9 +197,14 @@ async function renderRankCard(data) {
   // the raw position number is more informative than "CROWNED" so
   // we render it big and centered right below the emblem. Gives
   // every Crowned card a distinct "#1 / #4 / #10" identity.
+  //
+  // The offset is negative because the emblem PNGs have transparent
+  // padding at the bottom of their bounding box — anchoring the
+  // number a bit above EMBLEM_Y + EMBLEM_BOX pulls it visually up
+  // against the crown art instead of leaving dead air in between.
   if (tier.topN && position !== null && position !== undefined) {
     const emblemCenterX = EMBLEM_X + EMBLEM_BOX / 2;
-    const posY = EMBLEM_Y + EMBLEM_BOX + 12;
+    const posY = EMBLEM_Y + EMBLEM_BOX - 20;
     ctx.fillStyle = tierHex;
     ctx.font = `bold 64px "${FONT_FAMILY}"`;
     ctx.textAlign = 'center';
