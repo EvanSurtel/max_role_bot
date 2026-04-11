@@ -67,7 +67,10 @@ function buildRanksPanel(lang = 'en', { withThumbnails = true } = {}) {
       const emblemPath = path.join(ASSETS_DIR, tier.emblem);
       if (fs.existsSync(emblemPath)) {
         files.push(new AttachmentBuilder(emblemPath, { name: tier.emblem }));
-        embed.setThumbnail(`attachment://${tier.emblem}`);
+        // setImage() renders the emblem full-width at the bottom of
+        // the embed — much larger than setThumbnail(), which just
+        // sticks a small square in the corner.
+        embed.setImage(`attachment://${tier.emblem}`);
       }
     }
 
