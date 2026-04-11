@@ -6,11 +6,12 @@ const { USDC_MINT_MAINNET, USDC_MINT_DEVNET } = require('../config/constants');
 
 /**
  * Get the USDC mint public key based on network config.
+ * Defaults to mainnet-beta — match the default in connection.js.
  * @returns {PublicKey}
  */
 function getUsdcMint() {
-  const network = (process.env.SOLANA_NETWORK || 'devnet').toLowerCase();
-  const mint = network === 'mainnet-beta' || network === 'mainnet'
+  const network = (process.env.SOLANA_NETWORK || 'mainnet-beta').toLowerCase();
+  const mint = (network === 'mainnet-beta' || network === 'mainnet')
     ? USDC_MINT_MAINNET
     : (process.env.USDC_MINT_ADDRESS || USDC_MINT_DEVNET);
   return new PublicKey(mint);
