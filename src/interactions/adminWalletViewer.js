@@ -17,9 +17,11 @@ const { t, langFor } = require('../locales/i18n');
 
 function isAdmin(member) {
   if (!member) return false;
-  // Owner role is treated as admin-equivalent everywhere.
+  // CEO and owner roles are treated as admin-equivalent everywhere.
+  const ceoRoleId = process.env.CEO_ROLE_ID;
   const ownerRoleId = process.env.OWNER_ROLE_ID;
   const adminRoleId = process.env.ADMIN_ROLE_ID;
+  if (ceoRoleId && member.roles.cache.has(ceoRoleId)) return true;
   if (ownerRoleId && member.roles.cache.has(ownerRoleId)) return true;
   if (adminRoleId && member.roles.cache.has(adminRoleId)) return true;
   return false;

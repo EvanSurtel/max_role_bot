@@ -148,12 +148,14 @@ async function handleSeasonButton(interaction) {
   const { getBotDisplayLanguage } = require('../utils/languageRefresh');
   const sharedLang = getBotDisplayLanguage();
 
-  // Check admin — owner role is admin-equivalent.
+  // Check admin — CEO and owner roles are admin-equivalent.
   const adminRoleId = process.env.ADMIN_ROLE_ID;
   const ownerRoleId = process.env.OWNER_ROLE_ID;
+  const ceoRoleId = process.env.CEO_ROLE_ID;
   const hasAdmin = adminRoleId && interaction.member.roles.cache.has(adminRoleId);
   const hasOwner = ownerRoleId && interaction.member.roles.cache.has(ownerRoleId);
-  if (!hasAdmin && !hasOwner) {
+  const hasCeo = ceoRoleId && interaction.member.roles.cache.has(ceoRoleId);
+  if (!hasAdmin && !hasOwner && !hasCeo) {
     return interaction.reply({ content: t('season_panel.admin_only', lang), ephemeral: true });
   }
 
@@ -258,12 +260,14 @@ async function handleSeasonModal(interaction) {
   if (interaction.customId !== 'season_end_modal') return;
 
   const lang = langFor(interaction);
-  // Admin-equivalent: owner role shares all admin powers.
+  // Admin-equivalent: CEO and owner roles share all admin powers.
   const adminRoleId = process.env.ADMIN_ROLE_ID;
   const ownerRoleId = process.env.OWNER_ROLE_ID;
+  const ceoRoleId = process.env.CEO_ROLE_ID;
   const hasAdmin = adminRoleId && interaction.member.roles.cache.has(adminRoleId);
   const hasOwner = ownerRoleId && interaction.member.roles.cache.has(ownerRoleId);
-  if (!hasAdmin && !hasOwner) {
+  const hasCeo = ceoRoleId && interaction.member.roles.cache.has(ceoRoleId);
+  if (!hasAdmin && !hasOwner && !hasCeo) {
     return interaction.reply({ content: t('season_panel.admin_only', lang), ephemeral: true });
   }
 

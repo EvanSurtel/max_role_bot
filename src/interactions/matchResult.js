@@ -16,14 +16,17 @@ const { MATCH_STATUS, CHALLENGE_STATUS, PLAYER_ROLE } = require('../config/const
 const { t, langFor } = require('../locales/i18n');
 
 /**
- * Check if a member has dispute resolution permissions (owner, admin,
- * or wager/XP staff). Owner role has the same powers as admin.
+ * Check if a member has dispute resolution permissions (CEO, owner,
+ * admin, or wager/XP staff). CEO and owner have the same powers as
+ * admin everywhere in the bot.
  */
 function canResolveDisputes(member) {
+  const ceoRoleId = process.env.CEO_ROLE_ID;
   const ownerRoleId = process.env.OWNER_ROLE_ID;
   const adminRoleId = process.env.ADMIN_ROLE_ID;
   const wagerStaffId = process.env.WAGER_STAFF_ROLE_ID;
   const xpStaffId = process.env.XP_STAFF_ROLE_ID;
+  if (ceoRoleId && member.roles.cache.has(ceoRoleId)) return true;
   if (ownerRoleId && member.roles.cache.has(ownerRoleId)) return true;
   if (adminRoleId && member.roles.cache.has(adminRoleId)) return true;
   if (wagerStaffId && member.roles.cache.has(wagerStaffId)) return true;
@@ -169,6 +172,7 @@ async function handleNoShowReport(interaction) {
   });
 
   // Post admin resolve buttons to staff-only channel (admin alerts), NOT the vote channel
+  const ceoRoleId = process.env.CEO_ROLE_ID;
   const ownerRoleId = process.env.OWNER_ROLE_ID;
   const adminRoleId = process.env.ADMIN_ROLE_ID;
   const wagerStaffId = process.env.WAGER_STAFF_ROLE_ID;
@@ -178,6 +182,7 @@ async function handleNoShowReport(interaction) {
   if (xpStaffId) pings.push(`<@&${xpStaffId}>`);
   if (adminRoleId) pings.push(`<@&${adminRoleId}>`);
   if (ownerRoleId) pings.push(`<@&${ownerRoleId}>`);
+  if (ceoRoleId) pings.push(`<@&${ceoRoleId}>`);
 
   const adminRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`admin_resolve_team1_${matchId}`).setLabel('Team 1 Wins').setStyle(ButtonStyle.Primary),
@@ -427,6 +432,7 @@ async function triggerDispute(client, matchId) {
     const captainUser = captainPlayer ? userRepo.findById(captainPlayer.user_id) : null;
     const sharedLang = captainUser ? langFor({ user: { id: captainUser.discord_id }, locale: '' }) : 'en';
 
+    const ceoRoleId = process.env.CEO_ROLE_ID;
     const ownerRoleId = process.env.OWNER_ROLE_ID;
     const adminRoleId = process.env.ADMIN_ROLE_ID;
     const wagerStaffId = process.env.WAGER_STAFF_ROLE_ID;
@@ -436,6 +442,7 @@ async function triggerDispute(client, matchId) {
     if (xpStaffId) pings.push(`<@&${xpStaffId}>`);
     if (adminRoleId) pings.push(`<@&${adminRoleId}>`);
     if (ownerRoleId) pings.push(`<@&${ownerRoleId}>`);
+    if (ceoRoleId) pings.push(`<@&${ceoRoleId}>`);
     const staffPing = pings.length > 0 ? pings.join(' ') : 'Staff';
 
     await sharedChannel.send({
