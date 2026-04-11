@@ -337,6 +337,13 @@ async function handleAdminModal(interaction) {
     db.prepare('INSERT INTO xp_history (user_id, match_id, match_type, xp_amount, season) VALUES (?, NULL, ?, ?, ?)').run(user.id, 'admin_adjust', xpAmount, getCurrentSeason());
     if (neatqueueService.isConfigured()) neatqueueService.addPoints(targetId, xpAmount).catch(() => {});
     logAdminAction(interaction.user.id, 'adjust_xp', 'user', user.id, { xpAmount, reason });
+
+    // Re-sync the user's rank role — they may have crossed a tier
+    // threshold or moved in/out of the Crowned top 10.
+    const { syncRank } = require('../utils/rankRoleSync');
+    syncRank(interaction.client, user.id).catch(err => {
+      console.error('[LeaderboardPanel] Rank sync failed after admin XP adjust:', err.message);
+    });
     const { postTransaction } = require('../utils/transactionFeed');
     postTransaction({
       type: 'admin_adjust_xp',

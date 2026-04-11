@@ -231,6 +231,16 @@ async function handleRegistrationModal(interaction) {
       console.warn(`[Onboarding] Could not set nickname:`, err.message);
     }
 
+    // Grant the starting rank role (Bronze at 500 XP under the
+    // default progression). Non-blocking — onboarding still succeeds
+    // if the rank role env vars aren't configured yet.
+    try {
+      const { syncRank } = require('../utils/rankRoleSync');
+      await syncRank(interaction.client, user.id);
+    } catch (err) {
+      console.warn(`[Onboarding] Rank role sync failed:`, err.message);
+    }
+
     // Register IGN with NeatQueue
     if (neatqueueService.isConfigured()) {
       try {

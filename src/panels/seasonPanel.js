@@ -302,6 +302,14 @@ async function handleSeasonModal(interaction) {
     db.prepare('UPDATE users SET xp_points = ?, total_wins = 0, total_losses = 0 WHERE accepted_tos = 1').run(STARTING_XP);
     console.log(`[Season] Reset all users to ${STARTING_XP} XP, 0W-0L`);
 
+    // 2b. Re-sync every user's rank role to match the new 500-XP
+    // baseline. Runs in the background so it doesn't block the rest
+    // of the season-end flow.
+    const { syncAllRanks } = require('../utils/rankRoleSync');
+    syncAllRanks(interaction.client).catch(err => {
+      console.error('[Season] Rank sync after season reset failed:', err.message);
+    });
+
     // 3. Set new season
     setCurrentSeason(newSeason);
 

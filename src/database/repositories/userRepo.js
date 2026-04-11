@@ -1,9 +1,18 @@
 const db = require('../db');
 
+// Starting XP for a brand-new user. This MUST match STARTING_XP in
+// seasonPanel.js — new users and season-reset users should land on
+// the same baseline so the leaderboard + rank roles stay consistent.
+const STARTING_XP = 500;
+
 const stmts = {
   findById: db.prepare('SELECT * FROM users WHERE id = ?'),
   findByDiscordId: db.prepare('SELECT * FROM users WHERE discord_id = ?'),
-  create: db.prepare('INSERT INTO users (discord_id) VALUES (?) RETURNING *'),
+  // Explicitly set xp_points to the starting baseline instead of
+  // relying on the 0 DB default — without this, new users joined
+  // mid-season with 0 XP while everyone else was at 500, and a
+  // single loss dropped them below zero.
+  create: db.prepare('INSERT INTO users (discord_id, xp_points) VALUES (?, ' + STARTING_XP + ') RETURNING *'),
   acceptTos: db.prepare('UPDATE users SET accepted_tos = 1 WHERE id = ?'),
   setLanguage: db.prepare('UPDATE users SET language = ? WHERE discord_id = ?'),
 

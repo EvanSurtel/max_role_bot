@@ -413,6 +413,16 @@ async function resolveMatch(client, matchId, winningTeam) {
     throw new Error(`Match ${matchId} not found`);
   }
 
+  // Idempotency guard — without this, if resolveMatch gets called
+  // twice for the same match (race, retry, admin re-click) the bot
+  // would double-award XP, double-count wins/losses, and try to
+  // disburse the escrow twice. Hard block: once a match is completed,
+  // it's done.
+  if (match.status === MATCH_STATUS.COMPLETED) {
+    console.warn(`[MatchService] resolveMatch called on already-completed match #${matchId} — skipping`);
+    return;
+  }
+
   const challenge = challengeRepo.findById(match.challenge_id);
   if (!challenge) {
     throw new Error(`Challenge ${match.challenge_id} not found for match ${matchId}`);
@@ -674,6 +684,14 @@ async function resolveMatch(client, matchId, winningTeam) {
   const allPlayerIds = allPlayers.map(p => p.user_id);
   updateNicknames(client, allPlayerIds).catch(err => {
     console.error(`[MatchService] Nickname update failed:`, err.message);
+  });
+
+  // Sync rank roles for every match participant — the match may
+  // have bumped someone into a new tier (or knocked them out of
+  // the Crowned top 10).
+  const { syncRanks } = require('../utils/rankRoleSync');
+  syncRanks(client, allPlayerIds).catch(err => {
+    console.error(`[MatchService] Rank role sync failed:`, err.message);
   });
 
   // Schedule channel cleanup after 5 minutes
