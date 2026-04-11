@@ -153,9 +153,11 @@ async function renderRankCard(data) {
   ctx.fillRect(0, HEIGHT - barH, WIDTH, barH);
 
   // ─── Emblem (left side, big) ──────────────────────────────
-  const EMBLEM_BOX = 340;
+  // Anchored near the top so there's room for the position label
+  // below when the tier is position-based (Crowned).
+  const EMBLEM_BOX = 320;
   const EMBLEM_X = 50;
-  const EMBLEM_Y = (HEIGHT - EMBLEM_BOX) / 2;
+  const EMBLEM_Y = 30;
 
   let emblemDrawn = false;
   if (tier.emblem) {
@@ -185,6 +187,23 @@ async function renderRankCard(data) {
     ctx.beginPath();
     ctx.arc(EMBLEM_X + EMBLEM_BOX / 2, EMBLEM_Y + EMBLEM_BOX / 2, EMBLEM_BOX / 2 - 20, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // ─── Position label under the emblem (Crowned only) ──────
+  // Crowned is top-N by leaderboard position — for those players
+  // the raw position number is more informative than "CROWNED" so
+  // we render it big and centered right below the emblem. Gives
+  // every Crowned card a distinct "#1 / #4 / #10" identity.
+  if (tier.topN && position !== null && position !== undefined) {
+    const emblemCenterX = EMBLEM_X + EMBLEM_BOX / 2;
+    const posY = EMBLEM_Y + EMBLEM_BOX + 12;
+    ctx.fillStyle = tierHex;
+    ctx.font = `bold 64px "${FONT_FAMILY}"`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`#${position}`, emblemCenterX, posY);
+    // reset alignment so the right-column text draws from x=RIGHT_X
+    ctx.textAlign = 'left';
   }
 
   // ─── Right side: text column ──────────────────────────────
@@ -222,13 +241,13 @@ async function renderRankCard(data) {
   ctx.stroke();
 
   // ─── Stats row ────────────────────────────────────────────
+  // Position is intentionally NOT a stat cell — for Crowned cards
+  // it's already rendered huge under the emblem, and non-Crowned
+  // players don't get a position assigned at all.
   const stats = [
     { label: 'SEASON XP', value: points.toLocaleString('en-US') },
     { label: 'RECORD',    value: `${wins}W - ${losses}L` },
   ];
-  if (position !== null && position !== undefined) {
-    stats.push({ label: 'LEADERBOARD', value: `#${position}` });
-  }
 
   const cellW = RIGHT_W / stats.length;
   const labelY = dividerY + 22;
