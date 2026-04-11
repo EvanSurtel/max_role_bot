@@ -153,11 +153,14 @@ async function renderRankCard(data) {
   ctx.fillRect(0, HEIGHT - barH, WIDTH, barH);
 
   // ─── Emblem (left side, big) ──────────────────────────────
-  // Anchored near the top so there's room for the position label
-  // below when the tier is position-based (Crowned).
+  // Non-Crowned cards get a vertically centered emblem. Crowned
+  // cards shift the emblem up so the big "#N" position label can
+  // sit underneath without getting clipped or overlapping the
+  // bottom bar.
   const EMBLEM_BOX = 320;
   const EMBLEM_X = 50;
-  const EMBLEM_Y = 30;
+  const hasPositionLabel = tier.topN && position !== null && position !== undefined;
+  const EMBLEM_Y = hasPositionLabel ? 30 : Math.floor((HEIGHT - EMBLEM_BOX) / 2);
 
   let emblemDrawn = false;
   if (tier.emblem) {
