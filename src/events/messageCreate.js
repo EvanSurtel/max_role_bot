@@ -94,64 +94,67 @@ async function handleRankPreview(message) {
     obsidian: 10000,
   };
 
-  const files = [];
+  // Intro line first, then each card posted as its own message so the
+  // user can scroll through them one-at-a-time in the channel (vs
+  // dumping 10 attachments into a single message).
   try {
-    // Base tiers — 7 cards
-    for (const tier of RANK_TIERS) {
-      if (tier.topN) continue; // Crowned handled below
-      const xp = sampleXp[tier.key] ?? 500;
-      const rankName = (tRanks[tier.key] && tRanks[tier.key].name) || tier.key;
+    await message.reply({
+      content: '**Rank card previews** — sending one at a time…',
+      allowedMentions: { repliedUser: false },
+    });
+  } catch { /* ignore — still try to render */ }
+
+  // Helper: render + send a single card, swallow errors per-card so
+  // one broken emblem doesn't abort the whole preview run.
+  async function sendOne(tier, rankName, sampleData, label) {
+    try {
       const buf = await renderRankCard({
         displayName: 'Sample Player',
         ign: 'SampleIGN',
-        points: xp,
-        wins: 20,
-        losses: 10,
-        position: null,
+        ...sampleData,
         tier,
         rankName,
       });
-      files.push(new AttachmentBuilder(buf, { name: `preview-${tier.key}.png` }));
+      const file = new AttachmentBuilder(buf, { name: `preview-${tier.key}${sampleData.position != null ? '-' + sampleData.position : ''}.png` });
+      await message.channel.send({
+        content: label,
+        files: [file],
+        allowedMentions: { parse: [] },
+      });
+      // Small pacing delay so Discord renders them sequentially
+      // instead of all bunching up from rate-limit queueing.
+      await new Promise(r => setTimeout(r, 400));
+    } catch (err) {
+      console.error(`[RankPreview] Failed to render ${tier.key}:`, err.message);
     }
-
-    // Crowned variants at 1st, 5th, 10th
-    const crowned = RANK_TIERS.find(t => t.topN);
-    if (crowned) {
-      const rankName = (tRanks.crowned && tRanks.crowned.name) || 'Crowned';
-      for (const pos of [1, 5, 10]) {
-        const buf = await renderRankCard({
-          displayName: 'Sample Player',
-          ign: 'SampleIGN',
-          points: 15000,
-          wins: 50,
-          losses: 8,
-          position: pos,
-          tier: crowned,
-          rankName,
-        });
-        files.push(new AttachmentBuilder(buf, { name: `preview-crowned-${pos}.png` }));
-      }
-    }
-  } catch (err) {
-    console.error('[RankPreview] Render failed:', err);
-    return message.reply({
-      content: 'Preview render failed — check the bot logs.',
-      allowedMentions: { repliedUser: false },
-    });
   }
 
-  if (files.length === 0) {
-    return message.reply({
-      content: 'No tiers configured to preview.',
-      allowedMentions: { repliedUser: false },
-    });
+  // Base tiers — one message each
+  for (const tier of RANK_TIERS) {
+    if (tier.topN) continue;
+    const rankName = (tRanks[tier.key] && tRanks[tier.key].name) || tier.key;
+    const xp = sampleXp[tier.key] ?? 500;
+    await sendOne(
+      tier,
+      rankName,
+      { points: xp, wins: 20, losses: 10, position: null },
+      `**${rankName}**`,
+    );
   }
 
-  return message.reply({
-    content: `**Rank card previews** — ${files.length} variants (base tiers + Crowned at #1/#5/#10)`,
-    files,
-    allowedMentions: { repliedUser: false },
-  });
+  // Crowned variants at positions 1, 5, 10 — one message each
+  const crowned = RANK_TIERS.find(t => t.topN);
+  if (crowned) {
+    const rankName = (tRanks.crowned && tRanks.crowned.name) || 'Crowned';
+    for (const pos of [1, 5, 10]) {
+      await sendOne(
+        crowned,
+        rankName,
+        { points: 15000, wins: 50, losses: 8, position: pos },
+        `**${rankName} — #${pos}**`,
+      );
+    }
+  }
 }
 
 async function handleRankCommand(message) {
@@ -171,8 +174,12 @@ async function handleRankCommand(message) {
     });
   }
   return message.reply({
+    content: result.content,
     embeds: result.embeds,
     files: result.files,
-    allowedMentions: { repliedUser: false },
+    // repliedUser: false so the "reply" arrow doesn't ping the
+    // sender; users: [] so the <@target> pill in content is
+    // clickable-to-profile but doesn't ping the target either.
+    allowedMentions: { repliedUser: false, users: [] },
   });
 }

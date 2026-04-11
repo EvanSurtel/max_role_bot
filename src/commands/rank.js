@@ -123,7 +123,18 @@ async function buildRankCard(targetUser, lang = 'en') {
       rankName,
     });
     const attachment = new AttachmentBuilder(pngBuffer, { name: `rank-${user.discord_id}.png` });
-    return { kind: 'card', embeds: [], files: [attachment] };
+    // Include the target user as a clickable mention in the message
+    // content. `allowedMentions: { users: [] }` tells Discord to
+    // render the mention pill (clickable → profile popup) without
+    // actually sending them a ping — the caller still has to pass
+    // this along on the final interaction.reply / message.reply.
+    return {
+      kind: 'card',
+      content: `<@${targetUser.id}>`,
+      embeds: [],
+      files: [attachment],
+      allowedMentions: { users: [] },
+    };
   } catch (err) {
     console.error('[RankCmd] Card render failed:', err.message);
     return {
@@ -155,6 +166,11 @@ module.exports = {
     if (result.kind === 'error') {
       return interaction.editReply({ content: result.content });
     }
-    return interaction.editReply({ embeds: result.embeds, files: result.files });
+    return interaction.editReply({
+      content: result.content,
+      embeds: result.embeds,
+      files: result.files,
+      allowedMentions: result.allowedMentions,
+    });
   },
 };

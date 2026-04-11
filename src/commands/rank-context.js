@@ -24,6 +24,11 @@ module.exports = {
     if (result.kind === 'error') {
       return interaction.editReply({ content: result.content });
     }
-    return interaction.editReply({ embeds: result.embeds, files: result.files });
+    return interaction.editReply({
+      content: result.content,
+      embeds: result.embeds,
+      files: result.files,
+      allowedMentions: result.allowedMentions,
+    });
   },
 };
