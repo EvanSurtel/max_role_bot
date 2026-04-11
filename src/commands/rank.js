@@ -11,16 +11,13 @@
 // to local users.xp_points if NeatQueue is unreachable. Crowned is
 // position-based (top N on the NeatQueue leaderboard).
 
-const path = require('path');
-const fs = require('fs');
-const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { RANK_TIERS } = require('../config/constants');
 const userRepo = require('../database/repositories/userRepo');
 const neatqueueService = require('../services/neatqueueService');
 const { getLocale } = require('../locales');
 const { langFor } = require('../locales/i18n');
-
-const EMBLEM_DIR = path.join(__dirname, '..', 'public', 'assets', 'emblems');
+const { renderRankCard } = require('../utils/rankCardRenderer');
 
 function _tierForXp(xp) {
   let match = RANK_TIERS[0];
@@ -109,41 +106,31 @@ async function buildRankCard(targetUser, lang = 'en') {
 
   // Display name priority: server nickname > IGN > Discord username
   const displayName = user.server_username || user.cod_ign || targetUser.username;
-  const flagPrefix = user.country_flag ? `${user.country_flag} ` : '';
 
-  const embed = new EmbedBuilder()
-    .setColor(tier.color)
-    .setAuthor({ name: `${flagPrefix}${displayName}` })
-    .setTitle(`🏆 ${rankName}`)
-    .addFields(
-      { name: 'Season XP', value: `**${points.toLocaleString('en-US')}**`, inline: true },
-      { name: 'Record', value: `**${user.total_wins || 0}W – ${user.total_losses || 0}L**`, inline: true },
-    );
-
-  if (position !== null) {
-    const medal = position === 1 ? '🥇'
-      : position === 2 ? '🥈'
-        : position === 3 ? '🥉'
-          : `#${position}`;
-    embed.addFields({ name: 'Leaderboard', value: `**${medal}**`, inline: true });
+  // Render a composited PNG rank card via canvas — big emblem,
+  // prominent name, stats row, tier-colored background accent.
+  // Delivered as a plain file attachment (no embed) so Discord
+  // renders it at full inline width for max visual impact.
+  try {
+    const pngBuffer = await renderRankCard({
+      displayName,
+      ign: user.cod_ign || null,
+      points,
+      wins: user.total_wins || 0,
+      losses: user.total_losses || 0,
+      position,
+      tier,
+      rankName,
+    });
+    const attachment = new AttachmentBuilder(pngBuffer, { name: `rank-${user.discord_id}.png` });
+    return { kind: 'card', embeds: [], files: [attachment] };
+  } catch (err) {
+    console.error('[RankCmd] Card render failed:', err.message);
+    return {
+      kind: 'error',
+      content: `Couldn't render <@${targetUser.id}>'s rank card right now. Try again in a moment.`,
+    };
   }
-
-  if (user.cod_ign) {
-    embed.setFooter({ text: `IGN: ${user.cod_ign}` });
-  }
-
-  // Attach the tier emblem — full-width image at the bottom of the
-  // embed, same size as the ranks panel display.
-  const files = [];
-  if (tier.emblem) {
-    const emblemPath = path.join(EMBLEM_DIR, tier.emblem);
-    if (fs.existsSync(emblemPath)) {
-      files.push(new AttachmentBuilder(emblemPath, { name: tier.emblem }));
-      embed.setImage(`attachment://${tier.emblem}`);
-    }
-  }
-
-  return { kind: 'card', embeds: [embed], files };
 }
 
 module.exports = {
