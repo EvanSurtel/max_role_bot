@@ -26,12 +26,63 @@
 
 const path = require('path');
 const fs = require('fs');
-const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 
 const EMBLEM_DIR = path.join(__dirname, '..', 'public', 'assets', 'emblems');
 
 const WIDTH = 1100;
 const HEIGHT = 440;
+
+// ─── Font detection ─────────────────────────────────────────────
+//
+// @napi-rs/canvas doesn't ship with any bundled fonts — text only
+// renders if the family we name in ctx.font matches a font that's
+// already on the system. On macOS "Helvetica Neue" / "Arial" exist
+// by default; on Ubuntu servers they usually don't, and canvas
+// silently drops the text instead of throwing. That's why the first
+// version of this card showed the emblem but no name.
+//
+// Fix: load system fonts at module require time, log what's there,
+// and pick the first family from a known-good preference list.
+// If NOTHING is available we log a loud warning with the exact apt
+// command to install a font package, and text falls back to whatever
+// canvas does by default (usually still nothing, but at least the
+// operator knows why).
+try {
+  GlobalFonts.loadSystemFonts();
+} catch (err) {
+  console.warn('[RankCard] GlobalFonts.loadSystemFonts() failed:', err.message);
+}
+
+const _availableFamilies = (() => {
+  try {
+    return (GlobalFonts.families || []).map(f => f.family);
+  } catch { return []; }
+})();
+
+const FONT_FAMILY = (() => {
+  const prefs = [
+    'DejaVu Sans',      // fonts-dejavu-core on Ubuntu (almost always present)
+    'Liberation Sans',  // fonts-liberation
+    'Noto Sans',        // fonts-noto-core
+    'Ubuntu',           // fonts-ubuntu
+    'Helvetica Neue',   // macOS dev
+    'Arial',            // Windows / macOS
+    'Helvetica',
+  ];
+  for (const name of prefs) {
+    if (_availableFamilies.includes(name)) return name;
+  }
+  return 'sans-serif';
+})();
+
+if (_availableFamilies.length === 0) {
+  console.warn('[RankCard] ⚠️  No system fonts detected. Rank card text will NOT render.');
+  console.warn('[RankCard]    Fix on Ubuntu:  sudo apt install fonts-dejavu-core');
+  console.warn('[RankCard]    Then restart the bot.');
+} else {
+  console.log(`[RankCard] ${_availableFamilies.length} font families available. Using "${FONT_FAMILY}".`);
+}
 
 function _hexFromTierColor(n) {
   return '#' + n.toString(16).padStart(6, '0');
@@ -119,14 +170,6 @@ async function renderRankCard(data) {
         const drawX = EMBLEM_X + (EMBLEM_BOX - drawW) / 2;
         const drawY = EMBLEM_Y + (EMBLEM_BOX - drawH) / 2;
 
-        // Soft glow under the emblem: draw a translucent scaled-up
-        // copy behind the sharp one
-        ctx.save();
-        ctx.globalAlpha = 0.35;
-        const glow = 24;
-        ctx.drawImage(img, drawX - glow, drawY - glow, drawW + glow * 2, drawH + glow * 2);
-        ctx.restore();
-
         ctx.drawImage(img, drawX, drawY, drawW, drawH);
         emblemDrawn = true;
       }
@@ -150,7 +193,7 @@ async function renderRankCard(data) {
 
   // Player display name — the hero text
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 68px "Helvetica Neue", Arial, sans-serif';
+  ctx.font = `bold 68px "${FONT_FAMILY}"`;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
   _fitText(ctx, displayName, RIGHT_X, 55, RIGHT_W, 68);
@@ -159,14 +202,14 @@ async function renderRankCard(data) {
   let subY = 130;
   if (ign && ign !== displayName) {
     ctx.fillStyle = '#a9a9bc';
-    ctx.font = '30px "Helvetica Neue", Arial, sans-serif';
+    ctx.font = `30px "${FONT_FAMILY}"`;
     _fitText(ctx, `IGN: ${ign}`, RIGHT_X, subY, RIGHT_W, 30);
     subY += 42;
   }
 
   // Tier name — big, in tier color, uppercase, spaced out
   ctx.fillStyle = tierHex;
-  ctx.font = 'bold 56px "Helvetica Neue", Arial, sans-serif';
+  ctx.font = `bold 56px "${FONT_FAMILY}"`;
   ctx.fillText(rankName.toUpperCase(), RIGHT_X, Math.max(subY + 10, 175));
 
   // Thin divider
@@ -196,18 +239,18 @@ async function renderRankCard(data) {
 
     // Label (muted)
     ctx.fillStyle = '#8d8da0';
-    ctx.font = '600 22px "Helvetica Neue", Arial, sans-serif';
+    ctx.font = `bold 22px "${FONT_FAMILY}"`;
     ctx.fillText(stat.label, cellX, labelY);
 
     // Value (bright, bold)
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 44px "Helvetica Neue", Arial, sans-serif';
+    ctx.font = `bold 44px "${FONT_FAMILY}"`;
     _fitText(ctx, stat.value, cellX, valueY, cellW - 16, 44);
   });
 
   // ─── Rank $ watermark (bottom right) ──────────────────────
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.font = 'bold 22px "Helvetica Neue", Arial, sans-serif';
+  ctx.font = `bold 22px "${FONT_FAMILY}"`;
   ctx.textAlign = 'right';
   ctx.fillText('RANK $', WIDTH - 30, HEIGHT - 42);
 
@@ -217,19 +260,21 @@ async function renderRankCard(data) {
 /**
  * Draw text, shrinking the font until it fits inside `maxWidth`.
  * Prevents long display names from colliding with the right edge.
+ *
+ * Extracts the weight (bold / normal) from the caller's ctx.font,
+ * keeps that weight constant, and only varies the size. The
+ * family name is always FONT_FAMILY (module-level constant).
  */
 function _fitText(ctx, text, x, y, maxWidth, basePx) {
+  const weightMatch = ctx.font.match(/^(bold|normal|\d{3})\b/i);
+  const weight = weightMatch ? weightMatch[1] : 'normal';
   let size = basePx;
-  // The caller already set the weight/family in ctx.font; re-parse it
-  // so we can change size without losing the weight/family.
-  const baseFont = ctx.font;
-  const weightFamily = baseFont.replace(/^[\s\d]*(\d+)px\s*/, '');
   while (size > 16) {
-    ctx.font = `${size}px ${weightFamily}`;
+    ctx.font = `${weight} ${size}px "${FONT_FAMILY}"`;
     if (ctx.measureText(text).width <= maxWidth) break;
     size -= 2;
   }
-  ctx.font = `${size}px ${weightFamily}`;
+  ctx.font = `${weight} ${size}px "${FONT_FAMILY}"`;
   ctx.fillText(text, x, y);
 }
 
