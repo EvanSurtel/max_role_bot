@@ -136,14 +136,16 @@ async function handleEscrowButton(interaction) {
   const { getBotDisplayLanguage } = require('../utils/languageRefresh');
   const sharedLang = getBotDisplayLanguage();
 
-  // Admin only — CEO and owner roles are admin-equivalent.
+  // Admin only — ads, CEO, and owner roles are admin-equivalent.
   const adminRoleId = process.env.ADMIN_ROLE_ID;
   const ownerRoleId = process.env.OWNER_ROLE_ID;
   const ceoRoleId = process.env.CEO_ROLE_ID;
+  const adsRoleId = process.env.ADS_ROLE_ID;
   const hasAdmin = adminRoleId && interaction.member.roles.cache.has(adminRoleId);
   const hasOwner = ownerRoleId && interaction.member.roles.cache.has(ownerRoleId);
   const hasCeo = ceoRoleId && interaction.member.roles.cache.has(ceoRoleId);
-  if (!hasAdmin && !hasOwner && !hasCeo) {
+  const hasAds = adsRoleId && interaction.member.roles.cache.has(adsRoleId);
+  if (!hasAdmin && !hasOwner && !hasCeo && !hasAds) {
     return interaction.reply({ content: t('escrow_panel.admin_only', lang), ephemeral: true });
   }
 

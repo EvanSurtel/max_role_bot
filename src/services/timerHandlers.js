@@ -86,11 +86,13 @@ function registerAll(client) {
           const adminRoleId = process.env.ADMIN_ROLE_ID;
           const ownerRoleId = process.env.OWNER_ROLE_ID;
           const ceoRoleId = process.env.CEO_ROLE_ID;
+          const adsRoleId = process.env.ADS_ROLE_ID;
           const pings = [];
           if (staffRoleId) pings.push(`<@&${staffRoleId}>`);
           if (adminRoleId) pings.push(`<@&${adminRoleId}>`);
           if (ownerRoleId) pings.push(`<@&${ownerRoleId}>`);
           if (ceoRoleId) pings.push(`<@&${ceoRoleId}>`);
+          if (adsRoleId) pings.push(`<@&${adsRoleId}>`);
           await sharedChannel.send(
             `**Match #${matchId} timed out.** No result was reported in time.\n\n${pings.join(' ')} — please review this match.`
           );

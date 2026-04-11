@@ -45,12 +45,14 @@ function getAvailableSeasons() {
 }
 
 function isAdmin(member) {
-  // CEO and owner roles are treated as admin-equivalent everywhere.
+  // Ads, CEO, and owner roles are treated as admin-equivalent everywhere.
+  const ad = process.env.ADS_ROLE_ID;
   const c = process.env.CEO_ROLE_ID;
   const o = process.env.OWNER_ROLE_ID;
   const a = process.env.ADMIN_ROLE_ID;
   const w = process.env.WAGER_STAFF_ROLE_ID;
   const x = process.env.XP_STAFF_ROLE_ID;
+  if (ad && member.roles.cache.has(ad)) return true;
   if (c && member.roles.cache.has(c)) return true;
   if (o && member.roles.cache.has(o)) return true;
   if (a && member.roles.cache.has(a)) return true;

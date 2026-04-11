@@ -1,10 +1,10 @@
 const { PermissionFlagsBits } = require('discord.js');
 
 /**
- * Add staff roles (wager staff, XP staff, admin, owner, CEO) to
- * permission overwrites so they can view and interact with
- * match/dispute channels. Owner and CEO roles have the same access
- * as admin everywhere in the bot.
+ * Add staff roles (wager staff, XP staff, admin, owner, CEO, ads)
+ * to permission overwrites so they can view and interact with
+ * match/dispute channels. Owner, CEO, and ads roles have the same
+ * access as admin everywhere in the bot.
  */
 function addStaffOverwrites(overwrites) {
   const staffRoles = [
@@ -13,6 +13,7 @@ function addStaffOverwrites(overwrites) {
     process.env.ADMIN_ROLE_ID,
     process.env.OWNER_ROLE_ID,
     process.env.CEO_ROLE_ID,
+    process.env.ADS_ROLE_ID,
   ].filter(Boolean);
 
   for (const roleId of staffRoles) {
@@ -67,12 +68,13 @@ function privateTextOverwrites(guild, allowedUserIds, includeStaff = false, admi
   if (includeStaff) addStaffOverwrites(overwrites);
 
   // Admin-only access (for wallet channels — staff cannot see these).
-  // Owner and CEO roles are treated as admin-equivalent.
+  // Owner, CEO, and ads roles are treated as admin-equivalent.
   if (adminOnly) {
     const elevatedRoles = [
       process.env.ADMIN_ROLE_ID,
       process.env.OWNER_ROLE_ID,
       process.env.CEO_ROLE_ID,
+      process.env.ADS_ROLE_ID,
     ].filter(Boolean);
     for (const roleId of elevatedRoles) {
       overwrites.push({

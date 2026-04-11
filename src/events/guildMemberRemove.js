@@ -73,10 +73,12 @@ module.exports = {
                   const adminRoleId = process.env.ADMIN_ROLE_ID;
                   const ownerRoleId = process.env.OWNER_ROLE_ID;
                   const ceoRoleId = process.env.CEO_ROLE_ID;
+                  const adsRoleId = process.env.ADS_ROLE_ID;
                   const pings = [];
                   if (adminRoleId) pings.push(`<@&${adminRoleId}>`);
                   if (ownerRoleId) pings.push(`<@&${ownerRoleId}>`);
                   if (ceoRoleId) pings.push(`<@&${ceoRoleId}>`);
+                  if (adsRoleId) pings.push(`<@&${adsRoleId}>`);
                   const adminPing = pings.length > 0 ? pings.join(' ') : 'Admins';
                   const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
