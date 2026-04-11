@@ -231,6 +231,24 @@ async function handleRegistrationModal(interaction) {
       console.warn(`[Onboarding] Could not set nickname:`, err.message);
     }
 
+    // Register IGN with NeatQueue + seed the starting XP balance.
+    // Must happen BEFORE the rank role sync so the user is actually
+    // on the NeatQueue leaderboard when syncRank queries it — otherwise
+    // the user would fall through to local xp_points (still correct,
+    // but NeatQueue should be the source of truth for everyone).
+    if (neatqueueService.isConfigured()) {
+      try {
+        await syncIgnToNeatQueue(discordId, codIgn);
+      } catch (err) {
+        console.error(`[Onboarding] NeatQueue IGN sync failed:`, err.message);
+      }
+      try {
+        await neatqueueService.addPoints(discordId, 500);
+      } catch (err) {
+        console.error(`[Onboarding] NeatQueue starting-points seed failed:`, err.message);
+      }
+    }
+
     // Grant the starting rank role (Bronze at 500 XP under the
     // default progression). Non-blocking — onboarding still succeeds
     // if the rank role env vars aren't configured yet.
@@ -239,15 +257,6 @@ async function handleRegistrationModal(interaction) {
       await syncRank(interaction.client, user.id);
     } catch (err) {
       console.warn(`[Onboarding] Rank role sync failed:`, err.message);
-    }
-
-    // Register IGN with NeatQueue
-    if (neatqueueService.isConfigured()) {
-      try {
-        await syncIgnToNeatQueue(discordId, codIgn);
-      } catch (err) {
-        console.error(`[Onboarding] NeatQueue IGN sync failed:`, err.message);
-      }
     }
 
     // NO per-user wallet channel anymore. The public #wallet channel serves
