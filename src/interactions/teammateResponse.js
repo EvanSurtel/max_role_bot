@@ -242,15 +242,19 @@ async function handleAccept(interaction, challenge, player, user) {
     }
   }
 
-  // Delete the notification channel after a short delay
-  const channel = interaction.channel;
-  setTimeout(async () => {
-    try {
-      await channelService.deleteChannel(channel);
-    } catch (err) {
-      console.error(`[TeammateResponse] Error deleting notification channel:`, err);
-    }
-  }, 5000);
+  // Delete the notification channel after a short delay — only when
+  // the invite came via a private server channel. DMs persist and
+  // can't be deleted by the bot.
+  if (interaction.inGuild()) {
+    const channel = interaction.channel;
+    setTimeout(async () => {
+      try {
+        await channelService.deleteChannel(channel);
+      } catch (err) {
+        console.error(`[TeammateResponse] Error deleting notification channel:`, err);
+      }
+    }, 5000);
+  }
 }
 
 /**
@@ -293,15 +297,18 @@ async function handleDecline(interaction, challenge, player, user) {
   // Cancel the entire challenge (refunds all held funds)
   await challengeService.cancelChallenge(challenge.id);
 
-  // Delete the notification channel after a short delay
-  const channel = interaction.channel;
-  setTimeout(async () => {
-    try {
-      await channelService.deleteChannel(channel);
-    } catch (err) {
-      console.error(`[TeammateResponse] Error deleting notification channel:`, err);
-    }
-  }, 5000);
+  // Delete the notification channel after a short delay — only when
+  // the invite came via a private server channel. DMs persist.
+  if (interaction.inGuild()) {
+    const channel = interaction.channel;
+    setTimeout(async () => {
+      try {
+        await channelService.deleteChannel(channel);
+      } catch (err) {
+        console.error(`[TeammateResponse] Error deleting notification channel:`, err);
+      }
+    }, 5000);
+  }
 }
 
 module.exports = { handleButton };

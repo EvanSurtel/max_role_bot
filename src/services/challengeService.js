@@ -14,7 +14,12 @@ const teammateTimers = new Map(); // `${challengeId}_${playerId}` -> timeout han
 
 /**
  * Notify each pending teammate about a challenge invitation.
- * Creates a private channel per teammate with Accept/Decline buttons.
+ *
+ * Strategy: try DM first (so we don't burn through Discord's 500
+ * channels-per-guild limit on transient invite channels). If the
+ * teammate has DMs disabled or the send fails for any reason, fall
+ * back to creating a private `invite-{username}` channel they can
+ * see.
  *
  * @param {import('discord.js').Guild} guild - The Discord guild.
  * @param {object} challenge - The challenge DB record.
@@ -32,25 +37,6 @@ async function notifyTeammates(guild, challenge) {
       }
 
       const discordId = user.discord_id;
-
-      // Resolve the Discord user to get their username for the channel name
-      let username = discordId;
-      try {
-        const discordUser = await guild.members.fetch(discordId);
-        username = discordUser.user.username;
-      } catch {
-        // Fall back to discord ID if we can't fetch the member
-      }
-
-      // Create a private channel for this teammate
-      const channel = await channelService.createPrivateChannel(
-        guild,
-        `invite-${username}`,
-        [discordId],
-      );
-
-      // Store the channel ID on the challenge_player record
-      challengePlayerRepo.setNotificationChannel(player.id, channel.id);
 
       // Build challenge details embed in the recipient's language
       const lang = getLang(discordId);
@@ -91,19 +77,47 @@ async function notifyTeammates(guild, challenge) {
           .setStyle(ButtonStyle.Danger),
       );
 
-      await channel.send({
-        content: `<@${discordId}>`,
-        embeds: [
-          {
-            title: t('notify_team.title', lang, { type: typeLabel, num: displayNum }),
-            description: description.join('\n'),
-            color: isWager ? 0xf1c40f : 0x3498db,
-          },
-        ],
-        components: [row],
-      });
+      const embedPayload = {
+        title: t('notify_team.title', lang, { type: typeLabel, num: displayNum }),
+        description: description.join('\n'),
+        color: isWager ? 0xf1c40f : 0x3498db,
+      };
 
-      // Start a timeout timer — treat as decline if no response
+      // ── Try DM first ────────────────────────────────────────────
+      let dmUser = null;
+      let fallbackChannel = null;
+      try {
+        dmUser = await guild.client.users.fetch(discordId);
+        await dmUser.send({ embeds: [embedPayload], components: [row] });
+        console.log(`[ChallengeService] DM'd teammate ${discordId} for challenge ${challenge.id}`);
+      } catch (dmErr) {
+        // DMs disabled / blocked / unreachable — fall back to a
+        // private server channel. This keeps channel creation rare
+        // rather than the default.
+        console.log(`[ChallengeService] DM failed for ${discordId} (${dmErr.message}) — falling back to private channel`);
+        dmUser = null;
+
+        let username = discordId;
+        try {
+          const discordMember = await guild.members.fetch(discordId);
+          username = discordMember.user.username;
+        } catch { /* fall back to discord ID */ }
+
+        fallbackChannel = await channelService.createPrivateChannel(
+          guild,
+          `invite-${username}`,
+          [discordId],
+        );
+        challengePlayerRepo.setNotificationChannel(player.id, fallbackChannel.id);
+
+        await fallbackChannel.send({
+          content: `<@${discordId}>`,
+          embeds: [embedPayload],
+          components: [row],
+        });
+      }
+
+      // ── Timeout timer — treat no response as decline ────────────
       const timerKey = `${challenge.id}_${player.id}`;
       const timer = setTimeout(async () => {
         teammateTimers.delete(timerKey);
@@ -112,36 +126,31 @@ async function notifyTeammates(guild, challenge) {
           const currentPlayer = challengePlayerRepo.findById(player.id);
           if (!currentPlayer || currentPlayer.status !== PLAYER_STATUS.PENDING) return;
 
-          // Treat as decline
           challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.DECLINED);
           console.log(`[ChallengeService] Teammate ${player.user_id} timed out for challenge ${challenge.id}`);
 
-          // Notify in the channel before deleting (in player's language)
-          try {
-            await channel.send(t('notify_team.timeout_msg', getLang(user.discord_id)));
-          } catch {
-            // Channel may already be deleted
+          const timeoutText = t('notify_team.timeout_msg', getLang(discordId));
+
+          if (fallbackChannel) {
+            try { await fallbackChannel.send(timeoutText); } catch { /* channel gone */ }
+          } else if (dmUser) {
+            try { await dmUser.send(timeoutText); } catch { /* DM now blocked */ }
           }
 
-          // Cancel the entire challenge
           await cancelChallenge(challenge.id);
 
-          // Try to delete the channel after a short delay
-          setTimeout(async () => {
-            try {
-              await channelService.deleteChannel(channel);
-            } catch {
-              // Channel may already be gone
-            }
-          }, 5000);
+          // Only the fallback channel can/should be deleted. DMs persist.
+          if (fallbackChannel) {
+            setTimeout(async () => {
+              try { await channelService.deleteChannel(fallbackChannel); } catch { /* gone */ }
+            }, 5000);
+          }
         } catch (err) {
           console.error(`[ChallengeService] Error handling teammate timeout:`, err);
         }
       }, TIMERS.TEAMMATE_ACCEPT);
 
       teammateTimers.set(timerKey, timer);
-
-      console.log(`[ChallengeService] Notified teammate ${discordId} in channel ${channel.id} for challenge ${challenge.id}`);
     } catch (err) {
       console.error(`[ChallengeService] Error notifying teammate ${player.user_id}:`, err);
     }

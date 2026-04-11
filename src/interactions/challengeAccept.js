@@ -684,6 +684,7 @@ async function handleTeamConfirmedAccept(interaction) {
 async function notifyTeam2Teammates(guild, challenge) {
   const channelService = require('../services/channelService');
   const { GAME_MODES, TIMERS, CHALLENGE_TYPE: CT } = require('../config/constants');
+  const { t, getLang } = require('../locales/i18n');
 
   const players = challengePlayerRepo.findByChallengeAndTeam(challenge.id, 2);
   const pendingPlayers = players.filter(p => p.status === PLAYER_STATUS.PENDING);
@@ -697,116 +698,112 @@ async function notifyTeam2Teammates(guild, challenge) {
       }
 
       const playerDiscordId = user.discord_id;
-
-      // Resolve the Discord user to get their username for the channel name
-      let username = playerDiscordId;
-      try {
-        const discordMember = await guild.members.fetch(playerDiscordId);
-        username = discordMember.user.username;
-      } catch {
-        // Fall back to discord ID if we can't fetch the member
-      }
-
-      // Create a private channel for this teammate
-      const channel = await channelService.createPrivateChannel(
-        guild,
-        `invite-${username}`,
-        [playerDiscordId],
-      );
-
-      // Store the channel ID on the challenge_player record
-      challengePlayerRepo.setNotificationChannel(player.id, channel.id);
-
-      // Build challenge details
+      const lang = getLang(playerDiscordId);
       const isWager = challenge.type === CT.WAGER;
       const modeInfo = GAME_MODES[challenge.game_modes];
       const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
 
       const acceptor = userRepo.findById(challenge.acceptor_user_id);
       const acceptorMention = acceptor ? `<@${acceptor.discord_id}>` : 'Unknown';
+      const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+      const displayNum = challenge.display_number || challenge.id;
 
       const description = [
-        `${acceptorMention} has invited you to join their team!`,
+        t('notify_team.description', lang, { creator: acceptorMention }),
         '',
-        `**Type:** ${isWager ? 'Wager' : 'XP Match'}`,
-        `**Team Size:** ${challenge.team_size}v${challenge.team_size}`,
-        `**Game Mode:** ${modeLabel}`,
-        `**Series:** Best of ${challenge.series_length}`,
+        `**${t('notify_team.field_type', lang)}:** ${typeLabel}`,
+        `**${t('notify_team.field_team_size', lang)}:** ${challenge.team_size}v${challenge.team_size}`,
+        `**${t('notify_team.field_mode', lang)}:** ${modeLabel}`,
+        `**${t('notify_team.field_series', lang)}:** ${t('challenge_create.series_label', lang, { n: challenge.series_length })}`,
       ];
 
       if (isWager) {
-        const entry = formatUsdc(challenge.entry_amount_usdc);
-        description.push(`**Entry:** ${entry} USDC per player`);
+        const entryAmount = (Number(challenge.entry_amount_usdc) / 1_000_000).toFixed(2);
+        description.push(`**${t('notify_team.field_entry', lang)}:** ${t('notify_team.entry_per_player', lang, { amount: entryAmount })}`);
       }
 
-      description.push('', `You have **${TIMERS.TEAMMATE_ACCEPT / 60000} minutes** to accept or decline.`);
+      description.push('', t('notify_team.accept_window', lang, { minutes: TIMERS.TEAMMATE_ACCEPT / 60000 }));
 
-      // Build buttons — same customIds as team 1 so teammateResponse.js handles them
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId(`teammate_accept_${challenge.id}`)
-          .setLabel('Accept')
+          .setLabel(t('notify_team.btn_accept', lang))
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
           .setCustomId(`teammate_decline_${challenge.id}`)
-          .setLabel('Decline')
+          .setLabel(t('notify_team.btn_decline', lang))
           .setStyle(ButtonStyle.Danger),
       );
 
-      await channel.send({
-        content: `<@${playerDiscordId}>`,
-        embeds: [
-          {
-            title: `Team Invite — ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id}`,
-            description: description.join('\n'),
-            color: isWager ? 0xf1c40f : 0x3498db,
-          },
-        ],
-        components: [row],
-      });
+      const embedPayload = {
+        title: t('notify_team.title', lang, { type: typeLabel, num: displayNum }),
+        description: description.join('\n'),
+        color: isWager ? 0xf1c40f : 0x3498db,
+      };
+
+      // ── Try DM first (conserve channel quota) ───────────────────
+      let dmUser = null;
+      let fallbackChannel = null;
+      try {
+        dmUser = await guild.client.users.fetch(playerDiscordId);
+        await dmUser.send({ embeds: [embedPayload], components: [row] });
+        console.log(`[ChallengeAccept] DM'd team 2 teammate ${playerDiscordId} for challenge ${challenge.id}`);
+      } catch (dmErr) {
+        console.log(`[ChallengeAccept] DM failed for ${playerDiscordId} (${dmErr.message}) — falling back to private channel`);
+        dmUser = null;
+
+        let username = playerDiscordId;
+        try {
+          const discordMember = await guild.members.fetch(playerDiscordId);
+          username = discordMember.user.username;
+        } catch { /* fall back to discord ID */ }
+
+        fallbackChannel = await channelService.createPrivateChannel(
+          guild,
+          `invite-${username}`,
+          [playerDiscordId],
+        );
+        challengePlayerRepo.setNotificationChannel(player.id, fallbackChannel.id);
+
+        await fallbackChannel.send({
+          content: `<@${playerDiscordId}>`,
+          embeds: [embedPayload],
+          components: [row],
+        });
+      }
 
       // Start a timeout timer — treat as decline if no response
       const challengeServiceRef = require('../services/challengeService');
-      const timerKey = `${challenge.id}_${player.id}`;
-
       const timer = setTimeout(async () => {
         try {
-          // Re-check the player's current status in case they already responded
           const currentPlayer = challengePlayerRepo.findById(player.id);
           if (!currentPlayer || currentPlayer.status !== PLAYER_STATUS.PENDING) return;
 
-          // Treat as decline
           challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.DECLINED);
           console.log(`[ChallengeAccept] Teammate ${player.user_id} timed out for challenge ${challenge.id}`);
 
-          // Notify in the channel before deleting
-          try {
-            await channel.send('You did not respond in time. The invitation has expired and the challenge has been cancelled.');
-          } catch {
-            // Channel may already be deleted
+          const timeoutText = t('notify_team.timeout_msg', getLang(playerDiscordId));
+
+          if (fallbackChannel) {
+            try { await fallbackChannel.send(timeoutText); } catch { /* channel gone */ }
+          } else if (dmUser) {
+            try { await dmUser.send(timeoutText); } catch { /* DM now blocked */ }
           }
 
-          // Cancel the entire challenge
           await challengeServiceRef.cancelChallenge(challenge.id);
 
-          // Delete the channel after a short delay
-          setTimeout(async () => {
-            try {
-              const channelSvc = require('../services/channelService');
-              await channelSvc.deleteChannel(channel);
-            } catch {
-              // Channel may already be gone
-            }
-          }, 5000);
+          if (fallbackChannel) {
+            setTimeout(async () => {
+              try { await channelService.deleteChannel(fallbackChannel); } catch { /* gone */ }
+            }, 5000);
+          }
         } catch (err) {
           console.error(`[ChallengeAccept] Error handling teammate timeout:`, err);
         }
       }, TIMERS.TEAMMATE_ACCEPT);
 
-      // Register the timer with challengeService so it can be cleared
-      // We use the same clearTeammateTimer approach
-      // Store locally for now — the timer will self-clean on fire
-      console.log(`[ChallengeAccept] Notified team 2 teammate ${playerDiscordId} in channel ${channel.id} for challenge ${challenge.id}`);
+      // Timer self-cleans on fire; no shared registry for team 2 timers
+      void timer;
     } catch (err) {
       console.error(`[ChallengeAccept] Error notifying team 2 teammate ${player.user_id}:`, err);
     }
