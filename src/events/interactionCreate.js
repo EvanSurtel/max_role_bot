@@ -183,19 +183,32 @@ module.exports = {
       // Auto-clean ephemeral replies after 5 min (skips wallet channels)
       installEphemeralAutoDelete(interaction);
 
-      // Slash commands — /rank is the only one today. Every other user
-      // action uses button panels. Add new commands by dropping files in
-      // src/commands/ and running `npm run deploy-commands`.
-      if (interaction.isChatInputCommand && interaction.isChatInputCommand()) {
-        const cmdName = interaction.commandName;
+      // Slash commands (/rank) and user context menu commands
+      // (right-click user → View Rank). Route both here — the command
+      // registry uses the Discord command name to map back to the
+      // module in src/commands/.
+      const isSlash = interaction.isChatInputCommand && interaction.isChatInputCommand();
+      const isUserContext = interaction.isUserContextMenuCommand && interaction.isUserContextMenuCommand();
+      if (isSlash || isUserContext) {
+        // Name-to-module map. Slash commands: `rank`. Context menu:
+        // Discord reports the display name ("View Rank") which doesn't
+        // map 1:1 to a filename, so we handle each one explicitly.
+        let modulePath = null;
+        if (isSlash && interaction.commandName === 'rank') modulePath = '../commands/rank';
+        if (isUserContext && interaction.commandName === 'View Rank') modulePath = '../commands/rank-context';
+
+        if (!modulePath) {
+          console.warn(`[Interaction] No handler found for command ${interaction.commandName}`);
+          return;
+        }
+
         try {
-          const command = require(`../commands/${cmdName}`);
+          const command = require(modulePath);
           if (command && typeof command.execute === 'function') {
             return await command.execute(interaction);
           }
-          console.warn(`[Interaction] No handler found for /${cmdName}`);
         } catch (err) {
-          console.error(`[Interaction] Error executing /${cmdName}:`, err);
+          console.error(`[Interaction] Error executing ${interaction.commandName}:`, err);
           try {
             if (interaction.replied || interaction.deferred) {
               await interaction.followUp({ content: 'Command failed. Please try again.', ephemeral: true });
