@@ -126,6 +126,28 @@ const XP_WAGER = {
   LOSS_XP: 0,       // No penalty for losing a wager
 };
 
+// Rank tiers used by the ranks display panel and (future) rank role sync.
+// Each tier is the FLOOR — a player is in tier X if their XP is >= minXp
+// and < the next tier's minXp. The highest tier has no upper bound.
+//
+// The `emblem` filename points at a PNG in src/public/assets/emblems/.
+// Drop the PNG there with the exact filename and it auto-renders on
+// the ranks panel. Colors are used as the embed sidebar color.
+//
+// Adjust the minXp values here if you want a different progression —
+// everything else (locale text, panel layout, inline language switch)
+// picks up the change automatically.
+const RANK_TIERS = [
+  { key: 'bronze',   minXp: 0,     color: 0xcd7f32, emblem: 'bronze.png' },
+  { key: 'silver',   minXp: 1000,  color: 0xbfc1c2, emblem: 'silver.png' },
+  { key: 'gold',     minXp: 2500,  color: 0xffd700, emblem: 'gold.png' },
+  { key: 'platinum', minXp: 5000,  color: 0x5ad1d1, emblem: 'platinum.png' },
+  { key: 'diamond',  minXp: 7500,  color: 0x66ccff, emblem: 'diamond.png' },
+  { key: 'sentinel', minXp: 10000, color: 0x9b59b6, emblem: 'sentinal.png' },
+  { key: 'obsidian', minXp: 15000, color: 0x2c2c54, emblem: 'obsidian.png' },
+  { key: 'crowned',  minXp: 25000, color: 0xff4500, emblem: 'crowned.png' },
+];
+
 // Current season identifier
 const CURRENT_SEASON = process.env.CURRENT_SEASON || '2026-S1';
 
@@ -200,6 +222,7 @@ module.exports = {
   COOLDOWNS,
   XP_MATCH,
   XP_WAGER,
+  RANK_TIERS,
   CURRENT_SEASON,
   CHALLENGE_STATUS,
   MATCH_STATUS,

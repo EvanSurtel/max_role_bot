@@ -103,6 +103,17 @@ async function sendEphemeralPanelForCurrentChannel(interaction, newLang) {
       return _sendPackedEphemeral(interaction, buildHowItWorksEmbeds(newLang));
     }
 
+    // Ranks channel → build the panel WITHOUT thumbnails for the
+    // ephemeral. Re-uploading 8 PNG files every time someone switches
+    // language would hammer Discord's rate limits; the public panel in
+    // the channel already has all emblems, so the ephemeral is just
+    // the translated text.
+    if (channelId === process.env.RANKS_CHANNEL_ID) {
+      const { buildRanksPanel } = require('../panels/ranksPanel');
+      const { embeds } = buildRanksPanel(newLang, { withThumbnails: false });
+      return _sendPackedEphemeral(interaction, embeds);
+    }
+
     // XP leaderboard
     if (channelId === process.env.XP_LEADERBOARD_CHANNEL_ID) {
       const { buildXpPanel } = require('../panels/leaderboardPanel');
