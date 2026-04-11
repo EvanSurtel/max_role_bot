@@ -5,6 +5,7 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
+  EmbedBuilder,
 } = require('discord.js');
 const userRepo = require('../database/repositories/userRepo');
 const walletRepo = require('../database/repositories/walletRepo');
@@ -58,6 +59,13 @@ async function handleWalletViewOpen(interaction) {
 async function handleWalletSubButton(interaction) {
   const id = interaction.customId;
   const lang = langFor(interaction);
+
+  // Withdrawal confirmation buttons — handled by a dedicated function
+  // that parses the validated amount/address out of the customId and
+  // runs the actual on-chain transfer only after the user confirms.
+  if (id === 'wallet_wd_cancel' || id.startsWith('wallet_wd_usdc_') || id.startsWith('wallet_wd_sol_')) {
+    return handleWithdrawConfirmButton(interaction);
+  }
 
   const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) {
@@ -214,7 +222,10 @@ async function handleWalletSubButton(interaction) {
 }
 
 /**
- * Handle the USDC withdraw modal submission.
+ * Handle the USDC withdraw modal submission. Validates input then
+ * shows a confirmation embed with the amount + destination address.
+ * The actual transfer runs only after the user clicks "Yes, send it"
+ * on the confirmation — see handleWithdrawConfirmButton + _executeUsdcWithdraw.
  */
 async function handleWithdrawModal(interaction) {
   const lang = langFor(interaction);
@@ -251,7 +262,44 @@ async function handleWithdrawModal(interaction) {
     });
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  // Show confirmation embed with Yes/Cancel buttons. The validated
+  // amount + address are encoded into the Yes button's customId so
+  // we don't have to stash them in server-side state.
+  const confirmEmbed = new EmbedBuilder()
+    .setTitle(t('wallet.withdraw_confirm_title', lang))
+    .setColor(0xf39c12)
+    .setDescription(t('wallet.withdraw_confirm_desc_usdc', lang, {
+      amount: amountUsdc.toFixed(2),
+      address,
+    }));
+
+  const fixedAmount = amountUsdc.toFixed(2);
+  const confirmRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`wallet_wd_usdc_${fixedAmount}_${address}`)
+      .setLabel(t('wallet.withdraw_confirm_btn_yes', lang))
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('wallet_wd_cancel')
+      .setLabel(t('wallet.withdraw_confirm_btn_cancel', lang))
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.reply({
+    embeds: [confirmEmbed],
+    components: [confirmRow],
+    ephemeral: true,
+  });
+}
+
+/**
+ * Actually transfer USDC on-chain. Called from handleWithdrawConfirmButton
+ * once the user has confirmed the confirmation embed. The interaction
+ * passed here is the BUTTON click interaction — it's already been
+ * deferred/updated to the "processing" state before this runs.
+ */
+async function _executeUsdcWithdraw(interaction, user, amountUsdc, address, lang) {
+  const amountSmallest = Math.floor(amountUsdc * USDC_PER_UNIT);
 
   if (!walletRepo.acquireLock(user.id)) {
     return interaction.editReply({ content: t('common.please_wait', lang) });
@@ -302,16 +350,21 @@ async function handleWithdrawModal(interaction) {
     walletRepo.releaseLock(user.id);
     return interaction.editReply({
       content: t('wallet.withdraw_success_usdc', lang, { amount: amountUsdc.toFixed(2), address, signature }),
+      embeds: [],
+      components: [],
     });
   } catch (err) {
     walletRepo.releaseLock(user.id);
     console.error('[Wallet] Withdrawal error:', err);
-    return interaction.editReply({ content: t('wallet.withdraw_failed', lang) });
+    return interaction.editReply({ content: t('wallet.withdraw_failed', lang), embeds: [], components: [] });
   }
 }
 
 /**
- * Handle the SOL withdraw modal submission.
+ * Handle the SOL withdraw modal submission. Validates input and shows
+ * a confirmation embed with the destination address. The actual
+ * transfer runs only after the user confirms — see
+ * handleWithdrawConfirmButton + _executeSolWithdraw.
  */
 async function handleWithdrawSolModal(interaction) {
   const lang = langFor(interaction);
@@ -337,17 +390,50 @@ async function handleWithdrawSolModal(interaction) {
     return interaction.reply({ content: t('common.amount_must_be_positive', lang), ephemeral: true });
   }
 
+  // Show confirmation embed with Yes/Cancel buttons.
+  const confirmEmbed = new EmbedBuilder()
+    .setTitle(t('wallet.withdraw_confirm_title', lang))
+    .setColor(0xf39c12)
+    .setDescription(t('wallet.withdraw_confirm_desc_sol', lang, {
+      amount: amountSol,
+      address,
+    }));
+
+  const confirmRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`wallet_wd_sol_${amountSol}_${address}`)
+      .setLabel(t('wallet.withdraw_confirm_btn_yes', lang))
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('wallet_wd_cancel')
+      .setLabel(t('wallet.withdraw_confirm_btn_cancel', lang))
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.reply({
+    embeds: [confirmEmbed],
+    components: [confirmRow],
+    ephemeral: true,
+  });
+}
+
+/**
+ * Actually transfer SOL on-chain. Called from handleWithdrawConfirmButton
+ * once the user has confirmed the confirmation embed.
+ */
+async function _executeSolWithdraw(interaction, user, amountSol, address, lang) {
   const lamports = Math.floor(amountSol * 1_000_000_000);
 
-  await interaction.deferReply({ ephemeral: true });
-
   try {
+    const wallet = walletRepo.findByUserId(user.id);
     const solBalance = Number(await walletManager.getSolBalance(wallet.solana_address));
     const reserveLamports = 5_000_000;
     if (lamports > solBalance - reserveLamports) {
       const availSol = ((solBalance - reserveLamports) / 1_000_000_000).toFixed(8);
       return interaction.editReply({
         content: t('common.insufficient_sol', lang, { available: availSol }),
+        embeds: [],
+        components: [],
       });
     }
 
@@ -376,11 +462,71 @@ async function handleWithdrawSolModal(interaction) {
 
     return interaction.editReply({
       content: t('wallet.withdraw_success_sol', lang, { amount: amountSol, address, signature }),
+      embeds: [],
+      components: [],
     });
   } catch (err) {
     console.error('[Wallet] SOL withdrawal error:', err);
-    return interaction.editReply({ content: t('wallet.withdraw_failed', lang) });
+    return interaction.editReply({ content: t('wallet.withdraw_failed', lang), embeds: [], components: [] });
   }
 }
 
-module.exports = { handleWalletViewOpen, handleWalletSubButton, handleWithdrawModal, handleWithdrawSolModal };
+/**
+ * Handle Confirm / Cancel button clicks on the withdrawal confirmation
+ * embed. CustomId formats:
+ *   wallet_wd_usdc_{amount}_{address}
+ *   wallet_wd_sol_{amount}_{address}
+ *   wallet_wd_cancel
+ *
+ * The validated amount and destination address are encoded into the
+ * customId at the time the confirmation embed is shown, so the click
+ * is self-contained — no server-side state to coordinate or expire.
+ */
+async function handleWithdrawConfirmButton(interaction) {
+  const lang = langFor(interaction);
+  const id = interaction.customId;
+
+  if (id === 'wallet_wd_cancel') {
+    return interaction.update({
+      content: t('wallet.withdraw_cancelled', lang),
+      embeds: [],
+      components: [],
+    });
+  }
+
+  const user = userRepo.findByDiscordId(interaction.user.id);
+  if (!user) {
+    return interaction.reply({ content: t('common.onboarding_required', lang), ephemeral: true });
+  }
+
+  // wallet_wd_<currency>_<amount>_<address>
+  const afterPrefix = id.substring('wallet_wd_'.length);
+  const firstUnd = afterPrefix.indexOf('_');
+  const currency = afterPrefix.substring(0, firstUnd); // 'usdc' or 'sol'
+  const rest = afterPrefix.substring(firstUnd + 1);
+  const secondUnd = rest.indexOf('_');
+  const amountStr = rest.substring(0, secondUnd);
+  const address = rest.substring(secondUnd + 1);
+  const amount = parseFloat(amountStr);
+
+  if (isNaN(amount) || !address) {
+    return interaction.reply({ content: t('wallet.withdraw_failed', lang), ephemeral: true });
+  }
+
+  // Swap the confirmation embed for a "processing…" notice while
+  // the on-chain transfer runs, then editReply with the final result.
+  await interaction.update({
+    content: t('wallet.withdraw_processing', lang),
+    embeds: [],
+    components: [],
+  });
+
+  if (currency === 'usdc') {
+    return _executeUsdcWithdraw(interaction, user, amount, address, lang);
+  }
+  if (currency === 'sol') {
+    return _executeSolWithdraw(interaction, user, amount, address, lang);
+  }
+}
+
+module.exports = { handleWalletViewOpen, handleWalletSubButton, handleWithdrawModal, handleWithdrawSolModal, handleWithdrawConfirmButton };
