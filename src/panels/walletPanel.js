@@ -153,9 +153,14 @@ async function handleWalletSubButton(interaction) {
   // address and MoonPay pays the user's bank.
   if (id === 'wallet_moonpay_withdraw') {
     const moonpay = require('../services/moonpay');
-    if (!moonpay.isConfigured()) {
+    // Full off-ramp readiness check (API keys + webhook secret +
+    // public webhook URL). Off-ramp CANNOT work without webhooks
+    // because MoonPay delivers the deposit address via webhook,
+    // so we refuse here even if the button somehow reached the
+    // user via a stale cached message.
+    if (!moonpay.isOfframpConfigured()) {
       return interaction.reply({
-        content: '🏦 Bank cash-outs are not configured yet. Ask an admin to set up MoonPay.',
+        content: '🏦 Bank cash-outs are not fully set up yet. Ask an admin to finish MoonPay webhook configuration.',
         ephemeral: true,
       });
     }

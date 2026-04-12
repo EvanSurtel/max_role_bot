@@ -45,21 +45,45 @@ function buildWalletView(wallet, user, lang, solLamports = null) {
     new ButtonBuilder().setCustomId('wallet_history').setLabel(t('wallet.btn_history', lang)).setStyle(ButtonStyle.Secondary),
   );
 
-  // MoonPay fiat on-ramp / off-ramp. Always shown on the wallet —
-  // the handlers refuse gracefully if MoonPay isn't configured so
-  // users see a clear "not set up" message instead of a silent fail.
-  const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('wallet_moonpay_deposit')
-      .setLabel('💳 Deposit using Credit/Debit Card')
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId('wallet_moonpay_withdraw')
-      .setLabel('🏦 Cash Out to Bank')
-      .setStyle(ButtonStyle.Primary),
-  );
+  // MoonPay fiat on-ramp / off-ramp buttons — each one is conditional
+  // on whether the bot has the config it actually needs to drive it.
+  //
+  //   Deposit (on-ramp): only needs MOONPAY_API_KEY + MOONPAY_SECRET_KEY.
+  //     MoonPay sends USDC to the user's bot wallet and the existing
+  //     deposit poller credits them — webhooks aren't required.
+  //
+  //   Cash Out (off-ramp): needs the above PLUS MOONPAY_WEBHOOK_SECRET
+  //     and WEBHOOK_PUBLIC_URL. The bot can't complete an off-ramp
+  //     without MoonPay webhooks because that's how MoonPay delivers
+  //     the deposit address the bot needs to send USDC to. If either
+  //     is missing, we hide the button entirely so users don't start
+  //     a flow that would silently strand.
+  //
+  // If the entire MoonPay integration is unconfigured, row2 is skipped
+  // and the wallet view stays at its classic single-row layout.
+  const moonpay = require('../services/moonpay');
+  const moonpayRow = new ActionRowBuilder();
+  if (moonpay.isConfigured()) {
+    moonpayRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId('wallet_moonpay_deposit')
+        .setLabel('💳 Deposit using Credit/Debit Card')
+        .setStyle(ButtonStyle.Primary),
+    );
+  }
+  if (moonpay.isOfframpConfigured()) {
+    moonpayRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId('wallet_moonpay_withdraw')
+        .setLabel('🏦 Cash Out to Bank')
+        .setStyle(ButtonStyle.Primary),
+    );
+  }
 
-  return { embeds: [embed], components: [row1, row2] };
+  const components = [row1];
+  if (moonpayRow.components.length > 0) components.push(moonpayRow);
+
+  return { embeds: [embed], components };
 }
 
 module.exports = { buildWalletView };

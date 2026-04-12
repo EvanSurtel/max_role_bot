@@ -86,9 +86,83 @@ legacy/                       # Old XRP code, slash commands, captainVote (prese
 4. No response in 10 min → auto-dispute
 5. Match inactivity (24h no report) → auto-dispute
 
-## Database Tables (10 total)
+## Database Tables (11 total)
 
-users, wallets, challenges, challenge_players, matches, transactions, timers, admin_actions, evidence, pending_transactions
+users, wallets, challenges, challenge_players, matches, transactions, timers, admin_actions, evidence, pending_transactions, moonpay_transactions
+
+## MoonPay Fiat On-Ramp / Off-Ramp
+
+Users can deposit via card / Apple Pay / Google Pay and cash out to bank through MoonPay's widget. Integrated as two Primary buttons on the wallet panel (second row), each gated on configuration state.
+
+### Architecture
+
+```
+User clicks "Deposit using Credit/Debit Card"
+  ↓
+walletPanel → moonpayService.initiateOnramp(userId)
+  ↓
+  inserts pending row in moonpay_transactions (external_id = UUID)
+  moonpay.js builds signed URL via HMAC-SHA256(url.search, sk_...)
+  ↓
+bot replies with ephemeral "Open MoonPay" link button
+  ↓
+user completes purchase on buy-sandbox.moonpay.com / buy.moonpay.com
+  ↓
+  MoonPay sends USDC to the user's bot wallet address (pre-filled in URL)
+  depositService polls every 30s, credits the user's DB balance
+  ↓
+  optional: MoonPay webhooks → webhookServer → moonpayService.handleWebhook
+    updates moonpay_transactions row with moonpay_id + fiat details
+    posts status updates to #transactions feed
+```
+
+Off-ramp is more involved because MoonPay generates the deposit address asynchronously:
+
+```
+User clicks "Cash Out to Bank" (only visible if webhooks are configured)
+  ↓
+walletPanel → moonpayService.initiateOfframp(userId)
+  ↓
+bot replies with ephemeral "Open MoonPay" link button
+  ↓
+user completes bank form on sell-sandbox.moonpay.com / sell.moonpay.com
+  ↓
+MoonPay creates sell transaction → webhook "transaction_created"
+  bot updates moonpay_transactions row with moonpay_id + fiat amount
+  ↓
+MoonPay generates deposit address → webhook "transaction_updated" status=waitingForDeposit
+  moonpayService._executeOfframpTransfer:
+    acquires wallet lock → signs USDC transfer from user's bot wallet
+    → MoonPay's deposit address → debits balance_available → stores signature
+  ↓
+MoonPay sees USDC arrive → converts to fiat → pays user's bank
+  final "transaction_updated" status=completed webhook closes the row
+```
+
+### Files
+- `src/services/moonpay.js` — URL signing (HMAC-SHA256), webhook signature verification, config checks (`isConfigured` for on-ramp, `isOfframpConfigured` for off-ramp)
+- `src/services/moonpayService.js` — initiate flows, handle webhooks, drive off-ramp USDC transfers, idempotent via `deposit_tx_signature`
+- `src/services/webhookServer.js` — Express HTTP server on `WEBHOOK_PORT` (default 3001), routes `POST /webhooks/moonpay` and `GET /health`, verifies signatures with `express.raw` body preserved
+- `src/database/migrations/006_moonpay_transactions.sql` — correlation table
+- `src/panels/walletPanel.js` + `walletPanelView.js` — button wiring, conditional visibility
+
+### Button visibility rules
+- **💳 Deposit using Credit/Debit Card** — shown if `MOONPAY_API_KEY` + `MOONPAY_SECRET_KEY` are set. Deposits work even without webhooks because the existing deposit poller credits the user once USDC arrives on-chain.
+- **🏦 Cash Out to Bank** — shown ONLY if ALSO `MOONPAY_WEBHOOK_SECRET` + `WEBHOOK_PUBLIC_URL` are set. Hidden by default so users can't start a flow that would silently strand.
+
+### Deployment
+- **Sandbox**: run `ngrok http 3001` on the bot server, paste the `https://xxxxx.ngrok-free.app` URL into the MoonPay dashboard webhook config, set that same URL as `WEBHOOK_PUBLIC_URL` in `.env`.
+- **Production**: put nginx/Caddy/Cloudflare in front, reverse proxy `/webhooks/*` to `localhost:3001`, use a real domain with TLS, point the MoonPay production dashboard webhook at `https://your-domain.com/webhooks/moonpay`.
+
+### Env vars
+```
+MOONPAY_ENV=sandbox                  # or "production"
+MOONPAY_API_KEY=pk_test_...           # pk_live_... in production
+MOONPAY_SECRET_KEY=sk_test_...        # sk_live_... in production — used for URL signing
+MOONPAY_WEBHOOK_SECRET=whsec_...      # from MoonPay webhook dashboard
+WEBHOOK_PORT=3001
+WEBHOOK_PUBLIC_URL=https://your-domain-or-ngrok.tld
+```
 
 ## Environment Variables
 

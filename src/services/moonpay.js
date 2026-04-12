@@ -150,8 +150,32 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
   }
 }
 
+/**
+ * Basic config check — enough to generate a signed URL. If this
+ * returns true we can safely expose the on-ramp (deposit) button;
+ * MoonPay webhooks are optional for on-ramp because the existing
+ * deposit poller credits the user automatically when USDC arrives.
+ */
 function isConfigured() {
   return Boolean(process.env.MOONPAY_API_KEY && process.env.MOONPAY_SECRET_KEY);
+}
+
+/**
+ * Full off-ramp readiness — also requires webhooks. Off-ramp CANNOT
+ * work without webhooks because the bot needs MoonPay to tell it
+ * where to send the user's USDC (MoonPay's sell-side deposit
+ * address is generated per-transaction and only delivered via the
+ * `waitingForDeposit` webhook). If MOONPAY_WEBHOOK_SECRET or
+ * WEBHOOK_PUBLIC_URL aren't set, the off-ramp button is hidden
+ * from the wallet panel so users can't start a flow that would
+ * just strand.
+ */
+function isOfframpConfigured() {
+  return (
+    isConfigured() &&
+    Boolean(process.env.MOONPAY_WEBHOOK_SECRET) &&
+    Boolean(process.env.WEBHOOK_PUBLIC_URL)
+  );
 }
 
 function getEnvLabel() {
@@ -163,5 +187,6 @@ module.exports = {
   buildSignedOffRampUrl,
   verifyWebhookSignature,
   isConfigured,
+  isOfframpConfigured,
   getEnvLabel,
 };
