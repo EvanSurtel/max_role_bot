@@ -86,15 +86,62 @@ async function getSolBalance(address) {
   return balance.toString();
 }
 
+// Known Solana addresses that pass `isOnCurve` but are NOT valid
+// withdrawal destinations. Sending USDC to any of these is an
+// irreversible loss of funds. This list is explicit because
+// `PublicKey.isOnCurve` returns true for all of them.
+const BLOCKED_WITHDRAW_DESTINATIONS = new Set([
+  '11111111111111111111111111111111',              // System Program
+  'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',    // SPL Token program
+  'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',    // Associated Token program
+  'ComputeBudget111111111111111111111111111111',    // Compute Budget program
+  // The USDC mint itself — if a user pastes the mint address
+  // thinking it's a wallet, their USDC goes to an unrecoverable
+  // address.
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',    // USDC mainnet mint
+  '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',    // USDC devnet mint
+  // Wrapped SOL mint — another common foot-gun paste target
+  'So11111111111111111111111111111111111111112',
+]);
+
 /**
- * Validate a Solana public key address.
+ * Validate a Solana public key address as a SAFE withdrawal destination.
+ *
+ * Three checks:
+ *   1. Parses as a valid base58 public key.
+ *   2. Point is on the ed25519 curve (so SPL transfers can actually
+ *      reach an account owned by this pubkey — PDAs and curve-off
+ *      addresses can't receive token transfers the normal way).
+ *   3. Not on the explicit blocklist of system/mint/program addresses
+ *      that would permanently lose the user's funds.
+ *
+ * ALSO blocks the bot's own escrow wallet address so a user can't
+ * accidentally (or maliciously) send their withdraw into the escrow —
+ * that flow has no matching credit path on the escrow side and would
+ * corrupt accounting.
+ *
  * @param {string} address - Address to validate.
  * @returns {boolean}
  */
 function isAddressValid(address) {
   try {
     new PublicKey(address);
-    return PublicKey.isOnCurve(address);
+    if (!PublicKey.isOnCurve(address)) return false;
+    if (BLOCKED_WITHDRAW_DESTINATIONS.has(address)) return false;
+    // Block the bot's own escrow address. Look it up fresh each call
+    // so an env var swap takes effect without a restart. If the env
+    // var is unset or malformed, we skip this check rather than
+    // throwing (the Solana connection layer will fail loudly on the
+    // actual submit anyway).
+    try {
+      const escrowSecret = process.env.ESCROW_WALLET_SECRET;
+      if (escrowSecret) {
+        const { Keypair } = require('@solana/web3.js');
+        const kp = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(escrowSecret)));
+        if (kp.publicKey.toBase58() === address) return false;
+      }
+    } catch { /* env var missing or malformed — skip escrow check */ }
+    return true;
   } catch {
     return false;
   }
