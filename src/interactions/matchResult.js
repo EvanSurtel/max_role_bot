@@ -626,6 +626,22 @@ async function handleAdminConfirmNoWinner(interaction) {
   const match = matchRepo.findById(matchId);
   if (!match) return interaction.reply({ content: t('common.match_not_found', lang), ephemeral: true });
 
+  // Atomic idempotency claim. Before this guard, two admins clicking
+  // "No Winner" within the same async window both entered the refund
+  // loop and transferUsdc fired for every player TWICE — draining
+  // escrow by 2× the pot amount.
+  //
+  // Claim the match from DISPUTED → COMPLETED atomically. Exactly
+  // ONE caller wins the row. If the claim fails, the match is
+  // already resolved (or never disputed) and we exit.
+  const claimed = matchRepo.atomicStatusTransition(matchId, MATCH_STATUS.DISPUTED, MATCH_STATUS.COMPLETED);
+  if (!claimed) {
+    return interaction.update({
+      content: 'This match has already been resolved.',
+      embeds: [], components: [],
+    });
+  }
+
   const challenge = challengeRepo.findById(match.challenge_id);
 
   const { logAdminAction } = require('../utils/adminAudit');
@@ -639,62 +655,66 @@ async function handleAdminConfirmNoWinner(interaction) {
   try {
     // For wagers: refund all escrow funds back to players
     if (challenge && challenge.type === 'wager' && Number(challenge.total_pot_usdc) > 0) {
-      const escrowManager = require('../solana/escrowManager');
       const challengePlayerRepo2 = require('../database/repositories/challengePlayerRepo');
       const allPlayers = challengePlayerRepo2.findByChallengeId(match.challenge_id);
-      const escrowKeypair = escrowManager.__test_getEscrowKeypair ? escrowManager.__test_getEscrowKeypair() : null;
 
-      // Refund each player their entry amount from escrow
-      for (const player of allPlayers) {
-        try {
-          const walletRepo = require('../database/repositories/walletRepo');
-          const walletRecord = walletRepo.findByUserId(player.user_id);
-          if (!walletRecord) continue;
+      // Load escrow keypair ONCE outside the loop so we don't
+      // re-parse the secret per-player. If the env var is missing
+      // we abort the refund entirely — silently continuing would
+      // mark the match completed without refunding anyone.
+      const { Keypair } = require('@solana/web3.js');
+      const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
+      if (!secretKeyJson) {
+        console.error(`[MatchResult] ESCROW_WALLET_SECRET missing — cannot refund match #${matchId}`);
+      } else {
+        const escrowKp = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyJson)));
+        const walletRepo = require('../database/repositories/walletRepo');
+        const transactionService = require('../solana/transactionService');
+        const transactionRepo = require('../database/repositories/transactionRepo');
+        const { postTransaction } = require('../utils/transactionFeed');
+        const userRepo = require('../database/repositories/userRepo');
 
-          const transactionService = require('../solana/transactionService');
-          const { Keypair } = require('@solana/web3.js');
-          const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
-          if (!secretKeyJson) continue;
-          const escrowKp = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyJson)));
+        // Refund each player their entry amount from escrow
+        for (const player of allPlayers) {
+          try {
+            const walletRecord = walletRepo.findByUserId(player.user_id);
+            if (!walletRecord) continue;
 
-          const { signature } = await transactionService.transferUsdc(
-            escrowKp,
-            walletRecord.solana_address,
-            challenge.entry_amount_usdc,
-          );
+            const { signature } = await transactionService.transferUsdc(
+              escrowKp,
+              walletRecord.solana_address,
+              challenge.entry_amount_usdc,
+            );
 
-          // Update DB balance
-          const currentAvailable = BigInt(walletRecord.balance_available);
-          const entryAmount = BigInt(challenge.entry_amount_usdc);
-          walletRepo.updateBalance(player.user_id, {
-            balanceAvailable: (currentAvailable + entryAmount).toString(),
-            balanceHeld: walletRecord.balance_held,
-          });
+            // Use creditAvailable (re-reads the wallet inside a
+            // transaction) instead of the old pattern which
+            // snapshotted balance_available BEFORE the await and
+            // then wrote `snapshot + entry`, clobbering any
+            // deposit/withdraw/hold that happened in the meantime.
+            walletRepo.creditAvailable(player.user_id, challenge.entry_amount_usdc);
 
-          const transactionRepo = require('../database/repositories/transactionRepo');
-          transactionRepo.create({
-            type: 'refund',
-            userId: player.user_id,
-            challengeId: match.challenge_id,
-            amountUsdc: challenge.entry_amount_usdc,
-            solanaTxSignature: signature,
-            fromAddress: escrowKp.publicKey.toBase58(),
-            toAddress: walletRecord.solana_address,
-            status: 'completed',
-            memo: `Refund (no winner) for challenge #${match.challenge_id}`,
-          });
+            transactionRepo.create({
+              type: 'refund',
+              userId: player.user_id,
+              challengeId: match.challenge_id,
+              amountUsdc: challenge.entry_amount_usdc,
+              solanaTxSignature: signature,
+              fromAddress: escrowKp.publicKey.toBase58(),
+              toAddress: walletRecord.solana_address,
+              status: 'completed',
+              memo: `Refund (no winner) for challenge #${match.challenge_id}`,
+            });
 
-          const { postTransaction } = require('../utils/transactionFeed');
-          const userRecord = require('../database/repositories/userRepo').findById(player.user_id);
-          postTransaction({ type: 'release', username: userRecord?.server_username, discordId: userRecord?.discord_id, amount: `$${(Number(challenge.entry_amount_usdc) / 1000000).toFixed(2)}`, currency: 'USDC', signature, challengeId: match.challenge_id, memo: `Refund (no winner)` });
-        } catch (err) {
-          console.error(`[MatchResult] Failed to refund player ${player.user_id}:`, err.message);
+            const userRecord = userRepo.findById(player.user_id);
+            postTransaction({ type: 'release', username: userRecord?.server_username, discordId: userRecord?.discord_id, amount: `$${(Number(challenge.entry_amount_usdc) / 1000000).toFixed(2)}`, currency: 'USDC', signature, challengeId: match.challenge_id, memo: `Refund (no winner)` });
+          } catch (err) {
+            console.error(`[MatchResult] Failed to refund player ${player.user_id}:`, err.message);
+          }
         }
       }
     }
 
-    // Mark match as completed with no winner
-    matchRepo.updateStatus(matchId, MATCH_STATUS.COMPLETED);
+    // Match already transitioned to COMPLETED by the atomic claim above.
     challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.COMPLETED);
 
     // No XP changes for anyone

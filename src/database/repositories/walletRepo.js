@@ -61,6 +61,29 @@ const releaseFundsTx = db.transaction((userId, amountUsdc) => {
   });
 });
 
+// Credit a positive delta to balance_available using a fresh DB read
+// inside a transaction — prevents the stale-read / stomped-balance
+// bug where a caller holds a wallet snapshot through an `await`
+// (e.g. an on-chain transfer) and then writes back `snapshot.avail
+// + delta`, silently clobbering any deposit / withdraw / hold that
+// happened in the meantime.
+//
+// Use this whenever you want to ADD to a user's available balance
+// after an async side-effect rather than the read-modify-write
+// pattern that audits flagged in C2, H3 and C4.
+const creditAvailableTx = db.transaction((userId, deltaUsdc) => {
+  const wallet = stmts.findByUserId.get(userId);
+  if (!wallet) throw new Error('Wallet not found');
+  const freshAvail = BigInt(wallet.balance_available);
+  const delta = BigInt(deltaUsdc);
+  if (delta < 0n) throw new Error('creditAvailable delta must be non-negative');
+  stmts.setBalances.run({
+    userId,
+    balanceAvailable: (freshAvail + delta).toString(),
+    balanceHeld: wallet.balance_held, // preserve held exactly as stored right now
+  });
+});
+
 const walletRepo = {
   findByUserId(userId) {
     return stmts.findByUserId.get(userId) || null;
@@ -84,6 +107,16 @@ const walletRepo = {
 
   releaseFunds(userId, amountUsdc) {
     return releaseFundsTx(userId, amountUsdc);
+  },
+
+  /**
+   * Atomically credit a non-negative delta to balance_available using
+   * a fresh DB read. Callers doing read-then-async-then-write should
+   * use this instead of walletRepo.updateBalance to avoid clobbering
+   * concurrent balance changes.
+   */
+  creditAvailable(userId, deltaUsdc) {
+    return creditAvailableTx(userId, deltaUsdc);
   },
 
   activate(userId) {
