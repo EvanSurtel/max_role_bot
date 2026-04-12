@@ -415,6 +415,15 @@ async function triggerDispute(client, matchId) {
     return;
   }
 
+  // Hard block: a completed match cannot be re-disputed. Winnings
+  // have already been disbursed; letting this proceed would allow a
+  // losing player to chain their way into admin "no winner" refunds
+  // from an escrow that's already been paid out.
+  if (match.status === MATCH_STATUS.COMPLETED) {
+    console.warn(`[MatchResult] triggerDispute refused — match #${matchId} is already completed`);
+    return;
+  }
+
   const challenge = challengeRepo.findById(match.challenge_id);
   if (!challenge) return;
 

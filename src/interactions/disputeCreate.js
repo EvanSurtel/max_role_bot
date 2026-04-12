@@ -21,13 +21,19 @@ async function handleCreateDispute(interaction) {
   const user = userRepo.findByDiscordId(discordId);
   if (!user) return interaction.reply({ content: t('common.not_registered', lang), ephemeral: true });
 
+  // Only live/disputed matches can be disputed. COMPLETED is NOT
+  // in this list — a completed match has already been paid out, and
+  // re-disputing it would let a losing player pull escrow funds that
+  // have already been disbursed to the winner. The guard is also
+  // enforced in handleDisputeConfirm and triggerDispute for defense
+  // in depth.
   const db = require('../database/db');
   const recentMatches = db.prepare(`
     SELECT m.*, c.game_modes, c.series_length, c.team_size, c.total_pot_usdc, c.type, c.display_number
     FROM matches m
     JOIN challenges c ON m.challenge_id = c.id
     JOIN challenge_players cp ON cp.challenge_id = c.id
-    WHERE cp.user_id = ? AND m.status IN ('completed', 'active', 'voting', 'disputed')
+    WHERE cp.user_id = ? AND m.status IN ('active', 'voting', 'disputed')
     ORDER BY m.created_at DESC LIMIT 10
   `).all(user.id);
 
@@ -70,6 +76,13 @@ async function handleDisputeSelect(interaction) {
   const match = matchRepo.findById(matchId);
   if (!match) return interaction.reply({ content: t('common.match_not_found', lang), ephemeral: true });
   if (match.status === MATCH_STATUS.DISPUTED) return interaction.reply({ content: t('dispute.already_disputed', lang), ephemeral: true });
+  // Completed matches are already paid out and cannot be re-opened.
+  if (match.status === MATCH_STATUS.COMPLETED) {
+    return interaction.reply({
+      content: 'This match is already resolved and cannot be disputed.',
+      ephemeral: true,
+    });
+  }
 
   const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) return interaction.reply({ content: t('common.not_registered_simple', lang), ephemeral: true });
@@ -101,6 +114,16 @@ async function handleDisputeConfirm(interaction) {
   if (!match) return interaction.reply({ content: t('common.match_not_found', lang), ephemeral: true });
   if (match.status === MATCH_STATUS.DISPUTED) {
     return interaction.update({ content: t('dispute.already_disputed', lang), embeds: [], components: [] });
+  }
+  // Hard refusal for completed matches — funds are already paid out,
+  // re-disputing would let a losing player pull escrow money that no
+  // longer belongs to the challenge.
+  if (match.status === MATCH_STATUS.COMPLETED) {
+    return interaction.update({
+      content: 'This match is already resolved and cannot be disputed.',
+      embeds: [],
+      components: [],
+    });
   }
 
   await interaction.update({ content: t('dispute.created', lang), embeds: [], components: [] });
