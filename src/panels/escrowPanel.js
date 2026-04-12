@@ -1,8 +1,23 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+} = require('discord.js');
 const { Keypair } = require('@solana/web3.js');
-const { getSolBalance, getUsdcBalance } = require('../solana/walletManager');
+const walletManager = require('../solana/walletManager');
+const { getSolBalance, getUsdcBalance } = walletManager;
+const transactionService = require('../solana/transactionService');
 const { LAMPORTS_PER_SOL, USDC_PER_UNIT } = require('../config/constants');
 const { t, langFor } = require('../locales/i18n');
+
+// Reserve kept in the escrow after any SOL withdrawal so the bot
+// always has gas for the next match's on-chain operations. Matches
+// the reserve the user-side SOL withdrawal uses.
+const SOL_RESERVE_LAMPORTS = 5_000_000; // 0.005 SOL
 
 function getEscrowAddress() {
   const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
@@ -13,6 +28,30 @@ function getEscrowAddress() {
   } catch {
     return null;
   }
+}
+
+function _getEscrowKeypair() {
+  const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
+  if (!secretKeyJson) return null;
+  try {
+    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyJson)));
+  } catch {
+    return null;
+  }
+}
+
+// Admin check — escrow actions require admin-equivalent role.
+// Mirrors the chain of admin-equivalent env vars used elsewhere.
+function _isAdminMember(member) {
+  const roles = member && member.roles && member.roles.cache;
+  if (!roles) return false;
+  const ids = [
+    process.env.ADMIN_ROLE_ID,
+    process.env.OWNER_ROLE_ID,
+    process.env.CEO_ROLE_ID,
+    process.env.ADS_ROLE_ID,
+  ].filter(Boolean);
+  return ids.some(id => roles.has(id));
 }
 
 async function buildEscrowPanel(lang = 'en') {
@@ -53,7 +92,7 @@ async function buildEscrowPanel(lang = 'en') {
     )
     .setTimestamp();
 
-  const row = new ActionRowBuilder().addComponents(
+  const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('escrow_refresh')
       .setLabel(t('escrow_panel.btn_refresh', lang))
@@ -64,7 +103,18 @@ async function buildEscrowPanel(lang = 'en') {
       .setStyle(ButtonStyle.Success),
   );
 
-  return { embeds: [embed], components: [row] };
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('escrow_withdraw_sol')
+      .setLabel('Withdraw SOL')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId('escrow_withdraw_usdc')
+      .setLabel('Withdraw USDC')
+      .setStyle(ButtonStyle.Danger),
+  );
+
+  return { embeds: [embed], components: [row1, row2] };
 }
 
 /**
@@ -128,24 +178,11 @@ async function postEscrowPanel(client, lang = 'en') {
 
 async function handleEscrowButton(interaction) {
   const id = interaction.customId;
-  // The escrow panel is a SHARED admin message — when one admin clicks
-  // Refresh, the rebuilt panel must stay in the bot display language so
-  // it doesn't switch to the clicker's preferred language for everyone.
-  // Ephemeral replies still use the clicker's language (langFor).
   const lang = langFor(interaction);
   const { getBotDisplayLanguage } = require('../utils/languageRefresh');
   const sharedLang = getBotDisplayLanguage();
 
-  // Admin only — ads, CEO, and owner roles are admin-equivalent.
-  const adminRoleId = process.env.ADMIN_ROLE_ID;
-  const ownerRoleId = process.env.OWNER_ROLE_ID;
-  const ceoRoleId = process.env.CEO_ROLE_ID;
-  const adsRoleId = process.env.ADS_ROLE_ID;
-  const hasAdmin = adminRoleId && interaction.member.roles.cache.has(adminRoleId);
-  const hasOwner = ownerRoleId && interaction.member.roles.cache.has(ownerRoleId);
-  const hasCeo = ceoRoleId && interaction.member.roles.cache.has(ceoRoleId);
-  const hasAds = adsRoleId && interaction.member.roles.cache.has(adsRoleId);
-  if (!hasAdmin && !hasOwner && !hasCeo && !hasAds) {
+  if (!_isAdminMember(interaction.member)) {
     return interaction.reply({ content: t('escrow_panel.admin_only', lang), ephemeral: true });
   }
 
@@ -158,6 +195,308 @@ async function handleEscrowButton(interaction) {
     const address = getEscrowAddress();
     return interaction.reply({ content: address || t('escrow_panel.not_configured_short', lang), ephemeral: true });
   }
+
+  // ─── Withdraw SOL button → show modal ───────────────────────
+  if (id === 'escrow_withdraw_sol') {
+    const modal = new ModalBuilder()
+      .setCustomId('escrow_withdraw_sol_modal')
+      .setTitle('Withdraw SOL from Escrow');
+    const addressInput = new TextInputBuilder()
+      .setCustomId('withdraw_address')
+      .setLabel('Destination Solana address')
+      .setPlaceholder('e.g. 7xKXt...')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMinLength(32)
+      .setMaxLength(44);
+    const amountInput = new TextInputBuilder()
+      .setCustomId('withdraw_amount')
+      .setLabel('Amount in SOL (e.g. 0.5)')
+      .setPlaceholder('0.5')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMinLength(1)
+      .setMaxLength(12);
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(addressInput),
+      new ActionRowBuilder().addComponents(amountInput),
+    );
+    return interaction.showModal(modal);
+  }
+
+  // ─── Withdraw USDC button → show modal ──────────────────────
+  if (id === 'escrow_withdraw_usdc') {
+    const modal = new ModalBuilder()
+      .setCustomId('escrow_withdraw_usdc_modal')
+      .setTitle('Withdraw USDC from Escrow');
+    const addressInput = new TextInputBuilder()
+      .setCustomId('withdraw_address')
+      .setLabel('Destination Solana address')
+      .setPlaceholder('e.g. 7xKXt...')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMinLength(32)
+      .setMaxLength(44);
+    const amountInput = new TextInputBuilder()
+      .setCustomId('withdraw_amount')
+      .setLabel('Amount in USDC (e.g. 10.50)')
+      .setPlaceholder('10.50')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMinLength(1)
+      .setMaxLength(12);
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(addressInput),
+      new ActionRowBuilder().addComponents(amountInput),
+    );
+    return interaction.showModal(modal);
+  }
+
+  // ─── Cancel confirmation ────────────────────────────────────
+  if (id === 'escrow_wd_cancel') {
+    return interaction.update({
+      content: 'Escrow withdrawal cancelled.',
+      embeds: [],
+      components: [],
+    });
+  }
+
+  // ─── Confirm → execute the on-chain transfer ────────────────
+  if (id.startsWith('escrow_wd_sol_') || id.startsWith('escrow_wd_usdc_')) {
+    return _executeEscrowWithdrawConfirm(interaction);
+  }
 }
 
-module.exports = { postEscrowPanel, handleEscrowButton };
+/**
+ * Modal-submit handler for the SOL and USDC withdraw modals. Validates
+ * input, builds a confirmation embed, returns it with Yes/Cancel buttons.
+ * The actual on-chain transfer only fires after the user clicks Yes.
+ */
+async function handleEscrowModal(interaction) {
+  const id = interaction.customId;
+  const lang = langFor(interaction);
+
+  if (!_isAdminMember(interaction.member)) {
+    return interaction.reply({ content: t('escrow_panel.admin_only', lang), ephemeral: true });
+  }
+
+  const address = interaction.fields.getTextInputValue('withdraw_address').trim();
+  const amountStr = interaction.fields.getTextInputValue('withdraw_amount').trim();
+  const amount = parseFloat(amountStr);
+
+  if (!walletManager.isAddressValid(address)) {
+    return interaction.reply({
+      content: '⚠️ Invalid or blocked destination address. Cannot withdraw to system programs, mints, or the escrow itself.',
+      ephemeral: true,
+    });
+  }
+
+  if (isNaN(amount) || amount <= 0) {
+    return interaction.reply({
+      content: '⚠️ Amount must be a positive number.',
+      ephemeral: true,
+    });
+  }
+
+  const escrowAddress = getEscrowAddress();
+  if (!escrowAddress) {
+    return interaction.reply({
+      content: '⚠️ Escrow wallet not configured.',
+      ephemeral: true,
+    });
+  }
+
+  // Validate balance on-chain before showing the confirmation so the
+  // admin sees a loud error immediately instead of at execute time.
+  if (id === 'escrow_withdraw_sol_modal') {
+    const solLamports = Number(await getSolBalance(escrowAddress));
+    const requestedLamports = Math.floor(amount * LAMPORTS_PER_SOL);
+    const availableLamports = solLamports - SOL_RESERVE_LAMPORTS;
+    if (requestedLamports > availableLamports) {
+      const availSol = (availableLamports / LAMPORTS_PER_SOL).toFixed(6);
+      return interaction.reply({
+        content: `⚠️ Insufficient SOL. Available after 0.005 SOL gas reserve: **${availSol} SOL**.`,
+        ephemeral: true,
+      });
+    }
+
+    const confirmEmbed = new EmbedBuilder()
+      .setTitle('⚠️ Confirm Escrow SOL Withdrawal')
+      .setColor(0xf39c12)
+      .setDescription([
+        'You are about to send **SOL** out of the escrow wallet:',
+        '',
+        `**Amount:** \`${amount} SOL\``,
+        `**Destination:**\n\`\`\`\n${address}\n\`\`\``,
+        '',
+        `**Escrow balance after:** ~${((solLamports - requestedLamports) / LAMPORTS_PER_SOL).toFixed(6)} SOL`,
+        '',
+        '⚠️ Crypto transfers cannot be reversed. Double-check the address.',
+      ].join('\n'));
+
+    const confirmRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`escrow_wd_sol_${amount}_${address}`)
+        .setLabel('Yes, send it')
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId('escrow_wd_cancel')
+        .setLabel('Cancel')
+        .setStyle(ButtonStyle.Secondary),
+    );
+
+    return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
+  }
+
+  if (id === 'escrow_withdraw_usdc_modal') {
+    const usdcSmallest = BigInt(await walletManager.getUsdcBalance(escrowAddress));
+    const requestedSmallest = BigInt(Math.floor(amount * USDC_PER_UNIT));
+    if (requestedSmallest > usdcSmallest) {
+      const availUsdc = (Number(usdcSmallest) / USDC_PER_UNIT).toFixed(2);
+      return interaction.reply({
+        content: `⚠️ Insufficient USDC. Escrow on-chain balance: **$${availUsdc} USDC**.`,
+        ephemeral: true,
+      });
+    }
+
+    // Warn if there are live matches relying on escrow USDC.
+    const db = require('../database/db');
+    const liveMatchCount = db.prepare(
+      "SELECT COUNT(*) as c FROM matches WHERE status IN ('active', 'voting', 'disputed')",
+    ).get()?.c || 0;
+
+    const liveWarning = liveMatchCount > 0
+      ? `\n\n⚠️ **${liveMatchCount} live match(es)** depend on escrow USDC for disbursement. Withdrawing too much may cause resolution to fail.`
+      : '';
+
+    const remainingAfter = Number(usdcSmallest - requestedSmallest) / USDC_PER_UNIT;
+    const confirmEmbed = new EmbedBuilder()
+      .setTitle('⚠️ Confirm Escrow USDC Withdrawal')
+      .setColor(0xf39c12)
+      .setDescription([
+        'You are about to send **USDC** out of the escrow wallet:',
+        '',
+        `**Amount:** \`$${amount.toFixed(2)} USDC\``,
+        `**Destination:**\n\`\`\`\n${address}\n\`\`\``,
+        '',
+        `**Escrow balance after:** ~$${remainingAfter.toFixed(2)} USDC`,
+        '',
+        '⚠️ Crypto transfers cannot be reversed. Double-check the address.' + liveWarning,
+      ].join('\n'));
+
+    const fixedAmount = amount.toFixed(2);
+    const confirmRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`escrow_wd_usdc_${fixedAmount}_${address}`)
+        .setLabel('Yes, send it')
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId('escrow_wd_cancel')
+        .setLabel('Cancel')
+        .setStyle(ButtonStyle.Secondary),
+    );
+
+    return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
+  }
+}
+
+/**
+ * Execute the on-chain transfer after the admin confirms. CustomId
+ * format: `escrow_wd_sol_{amount}_{address}` or `escrow_wd_usdc_...`.
+ * Admin check runs again as defense-in-depth.
+ */
+async function _executeEscrowWithdrawConfirm(interaction) {
+  const lang = langFor(interaction);
+
+  if (!_isAdminMember(interaction.member)) {
+    return interaction.reply({ content: t('escrow_panel.admin_only', lang), ephemeral: true });
+  }
+
+  // Parse: escrow_wd_{currency}_{amount}_{address}
+  const afterPrefix = interaction.customId.substring('escrow_wd_'.length);
+  const firstUnd = afterPrefix.indexOf('_');
+  const currency = afterPrefix.substring(0, firstUnd);
+  const rest = afterPrefix.substring(firstUnd + 1);
+  const secondUnd = rest.indexOf('_');
+  const amountStr = rest.substring(0, secondUnd);
+  const address = rest.substring(secondUnd + 1);
+  const amount = parseFloat(amountStr);
+
+  if (isNaN(amount) || !address) {
+    return interaction.reply({ content: '⚠️ Parse error on confirm.', ephemeral: true });
+  }
+
+  // Re-validate the address at confirm time (defense in depth against
+  // crafted customIds even though Discord signs interactions).
+  if (!walletManager.isAddressValid(address)) {
+    return interaction.reply({ content: '⚠️ Invalid or blocked destination address.', ephemeral: true });
+  }
+
+  const escrowKp = _getEscrowKeypair();
+  if (!escrowKp) {
+    return interaction.reply({ content: '⚠️ Escrow keypair not configured.', ephemeral: true });
+  }
+
+  // Swap confirmation for a "processing" notice while the on-chain
+  // round-trip runs, then report the signature on return.
+  await interaction.update({
+    content: 'Processing escrow withdrawal…',
+    embeds: [],
+    components: [],
+  });
+
+  const { postTransaction } = require('../utils/transactionFeed');
+
+  try {
+    if (currency === 'sol') {
+      const lamports = Math.floor(amount * LAMPORTS_PER_SOL);
+      const { signature } = await transactionService.transferSol(escrowKp, address, lamports);
+      postTransaction({
+        type: 'sol_withdrawal',
+        discordId: interaction.user.id,
+        amount: `${amount}`,
+        currency: 'SOL',
+        fromAddress: escrowKp.publicKey.toBase58(),
+        toAddress: address,
+        signature,
+        memo: `🛠️ Admin escrow SOL withdraw by <@${interaction.user.id}>: ${amount} SOL`,
+      });
+      return interaction.editReply({
+        content: `✅ Escrow SOL withdrawal complete.\n\n**Amount:** ${amount} SOL\n**To:** \`${address}\`\n**Signature:** \`${signature}\``,
+        embeds: [],
+        components: [],
+      });
+    }
+
+    if (currency === 'usdc') {
+      const amountSmallest = Math.floor(amount * USDC_PER_UNIT).toString();
+      const { signature } = await transactionService.transferUsdc(escrowKp, address, amountSmallest);
+      postTransaction({
+        type: 'withdrawal',
+        discordId: interaction.user.id,
+        amount: `$${amount.toFixed(2)}`,
+        currency: 'USDC',
+        fromAddress: escrowKp.publicKey.toBase58(),
+        toAddress: address,
+        signature,
+        memo: `🛠️ Admin escrow USDC withdraw by <@${interaction.user.id}>: $${amount.toFixed(2)} USDC`,
+      });
+      return interaction.editReply({
+        content: `✅ Escrow USDC withdrawal complete.\n\n**Amount:** $${amount.toFixed(2)} USDC\n**To:** \`${address}\`\n**Signature:** \`${signature}\``,
+        embeds: [],
+        components: [],
+      });
+    }
+
+    return interaction.editReply({ content: '⚠️ Unknown currency on confirm.', embeds: [], components: [] });
+  } catch (err) {
+    console.error('[Escrow] Withdrawal failed:', err);
+    return interaction.editReply({
+      content: `❌ Escrow withdrawal failed: ${err.message || err}`,
+      embeds: [],
+      components: [],
+    });
+  }
+}
+
+module.exports = { postEscrowPanel, handleEscrowButton, handleEscrowModal };

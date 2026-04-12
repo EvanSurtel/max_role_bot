@@ -352,6 +352,10 @@ module.exports = {
         if (id === 'wallet_withdraw_sol_modal') {
           return await walletPanel.handleWithdrawSolModal(interaction);
         }
+        // Admin escrow withdraw modals (SOL + USDC)
+        if (id === 'escrow_withdraw_sol_modal' || id === 'escrow_withdraw_usdc_modal') {
+          return await escrowPanel.handleEscrowModal(interaction);
+        }
         // evidence_modal_ removed — evidence posted directly in channel
         if (id.startsWith('lb_admin_')) {
           return await leaderboardPanel.handleAdminModal(interaction);
