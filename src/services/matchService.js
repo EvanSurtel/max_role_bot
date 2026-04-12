@@ -450,13 +450,59 @@ async function resolveMatch(client, matchId, winningTeam) {
   const winningPlayers = challengePlayerRepo.findByChallengeAndTeam(match.challenge_id, winningTeam);
   const winnerUserIds = winningPlayers.map(p => p.user_id);
 
-  // Disburse winnings (wager challenges only)
+  // Disburse winnings (wager challenges only).
+  //
+  // disburseWinnings returns `{ disbursements: [...] }` where each
+  // entry is either `{userId, signature, amount}` (success) or
+  // `{userId, error}` (failure). Previously the caller ignored
+  // that detail completely — any failure was silently swallowed
+  // and the match was marked COMPLETED with some winners unpaid
+  // and no retry path.
+  //
+  // Now: if ANY disbursement failed, or any expected winner was
+  // dropped before the loop (missing wallet), we revert the match
+  // status back to DISPUTED and alert the admin channel. The
+  // stranded escrow funds become an admin-visible problem that
+  // can be resolved manually instead of a silent loss.
   if (challenge.type === CHALLENGE_TYPE.WAGER && Number(challenge.total_pot_usdc) > 0) {
+    let disburseFailed = false;
+    let disburseError = null;
+    let disburseResult = null;
     try {
-      await escrowManager.disburseWinnings(match.challenge_id, winnerUserIds, challenge.total_pot_usdc);
-      console.log(`[MatchService] Winnings disbursed for match #${matchId}, team ${winningTeam} won`);
+      disburseResult = await escrowManager.disburseWinnings(
+        match.challenge_id,
+        winnerUserIds,
+        challenge.total_pot_usdc,
+      );
+      const failedPayouts = (disburseResult.disbursements || []).filter(d => d.error);
+      const successPayouts = (disburseResult.disbursements || []).filter(d => d.signature);
+      if (failedPayouts.length > 0 || successPayouts.length < winnerUserIds.length) {
+        disburseFailed = true;
+        disburseError = failedPayouts.length > 0
+          ? failedPayouts.map(d => `user ${d.userId}: ${d.error}`).join('; ')
+          : `only ${successPayouts.length}/${winnerUserIds.length} winners paid`;
+      } else {
+        console.log(`[MatchService] Winnings disbursed for match #${matchId}, team ${winningTeam} won`);
+      }
     } catch (err) {
+      disburseFailed = true;
+      disburseError = err.message;
       console.error(`[MatchService] Failed to disburse winnings for match #${matchId}:`, err.message);
+    }
+
+    if (disburseFailed) {
+      // Revert the match status so the next admin action can take
+      // over. Raise a loud alert so the operator knows real funds
+      // are stranded in escrow.
+      matchRepo.atomicStatusTransition(matchId, MATCH_STATUS.COMPLETED, MATCH_STATUS.DISPUTED);
+      const { postTransaction } = require('../utils/transactionFeed');
+      postTransaction({
+        type: 'balance_mismatch',
+        challengeId: match.challenge_id,
+        memo: `🚨 Disbursement FAILED for match #${matchId} — status reverted to DISPUTED. Escrow may have stranded funds. Error: ${disburseError}`,
+      });
+      console.error(`[MatchService] CRITICAL: disbursement failed for match #${matchId}, status reverted. Admin action required.`);
+      return;
     }
   }
 

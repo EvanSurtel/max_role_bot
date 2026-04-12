@@ -238,12 +238,12 @@ async function disburseWinnings(challengeId, winningPlayerIds, totalPotUsdc) {
         perPlayerShare.toString(),
       );
 
-      // Update winner's available balance in DB
-      const currentAvailable = BigInt(walletRecord.balance_available);
-      walletRepo.updateBalance(userId, {
-        balanceAvailable: (currentAvailable + perPlayerShare).toString(),
-        balanceHeld: walletRecord.balance_held,
-      });
+      // Credit the winner inside a fresh-read transaction. The old
+      // pattern snapshotted walletRecord.balance_available BEFORE
+      // the await and then wrote `snapshot + share`, silently
+      // clobbering any deposit / withdraw / hold that landed during
+      // the on-chain round-trip.
+      walletRepo.creditAvailable(userId, perPlayerShare.toString());
 
       transactionRepo.create({
         type: TRANSACTION_TYPE.DISBURSEMENT,
