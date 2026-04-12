@@ -61,6 +61,16 @@ client.once('ready', async () => {
     const healthService = require('./services/healthService');
     healthService.startHealthChecks(client);
 
+    // Start the webhook HTTP server (for MoonPay on-ramp / off-ramp
+    // callbacks). Safe to run whether or not MoonPay is configured —
+    // it just listens on WEBHOOK_PORT and 401s unsigned requests.
+    try {
+      const { startWebhookServer } = require('./services/webhookServer');
+      startWebhookServer();
+    } catch (err) {
+      console.error('[Boot] Webhook server failed to start:', err.message);
+    }
+
     // Schedule daily health summary (every 24h)
     setInterval(() => {
       healthService.postDailySummary(client).catch(err => {
@@ -151,6 +161,13 @@ async function shutdown(signal) {
     healthService.stopHealthChecks();
   } catch (err) {
     console.error('[Shutdown] Error stopping health checks:', err.message || err);
+  }
+
+  try {
+    const { stopWebhookServer } = require('./services/webhookServer');
+    stopWebhookServer();
+  } catch (err) {
+    console.error('[Shutdown] Error stopping webhook server:', err.message || err);
   }
 
   client.destroy();
