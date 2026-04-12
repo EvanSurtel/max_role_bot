@@ -413,13 +413,31 @@ async function resolveMatch(client, matchId, winningTeam) {
     throw new Error(`Match ${matchId} not found`);
   }
 
-  // Idempotency guard — without this, if resolveMatch gets called
-  // twice for the same match (race, retry, admin re-click) the bot
-  // would double-award XP, double-count wins/losses, and try to
-  // disburse the escrow twice. Hard block: once a match is completed,
-  // it's done.
-  if (match.status === MATCH_STATUS.COMPLETED) {
-    console.warn(`[MatchService] resolveMatch called on already-completed match #${matchId} — skipping`);
+  // Atomic idempotency claim — prevents double-resolve races.
+  //
+  // The previous version read match.status and then did a bunch of
+  // async work (disbursement) before finally setting the status to
+  // COMPLETED. Two concurrent callers (e.g., both captains reporting
+  // the same outcome within ~100ms, or an admin confirm colliding
+  // with the inactivity auto-dispute timer) could both pass the
+  // "status !== COMPLETED" check and both call disburseWinnings →
+  // winners get paid 2x the pot.
+  //
+  // Now we use matchRepo.atomicStatusTransition to flip the status
+  // from the current live state (active / voting / disputed) to
+  // COMPLETED inside a BEGIN IMMEDIATE transaction. Exactly ONE
+  // caller wins the row, the rest see a false return and exit. The
+  // status is already COMPLETED before disburseWinnings runs, which
+  // matches the shape of the rest of the function (it just keeps
+  // running and finishes the work).
+  const LIVE_STATUSES = [MATCH_STATUS.ACTIVE, MATCH_STATUS.VOTING, MATCH_STATUS.DISPUTED];
+  if (!LIVE_STATUSES.includes(match.status)) {
+    console.warn(`[MatchService] resolveMatch called on match #${matchId} with status=${match.status} — skipping`);
+    return;
+  }
+  const claimed = matchRepo.atomicStatusTransition(matchId, LIVE_STATUSES, MATCH_STATUS.COMPLETED);
+  if (!claimed) {
+    console.warn(`[MatchService] resolveMatch race lost on match #${matchId} — another caller already claimed it`);
     return;
   }
 
@@ -442,9 +460,10 @@ async function resolveMatch(client, matchId, winningTeam) {
     }
   }
 
-  // Update match: set winner and status to completed
+  // Update match: set winner. Status was already flipped to COMPLETED
+  // at the top of the function by the atomic idempotency claim, so
+  // there's no second updateStatus call here.
   matchRepo.setWinner(matchId, winningTeam);
-  matchRepo.updateStatus(matchId, MATCH_STATUS.COMPLETED);
 
   // Update challenge status to completed
   challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.COMPLETED);

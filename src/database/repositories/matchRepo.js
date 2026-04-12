@@ -79,6 +79,38 @@ const matchRepo = {
   updateStatus(id, status) {
     return stmts.updateStatus.run(status, id);
   },
+
+  /**
+   * Atomically transition a match's status from one of `expectedStatuses`
+   * to `newStatus`, inside a BEGIN IMMEDIATE transaction. Returns true
+   * if the transition claimed the row, false otherwise.
+   *
+   * Use this to prevent double-resolution races: the caller reads the
+   * current status, decides what to do, then stuff happens async. A
+   * concurrent caller can do the same work in parallel unless the
+   * status transition is atomic. This helper makes the read-and-flip
+   * one operation, so exactly ONE caller wins.
+   *
+   * Mirrors challengeRepo.atomicStatusTransition. Supports either a
+   * single expected status string or an array of allowed source
+   * statuses (so e.g. "claim resolution from active OR voting OR
+   * disputed" is a single call).
+   *
+   * @param {number} id
+   * @param {string|string[]} expectedStatuses
+   * @param {string} newStatus
+   * @returns {boolean}
+   */
+  atomicStatusTransition(id, expectedStatuses, newStatus) {
+    const allowed = Array.isArray(expectedStatuses) ? expectedStatuses : [expectedStatuses];
+    const tx = db.transaction(() => {
+      const row = stmts.findById.get(id);
+      if (!row || !allowed.includes(row.status)) return false;
+      stmts.updateStatus.run(newStatus, id);
+      return true;
+    });
+    return tx.immediate();
+  },
 };
 
 module.exports = matchRepo;
