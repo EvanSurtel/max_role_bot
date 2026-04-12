@@ -420,15 +420,33 @@ async function handleWithdrawSolModal(interaction) {
 /**
  * Actually transfer SOL on-chain. Called from handleWithdrawConfirmButton
  * once the user has confirmed the confirmation embed.
+ *
+ * Holds walletRepo.acquireLock for the duration of the on-chain submit
+ * so a user clicking "Yes, send it" twice in rapid succession can't
+ * race through two transferSol calls before the first one settles.
+ * The USDC withdraw path already did this; SOL withdraw was missing
+ * the lock and could be double-spent.
  */
 async function _executeSolWithdraw(interaction, user, amountSol, address, lang) {
   const lamports = Math.floor(amountSol * 1_000_000_000);
 
+  if (!walletRepo.acquireLock(user.id)) {
+    return interaction.editReply({
+      content: t('common.please_wait', lang),
+      embeds: [],
+      components: [],
+    });
+  }
+
   try {
+    // Re-fetch the wallet AFTER taking the lock — protects against the
+    // case where another flow updated the wallet row between when the
+    // confirmation embed was built and when the user clicked Yes.
     const wallet = walletRepo.findByUserId(user.id);
     const solBalance = Number(await walletManager.getSolBalance(wallet.solana_address));
     const reserveLamports = 5_000_000;
     if (lamports > solBalance - reserveLamports) {
+      walletRepo.releaseLock(user.id);
       const availSol = ((solBalance - reserveLamports) / 1_000_000_000).toFixed(8);
       return interaction.editReply({
         content: t('common.insufficient_sol', lang, { available: availSol }),
@@ -460,12 +478,14 @@ async function _executeSolWithdraw(interaction, user, amountSol, address, lang) 
     const { postTransaction } = require('../utils/transactionFeed');
     postTransaction({ type: 'sol_withdrawal', username: user.server_username, discordId: user.discord_id, amount: `${amountSol}`, currency: 'SOL', fromAddress: wallet.solana_address, toAddress: address, signature, memo: `SOL withdrawal: ${amountSol} SOL` });
 
+    walletRepo.releaseLock(user.id);
     return interaction.editReply({
       content: t('wallet.withdraw_success_sol', lang, { amount: amountSol, address, signature }),
       embeds: [],
       components: [],
     });
   } catch (err) {
+    walletRepo.releaseLock(user.id);
     console.error('[Wallet] SOL withdrawal error:', err);
     return interaction.editReply({ content: t('wallet.withdraw_failed', lang), embeds: [], components: [] });
   }
