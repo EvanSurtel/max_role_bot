@@ -583,12 +583,36 @@ async function handleTeamConfirmedAccept(interaction) {
   const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
   const entryUsdc = challenge.entry_amount_usdc;
 
+  // Atomically claim the challenge BEFORE doing any money work, any
+  // player inserts, or any async UI update. Without this, two
+  // different acceptors running the team accept flow in parallel
+  // could both pass the non-atomic status check above, both hold
+  // funds, and both insert team-2 captain rows — duplicating the
+  // team 2 roster and leaking one acceptor's entry into escrow with
+  // no refund path.
+  //
+  // The 1v1 accept path already used atomicStatusTransition; the
+  // team path was missing it. Using it here means exactly ONE
+  // acceptor ever transitions OPEN → ACCEPTED for a given challenge,
+  // and every concurrent claimant short-circuits cleanly.
+  const claimed = challengeRepo.atomicStatusTransition(
+    challengeId,
+    CHALLENGE_STATUS.OPEN,
+    CHALLENGE_STATUS.ACCEPTED,
+  );
+  if (!claimed) {
+    acceptFlows.delete(discordId);
+    return interaction.update({ content: 'This challenge is no longer available.', embeds: [], components: [] });
+  }
+
   await interaction.update({ content: 'Processing...', embeds: [], components: [] });
 
   try {
     // Check acceptor's balance and hold funds (if wager)
     if (isWager && Number(entryUsdc) > 0) {
       if (!escrowManager.canAfford(user.id, entryUsdc)) {
+        // Revert the status claim — we failed before any money moved
+        challengeRepo.atomicStatusTransition(challengeId, CHALLENGE_STATUS.ACCEPTED, CHALLENGE_STATUS.OPEN);
         acceptFlows.delete(discordId);
         return interaction.editReply({
           content: `Insufficient balance. You need **${formatUsdc(entryUsdc)} USDC** to accept this wager.`,
@@ -598,6 +622,9 @@ async function handleTeamConfirmedAccept(interaction) {
 
       const held = escrowManager.holdFunds(user.id, entryUsdc, challengeId);
       if (!held) {
+        // Revert the status claim on hold failure so the challenge
+        // is not silently stuck in ACCEPTED with no captain row.
+        challengeRepo.atomicStatusTransition(challengeId, CHALLENGE_STATUS.ACCEPTED, CHALLENGE_STATUS.OPEN);
         acceptFlows.delete(discordId);
         return interaction.editReply({
           content: 'Failed to hold funds. Please try again.',
@@ -632,8 +659,8 @@ async function handleTeamConfirmedAccept(interaction) {
       }
     }
 
-    // Set challenge status to 'accepted' (waiting for opponent teammates)
-    challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.ACCEPTED);
+    // Status is already ACCEPTED via the atomic claim at the top;
+    // no second updateStatus call needed.
 
     // Set challenge acceptor
     challengeRepo.setAcceptor(challengeId, user.id);
