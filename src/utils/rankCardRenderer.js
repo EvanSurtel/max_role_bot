@@ -225,12 +225,16 @@ async function renderRankCard(data) {
   ctx.textAlign = 'left';
   _fitText(ctx, displayName, RIGHT_X, 55, RIGHT_W, 68);
 
-  // IGN subtitle (only if different from display name, to avoid dup).
+  // IGN subtitle — always show if the user has an IGN on file, even
+  // if it matches their display name. IGN is the identifier people
+  // want visible on their rank card regardless of what their Discord
+  // name happens to be.
+  //
   // Pushed well below the display name so the two lines don't kiss —
   // canvas bounding boxes are tight and a bold 68px name sitting on a
   // 30px subtitle looked crowded otherwise.
   let subY = 150;
-  if (ign && ign !== displayName) {
+  if (ign) {
     ctx.fillStyle = '#a9a9bc';
     ctx.font = `30px "${FONT_FAMILY}"`;
     _fitText(ctx, `IGN: ${ign}`, RIGHT_X, subY, RIGHT_W, 30);
