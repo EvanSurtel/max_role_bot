@@ -243,7 +243,12 @@ async function handleRegistrationModal(interaction) {
         console.error(`[Onboarding] NeatQueue IGN sync failed:`, err.message);
       }
       try {
-        await neatqueueService.addPoints(discordId, 500);
+        // setPoints (not addPoints) — we want the user to land on
+        // exactly 500 on NeatQueue, not "500 more than whatever was
+        // there". Using the additive addPoints here once gave a
+        // user 1500 XP because they already had 1000 points from
+        // earlier testing.
+        await neatqueueService.setPoints(discordId, 500);
       } catch (err) {
         console.error(`[Onboarding] NeatQueue starting-points seed failed:`, err.message);
       }

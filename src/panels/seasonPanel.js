@@ -325,13 +325,18 @@ async function handleSeasonModal(interaction) {
         console.warn('[Season] Failed to reset NeatQueue:', err.message);
       }
 
-      // Set starting points (500) for all registered users in NeatQueue
+      // Set every user to exactly STARTING_XP on NeatQueue.
+      // setPoints (not addPoints) — if resetNeatQueue above failed
+      // or partially succeeded, addPoints would have stacked on top
+      // of the old value. setPoints reads the current number and
+      // adds the delta needed to hit the target, so the end state
+      // is always exactly STARTING_XP regardless of what happened.
       try {
         const allUsers = db.prepare('SELECT discord_id FROM users WHERE accepted_tos = 1').all();
         for (const u of allUsers) {
-          await neatqueueService.addPoints(u.discord_id, STARTING_XP).catch(() => {});
+          await neatqueueService.setPoints(u.discord_id, STARTING_XP).catch(() => {});
         }
-        console.log(`[Season] Set ${allUsers.length} users to ${STARTING_XP} starting XP in NeatQueue`);
+        console.log(`[Season] Set ${allUsers.length} users to exactly ${STARTING_XP} starting XP in NeatQueue`);
       } catch (err) {
         console.warn('[Season] Failed to set NeatQueue starting points:', err.message);
       }
@@ -392,10 +397,16 @@ async function resetNeatQueue() {
   const guildId = process.env.GUILD_ID;
   if (!token || !channelId) return;
 
+  // Snowflake IDs stay as STRINGS — parseInt corrupts 18-19 digit
+  // Discord IDs past Number.MAX_SAFE_INTEGER (same bug we fixed in
+  // neatqueueService and onboarding.syncIgnToNeatQueue). Before this
+  // fix the reset call went to a bogus channel_id and silently did
+  // nothing, which caused the subsequent addPoints(500) loop to
+  // stack on top of the old values instead of resetting to 500.
   const res = await fetch('https://api.neatqueue.com/api/v2/managestats/reset/all', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ server_id: parseInt(guildId), channel_id: parseInt(channelId) }),
+    body: JSON.stringify({ server_id: guildId, channel_id: channelId }),
   });
 
   if (!res.ok) {

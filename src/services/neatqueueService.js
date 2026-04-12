@@ -46,7 +46,9 @@ async function neatqueueFetch(path, options = {}) {
 }
 
 /**
- * Add (or subtract) points for a player.
+ * Add (or subtract) points for a player. Incremental — this ADDS
+ * `amount` to whatever NeatQueue already has for that user. Use
+ * setPoints() below if you want to land on an exact value.
  */
 async function addPoints(discordUserId, amount) {
   if (!isConfigured()) return null;
@@ -59,6 +61,44 @@ async function addPoints(discordUserId, amount) {
       user_id: String(discordUserId),
     }),
   });
+}
+
+/**
+ * SET a player's points to an exact value. NeatQueue's /add/stats
+ * endpoint is additive only (no setter), so this implementation
+ * reads the current points from the channel leaderboard and then
+ * calls addPoints() with the delta needed to land on `target`.
+ *
+ * Use this when seeding a fresh user or forcing a season-reset
+ * baseline — `addPoints(user, 500)` would have stacked on top of
+ * any existing value and silently handed out 1500 / 2000 / etc.
+ *
+ * Falls back to a pure addPoints(target) only if the leaderboard
+ * lookup fails entirely — better to seed than to crash.
+ */
+async function setPoints(discordUserId, target) {
+  if (!isConfigured()) return null;
+  const targetId = String(discordUserId);
+  try {
+    const raw = await getChannelLeaderboard();
+    const arr = Array.isArray(raw)
+      ? raw
+      : (raw && (raw.leaderboard || raw.data || raw.players || raw.entries)) || [];
+    const entry = Array.isArray(arr) ? arr.find(e => {
+      const uid = String(e.user_id || e.userId || e.id || e.discord_id || e.discordId || '');
+      return uid === targetId;
+    }) : null;
+    const current = entry
+      ? Number(entry.points ?? entry.score ?? (entry.stats && entry.stats.points) ?? entry.xp ?? 0)
+      : 0;
+    const delta = target - current;
+    if (delta === 0) return { current, delta, target };
+    await addPoints(discordUserId, delta);
+    return { current, delta, target };
+  } catch (err) {
+    console.warn(`[NeatQueue] setPoints(${targetId} → ${target}) fell back to pure addPoints: ${err.message}`);
+    return addPoints(discordUserId, target);
+  }
 }
 
 /**
@@ -113,4 +153,4 @@ async function getChannelLeaderboard() {
   return neatqueueFetch(`/api/v1/leaderboard/${guildId}/${channelId}`);
 }
 
-module.exports = { addPoints, addWin, addLoss, getPlayerStats, getChannelLeaderboard, isConfigured };
+module.exports = { addPoints, setPoints, addWin, addLoss, getPlayerStats, getChannelLeaderboard, isConfigured };
