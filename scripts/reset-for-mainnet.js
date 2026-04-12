@@ -93,10 +93,41 @@ async function main() {
   }
   console.log(`[Reset] ✓ Nicknames: ${ok} updated, ${skipped} skipped, ${failed} failed`);
 
-  // ─── 3. NeatQueue: reset every player's points to 500 ──────
+  // ─── 3. NeatQueue: full reset then seed everyone to 500 ────
   const neatqueueService = require('../src/services/neatqueueService');
   if (neatqueueService.isConfigured()) {
-    console.log('[Reset] Resetting NeatQueue points for every registered user...');
+    // Step A: wipe every stat (points, wins, losses, etc.) for the
+    // entire queue channel. Hits /api/v2/managestats/reset/all with
+    // IDs as strings (not parseInt — big Discord snowflakes overflow
+    // Number precision, which is what broke the old season-end flow).
+    console.log('[Reset] Full NeatQueue channel reset...');
+    try {
+      const token = process.env.NEATQUEUE_API_TOKEN;
+      const channelId = process.env.NEATQUEUE_CHANNEL_ID;
+      const guildId = process.env.GUILD_ID;
+      const res = await fetch('https://api.neatqueue.com/api/v2/managestats/reset/all', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ server_id: guildId, channel_id: channelId }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        console.warn(`[Reset] NeatQueue /managestats/reset/all failed (${res.status}): ${body}`);
+      } else {
+        console.log('[Reset] ✓ NeatQueue channel wiped to zero');
+      }
+    } catch (err) {
+      console.warn(`[Reset] NeatQueue reset request failed: ${err.message || err}`);
+    }
+
+    // Step B: seed every registered user back to exactly 500 points.
+    // setPoints reads the current value (which should be 0 after the
+    // wipe above, but be defensive) and adds the delta needed to hit
+    // 500. Safe to run even if the wipe didn't take.
+    console.log('[Reset] Seeding NeatQueue points (500 per user)...');
     let nqOk = 0, nqFailed = 0;
     for (const u of users) {
       try {
@@ -106,8 +137,11 @@ async function main() {
         console.warn(`[Reset] NeatQueue setPoints failed for ${u.discord_id}: ${err.message || err}`);
         nqFailed++;
       }
+      // Tiny pacing between HTTP calls so NeatQueue's rate limiter
+      // doesn't start rejecting them.
+      await new Promise(r => setTimeout(r, 120));
     }
-    console.log(`[Reset] ✓ NeatQueue: ${nqOk} reset, ${nqFailed} failed`);
+    console.log(`[Reset] ✓ NeatQueue seeded: ${nqOk} ok, ${nqFailed} failed`);
   } else {
     console.log('[Reset] NeatQueue not configured — skipping');
   }
