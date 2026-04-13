@@ -102,10 +102,11 @@ function getHealthSummary() {
     dbOk = true;
   } catch { /* */ }
 
-  let solanaOk = false;
+  let rpcOk = false;
   try {
-    getConnection();
-    solanaOk = true;
+    const { getProvider } = require('../base/connection');
+    getProvider();
+    rpcOk = true;
   } catch { /* */ }
 
   const pendingTxCount = db.prepare("SELECT COUNT(*) as c FROM pending_transactions WHERE status = 'pending'").get()?.c || 0;
@@ -114,7 +115,7 @@ function getHealthSummary() {
   return {
     uptime: `${uptimeHours}h`,
     dbConnected: dbOk,
-    solanaConnected: solanaOk,
+    solanaConnected: rpcOk,
     matchCreationDisabled,
     pendingTransactions: pendingTxCount,
     activeMatches,

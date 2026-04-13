@@ -245,17 +245,17 @@ async function handleWalletSubButton(interaction) {
   if (id === 'wallet_sol_max') {
     const modal = new ModalBuilder()
       .setCustomId('wallet_withdraw_sol_max_modal')
-      .setTitle('Withdraw Max SOL');
+      .setTitle('Withdraw Max ETH');
     modal.addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('withdraw_address')
-          .setLabel('Destination Solana address')
-          .setPlaceholder('e.g. 7xKXt...')
+          .setLabel('Destination Base address')
+          .setPlaceholder('0x...')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
-          .setMinLength(32)
-          .setMaxLength(44),
+          .setMinLength(42)
+          .setMaxLength(42),
       ),
     );
     return interaction.showModal(modal);
@@ -274,8 +274,8 @@ async function handleWalletSubButton(interaction) {
           .setPlaceholder(t('wallet.withdraw_address_placeholder', lang))
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
-          .setMinLength(32)
-          .setMaxLength(44),
+          .setMinLength(42)
+          .setMaxLength(42),
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
@@ -302,8 +302,8 @@ async function handleWalletSubButton(interaction) {
       .setPlaceholder(t('wallet.withdraw_address_placeholder', lang))
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
-      .setMinLength(32)
-      .setMaxLength(44);
+      .setMinLength(42)
+      .setMaxLength(42);
 
     const amountInput = new TextInputBuilder()
       .setCustomId('withdraw_amount')

@@ -107,7 +107,7 @@ async function buildEscrowPanel(lang = 'en') {
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('escrow_withdraw_sol')
-      .setLabel('Withdraw SOL')
+      .setLabel('Withdraw ETH')
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId('escrow_withdraw_usdc')
@@ -232,17 +232,17 @@ async function handleEscrowButton(interaction) {
   if (id === 'escrow_sol_max') {
     const modal = new ModalBuilder()
       .setCustomId('escrow_withdraw_sol_max_modal')
-      .setTitle('Withdraw Max SOL from Escrow');
+      .setTitle('Withdraw Max ETH from Escrow');
     modal.addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('withdraw_address')
-          .setLabel('Destination Solana address')
-          .setPlaceholder('e.g. 7xKXt...')
+          .setLabel('Destination Base address')
+          .setPlaceholder('0x...')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
-          .setMinLength(32)
-          .setMaxLength(44),
+          .setMinLength(42)
+          .setMaxLength(42),
       ),
     );
     return interaction.showModal(modal);
@@ -284,12 +284,12 @@ async function handleEscrowButton(interaction) {
       .setTitle('Withdraw USDC from Escrow');
     const addressInput = new TextInputBuilder()
       .setCustomId('withdraw_address')
-      .setLabel('Destination Solana address')
-      .setPlaceholder('e.g. 7xKXt...')
+      .setLabel('Destination Base address')
+      .setPlaceholder('0x...')
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
-      .setMinLength(32)
-      .setMaxLength(44);
+      .setMinLength(42)
+      .setMaxLength(42);
     const amountInput = new TextInputBuilder()
       .setCustomId('withdraw_amount')
       .setLabel('Amount in USDC (e.g. 10.50)')
