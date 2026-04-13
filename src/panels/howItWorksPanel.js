@@ -38,37 +38,59 @@ function _packEmbeds(embeds) {
 function buildHowItWorksEmbeds(lang = 'en') {
   const t = getLocale('howItWorks', lang);
 
-  const introEmbed = new EmbedBuilder()
-    .setTitle(t.intro.title)
-    .setColor(0x3498db)
-    .setDescription(t.intro.description);
+  const embeds = [];
 
-  const walletExplainEmbed = new EmbedBuilder()
-    .setTitle(t.wallet.title)
-    .setColor(0x2ecc71)
-    .setDescription(t.wallet.description);
+  if (t.intro) {
+    embeds.push(new EmbedBuilder()
+      .setTitle(t.intro.title)
+      .setColor(0x3498db)
+      .setDescription(t.intro.description));
+  }
 
-  const cryptoEmbed = new EmbedBuilder()
-    .setTitle(t.funding.title)
-    .setColor(0xf1c40f)
-    .setDescription(t.funding.description);
+  if (t.wallet) {
+    embeds.push(new EmbedBuilder()
+      .setTitle(t.wallet.title)
+      .setColor(0x2ecc71)
+      .setDescription(t.wallet.description));
+  }
 
-  const wagerEmbed = new EmbedBuilder()
-    .setTitle(t.wager.title)
-    .setColor(0xf1c40f)
-    .setDescription(t.wager.description);
+  // Legacy section — old locales may still have 'funding', new ones don't
+  if (t.funding) {
+    embeds.push(new EmbedBuilder()
+      .setTitle(t.funding.title)
+      .setColor(0xf1c40f)
+      .setDescription(t.funding.description));
+  }
 
-  const xpEmbed = new EmbedBuilder()
-    .setTitle(t.xp.title)
-    .setColor(0x3498db)
-    .setDescription(t.xp.description);
+  if (t.wager) {
+    embeds.push(new EmbedBuilder()
+      .setTitle(t.wager.title)
+      .setColor(0xf1c40f)
+      .setDescription(t.wager.description));
+  }
 
-  const tipsEmbed = new EmbedBuilder()
-    .setTitle(t.tips.title)
-    .setColor(0x95a5a6)
-    .setDescription(t.tips.description);
+  if (t.xp) {
+    embeds.push(new EmbedBuilder()
+      .setTitle(t.xp.title)
+      .setColor(0x3498db)
+      .setDescription(t.xp.description));
+  }
 
-  return [introEmbed, walletExplainEmbed, cryptoEmbed, wagerEmbed, xpEmbed, tipsEmbed];
+  if (t.withdraw) {
+    embeds.push(new EmbedBuilder()
+      .setTitle(t.withdraw.title)
+      .setColor(0xe67e22)
+      .setDescription(t.withdraw.description));
+  }
+
+  if (t.tips) {
+    embeds.push(new EmbedBuilder()
+      .setTitle(t.tips.title)
+      .setColor(0x95a5a6)
+      .setDescription(t.tips.description));
+  }
+
+  return embeds;
 }
 
 function buildHowItWorksPanel(lang = 'en') {

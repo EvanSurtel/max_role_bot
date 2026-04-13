@@ -352,26 +352,31 @@ async function startMatch(client, challengeId) {
     throw new Error(`Cannot start match: ${pendingPlayers.length} player(s) have not accepted`);
   }
 
-  // Transfer all held funds to escrow for each player (wager challenges only)
+  // Create match channels FIRST (so we have the match ID for the contract)
+  const match = await createMatchChannels(client, challenge);
+
+  // Transfer all held funds to escrow via smart contract (wager challenges only)
   if (challenge.type === CHALLENGE_TYPE.WAGER && Number(challenge.entry_amount_usdc) > 0) {
-    for (const player of allPlayers) {
-      if (player.funds_held) {
-        try {
-          await escrowManager.transferToEscrow(
-            player.user_id,
-            challenge.entry_amount_usdc,
-            challengeId,
-          );
-        } catch (err) {
-          console.error(`[MatchService] Failed to transfer funds for player ${player.user_id}:`, err.message);
-          // Continue with other players — partial failure handling could be enhanced
-        }
+    try {
+      // Ensure all players have gas for the on-chain transfer
+      const { ensureGas } = require('../base/gasFunder');
+      for (const player of allPlayers) {
+        await ensureGas(player.user_id);
       }
+
+      // Call the smart contract: create match on-chain + pull USDC from each player
+      await escrowManager.transferToEscrow(
+        match.id,                         // use match ID (not challenge ID) as the on-chain match ID
+        challengeId,
+        allPlayers.filter(p => p.funds_held),
+        challenge.entry_amount_usdc,
+        allPlayers.length,
+      );
+    } catch (err) {
+      console.error(`[MatchService] Failed to transfer funds to escrow for match #${match.id}:`, err.message);
+      // TODO: revert match creation on escrow failure (tracked as audit item H4)
     }
   }
-
-  // Create match channels
-  const match = await createMatchChannels(client, challenge);
 
   // Update challenge status to in_progress (createMatchChannels already does this, but be explicit)
   challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.IN_PROGRESS);

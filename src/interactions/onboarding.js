@@ -197,18 +197,39 @@ async function handleRegistrationModal(interaction) {
       WHERE id = ?
     `).run(displayName, codIgn, codUid, serverInput, country, region, user.id);
 
-    // Generate Solana wallet
+    // Generate Base wallet (Ethereum keypair)
     let wallet = walletRepo.findByUserId(user.id);
     if (!wallet) {
       const { address, encryptedPrivateKey, iv, tag, salt } = walletManager.generateWallet();
       wallet = walletRepo.create({
         userId: user.id,
-        solanaAddress: address,
+        solanaAddress: address, // legacy column name — stores Base address
         encryptedPrivateKey,
         encryptionIv: iv,
         encryptionTag: tag,
         encryptionSalt: salt,
       });
+
+      // Send a small ETH top-up for gas so the user can do their
+      // first on-chain action (approve, withdraw, etc.) without
+      // needing to acquire ETH themselves.
+      try {
+        const { ensureGas } = require('../base/gasFunder');
+        await ensureGas(user.id);
+      } catch (err) {
+        console.warn(`[Onboarding] Gas top-up failed for user ${user.id}:`, err.message);
+      }
+
+      // Approve the escrow contract to spend USDC from this wallet.
+      // One-time operation — sets allowance to max so future match
+      // deposits work without another approve call.
+      try {
+        const { approveEscrowForUser } = require('../base/escrowManager');
+        await approveEscrowForUser(user.id);
+      } catch (err) {
+        console.warn(`[Onboarding] Escrow approval failed for user ${user.id}:`, err.message);
+        // Non-fatal — will be retried before their first match
+      }
     }
 
     // Assign verified/member role
