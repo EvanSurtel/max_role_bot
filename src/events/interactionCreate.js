@@ -359,6 +359,9 @@ module.exports = {
         if (id === 'escrow_withdraw_sol_modal' || id === 'escrow_withdraw_usdc_modal') {
           return await escrowPanel.handleEscrowModal(interaction);
         }
+        if (id === 'escrow_withdraw_sol_max_modal') {
+          return await escrowPanel.handleEscrowSolMaxModal(interaction);
+        }
         // evidence_modal_ removed — evidence posted directly in channel
         if (id.startsWith('lb_admin_')) {
           return await leaderboardPanel.handleAdminModal(interaction);

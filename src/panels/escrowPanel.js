@@ -196,43 +196,82 @@ async function handleEscrowButton(interaction) {
     return interaction.reply({ content: address || t('escrow_panel.not_configured_short', lang), ephemeral: true });
   }
 
-  // ─── Withdraw SOL button → show modal ───────────────────────
+  // ─── Withdraw SOL button → show balance + Max / Custom ─────
   if (id === 'escrow_withdraw_sol') {
-    let maxSol = '';
+    let solDisplay = '0';
+    let maxSol = '0';
     try {
       const escrowAddr = getEscrowAddress();
       if (escrowAddr) {
         const solBalance = Number(await getSolBalance(escrowAddr));
+        solDisplay = (solBalance / LAMPORTS_PER_SOL).toFixed(6);
         const maxLamports = Math.max(0, solBalance - SOL_RESERVE_LAMPORTS);
-        if (maxLamports > 0) {
-          maxSol = (maxLamports / LAMPORTS_PER_SOL).toFixed(9).replace(/0+$/, '').replace(/\.$/, '');
-        }
+        maxSol = (maxLamports / LAMPORTS_PER_SOL).toFixed(9).replace(/0+$/, '').replace(/\.$/, '');
       }
-    } catch { /* leave empty */ }
+    } catch { /* fallback 0 */ }
 
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('escrow_sol_max')
+        .setLabel(`Send Max (${maxSol} SOL)`)
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('escrow_sol_custom')
+        .setLabel('Custom Amount')
+        .setStyle(ButtonStyle.Secondary),
+    );
+
+    return interaction.reply({
+      content: `**Escrow SOL Balance:** ${solDisplay} SOL\n**Max withdrawable:** ${maxSol} SOL`,
+      components: [row],
+      ephemeral: true,
+    });
+  }
+
+  if (id === 'escrow_sol_max') {
+    const modal = new ModalBuilder()
+      .setCustomId('escrow_withdraw_sol_max_modal')
+      .setTitle('Withdraw Max SOL from Escrow');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('withdraw_address')
+          .setLabel('Destination Solana address')
+          .setPlaceholder('e.g. 7xKXt...')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMinLength(32)
+          .setMaxLength(44),
+      ),
+    );
+    return interaction.showModal(modal);
+  }
+
+  if (id === 'escrow_sol_custom') {
     const modal = new ModalBuilder()
       .setCustomId('escrow_withdraw_sol_modal')
       .setTitle('Withdraw SOL from Escrow');
-    const addressInput = new TextInputBuilder()
-      .setCustomId('withdraw_address')
-      .setLabel('Destination Solana address')
-      .setPlaceholder('e.g. 7xKXt...')
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setMinLength(32)
-      .setMaxLength(44);
-    const amountInput = new TextInputBuilder()
-      .setCustomId('withdraw_amount')
-      .setLabel(maxSol ? `Max: ${maxSol} SOL` : 'Amount in SOL (e.g. 0.5)')
-      .setPlaceholder('0.5')
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setMinLength(1)
-      .setMaxLength(20);
-    if (maxSol) amountInput.setValue(maxSol);
     modal.addComponents(
-      new ActionRowBuilder().addComponents(addressInput),
-      new ActionRowBuilder().addComponents(amountInput),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('withdraw_address')
+          .setLabel('Destination Solana address')
+          .setPlaceholder('e.g. 7xKXt...')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMinLength(32)
+          .setMaxLength(44),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('withdraw_amount')
+          .setLabel('Amount in SOL (e.g. 0.5)')
+          .setPlaceholder('0.5')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMinLength(1)
+          .setMaxLength(20),
+      ),
     );
     return interaction.showModal(modal);
   }
@@ -512,4 +551,50 @@ async function _executeEscrowWithdrawConfirm(interaction) {
   }
 }
 
-module.exports = { postEscrowPanel, handleEscrowButton, handleEscrowModal };
+/**
+ * Handle the escrow "Send Max SOL" modal — address only, amount
+ * calculated fresh at execution time.
+ */
+async function handleEscrowSolMaxModal(interaction) {
+  if (!_isAdminMember(interaction.member)) {
+    return interaction.reply({ content: 'Admin only.', ephemeral: true });
+  }
+
+  const address = interaction.fields.getTextInputValue('withdraw_address').trim();
+  if (!walletManager.isAddressValid(address)) {
+    return interaction.reply({ content: 'Invalid or blocked address.', ephemeral: true });
+  }
+
+  const escrowKp = _getEscrowKeypair();
+  if (!escrowKp) return interaction.reply({ content: 'Escrow not configured.', ephemeral: true });
+
+  const escrowAddr = getEscrowAddress();
+  const solBalance = Number(await getSolBalance(escrowAddr));
+  const maxLamports = Math.max(0, solBalance - SOL_RESERVE_LAMPORTS);
+  if (maxLamports <= 0) {
+    return interaction.reply({ content: 'No SOL available after fees.', ephemeral: true });
+  }
+
+  const amount = maxLamports / LAMPORTS_PER_SOL;
+
+  const { EmbedBuilder: EB } = require('discord.js');
+  const confirmEmbed = new EB()
+    .setTitle('Confirm Escrow SOL Withdrawal')
+    .setColor(0xf39c12)
+    .setDescription(`**Amount:** ${amount} SOL\n**To:**\n\`\`\`\n${address}\n\`\`\``);
+
+  const confirmRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`escrow_wd_sol_${amount}_${address}`)
+      .setLabel('Yes, send it')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId('escrow_wd_cancel')
+      .setLabel('Cancel')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], ephemeral: true });
+}
+
+module.exports = { postEscrowPanel, handleEscrowButton, handleEscrowModal, handleEscrowSolMaxModal };
