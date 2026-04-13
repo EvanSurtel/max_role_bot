@@ -547,7 +547,10 @@ async function _executeSolWithdraw(interaction, user, amountSol, address, lang) 
     // confirmation embed was built and when the user clicked Yes.
     const wallet = walletRepo.findByUserId(user.id);
     const solBalance = Number(await walletManager.getSolBalance(wallet.solana_address));
-    const reserveLamports = 5_000_000;
+    // Only reserve enough for the rent-exempt minimum + this tx fee.
+    // No artificial reserve — if the user wants to drain their SOL
+    // they can drain their SOL.
+    const reserveLamports = 895_880; // rent-exempt (890880) + tx fee (5000)
     if (lamports > solBalance - reserveLamports) {
       walletRepo.releaseLock(user.id);
       const availSol = ((solBalance - reserveLamports) / 1_000_000_000).toFixed(8);

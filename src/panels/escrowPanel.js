@@ -14,10 +14,10 @@ const transactionService = require('../solana/transactionService');
 const { LAMPORTS_PER_SOL, USDC_PER_UNIT } = require('../config/constants');
 const { t, langFor } = require('../locales/i18n');
 
-// Reserve kept in the escrow after any SOL withdrawal so the bot
-// always has gas for the next match's on-chain operations. Matches
-// the reserve the user-side SOL withdrawal uses.
-const SOL_RESERVE_LAMPORTS = 5_000_000; // 0.005 SOL
+// Absolute minimum Solana needs to keep the account alive (rent-
+// exempt minimum + one tx fee). No artificial buffer — if you want
+// to drain your SOL you can drain your SOL.
+const SOL_RESERVE_LAMPORTS = 895_880; // rent-exempt (890880) + tx fee (5000)
 
 function getEscrowAddress() {
   const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
