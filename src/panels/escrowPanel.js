@@ -7,34 +7,35 @@ const {
   TextInputBuilder,
   TextInputStyle,
 } = require('discord.js');
-const { Keypair } = require('@solana/web3.js');
+const { ethers } = require('ethers');
 const walletManager = require('../base/walletManager');
-const { getSolBalance, getUsdcBalance } = walletManager;
+const { getEthBalance, getUsdcBalance } = walletManager;
 const transactionService = require('../base/transactionService');
-const { LAMPORTS_PER_SOL, USDC_PER_UNIT } = require('../config/constants');
+const { USDC_PER_UNIT } = require('../config/constants');
 const { t, langFor } = require('../locales/i18n');
 
-// Absolute minimum Solana needs to keep the account alive (rent-
-// exempt minimum + one tx fee). No artificial buffer — if you want
-// to drain your SOL you can drain your SOL.
-const SOL_RESERVE_LAMPORTS = 895_880; // rent-exempt (890880) + tx fee (5000)
+// Minimum ETH to keep after a withdrawal — enough for one more tx.
+// Base gas is ~0.00001 ETH per tx so this is very generous.
+const ETH_RESERVE_WEI = 100_000_000_000_000n; // 0.0001 ETH
 
 function getEscrowAddress() {
-  const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
-  if (!secretKeyJson) return null;
+  // On Base, the hot wallet private key is a hex string, not a JSON array.
+  const key = process.env.BOT_HOT_WALLET_PRIVATE_KEY;
+  if (!key) return null;
   try {
-    const kp = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyJson)));
-    return kp.publicKey.toBase58();
+    const wallet = new ethers.Wallet(key);
+    return wallet.address;
   } catch {
     return null;
   }
 }
 
-function _getEscrowKeypair() {
-  const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
-  if (!secretKeyJson) return null;
+function _getEscrowSigner() {
+  const key = process.env.BOT_HOT_WALLET_PRIVATE_KEY;
+  if (!key) return null;
   try {
-    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyJson)));
+    const { getProvider } = require('../base/connection');
+    return new ethers.Wallet(key, getProvider());
   } catch {
     return null;
   }
@@ -63,12 +64,12 @@ async function buildEscrowPanel(lang = 'en') {
     };
   }
 
-  let solBalance = '0';
+  let ethBalance = '0';
   let usdcBalance = '0';
-  try { solBalance = await getSolBalance(address); } catch { /* */ }
+  try { ethBalance = await getEthBalance(address); } catch { /* */ }
   try { usdcBalance = await getUsdcBalance(address); } catch { /* */ }
 
-  const solFormatted = (Number(solBalance) / LAMPORTS_PER_SOL).toFixed(6);
+  const ethFormatted = ethers.formatEther(ethBalance);
   const usdcFormatted = (Number(usdcBalance) / USDC_PER_UNIT).toFixed(2);
 
   const db = require('../database/db');
@@ -82,7 +83,7 @@ async function buildEscrowPanel(lang = 'en') {
     .setColor(0x2ecc71)
     .setDescription(`${t('escrow_panel.address_label', lang)}\n${address}`)
     .addFields(
-      { name: t('escrow_panel.field_sol', lang), value: `${solFormatted} SOL`, inline: true },
+      { name: 'ETH (gas)', value: `${ethFormatted} ETH`, inline: true },
       { name: t('escrow_panel.field_usdc', lang), value: `$${usdcFormatted} USDC`, inline: true },
       { name: '\u200b', value: '\u200b', inline: true },
       { name: t('escrow_panel.field_active', lang), value: `${activeMatches}`, inline: true },
@@ -196,24 +197,24 @@ async function handleEscrowButton(interaction) {
     return interaction.reply({ content: address || t('escrow_panel.not_configured_short', lang), ephemeral: true });
   }
 
-  // ─── Withdraw SOL button → show balance + Max / Custom ─────
+  // ─── Withdraw ETH button → show balance + Max / Custom ─────
   if (id === 'escrow_withdraw_sol') {
-    let solDisplay = '0';
-    let maxSol = '0';
+    let ethDisplay = '0';
+    let maxEth = '0';
     try {
       const escrowAddr = getEscrowAddress();
       if (escrowAddr) {
-        const solBalance = Number(await getSolBalance(escrowAddr));
-        solDisplay = (solBalance / LAMPORTS_PER_SOL).toFixed(6);
-        const maxLamports = Math.max(0, solBalance - SOL_RESERVE_LAMPORTS);
-        maxSol = (maxLamports / LAMPORTS_PER_SOL).toFixed(9).replace(/0+$/, '').replace(/\.$/, '');
+        const ethBalWei = BigInt(await getEthBalance(escrowAddr));
+        ethDisplay = ethers.formatEther(ethBalWei);
+        const maxWei = ethBalWei > ETH_RESERVE_WEI ? ethBalWei - ETH_RESERVE_WEI : 0n;
+        maxEth = ethers.formatEther(maxWei);
       }
     } catch { /* fallback 0 */ }
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('escrow_sol_max')
-        .setLabel(`Send Max (${maxSol} SOL)`)
+        .setLabel(`Send Max (${maxEth} ETH)`)
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId('escrow_sol_custom')
@@ -222,7 +223,7 @@ async function handleEscrowButton(interaction) {
     );
 
     return interaction.reply({
-      content: `**Escrow SOL Balance:** ${solDisplay} SOL\n**Max withdrawable:** ${maxSol} SOL`,
+      content: `**Escrow ETH Balance:** ${ethDisplay} ETH\n**Max withdrawable:** ${maxEth} ETH`,
       components: [row],
       ephemeral: true,
     });
@@ -250,23 +251,23 @@ async function handleEscrowButton(interaction) {
   if (id === 'escrow_sol_custom') {
     const modal = new ModalBuilder()
       .setCustomId('escrow_withdraw_sol_modal')
-      .setTitle('Withdraw SOL from Escrow');
+      .setTitle('Withdraw ETH from Escrow');
     modal.addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('withdraw_address')
-          .setLabel('Destination Solana address')
-          .setPlaceholder('e.g. 7xKXt...')
+          .setLabel('Destination Base/Ethereum address')
+          .setPlaceholder('0x...')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
-          .setMinLength(32)
-          .setMaxLength(44),
+          .setMinLength(42)
+          .setMaxLength(42),
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('withdraw_amount')
-          .setLabel('Amount in SOL (e.g. 0.5)')
-          .setPlaceholder('0.5')
+          .setLabel('Amount in ETH (e.g. 0.001)')
+          .setPlaceholder('0.001')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMinLength(1)
@@ -361,27 +362,26 @@ async function handleEscrowModal(interaction) {
   // Validate balance on-chain before showing the confirmation so the
   // admin sees a loud error immediately instead of at execute time.
   if (id === 'escrow_withdraw_sol_modal') {
-    const solLamports = Number(await getSolBalance(escrowAddress));
-    const requestedLamports = Math.floor(amount * LAMPORTS_PER_SOL);
-    const availableLamports = solLamports - SOL_RESERVE_LAMPORTS;
-    if (requestedLamports > availableLamports) {
-      const availSol = (availableLamports / LAMPORTS_PER_SOL).toFixed(6);
+    const ethBalWei = BigInt(await getEthBalance(escrowAddress));
+    const requestedWei = ethers.parseEther(String(amount));
+    const availableWei = ethBalWei > ETH_RESERVE_WEI ? ethBalWei - ETH_RESERVE_WEI : 0n;
+    if (requestedWei > availableWei) {
       return interaction.reply({
-        content: `⚠️ Insufficient SOL. Available after 0.005 SOL gas reserve: **${availSol} SOL**.`,
+        content: `⚠️ Insufficient ETH. Available after gas reserve: **${ethers.formatEther(availableWei)} ETH**.`,
         ephemeral: true,
       });
     }
 
     const confirmEmbed = new EmbedBuilder()
-      .setTitle('⚠️ Confirm Escrow SOL Withdrawal')
+      .setTitle('⚠️ Confirm Escrow ETH Withdrawal')
       .setColor(0xf39c12)
       .setDescription([
-        'You are about to send **SOL** out of the escrow wallet:',
+        'You are about to send **ETH** out of the escrow wallet:',
         '',
-        `**Amount:** \`${amount} SOL\``,
+        `**Amount:** \`${amount} ETH\``,
         `**Destination:**\n\`\`\`\n${address}\n\`\`\``,
         '',
-        `**Escrow balance after:** ~${((solLamports - requestedLamports) / LAMPORTS_PER_SOL).toFixed(6)} SOL`,
+        `**Escrow balance after:** ~${ethers.formatEther(ethBalWei - requestedWei)} ETH`,
         '',
         '⚠️ Crypto transfers cannot be reversed. Double-check the address.',
       ].join('\n'));
@@ -484,9 +484,9 @@ async function _executeEscrowWithdrawConfirm(interaction) {
     return interaction.reply({ content: '⚠️ Invalid or blocked destination address.', ephemeral: true });
   }
 
-  const escrowKp = _getEscrowKeypair();
-  if (!escrowKp) {
-    return interaction.reply({ content: '⚠️ Escrow keypair not configured.', ephemeral: true });
+  const escrowSigner = _getEscrowSigner();
+  if (!escrowSigner) {
+    return interaction.reply({ content: '⚠️ Escrow wallet not configured.', ephemeral: true });
   }
 
   // Swap confirmation for a "processing" notice while the on-chain
@@ -501,20 +501,20 @@ async function _executeEscrowWithdrawConfirm(interaction) {
 
   try {
     if (currency === 'sol') {
-      const lamports = Math.floor(amount * LAMPORTS_PER_SOL);
-      const { signature } = await transactionService.transferSol(escrowKp, address, lamports);
+      const amountWei = ethers.parseEther(String(amount));
+      const { signature } = await transactionService.transferEth(escrowSigner, address, amountWei);
       postTransaction({
-        type: 'sol_withdrawal',
+        type: 'eth_withdrawal',
         discordId: interaction.user.id,
         amount: `${amount}`,
-        currency: 'SOL',
-        fromAddress: escrowKp.publicKey.toBase58(),
+        currency: 'ETH',
+        fromAddress: escrowSigner.address,
         toAddress: address,
         signature,
-        memo: `🛠️ Admin escrow SOL withdraw by <@${interaction.user.id}>: ${amount} SOL`,
+        memo: `🛠️ Admin escrow ETH withdraw by <@${interaction.user.id}>: ${amount} ETH`,
       });
       return interaction.editReply({
-        content: `✅ Escrow SOL withdrawal complete.\n\n**Amount:** ${amount} SOL\n**To:** \`${address}\`\n**Signature:** \`${signature}\``,
+        content: `✅ Escrow ETH withdrawal complete.\n\n**Amount:** ${amount} ETH\n**To:** \`${address}\`\n**TX:** \`${signature}\`\n[View on BaseScan](https://basescan.org/tx/${signature})`,
         embeds: [],
         components: [],
       });
@@ -522,13 +522,13 @@ async function _executeEscrowWithdrawConfirm(interaction) {
 
     if (currency === 'usdc') {
       const amountSmallest = Math.floor(amount * USDC_PER_UNIT).toString();
-      const { signature } = await transactionService.transferUsdc(escrowKp, address, amountSmallest);
+      const { signature } = await transactionService.transferUsdc(escrowSigner, address, amountSmallest);
       postTransaction({
         type: 'withdrawal',
         discordId: interaction.user.id,
         amount: `$${amount.toFixed(2)}`,
         currency: 'USDC',
-        fromAddress: escrowKp.publicKey.toBase58(),
+        fromAddress: escrowSigner.address,
         toAddress: address,
         signature,
         memo: `🛠️ Admin escrow USDC withdraw by <@${interaction.user.id}>: $${amount.toFixed(2)} USDC`,
@@ -565,23 +565,22 @@ async function handleEscrowSolMaxModal(interaction) {
     return interaction.reply({ content: 'Invalid or blocked address.', ephemeral: true });
   }
 
-  const escrowKp = _getEscrowKeypair();
-  if (!escrowKp) return interaction.reply({ content: 'Escrow not configured.', ephemeral: true });
-
   const escrowAddr = getEscrowAddress();
-  const solBalance = Number(await getSolBalance(escrowAddr));
-  const maxLamports = Math.max(0, solBalance - SOL_RESERVE_LAMPORTS);
-  if (maxLamports <= 0) {
-    return interaction.reply({ content: 'No SOL available after fees.', ephemeral: true });
+  if (!escrowAddr) return interaction.reply({ content: 'Escrow not configured.', ephemeral: true });
+
+  const ethBalWei = BigInt(await getEthBalance(escrowAddr));
+  const maxWei = ethBalWei > ETH_RESERVE_WEI ? ethBalWei - ETH_RESERVE_WEI : 0n;
+  if (maxWei <= 0n) {
+    return interaction.reply({ content: 'No ETH available after fees.', ephemeral: true });
   }
 
-  const amount = maxLamports / LAMPORTS_PER_SOL;
+  const amount = ethers.formatEther(maxWei);
 
   const { EmbedBuilder: EB } = require('discord.js');
   const confirmEmbed = new EB()
-    .setTitle('Confirm Escrow SOL Withdrawal')
+    .setTitle('Confirm Escrow ETH Withdrawal')
     .setColor(0xf39c12)
-    .setDescription(`**Amount:** ${amount} SOL\n**To:**\n\`\`\`\n${address}\n\`\`\``);
+    .setDescription(`**Amount:** ${amount} ETH\n**To:**\n\`\`\`\n${address}\n\`\`\``);
 
   const confirmRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()

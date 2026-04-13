@@ -12,13 +12,14 @@ const { USDC_PER_UNIT } = require('../config/constants');
  * @param {object} wallet - wallet row from walletRepo
  * @param {object} user - user row from userRepo (for username + saved language)
  * @param {string} lang - language code
- * @param {string|null} solLamports - SOL balance in lamports, or null if unknown yet
+ * @param {string|null} gasBalance - ETH balance in wei (string), or null if unknown
  */
-function buildWalletView(wallet, user, lang, solLamports = null) {
+function buildWalletView(wallet, user, lang, gasBalance = null) {
+  const { ethers } = require('ethers');
   const availableUsdc = (Number(wallet.balance_available) / USDC_PER_UNIT).toFixed(2);
   const heldUsdc = (Number(wallet.balance_held) / USDC_PER_UNIT).toFixed(2);
-  const solFormatted = solLamports !== null
-    ? `${(Number(solLamports) / 1_000_000_000).toFixed(8)} SOL`
+  const gasFormatted = gasBalance !== null
+    ? `${ethers.formatEther(gasBalance)} ETH`
     : '—';
 
   const username = (user && (user.server_username || user.cod_ign)) || 'Player';
@@ -30,7 +31,7 @@ function buildWalletView(wallet, user, lang, solLamports = null) {
     .addFields(
       { name: t('wallet_embed.available', lang), value: `$${availableUsdc} USDC`, inline: true },
       { name: t('wallet_embed.held', lang), value: `$${heldUsdc} USDC`, inline: true },
-      { name: t('wallet.sol_balance', lang), value: solFormatted, inline: true },
+      { name: 'ETH (gas)', value: gasFormatted, inline: true },
     )
     .setFooter({ text: t('wallet_embed.footer', lang) })
     .setTimestamp();

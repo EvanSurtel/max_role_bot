@@ -35,11 +35,11 @@ async function handleWalletViewOpen(interaction) {
     return interaction.reply({ content: t('common.wallet_not_found', lang), ephemeral: true });
   }
 
-  let solBalance = '0';
-  try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
+  let ethBalance = '0';
+  try { ethBalance = await walletManager.getEthBalance(wallet.solana_address); } catch { /* */ }
 
   const { buildWalletView } = require('./walletPanelView');
-  const view = buildWalletView(wallet, user, lang, solBalance);
+  const view = buildWalletView(wallet, user, lang, ethBalance);
 
   // _persist: true — the wallet ephemeral must not auto-delete so the user
   // can click Copy Address / Withdraw / History on it without losing it.
@@ -201,33 +201,32 @@ async function handleWalletSubButton(interaction) {
     // Re-render the ephemeral wallet view in place with fresh balance data.
     await interaction.deferUpdate();
 
-    let solBalance = '0';
-    try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
+    let ethBalance = '0';
+    try { ethBalance = await walletManager.getEthBalance(wallet.solana_address); } catch { /* */ }
 
     // Re-fetch wallet to pick up any balance changes
     const freshWallet = walletRepo.findByUserId(user.id);
     const { buildWalletView } = require('./walletPanelView');
-    const view = buildWalletView(freshWallet, user, lang, solBalance);
+    const view = buildWalletView(freshWallet, user, lang, ethBalance);
     return interaction.editReply(view);
   }
 
   if (id === 'wallet_withdraw_sol') {
-    // Show balance + Max / Custom Amount buttons instead of going
-    // straight to a modal. Discord modals don't support buttons
-    // inside them, so this intermediate step IS the "Max button".
-    let solDisplay = '0';
-    let maxSol = '0';
+    const { ethers } = require('ethers');
+    let ethDisplay = '0';
+    let maxEth = '0';
     try {
-      const solBalance = Number(await walletManager.getSolBalance(wallet.solana_address));
-      solDisplay = (solBalance / 1_000_000_000).toFixed(6);
-      const maxLamports = Math.max(0, solBalance - 895_880);
-      maxSol = (maxLamports / 1_000_000_000).toFixed(9).replace(/0+$/, '').replace(/\.$/, '');
+      const ethBalWei = BigInt(await walletManager.getEthBalance(wallet.solana_address));
+      ethDisplay = ethers.formatEther(ethBalWei);
+      const reserveWei = 100_000_000_000_000n; // 0.0001 ETH
+      const maxWei = ethBalWei > reserveWei ? ethBalWei - reserveWei : 0n;
+      maxEth = ethers.formatEther(maxWei);
     } catch { /* fallback to 0 */ }
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('wallet_sol_max')
-        .setLabel(`Send Max (${maxSol} SOL)`)
+        .setLabel(`Send Max (${maxEth} ETH)`)
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId('wallet_sol_custom')
@@ -236,7 +235,7 @@ async function handleWalletSubButton(interaction) {
     );
 
     return interaction.reply({
-      content: `**SOL Balance:** ${solDisplay} SOL\n**Max withdrawable:** ${maxSol} SOL\n\nChoose an option:`,
+      content: `**ETH Balance:** ${ethDisplay} ETH\n**Max withdrawable:** ${maxEth} ETH\n\nChoose an option:`,
       components: [row],
       ephemeral: true,
     });
@@ -581,7 +580,8 @@ async function handleWithdrawSolModal(interaction) {
  * the lock and could be double-spent.
  */
 async function _executeSolWithdraw(interaction, user, amountSol, address, lang) {
-  const lamports = Math.floor(amountSol * 1_000_000_000);
+  const { ethers } = require('ethers');
+  const amountWei = ethers.parseEther(String(amountSol));
 
   if (!walletRepo.acquireLock(user.id)) {
     return interaction.editReply({
@@ -592,47 +592,42 @@ async function _executeSolWithdraw(interaction, user, amountSol, address, lang) 
   }
 
   try {
-    // Re-fetch the wallet AFTER taking the lock — protects against the
-    // case where another flow updated the wallet row between when the
-    // confirmation embed was built and when the user clicked Yes.
     const wallet = walletRepo.findByUserId(user.id);
-    const solBalance = Number(await walletManager.getSolBalance(wallet.solana_address));
-    // Only reserve enough for the rent-exempt minimum + this tx fee.
-    // No artificial reserve — if the user wants to drain their SOL
-    // they can drain their SOL.
-    const reserveLamports = 895_880; // rent-exempt (890880) + tx fee (5000)
-    if (lamports > solBalance - reserveLamports) {
+    const ethBalWei = BigInt(await walletManager.getEthBalance(wallet.solana_address));
+    // Minimal reserve — just enough for the gas cost of this tx.
+    const reserveWei = 100_000_000_000_000n; // 0.0001 ETH
+    if (amountWei > ethBalWei - reserveWei) {
       walletRepo.releaseLock(user.id);
-      const availSol = ((solBalance - reserveLamports) / 1_000_000_000).toFixed(8);
+      const availEth = ethers.formatEther(ethBalWei > reserveWei ? ethBalWei - reserveWei : 0n);
       return interaction.editReply({
-        content: t('common.insufficient_sol', lang, { available: availSol }),
+        content: `Insufficient ETH. Available after gas reserve: **${availEth} ETH**.`,
         embeds: [],
         components: [],
       });
     }
 
-    const senderKeypair = walletManager.getKeypairFromEncrypted(
+    const senderWallet = walletManager.getWalletFromEncrypted(
       wallet.encrypted_private_key,
       wallet.encryption_iv,
       wallet.encryption_tag,
       wallet.encryption_salt,
     );
 
-    const { signature } = await transactionService.transferSol(senderKeypair, address, lamports);
+    const { signature } = await transactionService.transferEth(senderWallet, address, amountWei);
 
     transactionRepo.create({
-      type: 'sol_withdrawal',
+      type: 'eth_withdrawal',
       userId: user.id,
       amountUsdc: '0',
       solanaTxSignature: signature,
       fromAddress: wallet.solana_address,
       toAddress: address,
       status: 'completed',
-      memo: `SOL withdrawal: ${amountSol} SOL (${lamports} lamports)`,
+      memo: `ETH withdrawal: ${amountSol} ETH`,
     });
 
     const { postTransaction } = require('../utils/transactionFeed');
-    postTransaction({ type: 'sol_withdrawal', username: user.server_username, discordId: user.discord_id, amount: `${amountSol}`, currency: 'SOL', fromAddress: wallet.solana_address, toAddress: address, signature, memo: `SOL withdrawal: ${amountSol} SOL` });
+    postTransaction({ type: 'eth_withdrawal', username: user.server_username, discordId: user.discord_id, amount: `${amountSol}`, currency: 'ETH', fromAddress: wallet.solana_address, toAddress: address, signature, memo: `ETH withdrawal: ${amountSol} ETH` });
 
     walletRepo.releaseLock(user.id);
     return interaction.editReply({
@@ -725,17 +720,18 @@ async function handleWithdrawSolMaxModal(interaction) {
   }
 
   // Calculate max fresh right now
-  const solBalance = Number(await walletManager.getSolBalance(wallet.solana_address));
-  const reserveLamports = 895_880;
-  const maxLamports = Math.max(0, solBalance - reserveLamports);
-  if (maxLamports <= 0) {
+  const { ethers } = require('ethers');
+  const ethBalWei = BigInt(await walletManager.getEthBalance(wallet.solana_address));
+  const reserveWei = 100_000_000_000_000n; // 0.0001 ETH
+  const maxWei = ethBalWei > reserveWei ? ethBalWei - reserveWei : 0n;
+  if (maxWei <= 0n) {
     return interaction.reply({
-      content: 'No SOL available to withdraw after transaction fees.',
+      content: 'No ETH available to withdraw after gas fees.',
       ephemeral: true,
     });
   }
 
-  const amountSol = maxLamports / 1_000_000_000;
+  const amountSol = ethers.formatEther(maxWei);
 
   // Show confirmation with Yes/Cancel — same pattern as regular withdraw
   const confirmEmbed = new EmbedBuilder()

@@ -662,14 +662,17 @@ async function handleAdminConfirmNoWinner(interaction) {
       // re-parse the secret per-player. If the env var is missing
       // we abort the refund entirely — silently continuing would
       // mark the match completed without refunding anyone.
-      const { Keypair } = require('@solana/web3.js');
-      const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
-      if (!secretKeyJson) {
-        console.error(`[MatchResult] ESCROW_WALLET_SECRET missing — cannot refund match #${matchId}`);
+      const transactionService = require('../base/transactionService');
+      let escrowSigner;
+      try {
+        escrowSigner = transactionService.getHotWalletSigner();
+      } catch {
+        escrowSigner = null;
+      }
+      if (!escrowSigner) {
+        console.error(`[MatchResult] BOT_HOT_WALLET_PRIVATE_KEY missing — cannot refund match #${matchId}`);
       } else {
-        const escrowKp = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyJson)));
         const walletRepo = require('../database/repositories/walletRepo');
-        const transactionService = require('../base/transactionService');
         const transactionRepo = require('../database/repositories/transactionRepo');
         const { postTransaction } = require('../utils/transactionFeed');
         const userRepo = require('../database/repositories/userRepo');
@@ -681,7 +684,7 @@ async function handleAdminConfirmNoWinner(interaction) {
             if (!walletRecord) continue;
 
             const { signature } = await transactionService.transferUsdc(
-              escrowKp,
+              escrowSigner,
               walletRecord.solana_address,
               challenge.entry_amount_usdc,
             );
@@ -699,7 +702,7 @@ async function handleAdminConfirmNoWinner(interaction) {
               challengeId: match.challenge_id,
               amountUsdc: challenge.entry_amount_usdc,
               solanaTxSignature: signature,
-              fromAddress: escrowKp.publicKey.toBase58(),
+              fromAddress: escrowSigner.address,
               toAddress: walletRecord.solana_address,
               status: 'completed',
               memo: `Refund (no winner) for challenge #${match.challenge_id}`,

@@ -45,12 +45,12 @@ client.once('ready', async () => {
     const { setClient: setTxFeedClient } = require('./utils/transactionFeed');
     setTxFeedClient(client);
 
-    // Initialize Solana connection
-    const { getConnection } = require('./base/connection');
-    getConnection();
+    // Initialize Base connection
+    const { getProvider } = require('./base/connection');
+    getProvider();
 
-    // Start deposit detection polling
-    const depositService = require('./services/depositService');
+    // Start deposit detection polling (Base USDC)
+    const depositService = require('./base/depositService');
     depositService.startPolling(client);
 
     // Start periodic balance reconciliation
@@ -143,7 +143,7 @@ async function shutdown(signal) {
   console.log(`\n[Shutdown] Received ${signal}, shutting down...`);
 
   try {
-    const depositService = require('./services/depositService');
+    const depositService = require('./base/depositService');
     depositService.stopPolling();
   } catch (err) {
     console.error('[Shutdown] Error stopping deposit polling:', err.message || err);

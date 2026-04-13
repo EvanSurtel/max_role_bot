@@ -1,6 +1,6 @@
-const { getSolBalance } = require('../base/walletManager');
-const { getConnection } = require('../base/connection');
-const { ESCROW_SOL_WARNING, ESCROW_SOL_CRITICAL, LAMPORTS_PER_SOL, TIMERS } = require('../config/constants');
+const { getEthBalance } = require('../base/walletManager');
+const { ethers } = require('ethers');
+const { ESCROW_SOL_WARNING, ESCROW_SOL_CRITICAL, TIMERS } = require('../config/constants');
 const db = require('../database/db');
 
 let healthInterval = null;
@@ -35,56 +35,54 @@ function stopHealthChecks() {
  * Check escrow wallet SOL balance and alert if low.
  */
 async function checkEscrowHealth(client) {
-  const { Keypair } = require('@solana/web3.js');
-  const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
-  if (!secretKeyJson) return;
+  const key = process.env.BOT_HOT_WALLET_PRIVATE_KEY;
+  if (!key) return;
 
-  let escrowKeypair;
+  let address;
   try {
-    escrowKeypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyJson)));
+    const wallet = new ethers.Wallet(key);
+    address = wallet.address;
   } catch (err) {
-    console.error('[Health] Invalid ESCROW_WALLET_SECRET:', err.message);
+    console.error('[Health] Invalid BOT_HOT_WALLET_PRIVATE_KEY:', err.message);
     return;
   }
-
-  const address = escrowKeypair.publicKey.toBase58();
-  const solBalance = BigInt(await getSolBalance(address));
+  const ethBalWei = BigInt(await getEthBalance(address));
+  const ethStr = ethers.formatEther(ethBalWei);
   const alertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
   const now = Date.now();
 
-  // Critical: < 0.01 SOL — disable new matches
-  if (solBalance < BigInt(ESCROW_SOL_CRITICAL)) {
+  // Critical: < 0.0001 ETH (~$0.25) — disable new matches
+  const criticalWei = 100_000_000_000_000n; // 0.0001 ETH
+  if (ethBalWei < criticalWei) {
     matchCreationDisabled = true;
-    if (now - lastCriticalAt > 30 * 60 * 1000) { // max once per 30 min
+    if (now - lastCriticalAt > 30 * 60 * 1000) {
       lastCriticalAt = now;
-      const solStr = (Number(solBalance) / LAMPORTS_PER_SOL).toFixed(4);
-      console.error(`[Health] CRITICAL: Escrow SOL balance is ${solStr}. New matches disabled.`);
+      console.error(`[Health] CRITICAL: Escrow ETH balance is ${ethStr}. New matches disabled.`);
       if (alertChannelId && client) {
         const ch = client.channels.cache.get(alertChannelId);
         if (ch) {
-          await ch.send(`**CRITICAL: Escrow wallet SOL balance is ${solStr} SOL.** New match creation has been disabled until this is resolved. Deposit SOL to: \`${address}\``);
+          await ch.send(`**CRITICAL: Escrow wallet ETH balance is ${ethStr} ETH.** New match creation has been disabled until this is resolved. Deposit ETH on Base to: \`${address}\``);
         }
       }
     }
     return;
   }
 
-  // If we were critical but now recovered
   if (matchCreationDisabled) {
     matchCreationDisabled = false;
-    console.log('[Health] Escrow SOL recovered above critical threshold. Matches re-enabled.');
+    console.log('[Health] Escrow ETH recovered above critical threshold. Matches re-enabled.');
   }
 
-  // Warning: < 0.05 SOL
-  if (solBalance < BigInt(ESCROW_SOL_WARNING)) {
-    if (now - lastWarningAt > 60 * 60 * 1000) { // max once per hour
+  // Warning: < 0.001 ETH (~$2.50)
+  const warningWei = 1_000_000_000_000_000n; // 0.001 ETH
+  if (ethBalWei < warningWei) {
+    if (now - lastWarningAt > 60 * 60 * 1000) {
       lastWarningAt = now;
-      const solStr = (Number(solBalance) / LAMPORTS_PER_SOL).toFixed(4);
-      console.warn(`[Health] WARNING: Escrow SOL balance is ${solStr}`);
+      console.warn(`[Health] WARNING: Escrow ETH balance is ${ethStr}`);
       if (alertChannelId && client) {
         const ch = client.channels.cache.get(alertChannelId);
         if (ch) {
-          await ch.send(`**Warning:** Escrow wallet SOL balance is low (${solStr} SOL). Deposit SOL to: \`${address}\``);
+          await ch.send(`**Warning:** Escrow wallet ETH balance is low (${ethStr} ETH). Deposit ETH on Base to: \`${address}\``);
         }
       }
     }
@@ -135,14 +133,13 @@ async function postDailySummary(client) {
 
   const summary = getHealthSummary();
 
-  let escrowSol = 'N/A';
+  let escrowEth = 'N/A';
   try {
-    const { Keypair } = require('@solana/web3.js');
-    const secretKeyJson = process.env.ESCROW_WALLET_SECRET;
-    if (secretKeyJson) {
-      const kp = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyJson)));
-      const bal = await getSolBalance(kp.publicKey.toBase58());
-      escrowSol = `${(Number(bal) / LAMPORTS_PER_SOL).toFixed(4)} SOL`;
+    const key = process.env.BOT_HOT_WALLET_PRIVATE_KEY;
+    if (key) {
+      const w = new ethers.Wallet(key);
+      const bal = await getEthBalance(w.address);
+      escrowEth = `${ethers.formatEther(bal)} ETH`;
     }
   } catch { /* */ }
 
@@ -150,8 +147,8 @@ async function postDailySummary(client) {
     '**Daily Health Summary**',
     `Uptime: ${summary.uptime}`,
     `DB: ${summary.dbConnected ? 'OK' : 'ERROR'}`,
-    `Solana RPC: ${summary.solanaConnected ? 'OK' : 'ERROR'}`,
-    `Escrow SOL: ${escrowSol}`,
+    `Base RPC: ${summary.solanaConnected ? 'OK' : 'ERROR'}`,
+    `Escrow ETH: ${escrowEth}`,
     `Match creation: ${summary.matchCreationDisabled ? 'DISABLED' : 'enabled'}`,
     `Pending transactions: ${summary.pendingTransactions}`,
     `Active matches: ${summary.activeMatches}`,

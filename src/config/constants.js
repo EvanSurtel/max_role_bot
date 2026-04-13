@@ -99,12 +99,16 @@ const COOLDOWNS = {
   SUBMIT_EVIDENCE: 5_000,
 };
 
-// Solana / USDC
+// Base / USDC
 const USDC_DECIMALS = 6;
 const USDC_PER_UNIT = 1_000_000;
-const LAMPORTS_PER_SOL = 1_000_000_000;
-const USDC_MINT_MAINNET = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const USDC_MINT_DEVNET = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+const WEI_PER_ETH = 1_000_000_000_000_000_000n; // 1e18 as BigInt
+const LAMPORTS_PER_SOL = 1_000_000_000; // backward compat alias — callers migrating to ETH
+const USDC_CONTRACT_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+const BASE_CHAIN_ID = 8453;
+// Legacy Solana references kept for callers that haven't migrated yet
+const USDC_MINT_MAINNET = USDC_CONTRACT_BASE;
+const USDC_MINT_DEVNET = USDC_CONTRACT_BASE;
 
 // XP Match ELO-based rewards
 const XP_MATCH = {
