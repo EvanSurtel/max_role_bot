@@ -20,7 +20,7 @@ const ETH_RESERVE_WEI = 100_000_000_000_000n; // 0.0001 ETH
 
 function getEscrowAddress() {
   // On Base, the hot wallet private key is a hex string, not a JSON array.
-  const key = process.env.BOT_HOT_WALLET_PRIVATE_KEY;
+  const key = process.env.GAS_FUNDER_PRIVATE_KEY;
   if (!key) return null;
   try {
     const wallet = new ethers.Wallet(key);
@@ -31,7 +31,7 @@ function getEscrowAddress() {
 }
 
 function _getEscrowSigner() {
-  const key = process.env.BOT_HOT_WALLET_PRIVATE_KEY;
+  const key = process.env.GAS_FUNDER_PRIVATE_KEY;
   if (!key) return null;
   try {
     const { getProvider } = require('../base/connection');

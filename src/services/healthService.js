@@ -35,7 +35,7 @@ function stopHealthChecks() {
  * Check escrow wallet SOL balance and alert if low.
  */
 async function checkEscrowHealth(client) {
-  const key = process.env.BOT_HOT_WALLET_PRIVATE_KEY;
+  const key = process.env.GAS_FUNDER_PRIVATE_KEY;
   if (!key) return;
 
   let address;
@@ -43,7 +43,7 @@ async function checkEscrowHealth(client) {
     const wallet = new ethers.Wallet(key);
     address = wallet.address;
   } catch (err) {
-    console.error('[Health] Invalid BOT_HOT_WALLET_PRIVATE_KEY:', err.message);
+    console.error('[Health] Invalid GAS_FUNDER_PRIVATE_KEY:', err.message);
     return;
   }
   const ethBalWei = BigInt(await getEthBalance(address));
@@ -136,7 +136,7 @@ async function postDailySummary(client) {
 
   let escrowEth = 'N/A';
   try {
-    const key = process.env.BOT_HOT_WALLET_PRIVATE_KEY;
+    const key = process.env.GAS_FUNDER_PRIVATE_KEY;
     if (key) {
       const w = new ethers.Wallet(key);
       const bal = await getEthBalance(w.address);

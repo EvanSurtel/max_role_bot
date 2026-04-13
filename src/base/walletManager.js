@@ -85,14 +85,20 @@ function isAddressValid(address) {
       '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA'.toLowerCase(), // USDbC (legacy bridged)
     ]);
 
-    // Also block the escrow/hot wallet address
+    // Block the gas funder wallet address
     try {
-      const hotWalletKey = process.env.BOT_HOT_WALLET_PRIVATE_KEY;
-      if (hotWalletKey) {
-        const hotWallet = new ethers.Wallet(hotWalletKey);
-        BLOCKED.add(hotWallet.address.toLowerCase());
+      const gasFunderKey = process.env.GAS_FUNDER_PRIVATE_KEY;
+      if (gasFunderKey) {
+        const gasFunder = new ethers.Wallet(gasFunderKey);
+        BLOCKED.add(gasFunder.address.toLowerCase());
       }
     } catch { /* env not set — skip */ }
+
+    // Block the escrow contract address
+    try {
+      const escrowAddr = process.env.ESCROW_CONTRACT_ADDRESS;
+      if (escrowAddr) BLOCKED.add(escrowAddr.toLowerCase());
+    } catch { /* */ }
 
     if (BLOCKED.has(address.toLowerCase())) return false;
 

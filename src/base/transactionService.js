@@ -52,13 +52,13 @@ async function transferEth(signer, toAddress, amountWei) {
 
 /**
  * Get a connected signer for the bot's hot wallet (used for escrow
- * operations and gas subsidies). Reads from BOT_HOT_WALLET_PRIVATE_KEY.
+ * operations and gas subsidies). Reads from GAS_FUNDER_PRIVATE_KEY.
  *
  * @returns {ethers.Wallet}
  */
 function getHotWalletSigner() {
-  const key = process.env.BOT_HOT_WALLET_PRIVATE_KEY;
-  if (!key) throw new Error('BOT_HOT_WALLET_PRIVATE_KEY not set');
+  const key = process.env.GAS_FUNDER_PRIVATE_KEY;
+  if (!key) throw new Error('GAS_FUNDER_PRIVATE_KEY not set');
   return new ethers.Wallet(key, getProvider());
 }
 

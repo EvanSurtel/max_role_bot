@@ -670,7 +670,7 @@ async function handleAdminConfirmNoWinner(interaction) {
         escrowSigner = null;
       }
       if (!escrowSigner) {
-        console.error(`[MatchResult] BOT_HOT_WALLET_PRIVATE_KEY missing — cannot refund match #${matchId}`);
+        console.error(`[MatchResult] GAS_FUNDER_PRIVATE_KEY missing — cannot refund match #${matchId}`);
       } else {
         const walletRepo = require('../database/repositories/walletRepo');
         const transactionRepo = require('../database/repositories/transactionRepo');
