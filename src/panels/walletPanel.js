@@ -212,6 +212,19 @@ async function handleWalletSubButton(interaction) {
   }
 
   if (id === 'wallet_withdraw_sol') {
+    // Pre-fill the amount field with the max withdrawable SOL so the
+    // user can just paste their address and hit submit without doing
+    // any math. Max = on-chain balance minus rent-exempt + tx fee.
+    let maxSol = '';
+    try {
+      const solBalance = Number(await walletManager.getSolBalance(wallet.solana_address));
+      const reserveLamports = 895_880; // rent-exempt (890880) + tx fee (5000)
+      const maxLamports = Math.max(0, solBalance - reserveLamports);
+      if (maxLamports > 0) {
+        maxSol = (maxLamports / 1_000_000_000).toFixed(9).replace(/0+$/, '').replace(/\.$/, '');
+      }
+    } catch { /* leave empty — user types manually */ }
+
     const modal = new ModalBuilder()
       .setCustomId('wallet_withdraw_sol_modal')
       .setTitle(t('wallet.withdraw_modal_title_sol', lang));
@@ -227,12 +240,13 @@ async function handleWalletSubButton(interaction) {
 
     const amountInput = new TextInputBuilder()
       .setCustomId('withdraw_amount')
-      .setLabel(t('wallet.withdraw_amount_label_sol', lang))
+      .setLabel(maxSol ? `Max: ${maxSol} SOL` : t('wallet.withdraw_amount_label_sol', lang))
       .setPlaceholder(t('wallet.withdraw_amount_placeholder_sol', lang))
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setMinLength(1)
-      .setMaxLength(10);
+      .setMaxLength(20);
+    if (maxSol) amountInput.setValue(maxSol);
 
     modal.addComponents(
       new ActionRowBuilder().addComponents(addressInput),

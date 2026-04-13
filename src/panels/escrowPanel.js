@@ -198,6 +198,18 @@ async function handleEscrowButton(interaction) {
 
   // ─── Withdraw SOL button → show modal ───────────────────────
   if (id === 'escrow_withdraw_sol') {
+    let maxSol = '';
+    try {
+      const escrowAddr = getEscrowAddress();
+      if (escrowAddr) {
+        const solBalance = Number(await getSolBalance(escrowAddr));
+        const maxLamports = Math.max(0, solBalance - SOL_RESERVE_LAMPORTS);
+        if (maxLamports > 0) {
+          maxSol = (maxLamports / LAMPORTS_PER_SOL).toFixed(9).replace(/0+$/, '').replace(/\.$/, '');
+        }
+      }
+    } catch { /* leave empty */ }
+
     const modal = new ModalBuilder()
       .setCustomId('escrow_withdraw_sol_modal')
       .setTitle('Withdraw SOL from Escrow');
@@ -211,12 +223,13 @@ async function handleEscrowButton(interaction) {
       .setMaxLength(44);
     const amountInput = new TextInputBuilder()
       .setCustomId('withdraw_amount')
-      .setLabel('Amount in SOL (e.g. 0.5)')
+      .setLabel(maxSol ? `Max: ${maxSol} SOL` : 'Amount in SOL (e.g. 0.5)')
       .setPlaceholder('0.5')
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setMinLength(1)
-      .setMaxLength(12);
+      .setMaxLength(20);
+    if (maxSol) amountInput.setValue(maxSol);
     modal.addComponents(
       new ActionRowBuilder().addComponents(addressInput),
       new ActionRowBuilder().addComponents(amountInput),
