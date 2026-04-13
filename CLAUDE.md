@@ -1,4 +1,4 @@
-# D4L CODM Wager Bot
+# Rank $ CODM Wager Bot
 
 Discord bot for Call of Duty Mobile competitive matches. Users wager USDC on matches through button-based interactions.
 
