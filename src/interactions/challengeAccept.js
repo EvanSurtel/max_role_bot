@@ -2,7 +2,7 @@ const { ActionRowBuilder, UserSelectMenuBuilder, ButtonBuilder, ButtonStyle, Emb
 const challengeRepo = require('../database/repositories/challengeRepo');
 const challengePlayerRepo = require('../database/repositories/challengePlayerRepo');
 const userRepo = require('../database/repositories/userRepo');
-const escrowManager = require('../solana/escrowManager');
+const escrowManager = require('../base/escrowManager');
 const matchService = require('../services/matchService');
 const challengeService = require('../services/challengeService');
 const { CHALLENGE_STATUS, PLAYER_STATUS, PLAYER_ROLE, CHALLENGE_TYPE } = require('../config/constants');

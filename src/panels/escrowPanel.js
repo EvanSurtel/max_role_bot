@@ -8,9 +8,9 @@ const {
   TextInputStyle,
 } = require('discord.js');
 const { Keypair } = require('@solana/web3.js');
-const walletManager = require('../solana/walletManager');
+const walletManager = require('../base/walletManager');
 const { getSolBalance, getUsdcBalance } = walletManager;
-const transactionService = require('../solana/transactionService');
+const transactionService = require('../base/transactionService');
 const { LAMPORTS_PER_SOL, USDC_PER_UNIT } = require('../config/constants');
 const { t, langFor } = require('../locales/i18n');
 

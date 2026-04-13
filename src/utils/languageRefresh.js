@@ -14,7 +14,7 @@
 
 const walletRepo = require('../database/repositories/walletRepo');
 const userRepo = require('../database/repositories/userRepo');
-const walletManager = require('../solana/walletManager');
+const walletManager = require('../base/walletManager');
 
 /**
  * Read the current bot display language from bot_settings.

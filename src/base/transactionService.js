@@ -26,7 +26,7 @@ async function transferUsdc(signer, toAddress, amountSmallest) {
     throw new Error(`USDC transfer reverted: ${tx.hash}`);
   }
   console.log(`[Base] USDC transfer ${amountSmallest} → ${toAddress} confirmed: ${tx.hash}`);
-  return { hash: tx.hash, receipt };
+  return { hash: tx.hash, signature: tx.hash, receipt };
 }
 
 /**
@@ -47,7 +47,7 @@ async function transferEth(signer, toAddress, amountWei) {
     throw new Error(`ETH transfer reverted: ${tx.hash}`);
   }
   console.log(`[Base] ETH transfer ${amountWei} wei → ${toAddress} confirmed: ${tx.hash}`);
-  return { hash: tx.hash, receipt };
+  return { hash: tx.hash, signature: tx.hash, receipt };
 }
 
 /**
@@ -65,5 +65,7 @@ function getHotWalletSigner() {
 module.exports = {
   transferUsdc,
   transferEth,
+  // Backward-compat alias — old code calls transferSol
+  transferSol: transferEth,
   getHotWalletSigner,
 };

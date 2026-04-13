@@ -10,8 +10,8 @@ const {
 const userRepo = require('../database/repositories/userRepo');
 const walletRepo = require('../database/repositories/walletRepo');
 const transactionRepo = require('../database/repositories/transactionRepo');
-const walletManager = require('../solana/walletManager');
-const transactionService = require('../solana/transactionService');
+const walletManager = require('../base/walletManager');
+const transactionService = require('../base/transactionService');
 const { USDC_PER_UNIT, TRANSACTION_TYPE } = require('../config/constants');
 const { t, langFor } = require('../locales/i18n');
 

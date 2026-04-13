@@ -105,8 +105,12 @@ function isAddressValid(address) {
 module.exports = {
   generateWallet,
   getWalletFromEncrypted,
+  // Backward-compat alias — old code calls getKeypairFromEncrypted
+  getKeypairFromEncrypted: getWalletFromEncrypted,
   getUsdcBalance,
   getEthBalance,
+  // Backward-compat alias — old code calls getSolBalance
+  getSolBalance: getEthBalance,
   isAddressValid,
   USDC_CONTRACT,
   USDC_DECIMALS,

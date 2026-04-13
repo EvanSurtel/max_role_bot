@@ -1,5 +1,5 @@
-const { getSolBalance } = require('../solana/walletManager');
-const { getConnection } = require('../solana/connection');
+const { getSolBalance } = require('../base/walletManager');
+const { getConnection } = require('../base/connection');
 const { ESCROW_SOL_WARNING, ESCROW_SOL_CRITICAL, LAMPORTS_PER_SOL, TIMERS } = require('../config/constants');
 const db = require('../database/db');
 

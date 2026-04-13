@@ -9,7 +9,7 @@ const {
 } = require('discord.js');
 const userRepo = require('../database/repositories/userRepo');
 const walletRepo = require('../database/repositories/walletRepo');
-const walletManager = require('../solana/walletManager');
+const walletManager = require('../base/walletManager');
 const channelService = require('../services/channelService');
 const neatqueueService = require('../services/neatqueueService');
 const { t, langFor } = require('../locales/i18n');

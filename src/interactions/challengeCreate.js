@@ -758,7 +758,7 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
     const userRepo = require('../database/repositories/userRepo');
     const challengeRepo = require('../database/repositories/challengeRepo');
     const challengePlayerRepo = require('../database/repositories/challengePlayerRepo');
-    const escrowManager = require('../solana/escrowManager');
+    const escrowManager = require('../base/escrowManager');
     const { CHALLENGE_STATUS, PLAYER_ROLE, PLAYER_STATUS } = require('../config/constants');
 
     const user = userRepo.findByDiscordId(userId);

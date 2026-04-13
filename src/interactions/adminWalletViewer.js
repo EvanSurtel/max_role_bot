@@ -10,7 +10,7 @@
 const userRepo = require('../database/repositories/userRepo');
 const walletRepo = require('../database/repositories/walletRepo');
 const transactionRepo = require('../database/repositories/transactionRepo');
-const walletManager = require('../solana/walletManager');
+const walletManager = require('../base/walletManager');
 const { USDC_PER_UNIT } = require('../config/constants');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { t, langFor } = require('../locales/i18n');

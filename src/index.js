@@ -46,7 +46,7 @@ client.once('ready', async () => {
     setTxFeedClient(client);
 
     // Initialize Solana connection
-    const { getConnection } = require('./solana/connection');
+    const { getConnection } = require('./base/connection');
     getConnection();
 
     // Start deposit detection polling

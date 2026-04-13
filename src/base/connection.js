@@ -39,4 +39,9 @@ function getProvider() {
   return provider;
 }
 
-module.exports = { getProvider, BASE_CHAIN_ID };
+module.exports = {
+  getProvider,
+  // Backward-compat alias — old code calls getConnection
+  getConnection: getProvider,
+  BASE_CHAIN_ID,
+};

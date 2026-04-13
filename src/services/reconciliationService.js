@@ -1,5 +1,5 @@
 const walletRepo = require('../database/repositories/walletRepo');
-const walletManager = require('../solana/walletManager');
+const walletManager = require('../base/walletManager');
 
 let reconcileInterval = null;
 

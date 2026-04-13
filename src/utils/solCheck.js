@@ -1,4 +1,4 @@
-const { getSolBalance } = require('../solana/walletManager');
+const { getSolBalance } = require('../base/walletManager');
 const { MIN_SOL_FOR_GAS, LAMPORTS_PER_SOL } = require('../config/constants');
 
 /**

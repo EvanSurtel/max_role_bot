@@ -669,7 +669,7 @@ async function handleAdminConfirmNoWinner(interaction) {
       } else {
         const escrowKp = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyJson)));
         const walletRepo = require('../database/repositories/walletRepo');
-        const transactionService = require('../solana/transactionService');
+        const transactionService = require('../base/transactionService');
         const transactionRepo = require('../database/repositories/transactionRepo');
         const { postTransaction } = require('../utils/transactionFeed');
         const userRepo = require('../database/repositories/userRepo');
