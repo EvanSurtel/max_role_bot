@@ -475,7 +475,8 @@ async function resolveMatch(client, matchId, winningTeam) {
     let disburseResult = null;
     try {
       disburseResult = await escrowManager.disburseWinnings(
-        match.challenge_id,
+        matchId,                    // on-chain match ID
+        match.challenge_id,         // DB challenge ID for transaction records
         winnerUserIds,
         challenge.total_pot_usdc,
       );
