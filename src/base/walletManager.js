@@ -1,19 +1,28 @@
-// Base wallet management.
+// Base wallet management — CDP Smart Accounts (ERC-4337).
 //
-// Generates Ethereum keypairs (which work on Base since Base is EVM),
-// encrypts private keys with AES-256-GCM + per-user salt (same
-// scheme the Solana version used), and provides balance queries for
-// USDC (ERC-20) and ETH (gas).
+// Every user gets a Smart Account created via the Coinbase Developer
+// Platform (CDP) Smart Wallet API. Smart Accounts support gasless
+// transactions through the Coinbase Paymaster — users never need ETH.
+//
+// The CDP SDK handles:
+//   - Smart Account creation (counterfactual — deployed on first tx)
+//   - Transaction signing (server-side signer key)
+//   - UserOperation bundling (submitted via CDP Bundler)
+//   - Gas sponsorship (Coinbase Paymaster auto-sponsors USDC transfers)
+//
+// The bot stores the CDP wallet ID (encrypted) in the DB. To sign a
+// tx later, it re-loads the wallet from CDP using the stored ID.
 
+const { Coinbase, Wallet } = require('@coinbase/coinbase-sdk');
 const { ethers } = require('ethers');
 const { encrypt, decrypt, generateSalt } = require('../utils/crypto');
 const { getProvider } = require('./connection');
 
-// Native USDC on Base — NOT USDbC (the old bridged version).
+// Native USDC on Base — NOT USDbC (legacy bridged).
 const USDC_CONTRACT = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const USDC_DECIMALS = 6;
 
-// Minimal ERC-20 ABI — just the functions we actually call.
+// Minimal ERC-20 ABI for balance/allowance queries (read-only, no signing).
 const ERC20_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -21,18 +30,54 @@ const ERC20_ABI = [
   'function approve(address spender, uint256 amount) returns (bool)',
 ];
 
+// CDP SDK singleton — initialized on first use.
+let _cdpInitialized = false;
+
+function _ensureCdpInit() {
+  if (_cdpInitialized) return;
+  const apiKeyName = process.env.CDP_API_KEY_NAME;
+  const apiKeySecret = process.env.CDP_API_KEY_SECRET;
+  if (!apiKeyName || !apiKeySecret) {
+    throw new Error('CDP_API_KEY_NAME and CDP_API_KEY_SECRET must be set in .env');
+  }
+  Coinbase.configure({
+    apiKeyName,
+    privateKey: apiKeySecret,
+  });
+  _cdpInitialized = true;
+}
+
 /**
- * Generate a new Ethereum wallet (works on Base).
- * Returns the public address + encrypted private key components.
+ * Create a new CDP Smart Account for a user on Base.
+ *
+ * Returns the Smart Account address + the wallet data (encrypted)
+ * that the bot needs to re-load the wallet later for signing.
+ *
+ * The wallet data is a JSON string containing the CDP wallet ID
+ * and any metadata the SDK needs to reconstruct the signer.
  */
-function generateWallet() {
-  const wallet = ethers.Wallet.createRandom();
+async function generateWallet() {
+  _ensureCdpInit();
+
+  // Create a wallet on Base mainnet via CDP
+  const wallet = await Wallet.create({ networkId: 'base-mainnet' });
+
+  // The default address is the Smart Account address
+  const defaultAddress = await wallet.getDefaultAddress();
+  const address = defaultAddress.getId();
+
+  // Export the wallet data so we can re-import it later.
+  // This contains the wallet ID + seed — everything needed to sign.
+  const walletData = wallet.export();
+  const walletDataJson = JSON.stringify(walletData);
+
+  // Encrypt the wallet data for storage
   const salt = generateSalt();
-  const { encrypted, iv, tag } = encrypt(wallet.privateKey, salt);
+  const { encrypted, iv, tag } = encrypt(walletDataJson, salt);
 
   return {
-    address: wallet.address,
-    encryptedPrivateKey: encrypted,
+    address,
+    encryptedPrivateKey: encrypted,   // legacy column name — stores encrypted CDP wallet data
     iv,
     tag,
     salt,
@@ -40,13 +85,15 @@ function generateWallet() {
 }
 
 /**
- * Reconstruct a signing Wallet from the encrypted private key.
- * Connects it to the Base provider so it can send transactions.
+ * Re-load a CDP wallet from encrypted wallet data.
+ * Returns the CDP Wallet object ready for signing.
  */
-function getWalletFromEncrypted(encryptedPrivateKey, iv, tag, salt) {
-  const privateKey = decrypt(encryptedPrivateKey, iv, tag, salt);
-  const provider = getProvider();
-  return new ethers.Wallet(privateKey, provider);
+async function getWalletFromEncrypted(encryptedData, iv, tag, salt) {
+  _ensureCdpInit();
+  const walletDataJson = decrypt(encryptedData, iv, tag, salt);
+  const walletData = JSON.parse(walletDataJson);
+  const wallet = await Wallet.import(walletData);
+  return wallet;
 }
 
 /**
@@ -61,8 +108,10 @@ async function getUsdcBalance(address) {
 }
 
 /**
- * Get the ETH balance of an address on Base (for gas).
- * Returns a string in wei.
+ * Get the ETH balance of an address on Base.
+ * Returns a string in wei. (Smart Account users don't need ETH
+ * because the Paymaster sponsors gas, but we keep this for the
+ * admin escrow panel and health checks.)
  */
 async function getEthBalance(address) {
   const provider = getProvider();
@@ -72,36 +121,24 @@ async function getEthBalance(address) {
 
 /**
  * Validate a Base/Ethereum address.
- * Checks format + blocks known dangerous addresses.
  */
 function isAddressValid(address) {
   try {
     if (!ethers.isAddress(address)) return false;
 
-    // Block known contracts / dead addresses
     const BLOCKED = new Set([
-      '0x0000000000000000000000000000000000000000',                // zero address
-      USDC_CONTRACT.toLowerCase(),                                  // USDC contract itself
-      '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA'.toLowerCase(), // USDbC (legacy bridged)
+      '0x0000000000000000000000000000000000000000',
+      USDC_CONTRACT.toLowerCase(),
+      '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA'.toLowerCase(), // USDbC legacy
     ]);
 
-    // Block the gas funder wallet address
-    try {
-      const gasFunderKey = process.env.GAS_FUNDER_PRIVATE_KEY;
-      if (gasFunderKey) {
-        const gasFunder = new ethers.Wallet(gasFunderKey);
-        BLOCKED.add(gasFunder.address.toLowerCase());
-      }
-    } catch { /* env not set — skip */ }
-
-    // Block the escrow contract address
+    // Block escrow contract
     try {
       const escrowAddr = process.env.ESCROW_CONTRACT_ADDRESS;
       if (escrowAddr) BLOCKED.add(escrowAddr.toLowerCase());
     } catch { /* */ }
 
     if (BLOCKED.has(address.toLowerCase())) return false;
-
     return true;
   } catch {
     return false;
@@ -111,11 +148,10 @@ function isAddressValid(address) {
 module.exports = {
   generateWallet,
   getWalletFromEncrypted,
-  // Backward-compat alias — old code calls getKeypairFromEncrypted
+  // Backward-compat aliases
   getKeypairFromEncrypted: getWalletFromEncrypted,
   getUsdcBalance,
   getEthBalance,
-  // Backward-compat alias — old code calls getSolBalance
   getSolBalance: getEthBalance,
   isAddressValid,
   USDC_CONTRACT,

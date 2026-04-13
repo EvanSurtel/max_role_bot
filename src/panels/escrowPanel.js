@@ -19,26 +19,8 @@ const { t, langFor } = require('../locales/i18n');
 const ETH_RESERVE_WEI = 100_000_000_000_000n; // 0.0001 ETH
 
 function getEscrowAddress() {
-  // On Base, the hot wallet private key is a hex string, not a JSON array.
-  const key = process.env.GAS_FUNDER_PRIVATE_KEY;
-  if (!key) return null;
-  try {
-    const wallet = new ethers.Wallet(key);
-    return wallet.address;
-  } catch {
-    return null;
-  }
-}
-
-function _getEscrowSigner() {
-  const key = process.env.GAS_FUNDER_PRIVATE_KEY;
-  if (!key) return null;
-  try {
-    const { getProvider } = require('../base/connection');
-    return new ethers.Wallet(key, getProvider());
-  } catch {
-    return null;
-  }
+  // The escrow contract address on Base — shows contract USDC balance.
+  return process.env.ESCROW_CONTRACT_ADDRESS || null;
 }
 
 // Admin check — escrow actions require admin-equivalent role.
@@ -484,7 +466,7 @@ async function _executeEscrowWithdrawConfirm(interaction) {
     return interaction.reply({ content: '⚠️ Invalid or blocked destination address.', ephemeral: true });
   }
 
-  const escrowSigner = _getEscrowSigner();
+  const escrowSigner = null;
   if (!escrowSigner) {
     return interaction.reply({ content: '⚠️ Escrow wallet not configured.', ephemeral: true });
   }
@@ -508,7 +490,7 @@ async function _executeEscrowWithdrawConfirm(interaction) {
         discordId: interaction.user.id,
         amount: `${amount}`,
         currency: 'ETH',
-        fromAddress: escrowSigner.address,
+        fromAddress: null?.address,
         toAddress: address,
         signature,
         memo: `🛠️ Admin escrow ETH withdraw by <@${interaction.user.id}>: ${amount} ETH`,
@@ -528,7 +510,7 @@ async function _executeEscrowWithdrawConfirm(interaction) {
         discordId: interaction.user.id,
         amount: `$${amount.toFixed(2)}`,
         currency: 'USDC',
-        fromAddress: escrowSigner.address,
+        fromAddress: null?.address,
         toAddress: address,
         signature,
         memo: `🛠️ Admin escrow USDC withdraw by <@${interaction.user.id}>: $${amount.toFixed(2)} USDC`,

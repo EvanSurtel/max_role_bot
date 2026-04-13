@@ -358,13 +358,8 @@ async function startMatch(client, challengeId) {
   // Transfer all held funds to escrow via smart contract (wager challenges only)
   if (challenge.type === CHALLENGE_TYPE.WAGER && Number(challenge.entry_amount_usdc) > 0) {
     try {
-      // Ensure all players have gas for the on-chain transfer
-      const { ensureGas } = require('../base/gasFunder');
-      for (const player of allPlayers) {
-        await ensureGas(player.user_id);
-      }
-
-      // Call the smart contract: create match on-chain + pull USDC from each player
+      // Call the smart contract: create match on-chain + pull USDC from each player.
+      // Gas is sponsored by the Coinbase Paymaster — no ETH needed.
       await escrowManager.transferToEscrow(
         match.id,                         // use match ID (not challenge ID) as the on-chain match ID
         challengeId,

@@ -1,4 +1,4 @@
-// Base escrow manager — smart contract integration.
+// Base escrow manager — smart contract + CDP Smart Accounts.
 //
 // Every match's USDC flows through the WagerEscrow.sol contract:
 //   1. createMatch — registers match on-chain
@@ -6,49 +6,51 @@
 //   3. resolveMatch — sends pot to winners
 //   4. cancelMatch — refunds all players
 //
-// The bot (contract owner) signs all contract calls using the gas
-// funder wallet. Each player's USDC is pulled from their INDIVIDUAL
-// wallet via ERC-20 transferFrom — requires prior approve() by the
-// player's wallet on the USDC contract.
+// All on-chain calls are signed via CDP Smart Accounts. The bot's
+// owner CDP wallet signs contract calls (createMatch, resolve, cancel).
+// Each user's CDP wallet signs their approve() call during onboarding.
+// The Coinbase Paymaster sponsors gas for everything — no ETH needed.
 //
 // DB-level hold/release is preserved for the pre-escrow phase
-// (challenge accepted → match not yet started). On-chain transfer
-// only happens at match start (depositToEscrow).
+// (challenge accepted → match not yet started).
 
+const { Coinbase, Wallet } = require('@coinbase/coinbase-sdk');
 const { ethers } = require('ethers');
 const db = require('../database/db');
 const walletRepo = require('../database/repositories/walletRepo');
 const transactionRepo = require('../database/repositories/transactionRepo');
 const walletManager = require('./walletManager');
+const transactionService = require('./transactionService');
 const { getProvider } = require('./connection');
 const { USDC_PER_UNIT, TRANSACTION_TYPE } = require('../config/constants');
 
-// Minimal ABI for the WagerEscrow contract — only the functions we call.
-const ESCROW_ABI = [
-  'function createMatch(uint256 matchId, uint256 entryAmount, uint8 playerCount) external',
-  'function depositToEscrow(uint256 matchId, address player) external',
-  'function resolveMatch(uint256 matchId, address[] winners, uint256[] amounts) external',
-  'function cancelMatch(uint256 matchId, address[] players, uint256[] refunds) external',
-  'function getMatch(uint256 matchId) external view returns (tuple(uint256 entryAmount, uint8 playerCount, uint8 depositsCount, uint256 totalDeposited, bool resolved, bool cancelled))',
-  'function getContractUsdcBalance() external view returns (uint256)',
+// The escrow contract ABI (JSON format for CDP invokeContract)
+const ESCROW_ABI_JSON = [
+  { name: 'createMatch', type: 'function', inputs: [{ name: 'matchId', type: 'uint256' }, { name: 'entryAmount', type: 'uint256' }, { name: 'playerCount', type: 'uint8' }], outputs: [] },
+  { name: 'depositToEscrow', type: 'function', inputs: [{ name: 'matchId', type: 'uint256' }, { name: 'player', type: 'address' }], outputs: [] },
+  { name: 'resolveMatch', type: 'function', inputs: [{ name: 'matchId', type: 'uint256' }, { name: 'winners', type: 'address[]' }, { name: 'amounts', type: 'uint256[]' }], outputs: [] },
+  { name: 'cancelMatch', type: 'function', inputs: [{ name: 'matchId', type: 'uint256' }, { name: 'players', type: 'address[]' }, { name: 'refunds', type: 'uint256[]' }], outputs: [] },
 ];
 
-// ERC-20 approve ABI (for the one-time approval flow)
-const APPROVE_ABI = [
-  'function approve(address spender, uint256 amount) returns (bool)',
-  'function allowance(address owner, address spender) view returns (uint256)',
-];
+// Cache the bot's owner CDP wallet (used for contract admin calls)
+let _ownerWallet = null;
 
-function _getEscrowContract(signer) {
-  const addr = process.env.ESCROW_CONTRACT_ADDRESS;
-  if (!addr) throw new Error('ESCROW_CONTRACT_ADDRESS not set');
-  return new ethers.Contract(addr, ESCROW_ABI, signer || getProvider());
+async function _getOwnerWallet() {
+  if (_ownerWallet) return _ownerWallet;
+  // The owner wallet is the one that deployed the escrow contract.
+  // Store its exported data in CDP_OWNER_WALLET_DATA env var (encrypted
+  // JSON from wallet.export(), same format as user wallets).
+  const ownerData = process.env.CDP_OWNER_WALLET_DATA;
+  if (!ownerData) throw new Error('CDP_OWNER_WALLET_DATA not set — needed for escrow contract calls');
+  walletManager; // ensure CDP is initialized via the import side-effect
+  _ownerWallet = await Wallet.import(JSON.parse(ownerData));
+  return _ownerWallet;
 }
 
-function _getGasFunderSigner() {
-  const key = process.env.GAS_FUNDER_PRIVATE_KEY;
-  if (!key) throw new Error('GAS_FUNDER_PRIVATE_KEY not set');
-  return new ethers.Wallet(key, getProvider());
+function _escrowAddress() {
+  const addr = process.env.ESCROW_CONTRACT_ADDRESS;
+  if (!addr) throw new Error('ESCROW_CONTRACT_ADDRESS not set');
+  return addr;
 }
 
 // ─── DB-level hold/release (pre-escrow phase) ──────────────────
@@ -64,11 +66,8 @@ function holdFunds(userId, amountUsdc, challengeId) {
     walletRepo.holdFunds(userId, amountUsdc);
     transactionRepo.create({
       type: TRANSACTION_TYPE.HOLD || 'hold',
-      userId,
-      challengeId,
-      amountUsdc,
-      solanaTxSignature: null,
-      status: 'completed',
+      userId, challengeId, amountUsdc,
+      solanaTxSignature: null, status: 'completed',
       memo: `Hold for challenge #${challengeId}`,
     });
     return true;
@@ -83,11 +82,8 @@ function releaseFunds(userId, amountUsdc, challengeId) {
     walletRepo.releaseFunds(userId, amountUsdc);
     transactionRepo.create({
       type: TRANSACTION_TYPE.RELEASE || 'release',
-      userId,
-      challengeId,
-      amountUsdc,
-      solanaTxSignature: null,
-      status: 'completed',
+      userId, challengeId, amountUsdc,
+      solanaTxSignature: null, status: 'completed',
       memo: `Release for challenge #${challengeId}`,
     });
     return true;
@@ -97,80 +93,67 @@ function releaseFunds(userId, amountUsdc, challengeId) {
   }
 }
 
-// ─── On-chain escrow operations ────────────────────────────────
+// ─── On-chain: approve escrow to spend user's USDC ─────────────
 
-/**
- * Approve the escrow contract to spend USDC from a user's wallet.
- * Called once during onboarding or before the user's first match.
- * Sets allowance to max uint256 so it never needs to be renewed.
- */
 async function approveEscrowForUser(userId) {
-  const wallet = walletRepo.findByUserId(userId);
-  if (!wallet) throw new Error(`No wallet for user ${userId}`);
+  const walletRecord = walletRepo.findByUserId(userId);
+  if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
 
-  const userSigner = walletManager.getWalletFromEncrypted(
-    wallet.encrypted_private_key,
-    wallet.encryption_iv,
-    wallet.encryption_tag,
-    wallet.encryption_salt,
+  const userCdpWallet = await walletManager.getWalletFromEncrypted(
+    walletRecord.encrypted_private_key,
+    walletRecord.encryption_iv,
+    walletRecord.encryption_tag,
+    walletRecord.encryption_salt,
   );
 
-  const escrowAddr = process.env.ESCROW_CONTRACT_ADDRESS;
-  if (!escrowAddr) throw new Error('ESCROW_CONTRACT_ADDRESS not set');
-
-  const usdcContract = new ethers.Contract(
-    walletManager.USDC_CONTRACT,
-    APPROVE_ABI,
-    userSigner,
+  const { hash } = await transactionService.approveUsdc(
+    userCdpWallet,
+    _escrowAddress(),
   );
 
-  // Check current allowance first — skip if already approved
-  const currentAllowance = await usdcContract.allowance(userSigner.address, escrowAddr);
-  if (currentAllowance > BigInt(1e18)) {
-    console.log(`[Escrow] User ${userId} already has sufficient allowance`);
-    return { hash: null, alreadyApproved: true };
-  }
-
-  const tx = await usdcContract.approve(escrowAddr, ethers.MaxUint256);
-  const receipt = await tx.wait();
-  console.log(`[Escrow] Approved escrow for user ${userId}: ${tx.hash}`);
-  return { hash: tx.hash, receipt };
+  console.log(`[Escrow] Approved escrow for user ${userId}: ${hash}`);
+  return { hash };
 }
 
-/**
- * Create a match on-chain. Called when all participants are confirmed.
- * The gas funder signs (it's the contract owner).
- */
+// ─── On-chain: create match in the contract ────────────────────
+
 async function createOnChainMatch(matchId, entryAmountUsdc, playerCount) {
-  const gasFunder = _getGasFunderSigner();
-  const contract = _getEscrowContract(gasFunder);
-
-  const tx = await contract.createMatch(matchId, entryAmountUsdc, playerCount);
-  const receipt = await tx.wait();
-  console.log(`[Escrow] On-chain match #${matchId} created: ${tx.hash}`);
-  return { hash: tx.hash, receipt };
+  const ownerWallet = await _getOwnerWallet();
+  const { hash } = await transactionService.invokeContract(
+    ownerWallet,
+    _escrowAddress(),
+    'createMatch',
+    { matchId: String(matchId), entryAmount: String(entryAmountUsdc), playerCount: String(playerCount) },
+    ESCROW_ABI_JSON,
+  );
+  console.log(`[Escrow] On-chain match #${matchId} created: ${hash}`);
+  return { hash };
 }
 
-/**
- * Pull USDC from a player's wallet into the escrow contract.
- * The gas funder signs the contract call; the contract does
- * transferFrom(player, contract, amount) — requires prior approve().
- */
+// ─── On-chain: deposit player's USDC into escrow ───────────────
+
 async function depositToEscrow(userId, matchId, challengeId) {
-  const wallet = walletRepo.findByUserId(userId);
-  if (!wallet) throw new Error(`No wallet for user ${userId}`);
+  const walletRecord = walletRepo.findByUserId(userId);
+  if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
 
-  const gasFunder = _getGasFunderSigner();
-  const contract = _getEscrowContract(gasFunder);
+  // The contract owner calls depositToEscrow which does transferFrom(player, contract, amount)
+  const ownerWallet = await _getOwnerWallet();
+  const { hash } = await transactionService.invokeContract(
+    ownerWallet,
+    _escrowAddress(),
+    'depositToEscrow',
+    { matchId: String(matchId), player: walletRecord.solana_address },
+    ESCROW_ABI_JSON,
+  );
 
-  const tx = await contract.depositToEscrow(matchId, wallet.solana_address);
-  const receipt = await tx.wait();
+  // Zero out held balance in DB (funds now in contract)
+  const provider = getProvider();
+  const escrowAbi = ['function getMatch(uint256) view returns (tuple(uint256,uint8,uint8,uint256,bool,bool))'];
+  const escrowContract = new ethers.Contract(_escrowAddress(), escrowAbi, provider);
+  const matchData = await escrowContract.getMatch(matchId);
+  const entryAmount = matchData[0].toString();
 
-  // Zero out the held balance in DB (funds are now in the contract)
   const freshWallet = walletRepo.findByUserId(userId);
-  const matchData = await contract.getMatch(matchId);
-  const entryAmount = matchData.entryAmount.toString();
-
   const newHeld = (BigInt(freshWallet.balance_held) - BigInt(entryAmount)).toString();
   walletRepo.updateBalance(userId, {
     balanceAvailable: freshWallet.balance_available,
@@ -179,48 +162,37 @@ async function depositToEscrow(userId, matchId, challengeId) {
 
   transactionRepo.create({
     type: TRANSACTION_TYPE.ESCROW_IN || 'escrow_in',
-    userId,
-    challengeId,
-    amountUsdc: entryAmount,
-    solanaTxSignature: tx.hash,
-    fromAddress: wallet.solana_address,
-    toAddress: process.env.ESCROW_CONTRACT_ADDRESS,
+    userId, challengeId, amountUsdc: entryAmount,
+    solanaTxSignature: hash,
+    fromAddress: walletRecord.solana_address,
+    toAddress: _escrowAddress(),
     status: 'completed',
     memo: `Escrow deposit for match #${matchId}`,
   });
 
-  console.log(`[Escrow] User ${userId} deposited to match #${matchId}: ${tx.hash}`);
-  return { hash: tx.hash };
+  console.log(`[Escrow] User ${userId} deposited to match #${matchId}: ${hash}`);
+  return { hash };
 }
 
-/**
- * Transfer USDC from each player's wallet to escrow for a match.
- * Called when a match starts — loops all players.
- */
-async function transferToEscrow(matchId, challengeId, allPlayers, entryAmountUsdc, playerCount) {
-  // Step 1: create the match on-chain
-  await createOnChainMatch(matchId, entryAmountUsdc, playerCount);
+// ─── On-chain: transfer all players' USDC to escrow ────────────
 
-  // Step 2: deposit each player's entry
+async function transferToEscrow(matchId, challengeId, allPlayers, entryAmountUsdc, playerCount) {
+  await createOnChainMatch(matchId, entryAmountUsdc, playerCount);
   for (const player of allPlayers) {
     await depositToEscrow(player.user_id, matchId, challengeId);
   }
 }
 
-/**
- * Resolve a match — distribute pot to winners via the smart contract.
- */
+// ─── On-chain: resolve match → pay winners ─────────────────────
+
 async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPotUsdc) {
   if (!winningPlayerIds || winningPlayerIds.length === 0) {
     throw new Error('No winning player IDs provided');
   }
 
-  const gasFunder = _getGasFunderSigner();
-  const contract = _getEscrowContract(gasFunder);
   const totalPot = BigInt(totalPotUsdc);
   const perPlayerShare = totalPot / BigInt(winningPlayerIds.length);
 
-  // Build arrays for the contract call
   const winnerAddresses = [];
   const winnerAmounts = [];
   const disbursements = [];
@@ -228,22 +200,28 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
   for (const userId of winningPlayerIds) {
     const walletRecord = walletRepo.findByUserId(userId);
     if (!walletRecord) {
-      console.error(`[Escrow] No wallet for winning user ${userId}, skipping`);
       disbursements.push({ userId, error: 'no wallet' });
       continue;
     }
     winnerAddresses.push(walletRecord.solana_address);
-    winnerAmounts.push(perPlayerShare);
+    winnerAmounts.push(perPlayerShare.toString());
     disbursements.push({ userId, address: walletRecord.solana_address, amount: perPlayerShare.toString() });
   }
 
-  if (winnerAddresses.length === 0) {
-    throw new Error('No winners with wallets found');
-  }
+  if (winnerAddresses.length === 0) throw new Error('No winners with wallets');
 
-  // Call the contract — sends USDC from contract to each winner
-  const tx = await contract.resolveMatch(matchId, winnerAddresses, winnerAmounts);
-  const receipt = await tx.wait();
+  const ownerWallet = await _getOwnerWallet();
+  const { hash } = await transactionService.invokeContract(
+    ownerWallet,
+    _escrowAddress(),
+    'resolveMatch',
+    {
+      matchId: String(matchId),
+      winners: winnerAddresses,
+      amounts: winnerAmounts,
+    },
+    ESCROW_ABI_JSON,
+  );
 
   // Credit each winner's DB balance
   for (const d of disbursements) {
@@ -252,33 +230,27 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
       walletRepo.creditAvailable(d.userId, d.amount);
       transactionRepo.create({
         type: TRANSACTION_TYPE.DISBURSEMENT || 'disbursement',
-        userId: d.userId,
-        challengeId,
+        userId: d.userId, challengeId,
         amountUsdc: d.amount,
-        solanaTxSignature: tx.hash,
-        fromAddress: process.env.ESCROW_CONTRACT_ADDRESS,
+        solanaTxSignature: hash,
+        fromAddress: _escrowAddress(),
         toAddress: d.address,
         status: 'completed',
         memo: `Winnings for match #${matchId}`,
       });
-      d.hash = tx.hash;
+      d.hash = hash;
     } catch (err) {
-      console.error(`[Escrow] Failed to credit winner ${d.userId}:`, err.message);
       d.error = err.message;
     }
   }
 
-  console.log(`[Escrow] Match #${matchId} resolved: ${winnerAddresses.length} winners paid. TX: ${tx.hash}`);
-  return { disbursements, hash: tx.hash };
+  console.log(`[Escrow] Match #${matchId} resolved: ${winnerAddresses.length} winners. TX: ${hash}`);
+  return { disbursements, hash };
 }
 
-/**
- * Cancel a match — refund all players via the smart contract.
- */
-async function cancelOnChainMatch(matchId, challengeId, allPlayers, entryAmountUsdc) {
-  const gasFunder = _getGasFunderSigner();
-  const contract = _getEscrowContract(gasFunder);
+// ─── On-chain: cancel match → refund all ───────────────────────
 
+async function cancelOnChainMatch(matchId, challengeId, allPlayers, entryAmountUsdc) {
   const playerAddresses = [];
   const refundAmounts = [];
 
@@ -286,44 +258,48 @@ async function cancelOnChainMatch(matchId, challengeId, allPlayers, entryAmountU
     const wallet = walletRepo.findByUserId(player.user_id);
     if (!wallet) continue;
     playerAddresses.push(wallet.solana_address);
-    refundAmounts.push(BigInt(entryAmountUsdc));
+    refundAmounts.push(entryAmountUsdc);
   }
 
   if (playerAddresses.length === 0) return;
 
-  const tx = await contract.cancelMatch(matchId, playerAddresses, refundAmounts);
-  const receipt = await tx.wait();
+  const ownerWallet = await _getOwnerWallet();
+  const { hash } = await transactionService.invokeContract(
+    ownerWallet,
+    _escrowAddress(),
+    'cancelMatch',
+    {
+      matchId: String(matchId),
+      players: playerAddresses,
+      refunds: refundAmounts,
+    },
+    ESCROW_ABI_JSON,
+  );
 
-  // Credit each player's DB balance
   for (const player of allPlayers) {
     try {
       walletRepo.creditAvailable(player.user_id, entryAmountUsdc);
       transactionRepo.create({
         type: 'refund',
-        userId: player.user_id,
-        challengeId,
+        userId: player.user_id, challengeId,
         amountUsdc: entryAmountUsdc,
-        solanaTxSignature: tx.hash,
-        fromAddress: process.env.ESCROW_CONTRACT_ADDRESS,
+        solanaTxSignature: hash,
+        fromAddress: _escrowAddress(),
         toAddress: walletRepo.findByUserId(player.user_id)?.solana_address || '',
         status: 'completed',
         memo: `Refund for cancelled match #${matchId}`,
       });
     } catch (err) {
-      console.error(`[Escrow] Failed to credit refund for user ${player.user_id}:`, err.message);
+      console.error(`[Escrow] Credit refund failed for user ${player.user_id}:`, err.message);
     }
   }
 
-  console.log(`[Escrow] Match #${matchId} cancelled. ${playerAddresses.length} players refunded. TX: ${tx.hash}`);
-  return { hash: tx.hash };
+  console.log(`[Escrow] Match #${matchId} cancelled. ${playerAddresses.length} refunded. TX: ${hash}`);
+  return { hash };
 }
 
-/**
- * Refund all held funds for all players in a challenge.
- * DB-level release — returns held → available. Used for challenges
- * that never reached the on-chain escrow phase (cancelled before
- * match start).
- */
+// ─── DB-level refund (pre-escrow, never hit chain) ─────────────
+
 function refundAll(challengeId) {
   const transactions = transactionRepo.findByChallengeId(challengeId);
   const holdAmounts = {};
@@ -344,17 +320,13 @@ function refundAll(challengeId) {
     try {
       walletRepo.releaseFunds(parseInt(userId), net.toString());
       transactionRepo.create({
-        type: 'refund',
-        userId: parseInt(userId),
-        challengeId,
-        amountUsdc: net.toString(),
-        solanaTxSignature: null,
+        type: 'refund', userId: parseInt(userId), challengeId,
+        amountUsdc: net.toString(), solanaTxSignature: null,
         status: 'completed',
         memo: `Refund for cancelled challenge #${challengeId}`,
       });
       refunded.push(parseInt(userId));
     } catch (err) {
-      console.error(`[Escrow] Failed to refund user ${userId}:`, err.message);
       failed.push(parseInt(userId));
     }
   }

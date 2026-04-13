@@ -226,16 +226,6 @@ async function handleRegistrationModal(interaction) {
         encryptionSalt: salt,
       });
 
-      // Send a small ETH top-up for gas so the user can do their
-      // first on-chain action (approve, withdraw, etc.) without
-      // needing to acquire ETH themselves.
-      try {
-        const { ensureGas } = require('../base/gasFunder');
-        await ensureGas(user.id);
-      } catch (err) {
-        console.warn(`[Onboarding] Gas top-up failed for user ${user.id}:`, err.message);
-      }
-
       // Approve the escrow contract to spend USDC from this wallet.
       // One-time operation — sets allowance to max so future match
       // deposits work without another approve call.
