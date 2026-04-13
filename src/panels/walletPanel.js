@@ -212,47 +212,83 @@ async function handleWalletSubButton(interaction) {
   }
 
   if (id === 'wallet_withdraw_sol') {
-    // Pre-fill the amount field with the max withdrawable SOL so the
-    // user can just paste their address and hit submit without doing
-    // any math. Max = on-chain balance minus rent-exempt + tx fee.
-    let maxSol = '';
+    // Show balance + Max / Custom Amount buttons instead of going
+    // straight to a modal. Discord modals don't support buttons
+    // inside them, so this intermediate step IS the "Max button".
+    let solDisplay = '0';
+    let maxSol = '0';
     try {
       const solBalance = Number(await walletManager.getSolBalance(wallet.solana_address));
-      const reserveLamports = 895_880; // rent-exempt (890880) + tx fee (5000)
-      const maxLamports = Math.max(0, solBalance - reserveLamports);
-      if (maxLamports > 0) {
-        maxSol = (maxLamports / 1_000_000_000).toFixed(9).replace(/0+$/, '').replace(/\.$/, '');
-      }
-    } catch { /* leave empty — user types manually */ }
+      solDisplay = (solBalance / 1_000_000_000).toFixed(6);
+      const maxLamports = Math.max(0, solBalance - 895_880);
+      maxSol = (maxLamports / 1_000_000_000).toFixed(9).replace(/0+$/, '').replace(/\.$/, '');
+    } catch { /* fallback to 0 */ }
 
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('wallet_sol_max')
+        .setLabel(`Send Max (${maxSol} SOL)`)
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('wallet_sol_custom')
+        .setLabel('Custom Amount')
+        .setStyle(ButtonStyle.Secondary),
+    );
+
+    return interaction.reply({
+      content: `**SOL Balance:** ${solDisplay} SOL\n**Max withdrawable:** ${maxSol} SOL\n\nChoose an option:`,
+      components: [row],
+      ephemeral: true,
+    });
+  }
+
+  // Max SOL → address-only modal, amount calculated at execution time
+  if (id === 'wallet_sol_max') {
+    const modal = new ModalBuilder()
+      .setCustomId('wallet_withdraw_sol_max_modal')
+      .setTitle('Withdraw Max SOL');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('withdraw_address')
+          .setLabel('Destination Solana address')
+          .setPlaceholder('e.g. 7xKXt...')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMinLength(32)
+          .setMaxLength(44),
+      ),
+    );
+    return interaction.showModal(modal);
+  }
+
+  // Custom SOL amount → normal modal with address + amount
+  if (id === 'wallet_sol_custom') {
     const modal = new ModalBuilder()
       .setCustomId('wallet_withdraw_sol_modal')
       .setTitle(t('wallet.withdraw_modal_title_sol', lang));
-
-    const addressInput = new TextInputBuilder()
-      .setCustomId('withdraw_address')
-      .setLabel(t('wallet.withdraw_address_label', lang))
-      .setPlaceholder(t('wallet.withdraw_address_placeholder', lang))
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setMinLength(32)
-      .setMaxLength(44);
-
-    const amountInput = new TextInputBuilder()
-      .setCustomId('withdraw_amount')
-      .setLabel(maxSol ? `Max: ${maxSol} SOL` : t('wallet.withdraw_amount_label_sol', lang))
-      .setPlaceholder(t('wallet.withdraw_amount_placeholder_sol', lang))
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setMinLength(1)
-      .setMaxLength(20);
-    if (maxSol) amountInput.setValue(maxSol);
-
     modal.addComponents(
-      new ActionRowBuilder().addComponents(addressInput),
-      new ActionRowBuilder().addComponents(amountInput),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('withdraw_address')
+          .setLabel(t('wallet.withdraw_address_label', lang))
+          .setPlaceholder(t('wallet.withdraw_address_placeholder', lang))
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMinLength(32)
+          .setMaxLength(44),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('withdraw_amount')
+          .setLabel(t('wallet.withdraw_amount_label_sol', lang))
+          .setPlaceholder(t('wallet.withdraw_amount_placeholder_sol', lang))
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMinLength(1)
+          .setMaxLength(20),
+      ),
     );
-
     return interaction.showModal(modal);
   }
 
@@ -669,4 +705,63 @@ async function handleWithdrawConfirmButton(interaction) {
   }
 }
 
-module.exports = { handleWalletViewOpen, handleWalletSubButton, handleWithdrawModal, handleWithdrawSolModal, handleWithdrawConfirmButton };
+/**
+ * Handle the "Send Max" SOL modal — only has an address field, no
+ * amount. Calculates the max withdrawable SOL fresh at execution
+ * time and goes straight to the confirmation embed.
+ */
+async function handleWithdrawSolMaxModal(interaction) {
+  const lang = langFor(interaction);
+  const user = userRepo.findByDiscordId(interaction.user.id);
+  if (!user) return interaction.reply({ content: t('common.onboarding_required', lang), ephemeral: true });
+
+  const wallet = walletRepo.findByUserId(user.id);
+  if (!wallet) return interaction.reply({ content: t('common.wallet_not_found', lang), ephemeral: true });
+
+  const address = interaction.fields.getTextInputValue('withdraw_address').trim();
+
+  if (!walletManager.isAddressValid(address)) {
+    return interaction.reply({ content: t('common.invalid_address', lang), ephemeral: true });
+  }
+
+  // Calculate max fresh right now
+  const solBalance = Number(await walletManager.getSolBalance(wallet.solana_address));
+  const reserveLamports = 895_880;
+  const maxLamports = Math.max(0, solBalance - reserveLamports);
+  if (maxLamports <= 0) {
+    return interaction.reply({
+      content: 'No SOL available to withdraw after transaction fees.',
+      ephemeral: true,
+    });
+  }
+
+  const amountSol = maxLamports / 1_000_000_000;
+
+  // Show confirmation with Yes/Cancel — same pattern as regular withdraw
+  const confirmEmbed = new EmbedBuilder()
+    .setTitle(t('wallet.withdraw_confirm_title', lang))
+    .setColor(0xf39c12)
+    .setDescription(t('wallet.withdraw_confirm_desc_sol', lang, {
+      amount: amountSol,
+      address,
+    }));
+
+  const confirmRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`wallet_wd_sol_${amountSol}_${address}`)
+      .setLabel(t('wallet.withdraw_confirm_btn_yes', lang))
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('wallet_wd_cancel')
+      .setLabel(t('wallet.withdraw_confirm_btn_cancel', lang))
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.reply({
+    embeds: [confirmEmbed],
+    components: [confirmRow],
+    ephemeral: true,
+  });
+}
+
+module.exports = { handleWalletViewOpen, handleWalletSubButton, handleWithdrawModal, handleWithdrawSolModal, handleWithdrawSolMaxModal, handleWithdrawConfirmButton };
