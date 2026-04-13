@@ -27,26 +27,28 @@ You deposit money using **MoonPay**, a third-party payment processor. Here's how
 4. **Funds arrive in your wallet** within a few minutes
 
 **Things to know about deposits:**
-- Minimum deposit: **$20**
-- MoonPay charges a small processing fee (roughly 1–4.5% depending on how you pay)
+- Minimum deposit: **$5**
+- Deposits via Coinbase have **0% fee**. Other methods may charge 3-5%.
 - Your bank or card company may also charge their own fees — that's between you and them
 - Deposits are **non-refundable** once they hit your wallet
-- You can also deposit directly from a Solana wallet if you already have USDC
+- You can also deposit directly from any wallet that supports USDC on the **Base** network
 
 ## 4. How Withdrawals Work
 
-You can cash out your winnings through MoonPay to your bank account or card:
+When you're ready to take your money out:
 
-1. **Open your wallet** and click **Cash Out to Bank**
-2. **Enter your bank details** on MoonPay's page
-3. **Funds are sent to your bank** — usually within 1–5 business days
+1. **Open your wallet** and click **Withdraw USDC**
+2. **Enter the amount** and the wallet address you want to send it to
+3. **Confirm** — your USDC is sent to that address on the Base network
+
+From there, sell your USDC on an exchange (like Coinbase) and withdraw to your bank.
 
 **Things to know about withdrawals:**
-- Minimum withdrawal: **$20**
-- MoonPay charges a withdrawal fee (about 1% for bank transfer, up to 4.5% for card)
-- You must wager your deposit at least once before you can withdraw it — no depositing and immediately cashing out
+- Minimum withdrawal: **$5**
+- No platform fee — the only cost is a tiny network gas fee (~$0.01-0.05)
+- You must wager your deposit at least once before you can withdraw it
 - Withdrawals are **final and cannot be reversed**
-- You can also withdraw USDC directly to any Solana wallet address (no MoonPay needed)
+- You can withdraw to any wallet that supports USDC on the **Base** network
 
 ## 5. Your Wallet
 
@@ -73,26 +75,10 @@ Your wallet is secured with encryption. Only the bot can access it.
 - No abusing bugs in the bot to gain an unfair advantage
 - Breaking these rules = permanent ban and forfeiture of your balance
 
-## 8. MoonPay (Third-Party Payment Processor)
 
-MoonPay is an independent company that handles card payments and bank transfers. We don't control MoonPay and we're not responsible for:
+## 8. Where This Is NOT Available
 
-- MoonPay's service being slow, down, or unavailable
-- Delays in processing your deposit or withdrawal
-- MoonPay rejecting your payment or identity verification
-- Any fees MoonPay charges
-
-When you use MoonPay, you also agree to **MoonPay's own Terms of Service and Privacy Policy**. Any issues with payment processing need to be resolved directly with MoonPay.
-
-## 9. Where This Is NOT Available
-
-**MoonPay withdrawals are not available in:**
-- Texas, Louisiana, New York (USA)
-- US Virgin Islands
-
-If you're in one of these areas, you can still withdraw USDC directly to your own Solana wallet address.
-
-**The full platform is not available in these countries:**
+**The platform is not available in these countries:**
 
 Afghanistan, Bangladesh, Barbados, Burkina Faso, China, Cuba, DR Congo, Guinea-Bissau, Haiti, Hungary, Iran, Iraq, Jamaica, Japan, Kosovo, Lebanon, Libya, Macao, Madagascar, Malaysia, Mongolia, Morocco, Myanmar, Nicaragua, Nigeria, North Korea, Pakistan, Palestine, Panama, Russia, Senegal, Somalia, South Sudan, Syria, Tajikistan, Timor-Leste, Uganda, Ukraine, US Virgin Islands, Venezuela, Western Sahara, Yemen, Zimbabwe
 
