@@ -368,8 +368,32 @@ async function startMatch(client, challengeId) {
         allPlayers.length,
       );
     } catch (err) {
-      console.error(`[MatchService] Failed to transfer funds to escrow for match #${match.id}:`, err.message);
-      // TODO: revert match creation on escrow failure (tracked as audit item H4)
+      console.error(`[MatchService] ESCROW FAILURE for match #${match.id}:`, err.message);
+
+      // Revert: refund all DB-held funds back to available
+      try {
+        escrowManager.refundAll(challengeId);
+      } catch (refundErr) {
+        console.error(`[MatchService] Refund after escrow failure also failed:`, refundErr.message);
+      }
+
+      // Revert: set challenge back to OPEN so it can be re-accepted
+      challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.CANCELLED);
+
+      // Clean up the match channels we just created
+      try {
+        await cleanupChannels(client, match.id);
+      } catch { /* best effort */ }
+
+      // Alert admins
+      const { postTransaction } = require('../utils/transactionFeed');
+      postTransaction({
+        type: 'balance_mismatch',
+        challengeId,
+        memo: `🚨 Escrow transfer FAILED for match #${match.id}. Challenge cancelled + funds refunded. Error: ${err.message}`,
+      });
+
+      throw new Error(`Escrow transfer failed — match #${match.id} cancelled`);
     }
   }
 

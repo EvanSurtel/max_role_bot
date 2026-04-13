@@ -390,9 +390,9 @@ module.exports = {
   // لوحة محفظة الضمان (المشرفين)
   escrow_panel: {
     title: 'محفظة الضمان',
-    not_configured: 'ESCROW_WALLET_SECRET غير مُهيأ.',
+    not_configured: 'ESCROW_CONTRACT_ADDRESS غير مُهيأ.',
     address_label: '**العنوان:**',
-    field_sol: 'رصيد SOL',
+    field_sol: 'ETH Balance',
     field_usdc: 'رصيد USDC',
     field_active: 'المباريات النشطة',
     field_disputed: 'المباريات المتنازع عليها',

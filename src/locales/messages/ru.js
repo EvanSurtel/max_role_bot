@@ -391,9 +391,9 @@ module.exports = {
   // Панель эскроу-кошелька (админ)
   escrow_panel: {
     title: 'Эскроу-Кошелёк',
-    not_configured: 'ESCROW_WALLET_SECRET не настроен.',
+    not_configured: 'ESCROW_CONTRACT_ADDRESS не настроен.',
     address_label: '**Адрес:**',
-    field_sol: 'Баланс SOL',
+    field_sol: 'ETH Balance',
     field_usdc: 'Баланс USDC',
     field_active: 'Активные Матчи',
     field_disputed: 'Спорные Матчи',

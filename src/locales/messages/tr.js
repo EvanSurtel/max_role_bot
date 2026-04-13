@@ -391,9 +391,9 @@ module.exports = {
   // Emanet cüzdan paneli (admin)
   escrow_panel: {
     title: 'Emanet Cüzdan',
-    not_configured: 'ESCROW_WALLET_SECRET yapılandırılmamış.',
+    not_configured: 'ESCROW_CONTRACT_ADDRESS yapılandırılmamış.',
     address_label: '**Adres:**',
-    field_sol: 'SOL Bakiyesi',
+    field_sol: 'ETH Balance',
     field_usdc: 'USDC Bakiyesi',
     field_active: 'Aktif Maçlar',
     field_disputed: 'İtirazlı Maçlar',

@@ -390,9 +390,9 @@ module.exports = {
   // Escrow wallet panel (admin)
   escrow_panel: {
     title: 'กระเป๋า Escrow',
-    not_configured: 'ยังไม่ได้ตั้งค่า ESCROW_WALLET_SECRET',
+    not_configured: 'ยังไม่ได้ตั้งค่า ESCROW_CONTRACT_ADDRESS',
     address_label: '**ที่อยู่:**',
-    field_sol: 'ยอด SOL',
+    field_sol: 'ETH Balance',
     field_usdc: 'ยอด USDC',
     field_active: 'แมตช์ที่กำลังเล่น',
     field_disputed: 'แมตช์ที่ถูก dispute',

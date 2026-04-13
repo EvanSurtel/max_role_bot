@@ -390,9 +390,9 @@ module.exports = {
   // Escrow wallet panel (admin)
   escrow_panel: {
     title: 'Escrow-Wallet',
-    not_configured: 'ESCROW_WALLET_SECRET ist nicht konfiguriert.',
+    not_configured: 'ESCROW_CONTRACT_ADDRESS ist nicht konfiguriert.',
     address_label: '**Adresse:**',
-    field_sol: 'SOL-Guthaben',
+    field_sol: 'ETH Balance',
     field_usdc: 'USDC-Guthaben',
     field_active: 'Aktive Matches',
     field_disputed: 'Strittige Matches',

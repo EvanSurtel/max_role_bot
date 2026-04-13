@@ -11,7 +11,7 @@
 //
 // Prerequisites:
 //   - npm install solc (Solidity compiler)
-//   - GAS_FUNDER_PRIVATE_KEY set in .env (deployer pays gas)
+//   - DEPLOYER_PRIVATE_KEY set in .env (deployer pays gas)
 //   - BASE_RPC_URL set in .env
 //   - USDC_CONTRACT_ADDRESS set in .env
 
@@ -90,9 +90,9 @@ async function main() {
   // ─── Deploy ──────────────────────────────────────────────
   const rpcUrl = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
   const provider = new ethers.JsonRpcProvider(rpcUrl, { name: 'base', chainId: 8453 });
-  const deployerKey = process.env.GAS_FUNDER_PRIVATE_KEY;
+  const deployerKey = process.env.DEPLOYER_PRIVATE_KEY;
   if (!deployerKey) {
-    console.error('[Deploy] GAS_FUNDER_PRIVATE_KEY not set in .env');
+    console.error('[Deploy] DEPLOYER_PRIVATE_KEY not set in .env');
     process.exit(1);
   }
 

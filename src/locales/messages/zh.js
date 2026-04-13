@@ -390,9 +390,9 @@ module.exports = {
   // Escrow wallet panel (admin)
   escrow_panel: {
     title: '托管钱包',
-    not_configured: '未配置 ESCROW_WALLET_SECRET。',
+    not_configured: '未配置 ESCROW_CONTRACT_ADDRESS。',
     address_label: '**地址:**',
-    field_sol: 'SOL 余额',
+    field_sol: 'ETH Balance',
     field_usdc: 'USDC 余额',
     field_active: '活跃比赛',
     field_disputed: '争议比赛',

@@ -390,9 +390,9 @@ module.exports = {
   // Escrow wallet panel (admin)
   escrow_panel: {
     title: 'Ví Escrow',
-    not_configured: 'ESCROW_WALLET_SECRET chưa được cấu hình.',
+    not_configured: 'ESCROW_CONTRACT_ADDRESS chưa được cấu hình.',
     address_label: '**Địa chỉ:**',
-    field_sol: 'Số Dư SOL',
+    field_sol: 'ETH Balance',
     field_usdc: 'Số Dư USDC',
     field_active: 'Trận Đang Diễn Ra',
     field_disputed: 'Trận Đang Tranh Chấp',

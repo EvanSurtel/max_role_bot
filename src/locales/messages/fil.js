@@ -390,9 +390,9 @@ module.exports = {
   // Escrow wallet panel (admin)
   escrow_panel: {
     title: 'Escrow Wallet',
-    not_configured: 'Hindi naka-configure ang ESCROW_WALLET_SECRET.',
+    not_configured: 'Hindi naka-configure ang ESCROW_CONTRACT_ADDRESS.',
     address_label: '**Address:**',
-    field_sol: 'SOL Balance',
+    field_sol: 'ETH Balance',
     field_usdc: 'USDC Balance',
     field_active: 'Mga Active na Match',
     field_disputed: 'Mga Disputed na Match',

@@ -199,6 +199,28 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
         emit MatchCancelled(matchId, players, refunds);
     }
 
+    // ─── Emergency Withdraw ────────────────────────────────────
+
+    /**
+     * @notice Emergency withdraw any USDC stuck in the contract.
+     *         Only callable by owner. Use this if a match gets stuck
+     *         (never resolved or cancelled) and USDC is stranded.
+     * @param to     Address to send the USDC to.
+     * @param amount Amount of USDC to withdraw.
+     */
+    function emergencyWithdraw(
+        address to,
+        uint256 amount
+    ) external onlyOwner nonReentrant {
+        require(to != address(0), "Cannot send to zero address");
+        require(amount > 0, "Amount must be > 0");
+        require(amount <= usdc.balanceOf(address(this)), "Exceeds contract balance");
+        usdc.safeTransfer(to, amount);
+        emit EmergencyWithdraw(to, amount);
+    }
+
+    event EmergencyWithdraw(address indexed to, uint256 amount);
+
     // ─── View Helpers ───────────────────────────────────────────
 
     function getMatch(uint256 matchId) external view returns (Match memory) {

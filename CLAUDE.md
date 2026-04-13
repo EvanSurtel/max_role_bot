@@ -15,9 +15,9 @@ Discord bot for Call of Duty Mobile competitive matches. Users wager USDC on mat
 ## Architecture
 
 ```
-User registers → Bot generates Ethereum wallet (works on Base)
-               → Encrypts private key with AES-256-GCM + per-user salt
-               → Sends small ETH top-up from gas funder
+User registers → Bot creates CDP Smart Account on Base
+               → Encrypts CDP wallet data with AES-256-GCM + per-user salt
+               → Approves escrow contract (gasless via Paymaster)
                → Signs approve(escrowContract, MAX) on USDC contract
 
 User deposits  → USDC arrives at user's individual wallet on Base
@@ -49,7 +49,6 @@ src/
     transactionService.js     # ERC-20 USDC transfers, ETH transfers, gas funder signer
     escrowManager.js          # Smart contract integration — hold/release (DB), createMatch, depositToEscrow, disburseWinnings, cancelMatch
     depositService.js         # Polls USDC balanceOf every 30s per user wallet
-    gasFunder.js              # Auto-sends ETH to user wallets when gas is low
   panels/
     lobbyPanel.js             # Main wager channel panel (Create Wager, XP Match, Wallet, Leaderboard)
     walletPanel.js            # Balance, deposit (region-aware), withdraw USDC/ETH, history
@@ -65,7 +64,7 @@ src/
     challengeCancel.js        # Creator cancels challenge, refunds all
     teammateResponse.js       # Accept/decline via DM (private channel fallback)
     matchResult.js            # Report win → accept/dispute → confirm → payout
-    onboarding.js             # TOS accept → wallet creation → gas top-up → escrow approval → region detection
+    onboarding.js             # TOS accept → wallet creation → escrow approval → region detection
     disputeCreate.js          # Create dispute from lobby
   services/
     matchService.js           # Create match channels, start match (smart contract), resolve, cleanup
@@ -123,11 +122,11 @@ programs/
 
 See `.env.example` for full list. Key vars:
 - `BOT_TOKEN`, `GUILD_ID`, `ADMIN_ROLE_ID`, `OWNER_ROLE_ID`, `CEO_ROLE_ID`, `ADS_ROLE_ID`
-- `BASE_RPC_URL`, `GAS_FUNDER_PRIVATE_KEY`, `ESCROW_CONTRACT_ADDRESS`, `USDC_CONTRACT_ADDRESS`
+- `BASE_RPC_URL`, `ESCROW_CONTRACT_ADDRESS`, `USDC_CONTRACT_ADDRESS`
 - `WAGER_CHANNEL_ID`, `CHALLENGES_CHANNEL_ID`, `ADMIN_ALERTS_CHANNEL_ID`
 - `ENCRYPTION_KEY`
 - `MIN_WAGER_USDC`, `MAX_WAGER_USDC`, `MIN_WITHDRAWAL_USDC`
-- `CDP_API_KEY`, `CDP_API_SECRET` (Coinbase Onramp for Group A deposits)
+- `CDP_API_KEY_NAME`, `CDP_API_KEY_SECRET`, `CDP_PROJECT_ID`, `PAYMASTER_RPC_URL`, `CDP_OWNER_WALLET_DATA` (Coinbase Onramp for Group A deposits)
 
 ## Running
 
@@ -141,8 +140,8 @@ npm run dev      # Watch mode
 ## Smart Contract Deployment
 
 ```bash
-# Set GAS_FUNDER_PRIVATE_KEY and BASE_RPC_URL in .env first
-# Fund the gas funder with ~$5 ETH on Base
+# Set CDP credentials and BASE_RPC_URL in .env first
+# Fund the deployer wallet with ~$5 ETH on Base
 node scripts/deploy-escrow.js
 # Prints ESCROW_CONTRACT_ADDRESS=0x... — paste into .env
 ```
