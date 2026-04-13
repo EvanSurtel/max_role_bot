@@ -12,10 +12,12 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@napi-rs/canvas": "^0.1.97",
+    "@openzeppelin/contracts": "^5.6.1",
     "better-sqlite3": "^11.7.0",
     "discord.js": "^14.16.0",
     "dotenv": "^16.4.0",
     "ethers": "^6.16.0",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "solc": "^0.8.34"
   }
 }
