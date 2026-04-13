@@ -94,107 +94,15 @@ async function handleWalletSubButton(interaction) {
     });
   }
 
-  // ─── MoonPay: Deposit with Credit/Debit Card ──────────────
-  // Generates a signed MoonPay on-ramp widget URL with the user's
-  // Solana wallet address pre-filled. When they complete the
-  // purchase, USDC lands in their bot wallet and the existing
-  // deposit poller credits them within ~30 seconds — same flow
-  // as any other deposit. MoonPay webhooks provide status updates
-  // on the admin transactions feed; they're not required for the
-  // USDC crediting.
-  if (id === 'wallet_moonpay_deposit') {
-    const moonpay = require('../services/moonpay');
-    if (!moonpay.isConfigured()) {
-      return interaction.reply({
-        content: '💳 Card deposits are not configured yet. Ask an admin to set up MoonPay.',
-        ephemeral: true,
-      });
-    }
-    try {
-      const moonpayService = require('../services/moonpayService');
-      const { url } = moonpayService.initiateOnramp(user.id);
-      const openButton = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setURL(url)
-          .setLabel('Open MoonPay')
-          .setStyle(ButtonStyle.Link),
-      );
-      const envLabel = moonpay.getEnvLabel();
-      const envWarning = envLabel !== 'production'
-        ? `\n\n⚠️ **SANDBOX MODE** — use MoonPay's test card numbers, no real money will move.`
-        : '';
-      return interaction.reply({
-        content:
-          `💳 **Deposit with Credit/Debit Card**\n\n` +
-          `Click the button below to open MoonPay in your browser. You'll choose an amount, pay with your card, ` +
-          `Apple Pay, or Google Pay, and the USDC will land in your bot wallet automatically — usually within a ` +
-          `few minutes.\n\n` +
-          `Your wallet address is already pre-filled. You don't need to copy anything.` +
-          envWarning,
-        components: [openButton],
-        ephemeral: true,
-      });
-    } catch (err) {
-      console.error('[Wallet] MoonPay on-ramp error:', err);
-      return interaction.reply({
-        content: `Could not start MoonPay deposit: ${err.message || err}`,
-        ephemeral: true,
-      });
-    }
-  }
-
-  // ─── MoonPay: Cash Out to Bank (off-ramp) ─────────────────
-  // Opens a signed MoonPay off-ramp widget URL. User fills out
-  // bank/card details on MoonPay's hosted page; MoonPay creates
-  // a sell transaction and the bot receives webhook callbacks.
-  // When MoonPay sends a `waitingForDeposit` webhook with a
-  // deposit address, moonpayService._executeOfframpTransfer
-  // signs a USDC transfer from the user's bot wallet to that
-  // address and MoonPay pays the user's bank.
-  if (id === 'wallet_moonpay_withdraw') {
-    const moonpay = require('../services/moonpay');
-    // Full off-ramp readiness check (API keys + webhook secret +
-    // public webhook URL). Off-ramp CANNOT work without webhooks
-    // because MoonPay delivers the deposit address via webhook,
-    // so we refuse here even if the button somehow reached the
-    // user via a stale cached message.
-    if (!moonpay.isOfframpConfigured()) {
-      return interaction.reply({
-        content: '🏦 Bank cash-outs are not fully set up yet. Ask an admin to finish MoonPay webhook configuration.',
-        ephemeral: true,
-      });
-    }
-    try {
-      const moonpayService = require('../services/moonpayService');
-      const { url } = moonpayService.initiateOfframp(user.id /* no fixed amount — user picks on MoonPay's page */);
-      const openButton = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setURL(url)
-          .setLabel('Open MoonPay')
-          .setStyle(ButtonStyle.Link),
-      );
-      const envLabel = moonpay.getEnvLabel();
-      const envWarning = envLabel !== 'production'
-        ? `\n\n⚠️ **SANDBOX MODE** — no real money will move.`
-        : '';
-      return interaction.reply({
-        content:
-          `🏦 **Cash Out to Bank**\n\n` +
-          `Click the button below to open MoonPay in your browser. You'll enter your bank details and the ` +
-          `amount you want, and MoonPay will walk you through the rest. The bot will send the required USDC ` +
-          `automatically when MoonPay is ready — you don't need to copy any addresses.\n\n` +
-          `Make sure you have enough USDC in your wallet to cover the cash-out amount plus MoonPay's fee.` +
-          envWarning,
-        components: [openButton],
-        ephemeral: true,
-      });
-    } catch (err) {
-      console.error('[Wallet] MoonPay off-ramp error:', err);
-      return interaction.reply({
-        content: `Could not start MoonPay cash-out: ${err.message || err}`,
-        ephemeral: true,
-      });
-    }
+  // MoonPay was removed. These customIds are dead — the stub
+  // moonpay.js returns isConfigured()=false so the buttons never
+  // render, but catch any stale cached ephemeral that might still
+  // have them.
+  if (id === 'wallet_moonpay_deposit' || id === 'wallet_moonpay_withdraw') {
+    return interaction.reply({
+      content: 'This feature is no longer available.',
+      ephemeral: true,
+    });
   }
 
   if (id === 'wallet_refresh') {
