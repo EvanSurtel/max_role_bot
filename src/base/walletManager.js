@@ -16,10 +16,12 @@
 const { Coinbase, Wallet } = require('@coinbase/coinbase-sdk');
 const { ethers } = require('ethers');
 const { encrypt, decrypt, generateSalt } = require('../utils/crypto');
-const { getProvider } = require('./connection');
+const { getProvider, getCdpNetworkId } = require('./connection');
 
-// Native USDC on Base — NOT USDbC (legacy bridged).
-const USDC_CONTRACT = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+// Native USDC on Base — configurable for testnet.
+// Mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 (Circle native USDC)
+// Testnet: set USDC_CONTRACT_ADDRESS in .env to your test token address
+const USDC_CONTRACT = process.env.USDC_CONTRACT_ADDRESS || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const USDC_DECIMALS = 6;
 
 // Minimal ERC-20 ABI for balance/allowance queries (read-only, no signing).
@@ -59,8 +61,8 @@ function _ensureCdpInit() {
 async function generateWallet() {
   _ensureCdpInit();
 
-  // Create a wallet on Base mainnet via CDP
-  const wallet = await Wallet.create({ networkId: 'base-mainnet' });
+  // Create a wallet on Base (mainnet or sepolia depending on BASE_NETWORK)
+  const wallet = await Wallet.create({ networkId: getCdpNetworkId() });
 
   // The default address is the Smart Account address
   const defaultAddress = await wallet.getDefaultAddress();

@@ -88,8 +88,13 @@ async function main() {
   console.log(`[Deploy] Artifact saved to ${artifactPath}`);
 
   // ─── Deploy ──────────────────────────────────────────────
-  const rpcUrl = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
-  const provider = new ethers.JsonRpcProvider(rpcUrl, { name: 'base', chainId: 8453 });
+  const network = (process.env.BASE_NETWORK || 'mainnet').toLowerCase();
+  const chainId = network === 'sepolia' ? 84532 : 8453;
+  const defaultRpc = network === 'sepolia' ? 'https://sepolia.base.org' : 'https://mainnet.base.org';
+  const explorerUrl = network === 'sepolia' ? 'https://sepolia.basescan.org' : 'https://basescan.org';
+  const rpcUrl = process.env.BASE_RPC_URL || defaultRpc;
+  const provider = new ethers.JsonRpcProvider(rpcUrl, { name: network === 'sepolia' ? 'base-sepolia' : 'base', chainId });
+  console.log(`[Deploy] Network: ${network} (chain ${chainId})`);
   const deployerKey = process.env.DEPLOYER_PRIVATE_KEY;
   if (!deployerKey) {
     console.error('[Deploy] DEPLOYER_PRIVATE_KEY not set in .env');
@@ -122,7 +127,7 @@ async function main() {
   console.log();
   console.log('═'.repeat(60));
   console.log(`[Deploy] ✅ WagerEscrow deployed at: ${deployedAddress}`);
-  console.log(`[Deploy] View on BaseScan: https://basescan.org/address/${deployedAddress}`);
+  console.log(`[Deploy] View on BaseScan: ${explorerUrl}/address/${deployedAddress}`);
   console.log();
   console.log('Add this to your .env:');
   console.log(`  ESCROW_CONTRACT_ADDRESS=${deployedAddress}`);
