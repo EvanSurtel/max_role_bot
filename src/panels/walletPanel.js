@@ -78,8 +78,67 @@ async function handleWalletSubButton(interaction) {
   }
 
   if (id === 'wallet_deposit') {
+    // Region-specific deposit instructions. Group A gets Coinbase
+    // Onramp link (0% fee). Group B gets Bitget Wallet instructions
+    // (3-5% fee). Falls back to generic if no region is set.
+    const depositRegion = user.deposit_region || 'GROUP_B';
+    const address = wallet.solana_address; // legacy column name — stores Base address
+
+    if (depositRegion === 'GROUP_A' && process.env.CDP_API_KEY) {
+      // Coinbase Onramp URL — prefills the user's Base address + USDC
+      const cdpAppId = process.env.CDP_API_KEY;
+      const onrampUrl = `https://pay.coinbase.com/buy/select-asset?appId=${cdpAppId}&addresses={"${address}":["base"]}&assets=["USDC"]&defaultNetwork=base&defaultAsset=USDC`;
+
+      const openButton = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setURL(onrampUrl)
+          .setLabel('Buy USDC — No Fees')
+          .setStyle(ButtonStyle.Link),
+      );
+
+      return interaction.reply({
+        content: [
+          '**💳 Deposit USDC**',
+          '',
+          `Your deposit address (Base network):`,
+          `\`\`\`\n${address}\n\`\`\``,
+          '',
+          '**Steps:**',
+          '1. Click the button below — it opens Coinbase',
+          '2. Enter the amount you want (minimum $5)',
+          '3. Pay with card, Apple Pay, Google Pay, or bank transfer',
+          '4. USDC arrives in your wallet within a few minutes — **0% fee**',
+          '',
+          '⚠️ **ONLY send USDC on the Base network to this address.** Sending on any other network = permanent loss.',
+        ].join('\n'),
+        components: [openButton],
+        ephemeral: true,
+      });
+    }
+
+    // Group B (or no CDP key) — Bitget Wallet instructions
     return interaction.reply({
-      content: t('wallet.deposit_info', lang, { address: wallet.solana_address }),
+      content: [
+        '**💳 Deposit USDC**',
+        '',
+        `Your deposit address (Base network):`,
+        `\`\`\`\n${address}\n\`\`\``,
+        '',
+        '**Steps:**',
+        '1. Download the **Bitget Wallet** app (free, no signup needed)',
+        '   iOS: https://apps.apple.com/app/bitget-wallet/id6738866685',
+        '   Android: https://play.google.com/store/apps/details?id=com.bitget.web3',
+        '2. Open the app → tap **Buy Crypto** → select **USDC**',
+        '3. Enter the amount (minimum ~$5)',
+        '4. Pay with your card, Apple Pay, Google Pay, PIX, or bank transfer',
+        '5. First time: verify your ID once (takes a few minutes)',
+        '6. Once USDC is in your Bitget Wallet, tap **Send**',
+        '7. Paste your deposit address above and **select the Base network**',
+        '',
+        '💸 Fee: ~3.5-5% from the payment provider.',
+        '',
+        '⚠️ When sending USDC, you **MUST** select the **Base** network. Sending on any other network = **permanent loss of funds.**',
+      ].join('\n'),
       ephemeral: true,
     });
   }

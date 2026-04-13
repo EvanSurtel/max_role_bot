@@ -658,62 +658,25 @@ async function handleAdminConfirmNoWinner(interaction) {
       const challengePlayerRepo2 = require('../database/repositories/challengePlayerRepo');
       const allPlayers = challengePlayerRepo2.findByChallengeId(match.challenge_id);
 
-      // Load escrow keypair ONCE outside the loop so we don't
-      // re-parse the secret per-player. If the env var is missing
-      // we abort the refund entirely — silently continuing would
-      // mark the match completed without refunding anyone.
-      const transactionService = require('../base/transactionService');
-      let escrowSigner;
+      // Cancel the match on-chain via the smart contract.
+      // The contract refunds all players' USDC from escrow back to
+      // their individual wallets in a single transaction.
+      const escrowManager = require('../base/escrowManager');
       try {
-        escrowSigner = transactionService.getHotWalletSigner();
-      } catch {
-        escrowSigner = null;
-      }
-      if (!escrowSigner) {
-        console.error(`[MatchResult] GAS_FUNDER_PRIVATE_KEY missing — cannot refund match #${matchId}`);
-      } else {
-        const walletRepo = require('../database/repositories/walletRepo');
-        const transactionRepo = require('../database/repositories/transactionRepo');
+        await escrowManager.cancelOnChainMatch(
+          matchId,
+          match.challenge_id,
+          allPlayers,
+          challenge.entry_amount_usdc,
+        );
+      } catch (err) {
+        console.error(`[MatchResult] On-chain cancel failed for match #${matchId}:`, err.message);
         const { postTransaction } = require('../utils/transactionFeed');
-        const userRepo = require('../database/repositories/userRepo');
-
-        // Refund each player their entry amount from escrow
-        for (const player of allPlayers) {
-          try {
-            const walletRecord = walletRepo.findByUserId(player.user_id);
-            if (!walletRecord) continue;
-
-            const { signature } = await transactionService.transferUsdc(
-              escrowSigner,
-              walletRecord.solana_address,
-              challenge.entry_amount_usdc,
-            );
-
-            // Use creditAvailable (re-reads the wallet inside a
-            // transaction) instead of the old pattern which
-            // snapshotted balance_available BEFORE the await and
-            // then wrote `snapshot + entry`, clobbering any
-            // deposit/withdraw/hold that happened in the meantime.
-            walletRepo.creditAvailable(player.user_id, challenge.entry_amount_usdc);
-
-            transactionRepo.create({
-              type: 'refund',
-              userId: player.user_id,
-              challengeId: match.challenge_id,
-              amountUsdc: challenge.entry_amount_usdc,
-              solanaTxSignature: signature,
-              fromAddress: escrowSigner.address,
-              toAddress: walletRecord.solana_address,
-              status: 'completed',
-              memo: `Refund (no winner) for challenge #${match.challenge_id}`,
-            });
-
-            const userRecord = userRepo.findById(player.user_id);
-            postTransaction({ type: 'release', username: userRecord?.server_username, discordId: userRecord?.discord_id, amount: `$${(Number(challenge.entry_amount_usdc) / 1000000).toFixed(2)}`, currency: 'USDC', signature, challengeId: match.challenge_id, memo: `Refund (no winner)` });
-          } catch (err) {
-            console.error(`[MatchResult] Failed to refund player ${player.user_id}:`, err.message);
-          }
-        }
+        postTransaction({
+          type: 'balance_mismatch',
+          challengeId: match.challenge_id,
+          memo: `🚨 On-chain cancel FAILED for match #${matchId} (no winner). Error: ${err.message}`,
+        });
       }
     }
 

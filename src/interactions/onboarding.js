@@ -192,10 +192,26 @@ async function handleRegistrationModal(interaction) {
     // Accept TOS and store profile
     userRepo.acceptTos(user.id);
     const db = require('../database/db');
+
+    // Determine deposit region from the server/country selection.
+    // Group A (Coinbase Onramp, 0% fee): US, UK, Canada, EU, Australia, Switzerland, Singapore, Japan
+    // Group B (Bitget Wallet, 3-5% fee): everyone else (LATAM, Africa, Asia, etc.)
+    const GROUP_A_REGIONS = new Set(['na']);
+    const GROUP_A_COUNTRIES = new Set([
+      '🇺🇸', '🇬🇧', '🇨🇦', '🇦🇺', '🇨🇭', '🇸🇬', '🇯🇵',
+      // EU flags
+      '🇦🇹', '🇧🇪', '🇧🇬', '🇭🇷', '🇨🇾', '🇨🇿', '🇩🇰', '🇪🇪', '🇫🇮', '🇫🇷',
+      '🇩🇪', '🇬🇷', '🇭🇺', '🇮🇪', '🇮🇹', '🇱🇻', '🇱🇹', '🇱🇺', '🇲🇹', '🇳🇱',
+      '🇵🇱', '🇵🇹', '🇷🇴', '🇸🇰', '🇸🇮', '🇪🇸', '🇸🇪',
+    ]);
+    const depositRegion = (GROUP_A_REGIONS.has(region) || GROUP_A_COUNTRIES.has(country))
+      ? 'GROUP_A'
+      : 'GROUP_B';
+
     db.prepare(`
-      UPDATE users SET server_username = ?, cod_ign = ?, cod_uid = ?, cod_server = ?, country_flag = ?, region = ?, tos_accepted_at = datetime('now')
+      UPDATE users SET server_username = ?, cod_ign = ?, cod_uid = ?, cod_server = ?, country_flag = ?, region = ?, deposit_region = ?, tos_accepted_at = datetime('now')
       WHERE id = ?
-    `).run(displayName, codIgn, codUid, serverInput, country, region, user.id);
+    `).run(displayName, codIgn, codUid, serverInput, country, region, depositRegion, user.id);
 
     // Generate Base wallet (Ethereum keypair)
     let wallet = walletRepo.findByUserId(user.id);

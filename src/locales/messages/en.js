@@ -36,10 +36,10 @@ module.exports = {
     onboarding_required: 'You need to complete onboarding first.',
     user_not_found: 'User not found.',
     wallet_not_found: 'Wallet not found.',
-    invalid_address: 'Invalid Solana address.',
+    invalid_address: 'Invalid address. Please enter a valid Base (0x) address.',
     amount_must_be_positive: 'Amount must be greater than 0.',
     insufficient_balance: 'Insufficient balance. You have **${available} USDC** available.',
-    insufficient_sol: 'Insufficient SOL. You have ~**{available} SOL** available after reserves.',
+    insufficient_sol: 'Insufficient ETH for gas fees. Please contact an admin.',
     please_wait: 'Please wait, another transaction is in progress.',
     language_changed: 'Language updated.',
     not_registered: 'You must complete registration with your COD Mobile UID first.',
@@ -170,7 +170,7 @@ module.exports = {
 
   wallet_embed: {
     title: '{username}\'s Wallet',
-    address: 'Solana Address',
+    address: 'Base Address',
     available: 'Available',
     held: 'Held in Wagers',
     footer: 'Use the buttons below to manage your wallet',
@@ -231,7 +231,7 @@ module.exports = {
     description: 'Wager **USDC** on Call of Duty Mobile matches.\n\nClick **Create Wager** to challenge other players.',
     btn_create_wager: 'Create Wager',
     btn_create_dispute: 'Create Dispute',
-    footer: 'Powered by Solana',
+    footer: 'Powered by Base',
   },
 
   xp_panel: {
