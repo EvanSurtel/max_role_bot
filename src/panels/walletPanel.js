@@ -433,7 +433,7 @@ async function _executeUsdcWithdraw(interaction, user, amountUsdc, address, lang
       return interaction.editReply({ content: t('common.insufficient_balance', lang, { available: availableFormatted }) });
     }
 
-    const senderKeypair = walletManager.getKeypairFromEncrypted(
+    const senderKeypair = await walletManager.getKeypairFromEncrypted(
       freshWallet.encrypted_private_key,
       freshWallet.encryption_iv,
       freshWallet.encryption_tag,
@@ -573,7 +573,7 @@ async function _executeSolWithdraw(interaction, user, amountSol, address, lang) 
       });
     }
 
-    const senderWallet = walletManager.getWalletFromEncrypted(
+    const senderWallet = await walletManager.getWalletFromEncrypted(
       wallet.encrypted_private_key,
       wallet.encryption_iv,
       wallet.encryption_tag,

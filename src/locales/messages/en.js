@@ -69,7 +69,7 @@ module.exports = {
   public_wallet: {
     title: '💰 Wallet',
     description: 'Click **View My Wallet** below to see your balance, deposit address, transaction history, and manage your funds.\n\nYour wallet info is **private** — only you can see your own balance and actions.',
-    footer: 'USDC + SOL on Solana',
+    footer: 'USDC on Base',
     btn_view_wallet: 'View My Wallet',
   },
 
@@ -89,7 +89,7 @@ module.exports = {
   transaction_dm: {
     deposit: '✅ **Deposit successful!**\n\nYou received **{amount} {currency}** in your wallet.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
     withdrawal: '✅ **Withdrawal successful!**\n\nYou sent **{amount} {currency}** to {to}.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
-    sol_withdrawal: '✅ **SOL withdrawal successful!**\n\nYou sent **{amount} {currency}** to {to}.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
+    sol_withdrawal: '✅ **ETH withdrawal successful!**',
     disbursement: '🏆 **Match winnings received!**\n\nYou received **{amount} {currency}** from your match.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
     release: '🔓 **Wager refunded**\n\n**{amount} {currency}** has been returned to your available balance.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
     refund: '🔓 **Refund received**\n\nYou received **{amount} {currency}** as a refund.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
@@ -448,9 +448,9 @@ module.exports = {
   // Escrow wallet panel (admin)
   escrow_panel: {
     title: 'Escrow Wallet',
-    not_configured: 'ESCROW_WALLET_SECRET not configured.',
+    not_configured: 'Escrow contract not configured. Set ESCROW_CONTRACT_ADDRESS in .env.',
     address_label: '**Address:**',
-    field_sol: 'SOL Balance',
+    field_sol: 'ETH Balance',
     field_usdc: 'USDC Balance',
     field_active: 'Active Matches',
     field_disputed: 'Disputed Matches',
