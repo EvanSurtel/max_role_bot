@@ -18,6 +18,7 @@
     "better-sqlite3": "^11.7.0",
     "discord.js": "^14.16.0",
     "dotenv": "^16.4.0",
+    "ethers": "^6.16.0",
     "express": "^5.2.1"
   }
 }
