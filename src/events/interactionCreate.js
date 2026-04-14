@@ -387,6 +387,10 @@ module.exports = {
         if (id === 'inline_lang_select') {
           return await languageSwitcher.handleInlineLanguageSelect(interaction);
         }
+        // Registration region dropdown
+        if (id.startsWith('reg_region_select_')) {
+          return await onboarding.handleRegionSelect(interaction);
+        }
         // Per-message language picks (challenge / result specific)
         if (id.startsWith('pml_pick_ch_')) {
           return await perMessageLanguage.handlePickLangForChallenge(interaction);

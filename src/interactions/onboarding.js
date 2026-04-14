@@ -78,16 +78,6 @@ async function handleButton(interaction) {
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
-          .setCustomId('reg_server')
-          .setLabel(t('onboarding.modal_server_label', lang))
-          .setPlaceholder(t('onboarding.modal_server_placeholder', lang))
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMinLength(1)
-          .setMaxLength(20),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
           .setCustomId('reg_country')
           .setLabel(t('onboarding.modal_country_label', lang))
           .setPlaceholder(t('onboarding.modal_country_placeholder', lang))
@@ -133,7 +123,6 @@ async function handleRegistrationModal(interaction) {
   const displayName = interaction.fields.getTextInputValue('reg_display_name').trim();
   const codIgn = interaction.fields.getTextInputValue('reg_cod_ign').trim();
   const codUid = interaction.fields.getTextInputValue('reg_cod_uid').trim();
-  const serverInput = interaction.fields.getTextInputValue('reg_server').trim();
   const country = interaction.fields.getTextInputValue('reg_country').trim();
 
   // Validate CODM UID:
@@ -165,41 +154,67 @@ async function handleRegistrationModal(interaction) {
     });
   }
 
-  // Map server to leaderboard region
-  const regionKey = serverInput.toLowerCase();
-  const region = SERVER_TO_REGION[regionKey] || null;
-  const validRegions = ['na', 'latam', 'eu', 'asia'];
-  if (!region || !validRegions.includes(region)) {
-    return interaction.reply({
-      content: t('onboarding.invalid_region', lang),
-      ephemeral: true,
-    });
+  // Store modal data temporarily and show region dropdown
+  const { StringSelectMenuBuilder } = require('discord.js');
+  const regionSelect = new StringSelectMenuBuilder()
+    .setCustomId(`reg_region_select_${discordId}`)
+    .setPlaceholder('Select your region')
+    .addOptions([
+      { label: 'NA (North America)', value: 'na' },
+      { label: 'EU (Europe)', value: 'eu' },
+      { label: 'LATAM (Latin America)', value: 'latam' },
+      { label: 'Asia / Oceania', value: 'asia' },
+      { label: 'Middle East / Africa', value: 'mea' },
+    ]);
+
+  // Cache the modal data so we can use it when they pick a region
+  if (!global._pendingRegistrations) global._pendingRegistrations = new Map();
+  global._pendingRegistrations.set(discordId, { displayName, codIgn, codUid, country, lang });
+
+  // Auto-expire after 5 minutes
+  setTimeout(() => global._pendingRegistrations.delete(discordId), 5 * 60 * 1000);
+
+  return interaction.reply({
+    content: '**Select your region:**',
+    components: [new ActionRowBuilder().addComponents(regionSelect)],
+    ephemeral: true,
+  });
+}
+
+/**
+ * Handle the region dropdown selection after the registration modal.
+ * This completes the registration: creates wallet, assigns roles, etc.
+ */
+async function handleRegionSelect(interaction) {
+  const discordId = interaction.user.id;
+  const pending = global._pendingRegistrations?.get(discordId);
+  if (!pending) {
+    return interaction.reply({ content: 'Registration expired. Please click Accept again.', ephemeral: true });
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  const region = interaction.values[0];
+  const { displayName, codIgn, codUid, country, lang } = pending;
+  global._pendingRegistrations.delete(discordId);
+
+  await interaction.deferUpdate();
 
   try {
-    // Create or get user
     let user = userRepo.findByDiscordId(discordId);
     if (!user) {
       user = userRepo.create(discordId);
     }
 
     if (user.accepted_tos === 1) {
-      return interaction.editReply({ content: t('onboarding.already_registered', lang) });
+      return interaction.editReply({ content: t('onboarding.already_registered', lang), components: [] });
     }
 
-    // Accept TOS and store profile
     userRepo.acceptTos(user.id);
     const db = require('../database/db');
 
-    // Determine deposit region from the server/country selection.
-    // Group A (Coinbase Onramp, 0% fee): US, UK, Canada, EU, Australia, Switzerland, Singapore, Japan
-    // Group B (Changelly, ~4-5% fee): everyone else (LATAM, Africa, Asia, etc.)
-    const GROUP_A_REGIONS = new Set(['na']);
+    // Determine deposit region
+    const GROUP_A_REGIONS = new Set(['na', 'eu']);
     const GROUP_A_COUNTRIES = new Set([
       '🇺🇸', '🇬🇧', '🇨🇦', '🇦🇺', '🇨🇭', '🇸🇬', '🇯🇵',
-      // EU flags
       '🇦🇹', '🇧🇪', '🇧🇬', '🇭🇷', '🇨🇾', '🇨🇿', '🇩🇰', '🇪🇪', '🇫🇮', '🇫🇷',
       '🇩🇪', '🇬🇷', '🇭🇺', '🇮🇪', '🇮🇹', '🇱🇻', '🇱🇹', '🇱🇺', '🇲🇹', '🇳🇱',
       '🇵🇱', '🇵🇹', '🇷🇴', '🇸🇰', '🇸🇮', '🇪🇸', '🇸🇪',
@@ -208,37 +223,35 @@ async function handleRegistrationModal(interaction) {
       ? 'GROUP_A'
       : 'GROUP_B';
 
+    const regionLabel = { na: 'NA', eu: 'EU', latam: 'LATAM', asia: 'Asia', mea: 'MEA' }[region] || region.toUpperCase();
+
     db.prepare(`
       UPDATE users SET server_username = ?, cod_ign = ?, cod_uid = ?, cod_server = ?, country_flag = ?, region = ?, deposit_region = ?, tos_accepted_at = datetime('now')
       WHERE id = ?
-    `).run(displayName, codIgn, codUid, serverInput, country, region, depositRegion, user.id);
+    `).run(displayName, codIgn, codUid, regionLabel, country, region, depositRegion, user.id);
 
-    // Generate Base wallet (Ethereum keypair)
+    // Generate Base wallet
     let wallet = walletRepo.findByUserId(user.id);
     if (!wallet) {
       const { address, encryptedPrivateKey, iv, tag, salt } = await walletManager.generateWallet(user.id);
       wallet = walletRepo.create({
         userId: user.id,
-        solanaAddress: address, // legacy column name — stores Base address
+        solanaAddress: address,
         encryptedPrivateKey,
         encryptionIv: iv,
         encryptionTag: tag,
         encryptionSalt: salt,
       });
 
-      // Approve the escrow contract to spend USDC from this wallet.
-      // One-time operation — sets allowance to max so future match
-      // deposits work without another approve call.
       try {
         const { approveEscrowForUser } = require('../base/escrowManager');
         await approveEscrowForUser(user.id);
       } catch (err) {
         console.warn(`[Onboarding] Escrow approval failed for user ${user.id}:`, err.message);
-        // Non-fatal — will be retried before their first match
       }
     }
 
-    // Assign verified/member role
+    // Assign member role
     const guild = interaction.guild;
     const memberRoleId = process.env.MEMBER_ROLE_ID;
     if (memberRoleId) {
@@ -250,7 +263,7 @@ async function handleRegistrationModal(interaction) {
       }
     }
 
-    // Set nickname to display name
+    // Set nickname
     try {
       const member = await guild.members.fetch(discordId);
       await member.setNickname(`${country} ${displayName} [500]`);
@@ -258,11 +271,7 @@ async function handleRegistrationModal(interaction) {
       console.warn(`[Onboarding] Could not set nickname:`, err.message);
     }
 
-    // Register IGN with NeatQueue + seed the starting XP balance.
-    // Must happen BEFORE the rank role sync so the user is actually
-    // on the NeatQueue leaderboard when syncRank queries it — otherwise
-    // the user would fall through to local xp_points (still correct,
-    // but NeatQueue should be the source of truth for everyone).
+    // NeatQueue sync
     if (neatqueueService.isConfigured()) {
       try {
         await syncIgnToNeatQueue(discordId, codIgn);
@@ -270,20 +279,13 @@ async function handleRegistrationModal(interaction) {
         console.error(`[Onboarding] NeatQueue IGN sync failed:`, err.message);
       }
       try {
-        // setPoints (not addPoints) — we want the user to land on
-        // exactly 500 on NeatQueue, not "500 more than whatever was
-        // there". Using the additive addPoints here once gave a
-        // user 1500 XP because they already had 1000 points from
-        // earlier testing.
         await neatqueueService.setPoints(discordId, 500);
       } catch (err) {
         console.error(`[Onboarding] NeatQueue starting-points seed failed:`, err.message);
       }
     }
 
-    // Grant the starting rank role (Bronze at 500 XP under the
-    // default progression). Non-blocking — onboarding still succeeds
-    // if the rank role env vars aren't configured yet.
+    // Rank role
     try {
       const { syncRank } = require('../utils/rankRoleSync');
       await syncRank(interaction.client, user.id);
@@ -291,11 +293,7 @@ async function handleRegistrationModal(interaction) {
       console.warn(`[Onboarding] Rank role sync failed:`, err.message);
     }
 
-    // NO per-user wallet channel anymore. The public #wallet channel serves
-    // all users — they click "View My Wallet" there to see their balance and
-    // manage their funds as an ephemeral in their own language.
-
-    // Send registration complete embed in the user's language
+    // Registration complete embed
     const walletChannelMention = process.env.WALLET_CHANNEL_ID
       ? `<#${process.env.WALLET_CHANNEL_ID}>`
       : '**#wallet**';
@@ -310,7 +308,7 @@ async function handleRegistrationModal(interaction) {
         `**${t('onboarding.complete_field_name', lang)}:** ${displayName}`,
         `**${t('onboarding.complete_field_ign', lang)}:** ${codIgn}`,
         `**${t('onboarding.complete_field_uid', lang)}:** ${codUid}`,
-        `**${t('onboarding.complete_field_region', lang)}:** ${serverInput}`,
+        `**${t('onboarding.complete_field_region', lang)}:** ${regionLabel}`,
         '',
         `**${t('onboarding.complete_wallet_header', lang)}**`,
         t('onboarding.complete_wallet_text', lang, { channel: walletChannelMention }),
@@ -324,9 +322,9 @@ async function handleRegistrationModal(interaction) {
         t('onboarding.complete_good_luck', lang),
       ].join('\n'));
 
-    await interaction.editReply({ embeds: [completeEmbed] });
+    await interaction.editReply({ embeds: [completeEmbed], components: [], content: '' });
 
-    // Notify admins in the admin alerts channel
+    // Admin notification
     const alertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
     if (alertChannelId) {
       try {
@@ -341,8 +339,7 @@ async function handleRegistrationModal(interaction) {
               `**Display Name:** ${displayName}`,
               `**COD IGN:** ${codIgn}`,
               `**COD UID:** ${codUid}`,
-              `**Server:** ${serverInput}`,
-              `**Region:** ${region}`,
+              `**Region:** ${regionLabel}`,
               `**Country:** ${country}`,
               `**Wallet:** \`${wallet.solana_address}\``,
             ].join('\n'))
@@ -356,14 +353,13 @@ async function handleRegistrationModal(interaction) {
 
     console.log(`[Onboarding] ${displayName} (${discordId}) registered: IGN=${codIgn}, UID=${codUid}, region=${region}`);
 
-    // Post to admin transaction feed
     try {
       const { postTransaction } = require('../utils/transactionFeed');
       postTransaction({
         type: 'user_registered',
         username: displayName,
         discordId,
-        memo: `${country} ${displayName} | IGN: ${codIgn} | UID: ${codUid} | Region: ${region.toUpperCase()} | Wallet: ${wallet.solana_address}`,
+        memo: `${country} ${displayName} | IGN: ${codIgn} | UID: ${codUid} | Region: ${regionLabel} | Wallet: ${wallet.solana_address}`,
       });
     } catch { /* */ }
 
@@ -371,6 +367,7 @@ async function handleRegistrationModal(interaction) {
     console.error('[Onboarding] Error during registration:', err);
     await interaction.editReply({
       content: t('onboarding.registration_failed', lang),
+      components: [],
     });
   }
 }
@@ -512,6 +509,7 @@ async function _handleAnyLanguageSelect(interaction, logPrefix) {
 module.exports = {
   handleButton,
   handleRegistrationModal,
+  handleRegionSelect,
   sendWalletPanel,
   handleWalletRefresh,
   handleWelcomeLanguageMaster,
