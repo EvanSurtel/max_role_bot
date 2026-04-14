@@ -23,6 +23,100 @@ const SERVER_TO_REGION = {
   'vietnam': 'asia', 'india': 'asia', 'middle east': 'asia', 'oceania': 'asia',
 };
 
+const COUNTRY_FLAGS = {
+  na: [
+    { label: '🇺🇸 United States', value: '🇺🇸' },
+    { label: '🇨🇦 Canada', value: '🇨🇦' },
+  ],
+  eu: [
+    { label: '🇬🇧 United Kingdom', value: '🇬🇧' },
+    { label: '🇩🇪 Germany', value: '🇩🇪' },
+    { label: '🇫🇷 France', value: '🇫🇷' },
+    { label: '🇪🇸 Spain', value: '🇪🇸' },
+    { label: '🇮🇹 Italy', value: '🇮🇹' },
+    { label: '🇳🇱 Netherlands', value: '🇳🇱' },
+    { label: '🇵🇱 Poland', value: '🇵🇱' },
+    { label: '🇵🇹 Portugal', value: '🇵🇹' },
+    { label: '🇸🇪 Sweden', value: '🇸🇪' },
+    { label: '🇧🇪 Belgium', value: '🇧🇪' },
+    { label: '🇦🇹 Austria', value: '🇦🇹' },
+    { label: '🇨🇭 Switzerland', value: '🇨🇭' },
+    { label: '🇮🇪 Ireland', value: '🇮🇪' },
+    { label: '🇩🇰 Denmark', value: '🇩🇰' },
+    { label: '🇫🇮 Finland', value: '🇫🇮' },
+    { label: '🇳🇴 Norway', value: '🇳🇴' },
+    { label: '🇬🇷 Greece', value: '🇬🇷' },
+    { label: '🇷🇴 Romania', value: '🇷🇴' },
+    { label: '🇨🇿 Czech Republic', value: '🇨🇿' },
+    { label: '🇭🇺 Hungary', value: '🇭🇺' },
+    { label: '🇷🇺 Russia', value: '🇷🇺' },
+    { label: '🇺🇦 Ukraine', value: '🇺🇦' },
+    { label: '🇹🇷 Turkey', value: '🇹🇷' },
+  ],
+  latam: [
+    { label: '🇧🇷 Brazil', value: '🇧🇷' },
+    { label: '🇲🇽 Mexico', value: '🇲🇽' },
+    { label: '🇦🇷 Argentina', value: '🇦🇷' },
+    { label: '🇨🇴 Colombia', value: '🇨🇴' },
+    { label: '🇨🇱 Chile', value: '🇨🇱' },
+    { label: '🇵🇪 Peru', value: '🇵🇪' },
+    { label: '🇻🇪 Venezuela', value: '🇻🇪' },
+    { label: '🇪🇨 Ecuador', value: '🇪🇨' },
+    { label: '🇨🇷 Costa Rica', value: '🇨🇷' },
+    { label: '🇵🇦 Panama', value: '🇵🇦' },
+    { label: '🇬🇹 Guatemala', value: '🇬🇹' },
+    { label: '🇵🇷 Puerto Rico', value: '🇵🇷' },
+    { label: '🇩🇴 Dominican Republic', value: '🇩🇴' },
+    { label: '🇺🇾 Uruguay', value: '🇺🇾' },
+    { label: '🇧🇴 Bolivia', value: '🇧🇴' },
+    { label: '🇵🇾 Paraguay', value: '🇵🇾' },
+    { label: '🇭🇳 Honduras', value: '🇭🇳' },
+    { label: '🇸🇻 El Salvador', value: '🇸🇻' },
+    { label: '🇳🇮 Nicaragua', value: '🇳🇮' },
+    { label: '🇨🇺 Cuba', value: '🇨🇺' },
+  ],
+  asia: [
+    { label: '🇮🇳 India', value: '🇮🇳' },
+    { label: '🇵🇭 Philippines', value: '🇵🇭' },
+    { label: '🇮🇩 Indonesia', value: '🇮🇩' },
+    { label: '🇹🇭 Thailand', value: '🇹🇭' },
+    { label: '🇻🇳 Vietnam', value: '🇻🇳' },
+    { label: '🇲🇾 Malaysia', value: '🇲🇾' },
+    { label: '🇸🇬 Singapore', value: '🇸🇬' },
+    { label: '🇯🇵 Japan', value: '🇯🇵' },
+    { label: '🇰🇷 South Korea', value: '🇰🇷' },
+    { label: '🇨🇳 China', value: '🇨🇳' },
+    { label: '🇹🇼 Taiwan', value: '🇹🇼' },
+    { label: '🇵🇰 Pakistan', value: '🇵🇰' },
+    { label: '🇧🇩 Bangladesh', value: '🇧🇩' },
+    { label: '🇱🇰 Sri Lanka', value: '🇱🇰' },
+    { label: '🇳🇵 Nepal', value: '🇳🇵' },
+    { label: '🇲🇲 Myanmar', value: '🇲🇲' },
+    { label: '🇰🇭 Cambodia', value: '🇰🇭' },
+    { label: '🇦🇺 Australia', value: '🇦🇺' },
+    { label: '🇳🇿 New Zealand', value: '🇳🇿' },
+  ],
+  mea: [
+    { label: '🇸🇦 Saudi Arabia', value: '🇸🇦' },
+    { label: '🇦🇪 UAE', value: '🇦🇪' },
+    { label: '🇪🇬 Egypt', value: '🇪🇬' },
+    { label: '🇶🇦 Qatar', value: '🇶🇦' },
+    { label: '🇰🇼 Kuwait', value: '🇰🇼' },
+    { label: '🇧🇭 Bahrain', value: '🇧🇭' },
+    { label: '🇴🇲 Oman', value: '🇴🇲' },
+    { label: '🇯🇴 Jordan', value: '🇯🇴' },
+    { label: '🇱🇧 Lebanon', value: '🇱🇧' },
+    { label: '🇮🇶 Iraq', value: '🇮🇶' },
+    { label: '🇳🇬 Nigeria', value: '🇳🇬' },
+    { label: '🇿🇦 South Africa', value: '🇿🇦' },
+    { label: '🇰🇪 Kenya', value: '🇰🇪' },
+    { label: '🇬🇭 Ghana', value: '🇬🇭' },
+    { label: '🇲🇦 Morocco', value: '🇲🇦' },
+    { label: '🇹🇳 Tunisia', value: '🇹🇳' },
+    { label: '🇩🇿 Algeria', value: '🇩🇿' },
+  ],
+};
+
 /**
  * Handle button interactions for onboarding.
  */
@@ -33,62 +127,29 @@ async function handleButton(interaction) {
     const discordId = interaction.user.id;
     const lang = langFor(interaction);
 
-    // Check if already registered
     const existingUser = userRepo.findByDiscordId(discordId);
     if (existingUser && existingUser.accepted_tos === 1) {
-      await interaction.reply({ content: t('onboarding.already_registered', lang), ephemeral: true });
-      return;
+      return interaction.reply({ content: t('onboarding.already_registered', lang), ephemeral: true });
     }
 
-    // Show registration modal in the user's language
-    const modal = new ModalBuilder()
-      .setCustomId('registration_modal')
-      .setTitle(t('onboarding.modal_title', lang));
+    // Step 1: Region dropdown
+    const { StringSelectMenuBuilder } = require('discord.js');
+    const regionSelect = new StringSelectMenuBuilder()
+      .setCustomId(`reg_region_select_${discordId}`)
+      .setPlaceholder('Select your region')
+      .addOptions([
+        { label: 'NA (North America)', value: 'na' },
+        { label: 'EU (Europe)', value: 'eu' },
+        { label: 'LATAM (Latin America)', value: 'latam' },
+        { label: 'Asia / Oceania', value: 'asia' },
+        { label: 'Middle East / Africa', value: 'mea' },
+      ]);
 
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('reg_display_name')
-          .setLabel(t('onboarding.modal_display_name_label', lang))
-          .setPlaceholder(t('onboarding.modal_display_name_placeholder', lang))
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMinLength(1)
-          .setMaxLength(30),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('reg_cod_ign')
-          .setLabel(t('onboarding.modal_cod_ign_label', lang))
-          .setPlaceholder(t('onboarding.modal_cod_ign_placeholder', lang))
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMinLength(1)
-          .setMaxLength(30),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('reg_cod_uid')
-          .setLabel(t('onboarding.modal_cod_uid_label', lang))
-          .setPlaceholder(t('onboarding.modal_cod_uid_placeholder', lang))
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMinLength(5)
-          .setMaxLength(20),
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('reg_country')
-          .setLabel(t('onboarding.modal_country_label', lang))
-          .setPlaceholder(t('onboarding.modal_country_placeholder', lang))
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setMinLength(1)
-          .setMaxLength(10),
-      ),
-    );
-
-    return interaction.showModal(modal);
+    return interaction.reply({
+      content: '**Step 1/4 -- Select your region:**',
+      components: [new ActionRowBuilder().addComponents(regionSelect)],
+      ephemeral: true,
+    });
   }
 
   if (id === 'tos_decline') {
@@ -115,15 +176,25 @@ async function handleButton(interaction) {
 
 /**
  * Handle the registration modal submission.
+ * Reads 3 fields (Display Name, COD IGN, COD UID) — region and country
+ * were already collected via dropdowns and stored in global._pendingRegistrations.
  */
 async function handleRegistrationModal(interaction) {
   const discordId = interaction.user.id;
   const lang = langFor(interaction);
 
+  // Retrieve region + country stored earlier by the dropdown steps
+  const pending = global._pendingRegistrations?.get(discordId);
+  if (!pending || !pending.region || !pending.country) {
+    return interaction.reply({ content: 'Registration expired. Please click Accept again.', ephemeral: true });
+  }
+
+  const { region, country } = pending;
+  global._pendingRegistrations.delete(discordId);
+
   const displayName = interaction.fields.getTextInputValue('reg_display_name').trim();
   const codIgn = interaction.fields.getTextInputValue('reg_cod_ign').trim();
   const codUid = interaction.fields.getTextInputValue('reg_cod_uid').trim();
-  const country = interaction.fields.getTextInputValue('reg_country').trim();
 
   // Validate CODM UID:
   // - Must be numeric
@@ -154,49 +225,8 @@ async function handleRegistrationModal(interaction) {
     });
   }
 
-  // Store modal data temporarily and show region dropdown
-  const { StringSelectMenuBuilder } = require('discord.js');
-  const regionSelect = new StringSelectMenuBuilder()
-    .setCustomId(`reg_region_select_${discordId}`)
-    .setPlaceholder('Select your region')
-    .addOptions([
-      { label: 'NA (North America)', value: 'na' },
-      { label: 'EU (Europe)', value: 'eu' },
-      { label: 'LATAM (Latin America)', value: 'latam' },
-      { label: 'Asia / Oceania', value: 'asia' },
-      { label: 'Middle East / Africa', value: 'mea' },
-    ]);
-
-  // Cache the modal data so we can use it when they pick a region
-  if (!global._pendingRegistrations) global._pendingRegistrations = new Map();
-  global._pendingRegistrations.set(discordId, { displayName, codIgn, codUid, country, lang });
-
-  // Auto-expire after 5 minutes
-  setTimeout(() => global._pendingRegistrations.delete(discordId), 5 * 60 * 1000);
-
-  return interaction.reply({
-    content: '**Select your region:**',
-    components: [new ActionRowBuilder().addComponents(regionSelect)],
-    ephemeral: true,
-  });
-}
-
-/**
- * Handle the region dropdown selection after the registration modal.
- * This completes the registration: creates wallet, assigns roles, etc.
- */
-async function handleRegionSelect(interaction) {
-  const discordId = interaction.user.id;
-  const pending = global._pendingRegistrations?.get(discordId);
-  if (!pending) {
-    return interaction.reply({ content: 'Registration expired. Please click Accept again.', ephemeral: true });
-  }
-
-  const region = interaction.values[0];
-  const { displayName, codIgn, codUid, country, lang } = pending;
-  global._pendingRegistrations.delete(discordId);
-
-  await interaction.deferUpdate();
+  // --- Full registration (wallet, roles, NeatQueue, nickname, etc.) ---
+  await interaction.deferReply({ ephemeral: true });
 
   try {
     let user = userRepo.findByDiscordId(discordId);
@@ -209,7 +239,6 @@ async function handleRegionSelect(interaction) {
     }
 
     userRepo.acceptTos(user.id);
-    const db = require('../database/db');
 
     // Determine deposit region
     const GROUP_A_REGIONS = new Set(['na', 'eu']);
@@ -373,6 +402,103 @@ async function handleRegionSelect(interaction) {
 }
 
 /**
+ * Handle the region dropdown selection (Step 1).
+ * Stores the selected region in the pending cache and shows the country flag dropdown.
+ */
+async function handleRegionSelect(interaction) {
+  const discordId = interaction.user.id;
+  const region = interaction.values[0];
+
+  // Initialize pending cache
+  if (!global._pendingRegistrations) global._pendingRegistrations = new Map();
+
+  // Store region; auto-expire after 5 minutes
+  global._pendingRegistrations.set(discordId, { region });
+  setTimeout(() => {
+    const p = global._pendingRegistrations?.get(discordId);
+    if (p && !p.country) global._pendingRegistrations.delete(discordId);
+  }, 5 * 60 * 1000);
+
+  // Build country flag dropdown filtered by region
+  const flags = COUNTRY_FLAGS[region];
+  if (!flags || flags.length === 0) {
+    return interaction.update({ content: 'No countries found for that region. Please try again.', components: [] });
+  }
+
+  const { StringSelectMenuBuilder } = require('discord.js');
+  const countrySelect = new StringSelectMenuBuilder()
+    .setCustomId(`reg_country_select_${discordId}`)
+    .setPlaceholder('Select your country')
+    .addOptions(flags.slice(0, 25)); // Discord max 25 options
+
+  const regionLabel = { na: 'NA', eu: 'EU', latam: 'LATAM', asia: 'Asia/Oceania', mea: 'Middle East/Africa' }[region] || region;
+
+  return interaction.update({
+    content: `**Step 2/4 -- Region: ${regionLabel}**\nSelect your country:`,
+    components: [new ActionRowBuilder().addComponents(countrySelect)],
+  });
+}
+
+/**
+ * Handle the country flag dropdown selection (Step 2).
+ * Stores the selected country flag in the pending cache and opens the
+ * 3-field registration modal (Display Name, COD IGN, COD UID).
+ */
+async function handleCountrySelect(interaction) {
+  const discordId = interaction.user.id;
+  const country = interaction.values[0];
+
+  const pending = global._pendingRegistrations?.get(discordId);
+  if (!pending || !pending.region) {
+    return interaction.reply({ content: 'Registration expired. Please click Accept again.', ephemeral: true });
+  }
+
+  // Store country in cache
+  pending.country = country;
+
+  // Auto-expire after 5 minutes
+  setTimeout(() => global._pendingRegistrations.delete(discordId), 5 * 60 * 1000);
+
+  // Open 3-field registration modal
+  const modal = new ModalBuilder()
+    .setCustomId('registration_modal')
+    .setTitle('Register for Rank $');
+
+  const displayNameInput = new TextInputBuilder()
+    .setCustomId('reg_display_name')
+    .setLabel('Display Name')
+    .setPlaceholder('Your name in the server')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(32);
+
+  const codIgnInput = new TextInputBuilder()
+    .setCustomId('reg_cod_ign')
+    .setLabel('COD Mobile IGN (In-Game Name)')
+    .setPlaceholder('Your exact CODM username')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(50);
+
+  const codUidInput = new TextInputBuilder()
+    .setCustomId('reg_cod_uid')
+    .setLabel('COD Mobile UID (13-19 digits)')
+    .setPlaceholder('e.g. 6742801234567890123')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMinLength(13)
+    .setMaxLength(19);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(displayNameInput),
+    new ActionRowBuilder().addComponents(codIgnInput),
+    new ActionRowBuilder().addComponents(codUidInput),
+  );
+
+  return interaction.showModal(modal);
+}
+
+/**
  * Sync IGN to NeatQueue via their API.
  */
 async function syncIgnToNeatQueue(discordUserId, ign) {
@@ -510,6 +636,7 @@ module.exports = {
   handleButton,
   handleRegistrationModal,
   handleRegionSelect,
+  handleCountrySelect,
   sendWalletPanel,
   handleWalletRefresh,
   handleWelcomeLanguageMaster,

@@ -391,6 +391,10 @@ module.exports = {
         if (id.startsWith('reg_region_select_')) {
           return await onboarding.handleRegionSelect(interaction);
         }
+        // Registration country flag dropdown
+        if (id.startsWith('reg_country_select_')) {
+          return await onboarding.handleCountrySelect(interaction);
+        }
         // Per-message language picks (challenge / result specific)
         if (id.startsWith('pml_pick_ch_')) {
           return await perMessageLanguage.handlePickLangForChallenge(interaction);
