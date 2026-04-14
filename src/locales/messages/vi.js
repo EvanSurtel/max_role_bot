@@ -421,6 +421,7 @@ module.exports = {
     region_latam: 'LATAM',
     region_eu: 'EU',
     region_asia: 'Asia',
+    region_mea: 'Trung Đông / Châu Phi',
     btn_adjust_xp: 'Điều Chỉnh XP',
     btn_adjust_wl: 'Điều Chỉnh W/L',
     btn_adjust_earnings: 'Điều Chỉnh Thu Nhập',

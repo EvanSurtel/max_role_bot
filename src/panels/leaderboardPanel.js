@@ -4,10 +4,10 @@ const { USDC_PER_UNIT } = require('../config/constants');
 const { t, langFor } = require('../locales/i18n');
 const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
 
-const REGIONS = ['global', 'na', 'latam', 'eu', 'asia'];
+const REGIONS = ['global', 'na', 'eu', 'latam', 'asia', 'mea'];
 // English fallback labels — used in code paths that need to identify a region
 // from the embed title (the actual displayed labels are translated via t()).
-const REGION_LABELS = { global: 'Global', na: 'NA', latam: 'LATAM', eu: 'EU', asia: 'Asia' };
+const REGION_LABELS = { global: 'Global', na: 'NA', eu: 'EU', latam: 'LATAM', asia: 'Asia', mea: 'MEA' };
 
 function regionLabel(region, lang) {
   return t(`leaderboard_panel.region_${region}`, lang);

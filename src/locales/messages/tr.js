@@ -422,6 +422,7 @@ module.exports = {
     region_latam: 'LATAM',
     region_eu: 'EU',
     region_asia: 'Asia',
+    region_mea: 'Orta Doğu / Afrika',
     btn_adjust_xp: 'XP Düzenle',
     btn_adjust_wl: 'W/L Düzenle',
     btn_adjust_earnings: 'Kazançları Düzenle',

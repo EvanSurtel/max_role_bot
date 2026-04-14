@@ -421,6 +421,7 @@ module.exports = {
     region_latam: 'LATAM',
     region_eu: 'EU',
     region_asia: 'Asia',
+    region_mea: '중동 / 아프리카',
     btn_adjust_xp: 'XP 조정',
     btn_adjust_wl: 'W/L 조정',
     btn_adjust_earnings: '수익 조정',

@@ -421,6 +421,7 @@ module.exports = {
     region_latam: 'LATAM',
     region_eu: 'EU',
     region_asia: 'Asia',
+    region_mea: 'Timur Tengah / Afrika',
     btn_adjust_xp: 'Laraskan XP',
     btn_adjust_wl: 'Laraskan W/L',
     btn_adjust_earnings: 'Laraskan Pendapatan',
