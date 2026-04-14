@@ -65,15 +65,18 @@ const rankEmoji = (i) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' 
 
 // ─── XP Leaderboard (one channel, region + season dropdowns) ─────
 
-async function buildXpPanel(region = 'global', view = 'season', seasonOverride = null, lang = 'en') {
+const PER_PAGE = 10;
+
+async function buildXpPanel(region = 'global', view = 'season', seasonOverride = null, lang = 'en', page = 1) {
   if (!REGIONS.includes(region)) region = 'global';
   const db = require('../database/db');
   const cs = getCurrentSeason();
   const viewSeason = seasonOverride || cs;
   const regionFilter = region === 'global' ? '' : ' AND u.region = ?';
   const regionParams = region === 'global' ? [] : [region];
+  const offset = (page - 1) * PER_PAGE;
 
-  let entries = [], title, footerText;
+  let entries = [], title, footerText, totalCount = 0;
   const rLabel = regionLabel(region, lang);
 
   if (view === 'season') {
@@ -82,30 +85,39 @@ async function buildXpPanel(region = 'global', view = 'season', seasonOverride =
       ? t('leaderboard_panel.xp_title_current', lang, { region: rLabel, season: viewSeason })
       : t('leaderboard_panel.xp_title', lang, { region: rLabel, season: viewSeason });
     footerText = isCurrent ? `${viewSeason} ${t('leaderboard_panel.current_label', lang)}` : viewSeason;
+    totalCount = db.prepare(`
+      SELECT COUNT(*) as cnt FROM (
+        SELECT u.id, COALESCE(SUM(xh.xp_amount), 0) as season_xp
+        FROM users u LEFT JOIN xp_history xh ON xh.user_id = u.id AND xh.season = ?
+        WHERE u.accepted_tos = 1${regionFilter} GROUP BY u.id HAVING season_xp > 0
+      )
+    `).get(viewSeason, ...regionParams).cnt;
     const rows = db.prepare(`
       SELECT u.discord_id, u.cod_ign, u.total_wins, u.total_losses,
              COALESCE(SUM(xh.xp_amount), 0) as season_xp
       FROM users u LEFT JOIN xp_history xh ON xh.user_id = u.id AND xh.season = ?
       WHERE u.accepted_tos = 1${regionFilter} GROUP BY u.id HAVING season_xp > 0
-      ORDER BY season_xp DESC LIMIT 10
-    `).all(viewSeason, ...regionParams);
+      ORDER BY season_xp DESC LIMIT ? OFFSET ?
+    `).all(viewSeason, ...regionParams, PER_PAGE, offset);
     entries = rows.map(r => ({ discord_id: r.discord_id, cod_ign: r.cod_ign, points: r.season_xp, wins: r.total_wins, losses: r.total_losses }));
   } else {
     title = t('leaderboard_panel.xp_alltime_title', lang, { region: rLabel });
     footerText = t('leaderboard_panel.alltime_label', lang);
-    const rows = db.prepare(`SELECT * FROM users WHERE accepted_tos = 1 AND xp_points > 0${regionFilter.replace('u.', '')} ORDER BY xp_points DESC LIMIT 10`).all(...regionParams);
+    totalCount = db.prepare(`SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1 AND xp_points > 0${regionFilter.replace('u.', '')}`).get(...regionParams).cnt;
+    const rows = db.prepare(`SELECT * FROM users WHERE accepted_tos = 1 AND xp_points > 0${regionFilter.replace('u.', '')} ORDER BY xp_points DESC LIMIT ? OFFSET ?`).all(...regionParams, PER_PAGE, offset);
     entries = rows.map(r => ({ discord_id: r.discord_id, cod_ign: r.cod_ign, points: r.xp_points, wins: r.total_wins, losses: r.total_losses }));
   }
 
+  const totalPages = Math.max(1, Math.ceil(totalCount / PER_PAGE));
   const lines = entries.length > 0
-    ? entries.map((e, i) => `${rankEmoji(i)} <@${e.discord_id}>${e.cod_ign ? ` \`${e.cod_ign}\`` : ''} — **${e.points.toLocaleString()} XP** \`(${e.wins}W-${e.losses}L)\``)
+    ? entries.map((e, i) => `${rankEmoji(offset + i)} <@${e.discord_id}>${e.cod_ign ? ` \`${e.cod_ign}\`` : ''} — **${e.points.toLocaleString()} XP** \`(${e.wins}W-${e.losses}L)\``)
     : [t('leaderboard_panel.no_players', lang)];
 
   const embed = new EmbedBuilder()
     .setTitle(title)
     .setDescription(lines.join('\n'))
     .setColor(view === 'season' ? 0xe67e22 : 0x5865F2)
-    .setFooter({ text: footerText })
+    .setFooter({ text: `${footerText} • Page ${page}/${totalPages}` })
     .setTimestamp();
 
   // Region dropdown
@@ -128,6 +140,9 @@ async function buildXpPanel(region = 'global', view = 'season', seasonOverride =
   const row1 = new ActionRowBuilder().addComponents(regionMenu);
   const row2 = new ActionRowBuilder().addComponents(seasonMenu);
   const row3 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`xplb_prev_${page}`).setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(page <= 1),
+    new ButtonBuilder().setCustomId('xplb_refresh').setLabel('🔄').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`xplb_next_${page}`).setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages),
     new ButtonBuilder().setCustomId('lb_admin_adjust_xp').setLabel(t('leaderboard_panel.btn_adjust_xp', lang)).setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('lb_admin_adjust_wl').setLabel(t('leaderboard_panel.btn_adjust_wl', lang)).setStyle(ButtonStyle.Danger),
   );
@@ -137,22 +152,28 @@ async function buildXpPanel(region = 'global', view = 'season', seasonOverride =
 
 // ─── Earnings Leaderboard (one channel, region dropdown) ─────────
 
-async function buildEarningsPanel(region = 'global', lang = 'en') {
+async function buildEarningsPanel(region = 'global', lang = 'en', page = 1) {
   if (!REGIONS.includes(region)) region = 'global';
   const db = require('../database/db');
   const regionFilter = region === 'global' ? '' : ' AND region = ?';
   const regionParams = region === 'global' ? [] : [region];
+  const offset = (page - 1) * PER_PAGE;
+
+  const totalCount = db.prepare(
+    `SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1 AND CAST(total_earnings_usdc AS INTEGER) > 0${regionFilter}`
+  ).get(...regionParams).cnt;
 
   const rows = db.prepare(
-    `SELECT * FROM users WHERE accepted_tos = 1 AND CAST(total_earnings_usdc AS INTEGER) > 0${regionFilter} ORDER BY CAST(total_earnings_usdc AS INTEGER) DESC LIMIT 10`
-  ).all(...regionParams);
+    `SELECT * FROM users WHERE accepted_tos = 1 AND CAST(total_earnings_usdc AS INTEGER) > 0${regionFilter} ORDER BY CAST(total_earnings_usdc AS INTEGER) DESC LIMIT ? OFFSET ?`
+  ).all(...regionParams, PER_PAGE, offset);
 
   const title = t('leaderboard_panel.earnings_title', lang, { region: regionLabel(region, lang) });
 
+  const totalPages = Math.max(1, Math.ceil(totalCount / PER_PAGE));
   const lines = rows.length > 0
     ? rows.map((row, i) => {
         const usdc = (Number(row.total_earnings_usdc) / USDC_PER_UNIT).toFixed(2);
-        return `${rankEmoji(i)} <@${row.discord_id}>${row.cod_ign ? ` \`${row.cod_ign}\`` : ''} — **$${usdc} USDC** \`(${row.total_wins}W-${row.total_losses}L)\``;
+        return `${rankEmoji(offset + i)} <@${row.discord_id}>${row.cod_ign ? ` \`${row.cod_ign}\`` : ''} — **$${usdc} USDC** \`(${row.total_wins}W-${row.total_losses}L)\``;
       })
     : [t('leaderboard_panel.no_earnings', lang)];
 
@@ -160,6 +181,7 @@ async function buildEarningsPanel(region = 'global', lang = 'en') {
     .setTitle(title)
     .setDescription(lines.join('\n'))
     .setColor(0x57F287)
+    .setFooter({ text: `Page ${page}/${totalPages}` })
     .setTimestamp();
 
   const regionMenu = new StringSelectMenuBuilder()
@@ -169,6 +191,9 @@ async function buildEarningsPanel(region = 'global', lang = 'en') {
 
   const row1 = new ActionRowBuilder().addComponents(regionMenu);
   const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`earnlb_prev_${page}`).setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(page <= 1),
+    new ButtonBuilder().setCustomId('earnlb_refresh').setLabel('🔄').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`earnlb_next_${page}`).setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages),
     new ButtonBuilder().setCustomId('lb_admin_adjust_earnings').setLabel(t('leaderboard_panel.btn_adjust_earnings', lang)).setStyle(ButtonStyle.Danger),
   );
 
@@ -215,6 +240,42 @@ async function handleLeaderboardButton(interaction) {
   const id = interaction.customId;
 
   // Admin adjust buttons
+  if (id === 'xplb_refresh') {
+    const { getBotDisplayLanguage } = require('../utils/languageRefresh');
+    const lang = getBotDisplayLanguage();
+    const region = getCurrentRegionFromEmbed(interaction, lang);
+    const panel = await buildXpPanel(region, 'season', null, lang, 1);
+    return interaction.update(panel);
+  }
+
+  if (id.startsWith('xplb_prev_') || id.startsWith('xplb_next_')) {
+    const { getBotDisplayLanguage } = require('../utils/languageRefresh');
+    const lang = getBotDisplayLanguage();
+    const region = getCurrentRegionFromEmbed(interaction, lang);
+    const currentPage = parseInt(id.split('_').pop(), 10);
+    const newPage = id.startsWith('xplb_prev_') ? currentPage - 1 : currentPage + 1;
+    const panel = await buildXpPanel(region, 'season', null, lang, Math.max(1, newPage));
+    return interaction.update(panel);
+  }
+
+  if (id === 'earnlb_refresh') {
+    const { getBotDisplayLanguage } = require('../utils/languageRefresh');
+    const lang = getBotDisplayLanguage();
+    const region = getCurrentRegionFromEmbed(interaction, lang);
+    const panel = await buildEarningsPanel(region, lang, 1);
+    return interaction.update(panel);
+  }
+
+  if (id.startsWith('earnlb_prev_') || id.startsWith('earnlb_next_')) {
+    const { getBotDisplayLanguage } = require('../utils/languageRefresh');
+    const lang = getBotDisplayLanguage();
+    const region = getCurrentRegionFromEmbed(interaction, lang);
+    const currentPage = parseInt(id.split('_').pop(), 10);
+    const newPage = id.startsWith('earnlb_prev_') ? currentPage - 1 : currentPage + 1;
+    const panel = await buildEarningsPanel(region, lang, Math.max(1, newPage));
+    return interaction.update(panel);
+  }
+
   if (id === 'lb_admin_adjust_xp' || id === 'lb_admin_adjust_wl' || id === 'lb_admin_adjust_earnings' || id === 'lb_admin_change_season') {
     return handleAdminButton(interaction);
   }
