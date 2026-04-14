@@ -4,7 +4,7 @@ module.exports = {
     description: [
       'हर player को उसके **season XP** के हिसाब से rank में रखा जाता है। जितना ज्यादा XP तुम कमाओगे, उतना ऊपर चढ़ोगे।',
       '',
-      'XP तीन sources से आता है — **XP queue matches**, **XP challenges**, और **wager wins**। सब तुम्हारे season XP total में add होता है।',
+      'XP तीन sources से आता है — **XP queue matches**, **XP challenges**, और **cash match wins**। सब तुम्हारे season XP total में add होता है।',
       '',
       '**हर नए season में सब लोग 500 XP पर reset हो जाते हैं और फिर से चढ़ना शुरू करते हैं।** तुम्हारे all-time earnings carry over होते हैं, लेकिन rank हर season एक fresh fight है।',
       '',

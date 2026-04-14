@@ -14,7 +14,7 @@ function buildXpMatchPanel(lang = 'en') {
 
   const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId('wager_type_xp')
+      .setCustomId('match_type_xp')
       .setLabel(t('xp_panel.btn_create_xp', lang))
       .setStyle(ButtonStyle.Primary),
   );

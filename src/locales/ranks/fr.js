@@ -4,7 +4,7 @@ module.exports = {
     description: [
       'Chaque joueur est placé dans un rang selon son **XP de saison**. Plus vous gagnez d\'XP, plus vous montez.',
       '',
-      'L\'XP vient de trois sources — **matchs en file XP**, **défis XP** et **victoires en mise**. Tout compte dans votre total d\'XP de saison.',
+      'L\'XP vient de trois sources — **matchs en file XP**, **défis XP** et **victoires en cash match**. Tout compte dans votre total d\'XP de saison.',
       '',
       '**À chaque nouvelle saison, tout le monde repart à 500 XP et recommence à grimper.** Vos gains à vie sont conservés, mais le rang est une nouvelle bataille chaque saison.',
       '',

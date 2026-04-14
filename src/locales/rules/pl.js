@@ -1,7 +1,7 @@
 module.exports = {
   general: {
     title: 'Zasady Serwera i Regulamin Meczy',
-    description: 'Grając w jakikolwiek mecz (zakład albo XP), akceptujesz wszystkie zasady poniżej. Łamanie zasad może skończyć się banem i możesz stracić swoje środki.',
+    description: 'Grając w jakikolwiek mecz (cash match albo XP), akceptujesz wszystkie zasady poniżej. Łamanie zasad może skończyć się banem i możesz stracić swoje środki.',
   },
 
   gameSettings: {
@@ -115,9 +115,9 @@ module.exports = {
   noShow: {
     title: 'Zasady Nieobecności',
     description: [
-      '**Mecze na kasę:** 15 minut, żeby się pojawić',
+      '**Cash Matches:** 15 minut, żeby się pojawić',
       '• Brak obecności = walkower — przeciwnik wygrywa domyślnie',
-      '• Ten sam wynik co przegrana meczu (przeciwnik zgarnia pulę)',
+      '• Ten sam wynik co przegrana meczu (przeciwnik zgarnia nagrodę za match)',
       '',
       '**Mecze Wyzwań XP:** 15 minut, żeby się pojawić',
       '• Brak obecności = walkower — przeciwnik wygrywa domyślnie',
@@ -133,23 +133,23 @@ module.exports = {
     ].join('\n'),
   },
 
-  wagerRules: {
-    title: 'Zasady Meczy na Kasę',
+  cashMatchRules: {
+    title: 'Zasady Cash Matches',
     description: [
       '**Konto:**',
       '• MUSISZ używać swojego zarejestrowanego konta COD Mobile (zgodnego z zarejestrowanym UID)',
       '• Granie na innym koncie = przegrywasz mecz i możesz dostać bana',
       '',
       '**Mecz:**',
-      '• Jak obie strony zaakceptują zakład, mecz musi być rozegrany — nie można się wycofać',
+      '• Jak obie strony zaakceptują cash match, mecz musi być rozegrany — nie można się wycofać',
       '• Obaj kapitanowie muszą zgłaszać wyniki uczciwie',
       '• Jak się rozłączysz, mecz idzie dalej — nie ma restartu, chyba że obie drużyny się zgodzą',
       '• Bot losuje mapy — nie da się ich zmienić po rozpoczęciu meczu',
       '',
       '**Kasa:**',
-      '• Możesz obstawiać od $0.50 do $100 na gracza',
+      '• Możesz wchodzić od $0.50 do $100 na gracza',
       '• Twoja kasa jest zablokowana podczas meczu — dostajesz ją z powrotem, gdy mecz jest rozstrzygnięty',
-      '• Zwycięzcy dzielą całą pulę po równo',
+      '• Zwycięzcy dzielą nagrodę za match po równo',
       '',
       '**Spory:**',
       '• Jak są rozbieżności, wrzuć swoje dowody (screeny/nagrania) na kanale meczu',
@@ -176,7 +176,7 @@ module.exports = {
       '',
       '**XP:**',
       '• Pokonanie silniejszej drużyny daje więcej XP, pokonanie słabszej daje mniej',
-      '• Całe XP z wyzwań, meczy kolejki i wygranych zakładów idzie do tego samego rankingu',
+      '• Całe XP z wyzwań, meczy kolejki i wygranych cash matchów idzie do tego samego rankingu',
       '',
       '**Spory:**',
       '• Jak są rozbieżności, wrzuć swoje dowody na kanale meczu',

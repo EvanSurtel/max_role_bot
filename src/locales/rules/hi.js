@@ -1,7 +1,7 @@
 module.exports = {
   general: {
     title: 'Server Rules और Match Regulations',
-    description: 'कोई भी match खेलकर (wager हो या XP), तुम नीचे दिए गए सारे rules मान रहे हो। इन rules को तोड़ने से ban हो सकते हो और अपना पैसा भी खो सकते हो।',
+    description: 'कोई भी match खेलकर (cash match हो या XP), तुम नीचे दिए गए सारे rules मान रहे हो। इन rules को तोड़ने से ban हो सकते हो और अपना पैसा भी खो सकते हो।',
   },
 
   gameSettings: {
@@ -115,9 +115,9 @@ module.exports = {
   noShow: {
     title: 'No-Show Rules',
     description: [
-      '**Wager Matches:** आने के लिए 15 minutes',
+      '**Cash Matches:** आने के लिए 15 minutes',
       '• No-show = forfeit — opponent default से जीत जाता है',
-      '• Match हारने वाला ही result (opponent pot ले जाता है)',
+      '• Match हारने वाला ही result (opponent match prize ले जाता है)',
       '',
       '**XP Challenge Matches:** आने के लिए 15 minutes',
       '• No-show = forfeit — opponent default से जीत जाता है',
@@ -133,23 +133,23 @@ module.exports = {
     ].join('\n'),
   },
 
-  wagerRules: {
-    title: 'Wager Match Rules',
+  cashMatchRules: {
+    title: 'Cash Match Rules',
     description: [
       '**Account:**',
       '• तुम्हें अपना registered COD Mobile account ही use करना है (जो तुम्हारे registered UID से match हो)',
       '• किसी और account से खेला = match हारोगे और ban भी हो सकते हो',
       '',
       '**Match:**',
-      '• जैसे ही दोनों sides wager accept कर लेते हैं, match खेलना ही पड़ेगा — पीछे नहीं हट सकते',
+      '• जैसे ही दोनों sides cash match accept कर लेते हैं, match खेलना ही पड़ेगा — पीछे नहीं हट सकते',
       '• दोनों captains को honest results report करने होंगे',
       '• अगर तुम disconnect हो जाते हो, तो match चलता रहेगा — restart तभी होगा जब दोनों teams agree करें',
       '• Bot maps random pick करता है — match शुरू होने के बाद तुम इन्हें change नहीं कर सकते',
       '',
       '**पैसा:**',
-      '• हर player $0.50 से $100 के बीच wager कर सकता है',
+      '• हर player $0.50 से $100 के बीच entry दे सकता है',
       '• तुम्हारा पैसा match के दौरान locked रहता है — result decide होने पर वापस मिलेगा',
-      '• Winners पूरा pot बराबर बांटते हैं',
+      '• Winners पूरा match prize बराबर बांटते हैं',
       '',
       '**Disputes:**',
       '• अगर कोई disagreement है, तो match channel में अपने proof (screenshots/recordings) post करो',
@@ -176,7 +176,7 @@ module.exports = {
       '',
       '**XP:**',
       '• Stronger team को हराने पर ज्यादा XP मिलता है, weaker team को हराने पर कम',
-      '• Challenges, queue matches, और wager wins से जो भी XP मिलता है सब एक ही ranking में जाता है',
+      '• Challenges, queue matches, और cash match wins से जो भी XP मिलता है सब एक ही ranking में जाता है',
       '',
       '**Disputes:**',
       '• अगर कोई disagreement है, तो match channel में अपने proof post करो',

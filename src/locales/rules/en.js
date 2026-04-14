@@ -1,7 +1,7 @@
 module.exports = {
   general: {
     title: 'Server Rules & Match Regulations',
-    description: 'By playing any match (wager or XP), you agree to all rules below. Breaking these rules can get you banned and you may lose your funds.',
+    description: 'By playing any match (cash match or XP), you agree to all rules below. Breaking these rules can get you banned and you may lose your funds.',
   },
 
   gameSettings: {
@@ -115,9 +115,9 @@ module.exports = {
   noShow: {
     title: 'No-Show Rules',
     description: [
-      '**Wager Matches:** 15 minutes to show up',
+      '**Cash Matches:** 15 minutes to show up',
       '• No-show = forfeit — opponent wins by default',
-      '• Same outcome as losing the match (opponent gets the pot)',
+      '• Same outcome as losing the match (opponent gets the match prize)',
       '',
       '**XP Challenge Matches:** 15 minutes to show up',
       '• No-show = forfeit — opponent wins by default',
@@ -133,23 +133,23 @@ module.exports = {
     ].join('\n'),
   },
 
-  wagerRules: {
-    title: 'Wager Match Rules',
+  cashMatchRules: {
+    title: 'Cash Match Rules',
     description: [
       '**Account:**',
       '• You MUST use your registered COD Mobile account (matching your registered UID)',
       '• Playing on a different account = you lose the match and could get banned',
       '',
       '**Match:**',
-      '• Once both sides accept a wager, the match must be played — no backing out',
+      '• Once both sides accept a cash match, the match must be played — no backing out',
       '• Both captains must report results honestly',
       '• If you disconnect, the match keeps going — no restart unless both teams agree',
       '• The bot picks the maps randomly — you can\'t change them once the match starts',
       '',
       '**Money:**',
-      '• You can wager between $0.50 and $100 per player',
+      '• You can enter between $0.50 and $100 per player',
       '• Your money is locked during the match — you get it back when the match is decided',
-      '• Winners split the full pot equally',
+      '• Winners split the match prize equally',
       '',
       '**Disputes:**',
       '• If there\'s a disagreement, post your proof (screenshots/recordings) in the match channel',
@@ -176,7 +176,7 @@ module.exports = {
       '',
       '**XP:**',
       '• Beating a stronger team gives you more XP, beating a weaker team gives you less',
-      '• All your XP from challenges, queue matches, and wager wins goes to the same ranking',
+      '• All your XP from challenges, queue matches, and cash match wins goes to the same ranking',
       '',
       '**Disputes:**',
       '• If there\'s a disagreement, post your proof in the match channel',

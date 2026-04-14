@@ -1,6 +1,6 @@
 // Admin transaction feed + per-user DM notifications.
 //
-// Every state change in the bot (deposit detected, wager created,
+// Every state change in the bot (deposit detected, challenge created,
 // match resolved, admin adjustment, etc.) calls postTransaction(),
 // which posts a structured embed to TRANSACTIONS_CHANNEL_ID for
 // admins to monitor.
@@ -85,7 +85,7 @@ async function _postOrRefreshHeader(client, channelId) {
       '',
       'You\'ll see:',
       '• 📥 Deposits and 📤 withdrawals',
-      '• 🔒 Wager entries and 💰 match payouts',
+      '• 🔒 Match entries and 💰 match payouts',
       '• 📝 Challenges created, ✅ accepted, ❌ cancelled',
       '• 🏆 Match results and ⚠️ disputes',
       '• 🛠️ Admin adjustments (XP, W/L, earnings)',

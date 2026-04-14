@@ -4,7 +4,7 @@ module.exports = {
     description: [
       'Każdy gracz jest przypisany do rangi na podstawie swojego **XP sezonu**. Im więcej XP zdobędziesz, tym wyżej się wspinasz.',
       '',
-      'XP przychodzi z trzech źródeł — **meczów z kolejki XP**, **wyzwań XP** i **wygranych zakładów**. Wszystko liczy się do twojego totalu XP sezonu.',
+      'XP przychodzi z trzech źródeł — **meczów z kolejki XP**, **wyzwań XP** i **wygranych cash matchów**. Wszystko liczy się do twojego totalu XP sezonu.',
       '',
       '**Każdy nowy sezon wszyscy resetują się do 500 XP i zaczynają się wspinać od nowa.** Twoje zarobki z całego życia zostają, ale ranga to świeża walka co sezon.',
       '',

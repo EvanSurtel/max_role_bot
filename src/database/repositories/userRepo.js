@@ -40,12 +40,12 @@ const addEarningsTx = db.transaction((id, amountUsdc) => {
   );
 });
 
-const addWageredTx = db.transaction((id, amountUsdc) => {
+const addEnteredTx = db.transaction((id, amountUsdc) => {
   const user = stmts.findById.get(id);
   if (!user) throw new Error('User not found');
-  const current = BigInt(user.total_wagered_usdc);
+  const current = BigInt(user.total_entered_usdc);
   const addition = BigInt(amountUsdc);
-  db.prepare('UPDATE users SET total_wagered_usdc = ? WHERE id = ?').run(
+  db.prepare('UPDATE users SET total_entered_usdc = ? WHERE id = ?').run(
     (current + addition).toString(),
     id,
   );
@@ -88,9 +88,12 @@ const userRepo = {
     return addEarningsTx(id, amountUsdc);
   },
 
-  addWagered(id, amountUsdc) {
-    return addWageredTx(id, amountUsdc);
+  addEntered(id, amountUsdc) {
+    return addEnteredTx(id, amountUsdc);
   },
+
+  // Backward-compat alias
+  addWagered: (...args) => userRepo.addEntered(...args),
 
   getXpLeaderboard(limit = 10) {
     return stmts.getXpLeaderboard.all(limit);

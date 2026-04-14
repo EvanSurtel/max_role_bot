@@ -4,7 +4,7 @@ module.exports = {
     description: [
       'Every player is placed into a rank based on their **season XP**. The more XP you earn, the higher you climb.',
       '',
-      'XP comes from three sources — **XP queue matches**, **XP challenges**, and **wager wins**. All of it counts toward your season XP total.',
+      'XP comes from three sources — **XP queue matches**, **XP challenges**, and **cash match wins**. All of it counts toward your season XP total.',
       '',
       '**Every new season, everyone resets to 500 XP and starts climbing again.** Your all-time earnings carry over, but rank is a fresh fight each season.',
       '',

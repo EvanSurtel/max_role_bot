@@ -4,7 +4,7 @@ module.exports = {
     description: [
       'Her oyuncu **sezon XP**\'sine göre bir rütbeye yerleştirilir. Ne kadar çok XP kazanırsan, o kadar yükseğe tırmanırsın.',
       '',
-      'XP üç kaynaktan gelir — **XP queue maçları**, **XP challenge\'lar** ve **wager zaferleri**. Hepsi sezon XP toplamına eklenir.',
+      'XP üç kaynaktan gelir — **XP queue maçları**, **XP challenge\'lar** ve **cash match zaferleri**. Hepsi sezon XP toplamına eklenir.',
       '',
       '**Her yeni sezon herkes 500 XP\'ye sıfırlanır ve tekrar tırmanmaya başlar.** Tüm zaman kazançların devam eder, ama rütbe her sezon yeni bir savaş.',
       '',

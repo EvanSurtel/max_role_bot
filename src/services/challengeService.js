@@ -40,13 +40,13 @@ async function notifyTeammates(guild, challenge) {
 
       // Build challenge details embed in the recipient's language
       const lang = getLang(discordId);
-      const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+      const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
       const modeInfo = GAME_MODES[challenge.game_modes];
       const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
 
       const creator = userRepo.findById(challenge.creator_user_id);
       const creatorMention = creator ? `<@${creator.discord_id}>` : 'Unknown';
-      const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+      const typeLabel = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
       const displayNum = challenge.display_number || challenge.id;
 
       const description = [
@@ -58,7 +58,7 @@ async function notifyTeammates(guild, challenge) {
         `**${t('notify_team.field_series', lang)}:** ${t('challenge_create.series_label', lang, { n: challenge.series_length })}`,
       ];
 
-      if (isWager) {
+      if (isCashMatch) {
         const entryAmount = (Number(challenge.entry_amount_usdc) / 1_000_000).toFixed(2);
         description.push(`**${t('notify_team.field_entry', lang)}:** ${t('notify_team.entry_per_player', lang, { amount: entryAmount })}`);
       }
@@ -80,7 +80,7 @@ async function notifyTeammates(guild, challenge) {
       const embedPayload = {
         title: t('notify_team.title', lang, { type: typeLabel, num: displayNum }),
         description: description.join('\n'),
-        color: isWager ? 0xf1c40f : 0x3498db,
+        color: isCashMatch ? 0xf1c40f : 0x3498db,
       };
 
       // ── Try DM first ────────────────────────────────────────────
@@ -164,7 +164,7 @@ async function notifyTeammates(guild, challenge) {
  * @param {object} challenge - The challenge DB record.
  */
 async function postToBoard(client, challenge) {
-  // Route wager challenges to CHALLENGES_CHANNEL_ID, XP challenges to XP_CHALLENGES_CHANNEL_ID
+  // Route cash match challenges to CHALLENGES_CHANNEL_ID, XP challenges to XP_CHALLENGES_CHANNEL_ID
   const channelId = challenge.type === 'xp'
     ? (process.env.XP_CHALLENGES_CHANNEL_ID || process.env.CHALLENGES_CHANNEL_ID)
     : process.env.CHALLENGES_CHANNEL_ID;
@@ -233,7 +233,7 @@ async function postToBoard(client, challenge) {
     } else {
       // Already expired — fire immediately
       timerService.createTimer('challenge_expiry', challenge.id, 0);
-      console.log(`[ChallengeService] ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id} already past expiry, firing immediately`);
+      console.log(`[ChallengeService] ${challenge.type === 'cash_match' ? 'Cash Match' : 'XP Match'} #${challenge.display_number || challenge.id} already past expiry, firing immediately`);
     }
   }
 

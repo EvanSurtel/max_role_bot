@@ -21,7 +21,7 @@ function isPlayerBusy(userId) {
   `).get(userId);
 
   if (formingChallenge) {
-    const label = formingChallenge.type === 'wager' ? 'Wager' : 'XP Match';
+    const label = formingChallenge.type === 'cash_match' ? 'Cash Match' : 'XP Match';
     const num = formingChallenge.display_number || formingChallenge.id;
     return { busy: true, reason: `You are already in ${label} #${num} (${formingChallenge.status}). Cancel or wait for it to finish.` };
   }

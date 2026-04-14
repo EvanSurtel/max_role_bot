@@ -51,10 +51,10 @@ function buildRulesEmbeds(lang = 'en') {
     .setColor(0xf39c12)
     .setDescription(t.noShow.description);
 
-  const wagerMatchRulesEmbed = new EmbedBuilder()
-    .setTitle(t.wagerRules.title)
+  const cashMatchRulesEmbed = new EmbedBuilder()
+    .setTitle(t.cashMatchRules.title)
     .setColor(0xf1c40f)
-    .setDescription(t.wagerRules.description);
+    .setDescription(t.cashMatchRules.description);
 
   const xpMatchRulesEmbed = new EmbedBuilder()
     .setTitle(t.xpRules.title)
@@ -64,7 +64,7 @@ function buildRulesEmbeds(lang = 'en') {
     xpMatchRulesEmbed.setFooter({ text: t.xpRules.footer });
   }
 
-  return [generalEmbed, gameSettingsEmbed, bannedWeaponsEmbed, bannedAttachmentsEmbed, bannedUtilityEmbed, allowedEmbed, cosmeticsEmbed, weaponRolesEmbed, noShowEmbed, wagerMatchRulesEmbed, xpMatchRulesEmbed];
+  return [generalEmbed, gameSettingsEmbed, bannedWeaponsEmbed, bannedAttachmentsEmbed, bannedUtilityEmbed, allowedEmbed, cosmeticsEmbed, weaponRolesEmbed, noShowEmbed, cashMatchRulesEmbed, xpMatchRulesEmbed];
 }
 
 function buildRulesPanel(lang = 'en') {

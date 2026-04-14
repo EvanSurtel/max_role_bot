@@ -17,7 +17,7 @@ const {
 } = require('../config/constants');
 const { t, langFor } = require('../locales/i18n');
 
-// How long an idle in-progress wager creation flow stays in memory before
+// How long an idle in-progress match creation flow stays in memory before
 // the user is treated as having abandoned it. Prevents activeFlows from
 // growing unbounded if users dismiss ephemerals mid-flow without cancelling.
 const FLOW_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -28,14 +28,14 @@ function navRow(step, lang = 'en') {
   if (step > 1) {
     buttons.push(
       new ButtonBuilder()
-        .setCustomId('wager_prev')
+        .setCustomId('match_prev')
         .setLabel(t('common.previous', lang))
         .setStyle(ButtonStyle.Secondary),
     );
   }
   buttons.push(
     new ButtonBuilder()
-      .setCustomId('wager_cancel_flow')
+      .setCustomId('match_cancel_flow')
       .setLabel(t('common.cancel', lang))
       .setStyle(ButtonStyle.Danger),
   );
@@ -78,7 +78,7 @@ function getLiveFlow(userId) {
  * Build the UI payload (content + components) for the current step of
  * a flow. Used both for normal step transitions and for resuming a
  * flow when the user dismissed their ephemeral and clicked Create
- * Wager again.
+ * Cash Match again.
  *
  * Returns { content, components, embeds } ready to pass to
  * interaction.reply or interaction.update.
@@ -90,10 +90,10 @@ function buildStepUI(flow, lang) {
   if (step === 1) {
     const row = new ActionRowBuilder().addComponents(
       ...TEAM_SIZES.map(size =>
-        new ButtonBuilder().setCustomId(`wager_teamsize_${size}`).setLabel(`${size}v${size}`).setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`match_teamsize_${size}`).setLabel(`${size}v${size}`).setStyle(ButtonStyle.Secondary),
       ),
     );
-    const stepKey = flow.type === CHALLENGE_TYPE.WAGER ? 'challenge_create.setting_up_wager' : 'challenge_create.setting_up_xp';
+    const stepKey = flow.type === CHALLENGE_TYPE.CASH_MATCH ? 'challenge_create.setting_up_cash_match' : 'challenge_create.setting_up_xp';
     return { content: t(stepKey, lang), embeds: [], components: [row, navRow(1, lang)] };
   }
 
@@ -126,7 +126,7 @@ function buildStepUI(flow, lang) {
       const chunk = modeKeys.slice(i, i + 4);
       const row = new ActionRowBuilder().addComponents(
         ...chunk.map(key =>
-          new ButtonBuilder().setCustomId(`wager_mode_${key}`).setLabel(GAME_MODES[key].label).setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`match_mode_${key}`).setLabel(GAME_MODES[key].label).setStyle(ButtonStyle.Secondary),
         ),
       );
       rows.push(row);
@@ -145,7 +145,7 @@ function buildStepUI(flow, lang) {
   if (step === 4) {
     const row = new ActionRowBuilder().addComponents(
       ...SERIES_LENGTHS.map(len =>
-        new ButtonBuilder().setCustomId(`wager_series_${len}`).setLabel(t('challenge_create.series_label', lang, { n: len })).setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`match_series_${len}`).setLabel(t('challenge_create.series_label', lang, { n: len })).setStyle(ButtonStyle.Secondary),
       ),
     );
     return {
@@ -158,8 +158,8 @@ function buildStepUI(flow, lang) {
   // Step 5: visibility buttons
   if (step === 5) {
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('wager_vis_anon').setLabel(t('challenge_create.btn_anonymous', lang)).setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('wager_vis_named').setLabel(t('challenge_create.btn_show_names', lang)).setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('match_vis_anon').setLabel(t('challenge_create.btn_anonymous', lang)).setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('match_vis_named').setLabel(t('challenge_create.btn_show_names', lang)).setStyle(ButtonStyle.Primary),
     );
     return {
       content: [
@@ -208,7 +208,7 @@ function buildTeammateReviewUI(flow, lang) {
     const row = new ActionRowBuilder().addComponents(
       ...chunk.map((discordId, j) =>
         new ButtonBuilder()
-          .setCustomId(`wager_remove_tm_${discordId}`)
+          .setCustomId(`match_remove_tm_${discordId}`)
           .setLabel(`✕ ${i + j + 1}`)
           .setStyle(ButtonStyle.Danger),
       ),
@@ -221,14 +221,14 @@ function buildTeammateReviewUI(flow, lang) {
   if (!isFull) {
     actionRow.addComponents(
       new ButtonBuilder()
-        .setCustomId('wager_add_more_tm')
+        .setCustomId('match_add_more_tm')
         .setLabel(t('challenge_create.btn_add_more_teammates', lang))
         .setStyle(ButtonStyle.Primary),
     );
   }
   actionRow.addComponents(
     new ButtonBuilder()
-      .setCustomId('wager_tm_continue')
+      .setCustomId('match_tm_continue')
       .setLabel(t('challenge_create.btn_continue', lang))
       .setStyle(ButtonStyle.Success)
       .setDisabled(!isFull),
@@ -255,7 +255,7 @@ async function handleButton(interaction) {
   const lang = langFor(interaction);
 
   // Confirm & Create challenge
-  if (id === 'wager_confirm_create') {
+  if (id === 'match_confirm_create') {
     const flow = getLiveFlow(userId);
     if (!flow) {
       return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
@@ -264,7 +264,7 @@ async function handleButton(interaction) {
   }
 
   // Previous button — go back one step
-  if (id === 'wager_prev') {
+  if (id === 'match_prev') {
     const flow = getLiveFlow(userId);
     if (!flow) {
       return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
@@ -282,10 +282,10 @@ async function handleButton(interaction) {
       touchFlow(flow);
       const row = new ActionRowBuilder().addComponents(
         ...TEAM_SIZES.map(size =>
-          new ButtonBuilder().setCustomId(`wager_teamsize_${size}`).setLabel(`${size}v${size}`).setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`match_teamsize_${size}`).setLabel(`${size}v${size}`).setStyle(ButtonStyle.Secondary),
         ),
       );
-      const stepKey = flow.type === CHALLENGE_TYPE.WAGER ? 'challenge_create.setting_up_wager' : 'challenge_create.setting_up_xp';
+      const stepKey = flow.type === CHALLENGE_TYPE.CASH_MATCH ? 'challenge_create.setting_up_cash_match' : 'challenge_create.setting_up_xp';
       return interaction.update({ content: t(stepKey, lang), embeds: [], components: [row, navRow(1, lang)] });
     }
 
@@ -314,7 +314,7 @@ async function handleButton(interaction) {
       touchFlow(flow);
       const row = new ActionRowBuilder().addComponents(
         ...SERIES_LENGTHS.map(len =>
-          new ButtonBuilder().setCustomId(`wager_series_${len}`).setLabel(t('challenge_create.series_label', lang, { n: len })).setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`match_series_${len}`).setLabel(t('challenge_create.series_label', lang, { n: len })).setStyle(ButtonStyle.Secondary),
         ),
       );
       return interaction.update({ content: t('challenge_create.select_series', lang, { mode: GAME_MODES[flow.gameMode]?.label || flow.gameMode }), embeds: [], components: [row, navRow(4, lang)] });
@@ -324,14 +324,14 @@ async function handleButton(interaction) {
   }
 
   // Cancel challenge creation — clear flow + close ephemeral
-  if (id === 'wager_cancel_create' || id === 'wager_cancel_flow') {
+  if (id === 'match_cancel_create' || id === 'match_cancel_flow') {
     activeFlows.delete(userId);
     finalizingUsers.delete(userId);
     return interaction.update({ content: t('challenge_create.cancelled_msg', lang), embeds: [], components: [] });
   }
 
-  // Step 1: Create Wager or XP Match — open the ephemeral flow
-  if (id === 'wager_type_wager' || id === 'wager_type_xp') {
+  // Step 1: Create Cash Match or XP Match — open the ephemeral flow
+  if (id === 'match_type_cash' || id === 'match_type_xp') {
     // Check if matches are paused (season transition)
     const { isMatchesPaused } = require('../panels/seasonPanel');
     if (isMatchesPaused()) {
@@ -358,14 +358,14 @@ async function handleButton(interaction) {
       return interaction.reply({ content: busy.reason, ephemeral: true });
     }
 
-    // If the user clicks Create Wager / XP Match while they already
+    // If the user clicks Create Cash Match / XP Match while they already
     // have an in-progress flow, treat it as "start over" — discard the
     // existing flow and start fresh. Users who dismissed an ephemeral
     // by accident can just click again to get a clean slate.
     activeFlows.delete(userId);
     finalizingUsers.delete(userId);
 
-    const type = id === 'wager_type_wager' ? CHALLENGE_TYPE.WAGER : CHALLENGE_TYPE.XP;
+    const type = id === 'match_type_cash' ? CHALLENGE_TYPE.CASH_MATCH : CHALLENGE_TYPE.XP;
 
     const flow = {
       type,
@@ -388,12 +388,12 @@ async function handleButton(interaction) {
   }
 
   // Teammate review: remove a specific teammate by Discord ID
-  if (id.startsWith('wager_remove_tm_')) {
+  if (id.startsWith('match_remove_tm_')) {
     const flow = getLiveFlow(userId);
     if (!flow) {
       return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
     }
-    const removedId = id.replace('wager_remove_tm_', '');
+    const removedId = id.replace('match_remove_tm_', '');
     flow.teammates = flow.teammates.filter(d => d !== removedId);
     touchFlow(flow);
     // If empty, go back to the picker; otherwise show updated review
@@ -403,7 +403,7 @@ async function handleButton(interaction) {
 
   // Teammate review: "Add More" — reopens the UserSelect picker for the
   // remaining slots
-  if (id === 'wager_add_more_tm') {
+  if (id === 'match_add_more_tm') {
     const flow = getLiveFlow(userId);
     if (!flow) {
       return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
@@ -428,7 +428,7 @@ async function handleButton(interaction) {
   }
 
   // Teammate review: "Continue" — proceed to game mode selection
-  if (id === 'wager_tm_continue') {
+  if (id === 'match_tm_continue') {
     const flow = getLiveFlow(userId);
     if (!flow) {
       return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
@@ -440,7 +440,7 @@ async function handleButton(interaction) {
   }
 
   // Step 2: Team size selection
-  if (id.startsWith('wager_teamsize_')) {
+  if (id.startsWith('match_teamsize_')) {
     const flow = getLiveFlow(userId);
     if (!flow) {
       return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
@@ -462,13 +462,13 @@ async function handleButton(interaction) {
   }
 
   // Step 4: Game mode selection
-  if (id.startsWith('wager_mode_')) {
+  if (id.startsWith('match_mode_')) {
     const flow = getLiveFlow(userId);
     if (!flow) {
       return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
     }
 
-    const mode = id.replace('wager_mode_', '');
+    const mode = id.replace('match_mode_', '');
     flow.gameMode = mode;
     touchFlow(flow);
 
@@ -476,7 +476,7 @@ async function handleButton(interaction) {
     const row = new ActionRowBuilder().addComponents(
       ...SERIES_LENGTHS.map(len =>
         new ButtonBuilder()
-          .setCustomId(`wager_series_${len}`)
+          .setCustomId(`match_series_${len}`)
           .setLabel(t('challenge_create.series_label', lang, { n: len }))
           .setStyle(ButtonStyle.Secondary),
       ),
@@ -491,7 +491,7 @@ async function handleButton(interaction) {
   }
 
   // Step 5: Series length selection
-  if (id.startsWith('wager_series_')) {
+  if (id.startsWith('match_series_')) {
     const flow = getLiveFlow(userId);
     if (!flow) {
       return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
@@ -505,11 +505,11 @@ async function handleButton(interaction) {
     // Show visibility options
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId('wager_vis_anon')
+        .setCustomId('match_vis_anon')
         .setLabel(t('challenge_create.btn_anonymous', lang))
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
-        .setCustomId('wager_vis_named')
+        .setCustomId('match_vis_named')
         .setLabel(t('challenge_create.btn_show_names', lang))
         .setStyle(ButtonStyle.Primary),
     );
@@ -530,17 +530,17 @@ async function handleButton(interaction) {
   }
 
   // Step 6: Visibility selection
-  if (id === 'wager_vis_anon' || id === 'wager_vis_named') {
+  if (id === 'match_vis_anon' || id === 'match_vis_named') {
     const flow = getLiveFlow(userId);
     if (!flow) {
       return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
     }
 
-    flow.anonymous = id === 'wager_vis_anon';
+    flow.anonymous = id === 'match_vis_anon';
     touchFlow(flow);
 
-    if (flow.type === CHALLENGE_TYPE.WAGER) {
-      // Show entry amount modal for wagers in user's language
+    if (flow.type === CHALLENGE_TYPE.CASH_MATCH) {
+      // Show entry amount modal for cash matches in user's language
       const modal = new ModalBuilder()
         .setCustomId('entry_amount')
         .setTitle(t('challenge_create.entry_modal_title', lang));
@@ -650,11 +650,11 @@ async function showChallengeConfirm(interaction, flow, amountUsdc) {
   flow.pendingAmount = amountUsdc; // store for after confirmation
 
   const modeLabel = GAME_MODES[flow.gameMode]?.label || flow.gameMode;
-  const typeLabel = flow.type === CHALLENGE_TYPE.WAGER
-    ? t('challenge_create.type_wager', lang)
+  const typeLabel = flow.type === CHALLENGE_TYPE.CASH_MATCH
+    ? t('challenge_create.type_cash_match', lang)
     : t('challenge_create.type_xp_match', lang);
-  const entryText = flow.type === CHALLENGE_TYPE.WAGER && amountUsdc > 0
-    ? `**${t('challenge_create.confirm_field_entry', lang)}:** ${t('challenge_create.confirm_entry_format', lang, { amount: amountUsdc })}\n**${t('challenge_create.confirm_field_pot', lang)}:** ${t('challenge_create.confirm_pot_format', lang, { amount: amountUsdc * flow.teamSize * 2 })}`
+  const entryText = flow.type === CHALLENGE_TYPE.CASH_MATCH && amountUsdc > 0
+    ? `**${t('challenge_create.confirm_field_entry', lang)}:** ${t('challenge_create.confirm_entry_format', lang, { amount: amountUsdc })}\n**${t('challenge_create.confirm_field_match_prize', lang)}:** ${t('challenge_create.confirm_match_prize_format', lang, { amount: amountUsdc * flow.teamSize * 2 })}`
     : `**${t('challenge_create.confirm_field_entry', lang)}:** ${t('challenge_create.confirm_no_entry', lang)}`;
   const teammateText = flow.teammates.length > 0
     ? `**${t('challenge_create.confirm_field_teammates', lang)}:** ${flow.teammates.map(id => `<@${id}>`).join(', ')}`
@@ -682,11 +682,11 @@ async function showChallengeConfirm(interaction, flow, amountUsdc) {
 
   const confirmRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId('wager_confirm_create')
+      .setCustomId('match_confirm_create')
       .setLabel(t('challenge_create.btn_confirm_create', lang))
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
-      .setCustomId('wager_cancel_create')
+      .setCustomId('match_cancel_create')
       .setLabel(t('challenge_create.btn_cancel_create', lang))
       .setStyle(ButtonStyle.Danger),
   );
@@ -715,7 +715,7 @@ async function showGameModes(interaction, flow) {
     const row = new ActionRowBuilder().addComponents(
       ...chunk.map(key =>
         new ButtonBuilder()
-          .setCustomId(`wager_mode_${key}`)
+          .setCustomId(`match_mode_${key}`)
           .setLabel(GAME_MODES[key].label)
           .setStyle(ButtonStyle.Secondary),
       ),
@@ -769,7 +769,7 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
     }
 
     const entryUsdc = Math.floor(amountUsdc * USDC_PER_UNIT);
-    const totalPotUsdc = entryUsdc * flow.teamSize * 2;
+    const matchPrizeUsdc = entryUsdc * flow.teamSize * 2;
 
     const expiresAt = new Date(Date.now() + TIMERS.CHALLENGE_EXPIRY).toISOString();
 
@@ -784,13 +784,13 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
       gameModes: flow.gameMode,
       seriesLength: flow.series,
       entryAmountUsdc: entryUsdc.toString(),
-      totalPotUsdc: totalPotUsdc.toString(),
+      totalPotUsdc: matchPrizeUsdc.toString(),
       isAnonymous: flow.anonymous ? 1 : 0,
       expiresAt,
     });
 
-    // For wager type, validate and hold creator's funds
-    if (flow.type === CHALLENGE_TYPE.WAGER && entryUsdc > 0) {
+    // For cash match type, validate and hold creator's funds
+    if (flow.type === CHALLENGE_TYPE.CASH_MATCH && entryUsdc > 0) {
       if (!escrowManager.canAfford(user.id, entryUsdc.toString())) {
         challengeRepo.updateStatus(challenge.id, CHALLENGE_STATUS.CANCELLED);
         activeFlows.delete(userId);
@@ -814,7 +814,7 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
       team: 1,
       role: PLAYER_ROLE.CAPTAIN,
       status: PLAYER_STATUS.ACCEPTED,
-      fundsHeld: (flow.type === CHALLENGE_TYPE.WAGER && entryUsdc > 0) ? 1 : 0,
+      fundsHeld: (flow.type === CHALLENGE_TYPE.CASH_MATCH && entryUsdc > 0) ? 1 : 0,
     });
 
     // Add teammates as pending team 1 players
@@ -849,9 +849,9 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
 
     // Build summary in user's language
     const modeLabel = GAME_MODES[flow.gameMode]?.label || flow.gameMode;
-    const isWager = flow.type === CHALLENGE_TYPE.WAGER;
-    const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
-    const entryText = isWager
+    const isCashMatch = flow.type === CHALLENGE_TYPE.CASH_MATCH;
+    const typeLabel = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
+    const entryText = isCashMatch
       ? `\n${t('challenge_create.confirm_field_entry', lang)}: **${t('challenge_create.confirm_entry_format', lang, { amount: amountUsdc })}**`
       : `\n${t('challenge_create.confirm_field_type', lang)}: **${typeLabel}** (${t('challenge_create.confirm_no_entry', lang)})`;
 
@@ -862,7 +862,7 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
       username: user.server_username,
       discordId: userId,
       challengeId: challenge.id,
-      memo: `${isWager ? 'Wager' : 'XP Match'} | ${flow.teamSize}v${flow.teamSize} | ${modeLabel} | Bo${flow.series}${isWager ? ` | $${amountUsdc} entry` : ''}`,
+      memo: `${isCashMatch ? 'Cash Match' : 'XP Match'} | ${flow.teamSize}v${flow.teamSize} | ${modeLabel} | Bo${flow.series}${isCashMatch ? ` | $${amountUsdc} entry` : ''}`,
     });
 
     const visibilityLabel = flow.anonymous

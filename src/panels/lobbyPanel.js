@@ -16,8 +16,8 @@ function buildLobbyPanel(lang = 'en') {
 
   const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId('wager_type_wager')
-      .setLabel(t('lobby.btn_create_wager', lang))
+      .setCustomId('match_type_cash')
+      .setLabel(t('lobby.btn_create_cash_match', lang))
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('create_dispute')

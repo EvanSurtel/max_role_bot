@@ -195,7 +195,7 @@ async function handleRegistrationModal(interaction) {
 
     // Determine deposit region from the server/country selection.
     // Group A (Coinbase Onramp, 0% fee): US, UK, Canada, EU, Australia, Switzerland, Singapore, Japan
-    // Group B (Bitget Wallet, 3-5% fee): everyone else (LATAM, Africa, Asia, etc.)
+    // Group B (Changelly, ~4-5% fee): everyone else (LATAM, Africa, Asia, etc.)
     const GROUP_A_REGIONS = new Set(['na']);
     const GROUP_A_COUNTRIES = new Set([
       '🇺🇸', '🇬🇧', '🇨🇦', '🇦🇺', '🇨🇭', '🇸🇬', '🇯🇵',
@@ -469,7 +469,7 @@ async function handleLanguagePanelSelect(interaction) {
  * dedicated language channel, ephemeral button picker). Saves the
  * user's language to the DB, sends a confirmation, and then sends
  * a follow-up ephemeral with the panel from THIS channel re-rendered
- * in the new language (TOS for welcome, lobby for wager, etc.).
+ * in the new language (TOS for welcome, lobby for cash match, etc.).
  */
 async function _handleAnyLanguageSelect(interaction, logPrefix) {
   const { SUPPORTED_LANGUAGES } = require('../locales');

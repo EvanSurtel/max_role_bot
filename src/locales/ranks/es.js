@@ -4,7 +4,7 @@ module.exports = {
     description: [
       'Cada jugador entra a un rango según su **XP de temporada**. Entre más XP ganes, más alto subes.',
       '',
-      'El XP viene de tres fuentes — **partidas de XP queue**, **retos de XP** y **victorias en apuestas**. Todo suma a tu total de XP de temporada.',
+      'El XP viene de tres fuentes — **partidas de XP queue**, **retos de XP** y **victorias en cash match**. Todo suma a tu total de XP de temporada.',
       '',
       '**Cada temporada nueva, todos reinician a 500 XP y empiezan a subir otra vez.** Tus ganancias de por vida se mantienen, pero el rango es pelea nueva cada temporada.',
       '',

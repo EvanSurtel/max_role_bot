@@ -22,16 +22,16 @@ function formatUsdc(amount) {
  * @param {string} lang - language code (defaults to bot display language)
  */
 function challengeEmbed(challenge, isAnonymous, teamPlayers, lang = 'en') {
-  const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const modeInfo = GAME_MODES[challenge.game_modes];
   const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
-  const typeLabel = isWager
-    ? t('challenge_create.type_wager', lang)
+  const typeLabel = isCashMatch
+    ? t('challenge_create.type_cash_match', lang)
     : t('challenge_create.type_xp_match', lang);
 
   const embed = new EmbedBuilder()
     .setTitle(`${typeLabel} #${challenge.display_number || challenge.id}`)
-    .setColor(isWager ? 0xf1c40f : 0x3498db)
+    .setColor(isCashMatch ? 0xf1c40f : 0x3498db)
     .addFields(
       { name: t('challenge_create.confirm_field_team_size', lang), value: `${challenge.team_size}v${challenge.team_size}`, inline: true },
       { name: t('challenge_create.confirm_field_mode', lang), value: modeLabel, inline: true },
@@ -39,12 +39,12 @@ function challengeEmbed(challenge, isAnonymous, teamPlayers, lang = 'en') {
     )
     .setTimestamp();
 
-  if (isWager) {
+  if (isCashMatch) {
     const entry = formatUsdc(challenge.entry_amount_usdc);
-    const pot = formatUsdc(challenge.total_pot_usdc);
+    const matchPrize = formatUsdc(challenge.total_pot_usdc);
     embed.addFields(
       { name: t('challenge_create.confirm_field_entry', lang), value: `${entry} USDC ${t('challenge_create.per_player', lang)}`, inline: true },
-      { name: t('challenge_create.confirm_field_pot', lang), value: `${pot} USDC`, inline: true },
+      { name: t('challenge_create.confirm_field_match_prize', lang), value: `${matchPrize} USDC`, inline: true },
     );
   }
 
@@ -76,7 +76,7 @@ function walletEmbed(wallet, user) {
     .setDescription(`Balance for **${user.username}**`)
     .addFields(
       { name: 'Available', value: `${available} USDC`, inline: true },
-      { name: 'Held in Wagers', value: `${held} USDC`, inline: true },
+      { name: 'Held in Matches', value: `${held} USDC`, inline: true },
       { name: 'Total', value: `${total} USDC`, inline: true },
       { name: 'Deposit Address', value: `\`${wallet.solana_address}\`` },
     )
@@ -88,20 +88,20 @@ function walletEmbed(wallet, user) {
  */
 function onboardingEmbed() {
   return new EmbedBuilder()
-    .setTitle('Welcome to Rank $ - Call of Duty Mobile Wagers and XP Matches')
+    .setTitle('Welcome to Rank $ - Call of Duty Mobile Cash Matches and XP Matches')
     .setColor(0xe74c3c)
     .setDescription(
-      'Before you can participate in wagers and XP matches, you must accept our Terms of Service.',
+      'Before you can participate in cash matches and XP matches, you must accept our Terms of Service.',
     )
     .addFields(
       {
         name: 'Terms of Service',
         value: [
-          '1. You must be of legal age to participate in wagers in your jurisdiction.',
-          '2. All wagers are final once a match begins. No refunds for completed matches.',
+          '1. You must be of legal age to participate in cash matches in your jurisdiction.',
+          '2. All matches are final once started. No refunds for completed matches.',
           '3. You are responsible for the security of your account and wallet.',
           '4. Cheating, exploiting, or unsportsmanlike conduct will result in a ban and forfeiture of funds.',
-          '5. The platform takes a fee from each wager pot as stated in the challenge details.',
+          '5. The platform takes a fee from each match prize as stated in the challenge details.',
           '6. USDC deposits and withdrawals are your responsibility. The platform is not liable for incorrect addresses.',
           '7. Disputes will be resolved by server administrators. Their decision is final.',
           '8. The platform reserves the right to modify these terms at any time.',
@@ -110,7 +110,7 @@ function onboardingEmbed() {
       {
         name: 'What happens next?',
         value:
-          'When you accept, a Solana wallet will be created for you. Deposit USDC to participate in wager matches. You will also need a tiny amount of SOL (~$0.50) for transaction fees.',
+          'When you accept, a Base wallet will be created for you. Deposit USDC to participate in cash matches.',
       },
     )
     .setFooter({ text: 'Click Accept to proceed or Decline to opt out.' });
@@ -120,7 +120,7 @@ function onboardingEmbed() {
  * Build an embed showing match status.
  */
 function matchEmbed(match, challenge) {
-  const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const modeInfo = GAME_MODES[challenge.game_modes];
   const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
 
@@ -135,8 +135,8 @@ function matchEmbed(match, challenge) {
     )
     .setTimestamp();
 
-  if (isWager) {
-    embed.addFields({ name: 'Pot', value: `${formatUsdc(challenge.total_pot_usdc)} USDC`, inline: true });
+  if (isCashMatch) {
+    embed.addFields({ name: 'Match Prize', value: `${formatUsdc(challenge.total_pot_usdc)} USDC`, inline: true });
   }
 
   if (match.winning_team) {
@@ -181,15 +181,15 @@ function voteEmbed(matchId) {
  * @param {string} lang - language code
  */
 function matchResultEmbed(match, challenge, winningPlayers, losingPlayers, userRepo, winXp, loseXp, winningTeam, lang = 'en') {
-  const isWagerMatch = challenge.type === CHALLENGE_TYPE.WAGER;
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const modeInfo = GAME_MODES[challenge.game_modes];
   const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
-  const totalPot = Number(challenge.total_pot_usdc);
+  const matchPrize = Number(challenge.total_pot_usdc);
   const entryAmount = Number(challenge.entry_amount_usdc);
-  const perPlayerPayout = totalPot > 0 && winningPlayers.length > 0 ? totalPot / winningPlayers.length : 0;
+  const perPlayerPayout = matchPrize > 0 && winningPlayers.length > 0 ? matchPrize / winningPlayers.length : 0;
   const perPlayerProfit = perPlayerPayout - entryAmount;
-  const matchTypeLabel = isWagerMatch
-    ? t('challenge_create.type_wager', lang)
+  const matchTypeLabel = isCashMatch
+    ? t('challenge_create.type_cash_match', lang)
     : t('challenge_create.type_xp_match', lang);
 
   const winnerLines = [];
@@ -197,7 +197,7 @@ function matchResultEmbed(match, challenge, winningPlayers, losingPlayers, userR
     const u = userRepo.findById(p.user_id);
     if (!u) continue;
     const ign = u.cod_ign ? `(${u.cod_ign})` : '';
-    const moneyText = isWagerMatch ? `**+${formatUsdc(perPlayerProfit)} USDC** ` : '';
+    const moneyText = isCashMatch ? `**+${formatUsdc(perPlayerProfit)} USDC** ` : '';
     winnerLines.push(`<@${u.discord_id}> ${ign} — ${moneyText}+${winXp} XP`);
   }
   const loserLines = [];
@@ -205,18 +205,18 @@ function matchResultEmbed(match, challenge, winningPlayers, losingPlayers, userR
     const u = userRepo.findById(p.user_id);
     if (!u) continue;
     const ign = u.cod_ign ? `(${u.cod_ign})` : '';
-    const moneyText = isWagerMatch ? `**-${formatUsdc(entryAmount)} USDC** ` : '';
+    const moneyText = isCashMatch ? `**-${formatUsdc(entryAmount)} USDC** ` : '';
     const xpText = loseXp > 0 ? `-${loseXp} XP` : '';
     loserLines.push(`<@${u.discord_id}> ${ign} — ${moneyText}${xpText}`);
   }
 
-  const titleLine = isWagerMatch
-    ? t('match_result_embed.title_winner_pot', lang, { team: winningTeam, amount: (totalPot / USDC_PER_UNIT).toFixed(2) })
+  const titleLine = isCashMatch
+    ? t('match_result_embed.title_winner_match_prize', lang, { team: winningTeam, amount: (matchPrize / USDC_PER_UNIT).toFixed(2) })
     : t('match_result_embed.title_winner', lang, { team: winningTeam });
 
   const embed = new EmbedBuilder()
     .setTitle(t('match_result_embed.title', lang, { type: matchTypeLabel, matchId: match.id }))
-    .setColor(isWagerMatch ? 0xf1c40f : 0x3498db)
+    .setColor(isCashMatch ? 0xf1c40f : 0x3498db)
     .setDescription([
       titleLine,
       '',
@@ -233,7 +233,7 @@ function matchResultEmbed(match, challenge, winningPlayers, losingPlayers, userR
     )
     .setTimestamp();
 
-  if (isWagerMatch) {
+  if (isCashMatch) {
     embed.addFields({
       name: t('match_result_embed.field_entry', lang),
       value: t('match_result_embed.entry_per_player_short', lang, { amount: (entryAmount / USDC_PER_UNIT).toFixed(2) }),

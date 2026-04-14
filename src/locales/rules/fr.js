@@ -1,7 +1,7 @@
 module.exports = {
   general: {
     title: 'Règles du Serveur et Règlement des Matchs',
-    description: 'En jouant n\'importe quel match (avec mise ou XP), vous acceptez toutes les règles ci-dessous. Enfreindre ces règles peut vous faire bannir et vous pourriez perdre votre argent.',
+    description: 'En jouant n\'importe quel match (cash match ou XP), vous acceptez toutes les règles ci-dessous. Enfreindre ces règles peut vous faire bannir et vous pourriez perdre votre argent.',
   },
 
   gameSettings: {
@@ -115,9 +115,9 @@ module.exports = {
   noShow: {
     title: 'Règles de Non-Présentation',
     description: [
-      '**Matchs avec mise :** 15 minutes pour se présenter',
+      '**Cash Matches :** 15 minutes pour se présenter',
       '• Non-présentation = forfait — l\'adversaire gagne par défaut',
-      '• Même résultat que perdre le match (l\'adversaire récupère le pot)',
+      '• Même résultat que perdre le match (l\'adversaire récupère le prix du match)',
       '',
       '**Matchs XP (défis) :** 15 minutes pour se présenter',
       '• Non-présentation = forfait — l\'adversaire gagne par défaut',
@@ -133,23 +133,23 @@ module.exports = {
     ].join('\n'),
   },
 
-  wagerRules: {
-    title: 'Règles des Matchs avec Mise',
+  cashMatchRules: {
+    title: 'Règles des Cash Matches',
     description: [
       '**Compte :**',
       '• Vous DEVEZ utiliser votre compte COD Mobile enregistré (celui qui correspond à votre UID enregistré)',
       '• Jouer avec un autre compte = vous perdez le match et pouvez être banni',
       '',
       '**Match :**',
-      '• Une fois que les deux côtés acceptent une mise, le match doit être joué — impossible de se défiler',
+      '• Une fois que les deux côtés acceptent un cash match, le match doit être joué — impossible de se défiler',
       '• Les deux capitaines doivent reporter les résultats honnêtement',
       '• Si vous vous déconnectez, le match continue — pas de restart sauf si les deux équipes sont d\'accord',
       '• Le bot choisit les maps aléatoirement — vous ne pouvez pas les changer une fois le match commencé',
       '',
       '**Argent :**',
-      '• Vous pouvez miser entre 0,50 $ et 100 $ par joueur',
+      '• Vous pouvez entrer entre 0,50 $ et 100 $ par joueur',
       '• Votre argent est verrouillé pendant le match — vous le récupérez une fois le match décidé',
-      '• Les gagnants se partagent le pot total équitablement',
+      '• Les gagnants se partagent le prix du match équitablement',
       '',
       '**Disputes :**',
       '• En cas de désaccord, postez vos preuves (captures d\'écran/enregistrements) dans le canal du match',
@@ -176,7 +176,7 @@ module.exports = {
       '',
       '**XP :**',
       '• Battre une équipe plus forte vous donne plus d\'XP, battre une équipe plus faible vous en donne moins',
-      '• Tout votre XP des défis, des matchs de queue et des victoires en mise va au même classement',
+      '• Tout votre XP des défis, des matchs de queue et des victoires en cash match va au même classement',
       '',
       '**Disputes :**',
       '• En cas de désaccord, postez vos preuves dans le canal du match',

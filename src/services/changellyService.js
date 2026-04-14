@@ -1,0 +1,152 @@
+const crypto = require('crypto');
+
+const DEFAULT_API_URL = 'https://fiat-api.changelly.com/v1';
+
+function getApiKey() {
+  return process.env.CHANGELLY_FIAT_API_KEY || '';
+}
+
+function getApiSecret() {
+  return process.env.CHANGELLY_FIAT_API_SECRET || '';
+}
+
+function getApiUrl() {
+  return process.env.CHANGELLY_FIAT_API_URL || DEFAULT_API_URL;
+}
+
+function isConfigured() {
+  return Boolean(getApiKey()) && Boolean(getApiSecret());
+}
+
+/**
+ * Create HMAC SHA256 signature of the request body.
+ */
+function _sign(body) {
+  const payload = typeof body === 'string' ? body : JSON.stringify(body);
+  return crypto
+    .createHmac('sha256', getApiSecret())
+    .update(payload)
+    .digest('hex');
+}
+
+/**
+ * Internal HTTP helper. Sets auth headers and handles errors.
+ */
+async function _request(method, path, body = null) {
+  if (!isConfigured()) {
+    console.warn('[Changelly] API key/secret not configured, skipping request');
+    return null;
+  }
+
+  const url = `${getApiUrl()}${path}`;
+  const serializedBody = body ? JSON.stringify(body) : '';
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Api-Key': getApiKey(),
+    'X-Api-Signature': _sign(serializedBody),
+  };
+
+  const options = { method, headers };
+  if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+    options.body = serializedBody;
+  }
+
+  try {
+    const res = await fetch(url, options);
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.error(`[Changelly] API error ${res.status} for ${method} ${path}: ${text}`);
+      return null;
+    }
+
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  } catch (err) {
+    console.error(`[Changelly] Request failed for ${method} ${path}:`, err.message);
+    return null;
+  }
+}
+
+/**
+ * Create a fiat-to-crypto order and return the redirect URL.
+ * @param {Object} options
+ * @param {string} options.userId       - Discord user ID
+ * @param {string} options.walletAddress - Base wallet address to receive USDC
+ * @param {number|string} options.amountUsd - Amount in USD
+ * @param {string} options.countryCode  - ISO 3166-1 alpha-2 country code
+ * @returns {Promise<{orderId: string, redirectUrl: string}|null>}
+ */
+async function createOrder({ userId, walletAddress, amountUsd, countryCode }) {
+  const body = {
+    externalOrderId: `rank-${userId}-${Date.now()}`,
+    externalUserId: userId,
+    currencyFrom: 'USD',
+    currencyTo: 'USDC',
+    amountFrom: String(amountUsd),
+    country: countryCode,
+    walletAddress,
+    walletExtraId: '',
+    paymentMethod: 'card',
+    metadata: { blockchain: 'base' },
+  };
+
+  const data = await _request('POST', '/orders', body);
+  if (!data) return null;
+
+  console.log(`[Changelly] Order created for user ${userId}: orderId=${data.orderId || data.id || 'unknown'}`);
+
+  return {
+    orderId: data.orderId || data.id,
+    redirectUrl: data.redirectUrl || data.paymentUrl || data.redirect_url,
+  };
+}
+
+/**
+ * Get available purchase offers with rates and fees.
+ * @param {number|string} amountUsd  - Amount in USD
+ * @param {string} countryCode       - ISO 3166-1 alpha-2 country code
+ * @returns {Promise<Array|null>}
+ */
+async function getOffers(amountUsd, countryCode) {
+  const params = new URLSearchParams({
+    currencyFrom: 'USD',
+    currencyTo: 'USDC',
+    amountFrom: String(amountUsd),
+    country: countryCode,
+    paymentMethod: 'card',
+  });
+
+  return _request('GET', `/offers?${params.toString()}`);
+}
+
+/**
+ * Validate that a wallet address is valid for Base USDC.
+ * @param {string} address - Wallet address to validate
+ * @returns {Promise<{result: boolean}|null>}
+ */
+async function validateAddress(address) {
+  const body = {
+    currency: 'USDC',
+    walletAddress: address,
+  };
+
+  return _request('POST', '/validate-address', body);
+}
+
+/**
+ * Get list of countries where Changelly on-ramp is available.
+ * @returns {Promise<Array|null>}
+ */
+async function getAvailableCountries() {
+  return _request('GET', '/available-countries');
+}
+
+module.exports = {
+  isConfigured,
+  createOrder,
+  getOffers,
+  validateAddress,
+  getAvailableCountries,
+};

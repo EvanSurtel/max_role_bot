@@ -1,7 +1,7 @@
 module.exports = {
   general: {
     title: 'Server-Regeln und Match-Bestimmungen',
-    description: 'Wenn du irgendein Match spielst (Wager oder XP), stimmst du allen Regeln unten zu. Wenn du diese Regeln brichst, kannst du gebannt werden und dein Geld verlieren.',
+    description: 'Wenn du irgendein Match spielst (Cash Match oder XP), stimmst du allen Regeln unten zu. Wenn du diese Regeln brichst, kannst du gebannt werden und dein Geld verlieren.',
   },
 
   gameSettings: {
@@ -115,9 +115,9 @@ module.exports = {
   noShow: {
     title: 'No-Show-Regeln',
     description: [
-      '**Wager-Matches:** 15 Minuten zum Auftauchen',
+      '**Cash Matches:** 15 Minuten zum Auftauchen',
       '• No-Show = Forfeit — Gegner gewinnt automatisch',
-      '• Gleiches Ergebnis wie ein verlorenes Match (Gegner bekommt den Pot)',
+      '• Gleiches Ergebnis wie ein verlorenes Match (Gegner bekommt den Match-Preis)',
       '',
       '**XP-Challenge-Matches:** 15 Minuten zum Auftauchen',
       '• No-Show = Forfeit — Gegner gewinnt automatisch',
@@ -133,23 +133,23 @@ module.exports = {
     ].join('\n'),
   },
 
-  wagerRules: {
-    title: 'Regeln für Wager-Matches',
+  cashMatchRules: {
+    title: 'Regeln für Cash Matches',
     description: [
       '**Account:**',
       '• Du MUSST deinen registrierten COD Mobile Account nutzen (der mit deiner registrierten UID übereinstimmt)',
       '• Mit einem anderen Account spielen = du verlierst das Match und kannst gebannt werden',
       '',
       '**Match:**',
-      '• Sobald beide Seiten eine Wette annehmen, muss das Match gespielt werden — kein Rückzug',
+      '• Sobald beide Seiten ein Cash Match annehmen, muss das Match gespielt werden — kein Rückzug',
       '• Beide Captains müssen die Ergebnisse ehrlich melden',
       '• Wenn du disconnectest, geht das Match weiter — kein Restart, außer beide Teams sind einverstanden',
       '• Der Bot wählt die Maps zufällig — du kannst sie nicht ändern, sobald das Match läuft',
       '',
       '**Geld:**',
-      '• Du kannst zwischen 0,50 $ und 100 $ pro Spieler wetten',
+      '• Du kannst zwischen 0,50 $ und 100 $ pro Spieler einsetzen',
       '• Dein Geld ist während des Matches gesperrt — du bekommst es zurück, wenn das Match entschieden ist',
-      '• Gewinner teilen sich den gesamten Pot gleichmäßig',
+      '• Gewinner teilen sich den gesamten Match-Preis gleichmäßig',
       '',
       '**Disputes:**',
       '• Bei Uneinigkeit poste deine Beweise (Screenshots/Aufnahmen) im Match-Channel',
@@ -176,7 +176,7 @@ module.exports = {
       '',
       '**XP:**',
       '• Ein stärkeres Team zu schlagen gibt dir mehr XP, ein schwächeres Team zu schlagen gibt weniger',
-      '• All deine XP aus Challenges, Queue-Matches und Wetten-Siegen gehen ins selbe Ranking',
+      '• All deine XP aus Challenges, Queue-Matches und Cash-Match-Siegen gehen ins selbe Ranking',
       '',
       '**Disputes:**',
       '• Bei Uneinigkeit poste deine Beweise im Match-Channel',

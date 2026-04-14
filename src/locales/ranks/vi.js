@@ -4,7 +4,7 @@ module.exports = {
     description: [
       'Mỗi người chơi được đặt vào một rank dựa trên **XP season** của họ. Càng kiếm được nhiều XP, bạn càng leo cao.',
       '',
-      'XP đến từ ba nguồn — **match XP queue**, **XP challenge**, và **thắng wager**. Tất cả đều được cộng vào tổng XP season của bạn.',
+      'XP đến từ ba nguồn — **match XP queue**, **XP challenge**, và **thắng cash match**. Tất cả đều được cộng vào tổng XP season của bạn.',
       '',
       '**Mỗi season mới, tất cả mọi người reset về 500 XP và bắt đầu leo lại.** Thu nhập mọi thời đại của bạn được giữ lại, nhưng rank là một cuộc chiến mới mỗi season.',
       '',

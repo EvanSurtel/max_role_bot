@@ -1,7 +1,7 @@
 module.exports = {
   general: {
     title: 'Reglas del Servidor y Regulaciones de Partidas',
-    description: 'Al jugar cualquier partida (apuesta o XP), aceptas todas las reglas de abajo. Romper estas reglas puede resultar en ban y podrías perder tu dinero.',
+    description: 'Al jugar cualquier partida (cash match o XP), aceptas todas las reglas de abajo. Romper estas reglas puede resultar en ban y podrías perder tu dinero.',
   },
 
   gameSettings: {
@@ -115,9 +115,9 @@ module.exports = {
   noShow: {
     title: 'Reglas de No Presentarse',
     description: [
-      '**Partidas con apuesta:** 15 minutos para presentarte',
+      '**Cash Matches:** 15 minutos para presentarte',
       '• No presentarse = forfeit — el rival gana automáticamente',
-      '• Mismo resultado que perder la partida (el rival se lleva el pozo)',
+      '• Mismo resultado que perder la partida (el rival se lleva el premio del match)',
       '',
       '**Partidas de XP (retos):** 15 minutos para presentarte',
       '• No presentarse = forfeit — el rival gana automáticamente',
@@ -133,23 +133,23 @@ module.exports = {
     ].join('\n'),
   },
 
-  wagerRules: {
-    title: 'Reglas de Partidas con Apuesta',
+  cashMatchRules: {
+    title: 'Reglas de Cash Match',
     description: [
       '**Cuenta:**',
       '• DEBES usar tu cuenta registrada de COD Mobile (la que coincide con tu UID registrado)',
       '• Jugar con otra cuenta = pierdes la partida y podrías ser baneado',
       '',
       '**Partida:**',
-      '• Una vez que ambos lados aceptan una apuesta, la partida se tiene que jugar — no te puedes salir',
+      '• Una vez que ambos lados aceptan un cash match, la partida se tiene que jugar — no te puedes salir',
       '• Ambos capitanes deben reportar los resultados honestamente',
       '• Si te desconectas, la partida sigue — no hay restart a menos que ambos equipos estén de acuerdo',
       '• El bot elige los mapas al azar — no se pueden cambiar una vez que empieza la partida',
       '',
       '**Dinero:**',
-      '• Puedes apostar entre $0.50 y $100 por jugador',
+      '• Puedes entrar con entre $0.50 y $100 por jugador',
       '• Tu dinero queda bloqueado durante la partida — te lo devuelven cuando se decida el resultado',
-      '• Los ganadores se reparten el pozo completo por igual',
+      '• Los ganadores se reparten el premio del match por igual',
       '',
       '**Disputas:**',
       '• Si hay un desacuerdo, publica tus pruebas (capturas/grabaciones) en el canal de la partida',
@@ -176,7 +176,7 @@ module.exports = {
       '',
       '**XP:**',
       '• Ganarle a un equipo más fuerte te da más XP, ganarle a uno más débil te da menos',
-      '• Todo tu XP de retos, partidas de queue y apuestas ganadas va al mismo ranking',
+      '• Todo tu XP de retos, partidas de queue y victorias en cash match va al mismo ranking',
       '',
       '**Disputas:**',
       '• Si hay un desacuerdo, publica tus pruebas en el canal de la partida',

@@ -1,7 +1,7 @@
 module.exports = {
   general: {
     title: 'Server Regels & Match Reglement',
-    description: 'Door een match te spelen (wager of XP), ga je akkoord met alle onderstaande regels. Het breken van deze regels kan je een ban opleveren en je kan je geld kwijtraken.',
+    description: 'Door een match te spelen (cash match of XP), ga je akkoord met alle onderstaande regels. Het breken van deze regels kan je een ban opleveren en je kan je geld kwijtraken.',
   },
 
   gameSettings: {
@@ -115,9 +115,9 @@ module.exports = {
   noShow: {
     title: 'No-Show Regels',
     description: [
-      '**Wager Matches:** 15 minuten om op te komen dagen',
+      '**Cash Matches:** 15 minuten om op te komen dagen',
       '• No-show = forfeit — tegenstander wint automatisch',
-      '• Zelfde uitkomst als het verliezen van de match (tegenstander krijgt de pot)',
+      '• Zelfde uitkomst als het verliezen van de match (tegenstander krijgt de matchprijs)',
       '',
       '**XP Challenge Matches:** 15 minuten om op te komen dagen',
       '• No-show = forfeit — tegenstander wint automatisch',
@@ -133,15 +133,15 @@ module.exports = {
     ].join('\n'),
   },
 
-  wagerRules: {
-    title: 'Wager Match Regels',
+  cashMatchRules: {
+    title: 'Cash Match Regels',
     description: [
       '**Account:**',
       '• Je MOET je geregistreerde COD Mobile account gebruiken (met de geregistreerde UID)',
       '• Spelen op een ander account = je verliest de match en kan een ban krijgen',
       '',
       '**Match:**',
-      '• Zodra beide kanten een wager accepteren, moet de match gespeeld worden — geen terugtrekken',
+      '• Zodra beide kanten een cash match accepteren, moet de match gespeeld worden — geen terugtrekken',
       '• Beide captains moeten eerlijk resultaten rapporteren',
       '• Als je disconnect, gaat de match door — geen restart tenzij beide teams akkoord gaan',
       '• De bot kiest de maps willekeurig — je kan ze niet veranderen zodra de match is begonnen',
@@ -149,7 +149,7 @@ module.exports = {
       '**Geld:**',
       '• Je kan tussen $0.50 en $100 per speler inzetten',
       '• Je geld is vergrendeld tijdens de match — je krijgt het terug als de match beslist is',
-      '• Winnaars delen de hele pot gelijk',
+      '• Winnaars delen de hele matchprijs gelijk',
       '',
       '**Disputes:**',
       '• Als er een meningsverschil is, post je bewijs (screenshots/opnames) in het match channel',
@@ -176,7 +176,7 @@ module.exports = {
       '',
       '**XP:**',
       '• Een sterker team verslaan geeft je meer XP, een zwakker team verslaan geeft minder',
-      '• Al je XP van challenges, queue matches en wager wins gaat naar dezelfde ranking',
+      '• Al je XP van challenges, queue matches en cash match wins gaat naar dezelfde ranking',
       '',
       '**Disputes:**',
       '• Als er een meningsverschil is, post je bewijs in het match channel',

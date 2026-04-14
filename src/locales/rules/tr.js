@@ -1,7 +1,7 @@
 module.exports = {
   general: {
     title: 'Sunucu Kuralları ve Maç Düzenlemeleri',
-    description: 'Herhangi bir maç oynayarak (wager veya XP), aşağıdaki tüm kuralları kabul etmiş sayılırsın. Kuralları çiğnemek banlanmana sebep olabilir ve paranı kaybedebilirsin.',
+    description: 'Herhangi bir maç oynayarak (cash match veya XP), aşağıdaki tüm kuralları kabul etmiş sayılırsın. Kuralları çiğnemek banlanmana sebep olabilir ve paranı kaybedebilirsin.',
   },
 
   gameSettings: {
@@ -115,9 +115,9 @@ module.exports = {
   noShow: {
     title: 'No-Show Kuralları',
     description: [
-      '**Wager Maçları:** Gelmek için 15 dakika',
+      '**Cash Match:** Gelmek için 15 dakika',
       '• Gelmemek = forfeit — rakip otomatik kazanır',
-      '• Maçı kaybetmekle aynı sonuç (rakip potu alır)',
+      '• Maçı kaybetmekle aynı sonuç (rakip maç ödülünü alır)',
       '',
       '**XP Challenge Maçları:** Gelmek için 15 dakika',
       '• Gelmemek = forfeit — rakip otomatik kazanır',
@@ -133,23 +133,23 @@ module.exports = {
     ].join('\n'),
   },
 
-  wagerRules: {
-    title: 'Wager Maçı Kuralları',
+  cashMatchRules: {
+    title: 'Cash Match Kuralları',
     description: [
       '**Hesap:**',
       '• Kayıtlı COD Mobile hesabını kullanmak ZORUNDASIN (kayıtlı UID\'n ile eşleşen)',
       '• Başka bir hesapta oynamak = maçı kaybedersin ve banlanabilirsin',
       '',
       '**Maç:**',
-      '• Her iki taraf wager\'ı kabul ettikten sonra maç oynanmak zorunda — geri dönüş yok',
+      '• Her iki taraf cash match\'i kabul ettikten sonra maç oynanmak zorunda — geri dönüş yok',
       '• Her iki kaptan da sonuçları dürüstçe bildirmeli',
       '• Bağlantın koparsa maç devam eder — her iki takım anlaşmadıkça restart yok',
       '• Mapleri bot rastgele seçer — maç başladıktan sonra değiştiremezsin',
       '',
       '**Para:**',
-      '• Oyuncu başına $0.50 ile $100 arasında wager yapabilirsin',
+      '• Oyuncu başına $0.50 ile $100 arasında giriş yapabilirsin',
       '• Paran maç boyunca kilitli — maç sonuçlandığında geri alırsın',
-      '• Kazananlar toplam potu eşit olarak paylaşır',
+      '• Kazananlar maç ödülünü eşit olarak paylaşır',
       '',
       '**Disputeler:**',
       '• Anlaşmazlık varsa kanıtını (ekran görüntüleri/kayıtlar) maç kanalına gönder',
@@ -176,7 +176,7 @@ module.exports = {
       '',
       '**XP:**',
       '• Daha güçlü bir takımı yenmek daha çok XP verir, daha zayıf bir takımı yenmek daha az verir',
-      '• Challenge\'lar, queue maçları ve wager zaferlerinden aldığın tüm XP aynı sıralamaya gider',
+      '• Challenge\'lar, queue maçları ve cash match zaferlerinden aldığın tüm XP aynı sıralamaya gider',
       '',
       '**Disputeler:**',
       '• Anlaşmazlık varsa kanıtını maç kanalına gönder',

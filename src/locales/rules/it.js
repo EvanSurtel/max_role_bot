@@ -1,7 +1,7 @@
 module.exports = {
   general: {
     title: 'Regole del Server e Regolamento dei Match',
-    description: 'Giocando qualsiasi match (con puntata o XP), accetti tutte le regole qui sotto. Infrangere queste regole può farti bannare e potresti perdere i tuoi soldi.',
+    description: 'Giocando qualsiasi match (cash match o XP), accetti tutte le regole qui sotto. Infrangere queste regole può farti bannare e potresti perdere i tuoi soldi.',
   },
 
   gameSettings: {
@@ -115,9 +115,9 @@ module.exports = {
   noShow: {
     title: 'Regole di Mancata Presentazione',
     description: [
-      '**Match con puntata:** 15 minuti per presentarsi',
+      '**Cash Match:** 15 minuti per presentarsi',
       '• Mancata presentazione = forfait — l\'avversario vince di default',
-      '• Stesso risultato che perdere il match (l\'avversario si prende il montepremi)',
+      '• Stesso risultato che perdere il match (l\'avversario si prende il premio del match)',
       '',
       '**Match XP (sfide):** 15 minuti per presentarsi',
       '• Mancata presentazione = forfait — l\'avversario vince di default',
@@ -133,23 +133,23 @@ module.exports = {
     ].join('\n'),
   },
 
-  wagerRules: {
-    title: 'Regole dei Match con Puntata',
+  cashMatchRules: {
+    title: 'Regole dei Cash Match',
     description: [
       '**Account:**',
       '• DEVI usare il tuo account COD Mobile registrato (quello che corrisponde al tuo UID registrato)',
       '• Giocare con un altro account = perdi il match e potresti essere bannato',
       '',
       '**Match:**',
-      '• Una volta che entrambe le parti accettano una puntata, il match deve essere giocato — non puoi tirarti indietro',
+      '• Una volta che entrambe le parti accettano un cash match, il match deve essere giocato — non puoi tirarti indietro',
       '• Entrambi i capitani devono riportare i risultati onestamente',
       '• Se ti disconnetti, il match continua — niente restart a meno che entrambi i team siano d\'accordo',
       '• Il bot sceglie le mappe casualmente — non puoi cambiarle una volta che il match è iniziato',
       '',
       '**Soldi:**',
-      '• Puoi puntare tra 0,50 $ e 100 $ per giocatore',
+      '• Puoi entrare con tra 0,50 $ e 100 $ per giocatore',
       '• I tuoi soldi sono bloccati durante il match — li riprendi quando il match è deciso',
-      '• I vincitori si dividono il montepremi totale equamente',
+      '• I vincitori si dividono il premio del match equamente',
       '',
       '**Dispute:**',
       '• Se c\'è un disaccordo, posta le tue prove (screenshot/registrazioni) nel canale del match',
@@ -176,7 +176,7 @@ module.exports = {
       '',
       '**XP:**',
       '• Battere un team più forte ti dà più XP, battere un team più debole te ne dà meno',
-      '• Tutti gli XP dalle sfide, match in coda e puntate vinte vanno nello stesso ranking',
+      '• Tutti gli XP dalle sfide, match in coda e vittorie in cash match vanno nello stesso ranking',
       '',
       '**Dispute:**',
       '• Se c\'è un disaccordo, posta le tue prove nel canale del match',

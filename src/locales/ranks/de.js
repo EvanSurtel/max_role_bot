@@ -4,7 +4,7 @@ module.exports = {
     description: [
       'Jeder Spieler wird basierend auf seiner **Season-XP** in einen Rang eingeordnet. Je mehr XP du verdienst, desto höher steigst du auf.',
       '',
-      'XP kommt aus drei Quellen — **XP-Queue-Matches**, **XP-Challenges** und **Wetten-Siege**. Alles zählt zu deiner Season-XP-Summe.',
+      'XP kommt aus drei Quellen — **XP-Queue-Matches**, **XP-Challenges** und **Cash-Match-Siege**. Alles zählt zu deiner Season-XP-Summe.',
       '',
       '**Jede neue Season setzen alle auf 500 XP zurück und fangen wieder an zu klettern.** Deine All-Time-Gewinne bleiben erhalten, aber der Rang ist jede Season ein frischer Kampf.',
       '',

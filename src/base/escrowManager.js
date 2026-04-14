@@ -3,7 +3,7 @@
 // Every match's USDC flows through the WagerEscrow.sol contract:
 //   1. createMatch — registers match on-chain
 //   2. depositToEscrow — pulls USDC from each player via transferFrom
-//   3. resolveMatch — sends pot to winners
+//   3. resolveMatch — sends match prize to winners
 //   4. cancelMatch — refunds all players
 //
 // All on-chain calls are signed via CDP Smart Accounts. The bot's
@@ -190,8 +190,8 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
     throw new Error('No winning player IDs provided');
   }
 
-  const totalPot = BigInt(totalPotUsdc);
-  const perPlayerShare = totalPot / BigInt(winningPlayerIds.length);
+  const matchPrize = BigInt(totalPotUsdc);
+  const perPlayerShare = matchPrize / BigInt(winningPlayerIds.length);
 
   const winnerAddresses = [];
   const winnerAmounts = [];

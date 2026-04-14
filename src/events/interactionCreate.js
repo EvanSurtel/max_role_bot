@@ -15,7 +15,7 @@ const escrowPanel = require('../panels/escrowPanel');
 const { isWalletChannel, AUTO_DELETE_MS } = require('../utils/ephemeralReply');
 
 // Per-user "current live ephemeral session" tracking. When the user
-// triggers a new ephemeral reply (Create Wager, View My Wallet,
+// triggers a new ephemeral reply (Create Cash Match, View My Wallet,
 // language picker, etc.), we delete their entire previous session —
 // the original ephemeral PLUS any follow-up ephemerals on the same
 // interaction — so the user only ever sees ONE bot ephemeral session
@@ -224,8 +224,8 @@ module.exports = {
       if (interaction.isButton()) {
         const id = interaction.customId;
 
-        // Wager creation flow buttons
-        if (id.startsWith('wager_')) {
+        // Match creation flow buttons
+        if (id.startsWith('match_')) {
           return await challengeCreate.handleButton(interaction);
         }
         // Challenge board accept button

@@ -46,12 +46,12 @@ async function handleCreateDispute(interaction) {
     const chunk = recentMatches.slice(i, i + 5);
     const row = new ActionRowBuilder().addComponents(
       ...chunk.map(m => {
-        const typeLabel = m.type === 'wager' ? 'Wager' : 'XP';
+        const typeLabel = m.type === 'cash_match' ? 'Cash' : 'XP';
         const num = m.display_number || m.id;
-        const pot = Number(m.total_pot_usdc) > 0 ? ` ${formatUsdc(m.total_pot_usdc)}` : '';
+        const prizeAmount = Number(m.total_pot_usdc) > 0 ? ` ${formatUsdc(m.total_pot_usdc)}` : '';
         return new ButtonBuilder()
           .setCustomId(`dispute_select_${m.id}`)
-          .setLabel(`${typeLabel} #${num}${pot}`)
+          .setLabel(`${typeLabel} #${num}${prizeAmount}`)
           .setStyle(m.status === 'disputed' ? ButtonStyle.Secondary : ButtonStyle.Danger);
       }),
     );

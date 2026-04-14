@@ -6,7 +6,7 @@
 // USDC contract.
 //
 // The bot doesn't know or care HOW the user got their USDC — whether
-// they used Coinbase Onramp (Group A), Bitget Wallet (Group B), or
+// they used Coinbase Onramp (Group A), Changelly (Group B), or
 // sent it from any other wallet. It just watches for the balance to
 // go up.
 

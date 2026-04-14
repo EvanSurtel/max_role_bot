@@ -4,7 +4,7 @@ module.exports = {
     description: [
       'Ogni giocatore viene inserito in un rango in base al suo **XP di stagione**. Più XP guadagni, più sali.',
       '',
-      'L\'XP arriva da tre fonti — **match in coda XP**, **sfide XP** e **vittorie di puntata**. Tutto conta per il tuo totale XP di stagione.',
+      'L\'XP arriva da tre fonti — **match in coda XP**, **sfide XP** e **vittorie in cash match**. Tutto conta per il tuo totale XP di stagione.',
       '',
       '**A ogni nuova stagione, tutti ripartono da 500 XP e ricominciano a salire.** I tuoi guadagni di sempre restano, ma il rango è una battaglia nuova a ogni stagione.',
       '',

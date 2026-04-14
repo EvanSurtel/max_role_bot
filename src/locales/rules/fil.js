@@ -1,7 +1,7 @@
 module.exports = {
   general: {
     title: 'Server Rules & Match Regulations',
-    description: 'Sa paglalaro ng kahit anong match (wager o XP), ina-agree mo lahat ng rules sa baba. Pag nilabag mo ang rules na ito, pwede kang ma-ban at mawalan ka ng funds mo.',
+    description: 'Sa paglalaro ng kahit anong match (cash match o XP), ina-agree mo lahat ng rules sa baba. Pag nilabag mo ang rules na ito, pwede kang ma-ban at mawalan ka ng funds mo.',
   },
 
   gameSettings: {
@@ -115,9 +115,9 @@ module.exports = {
   noShow: {
     title: 'No-Show Rules',
     description: [
-      '**Wager Matches:** 15 minutes para sumipot',
+      '**Cash Matches:** 15 minutes para sumipot',
       '• No-show = forfeit — automatic na panalo ang kalaban',
-      '• Same outcome sa pagkatalo sa match (yung kalaban ang kukuha ng pot)',
+      '• Same outcome sa pagkatalo sa match (yung kalaban ang kukuha ng match prize)',
       '',
       '**XP Challenge Matches:** 15 minutes para sumipot',
       '• No-show = forfeit — automatic na panalo ang kalaban',
@@ -133,23 +133,23 @@ module.exports = {
     ].join('\n'),
   },
 
-  wagerRules: {
-    title: 'Wager Match Rules',
+  cashMatchRules: {
+    title: 'Cash Match Rules',
     description: [
       '**Account:**',
       '• KAILANGAN mong gamitin ang registered COD Mobile account mo (yung tumutugma sa registered UID mo)',
       '• Ang paglalaro sa ibang account = talo ka sa match at pwede kang ma-ban',
       '',
       '**Match:**',
-      '• Kapag na-accept na ng parehong panig ang wager, kailangan nang laruin ang match — walang pag-atras',
+      '• Kapag na-accept na ng parehong panig ang cash match, kailangan nang laruin ang match — walang pag-atras',
       '• Kailangang tapat mag-report ng results ang parehong captains',
       '• Kung nag-disconnect ka, tuloy pa rin ang match — walang restart maliban na lang kung pareho namang sang-ayon yung teams',
       '• Random na pumipili ng maps ang bot — hindi mo na ma-change pag nag-start na ang match',
       '',
       '**Pera:**',
-      '• Pwede kang mag-wager sa pagitan ng $0.50 at $100 per player',
+      '• Pwede kang mag-enter sa pagitan ng $0.50 at $100 per player',
       '• Naka-lock yung pera mo sa buong match — makukuha mo pabalik pag na-decide na yung match',
-      '• Ang winners ay magha-hati sa full pot nang pantay',
+      '• Ang winners ay magha-hati sa match prize nang pantay',
       '',
       '**Disputes:**',
       '• Kung may hindi pagkakaunawaan, mag-post ng proof mo (screenshots/recordings) sa match channel',
@@ -176,7 +176,7 @@ module.exports = {
       '',
       '**XP:**',
       '• Ang pagtalo sa mas malakas na team ay nagbibigay sa\'yo ng mas maraming XP, ang pagtalo sa mas mahinang team ay mas kaunting XP',
-      '• Lahat ng XP mo galing sa challenges, queue matches, at wager wins ay papunta sa parehong ranking',
+      '• Lahat ng XP mo galing sa challenges, queue matches, at cash match wins ay papunta sa parehong ranking',
       '',
       '**Disputes:**',
       '• Kung may hindi pagkakaunawaan, mag-post ng proof mo sa match channel',

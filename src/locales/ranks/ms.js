@@ -4,7 +4,7 @@ module.exports = {
     description: [
       'Setiap pemain ditempatkan dalam rank berdasarkan **XP season** mereka. Lagi banyak XP yang kamu dapat, lagi tinggi kamu naik.',
       '',
-      'XP datang dari tiga sumber — **match XP queue**, **XP challenge**, dan **menang wager**. Semua dikira ke total XP season kamu.',
+      'XP datang dari tiga sumber — **match XP queue**, **XP challenge**, dan **menang cash match**. Semua dikira ke total XP season kamu.',
       '',
       '**Setiap season baru, semua orang reset ke 500 XP dan mula mendaki semula.** Earnings sepanjang masa kamu dikekalkan, tapi rank adalah pertarungan baru setiap season.',
       '',

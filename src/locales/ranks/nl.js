@@ -4,7 +4,7 @@ module.exports = {
     description: [
       'Elke speler wordt in een rank geplaatst op basis van zijn **season XP**. Hoe meer XP je verdient, hoe hoger je klimt.',
       '',
-      'XP komt van drie bronnen — **XP queue matches**, **XP challenges** en **wager winsten**. Alles telt op bij je season XP totaal.',
+      'XP komt van drie bronnen — **XP queue matches**, **XP challenges** en **cash match winsten**. Alles telt op bij je season XP totaal.',
       '',
       '**Elk nieuw seizoen reset iedereen naar 500 XP en begint opnieuw te klimmen.** Je all-time verdiensten blijven staan, maar rank is elk seizoen een frisse strijd.',
       '',

@@ -106,15 +106,15 @@ async function showAcceptConfirm(interaction, challenge, player, user) {
   const { GAME_MODES, CHALLENGE_TYPE } = require('../config/constants');
 
   const lang = langFor(interaction);
-  const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const modeInfo = GAME_MODES[challenge.game_modes];
   const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
   const entryAmount = (Number(challenge.entry_amount_usdc) / 1_000_000).toFixed(2);
-  const entryText = isWager && Number(challenge.entry_amount_usdc) > 0
+  const entryText = isCashMatch && Number(challenge.entry_amount_usdc) > 0
     ? '\n' + t('teammate.confirm_entry_held', lang, { amount: entryAmount })
     : '';
 
-  const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+  const typeLabel = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
   const displayNum = challenge.display_number || challenge.id;
 
   const confirmEmbed = new EmbedBuilder()
@@ -153,10 +153,10 @@ async function showDeclineConfirm(interaction, challenge, player, user) {
   const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
   const lang = langFor(interaction);
 
-  const isWager = challenge.type === 'wager';
-  const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
+  const typeLabel = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
   const typeLowerLabel = typeLabel.toLowerCase();
-  const refundNotice = isWager ? t('teammate.refund_notice_wager', lang) : '';
+  const refundNotice = isCashMatch ? t('teammate.refund_notice_cash_match', lang) : '';
 
   const confirmEmbed = new EmbedBuilder()
     .setTitle(t('teammate.confirm_decline_title', lang))
@@ -188,8 +188,8 @@ async function showDeclineConfirm(interaction, challenge, player, user) {
 async function handleAccept(interaction, challenge, player, user) {
   const lang = langFor(interaction);
 
-  // For wager challenges, check balance and hold funds
-  if (challenge.type === CHALLENGE_TYPE.WAGER && Number(challenge.entry_amount_usdc) > 0) {
+  // For cash match challenges, check balance and hold funds
+  if (challenge.type === CHALLENGE_TYPE.CASH_MATCH && Number(challenge.entry_amount_usdc) > 0) {
     const entryUsdc = challenge.entry_amount_usdc.toString();
 
     if (!escrowManager.canAfford(user.id, entryUsdc)) {
@@ -216,13 +216,13 @@ async function handleAccept(interaction, challenge, player, user) {
   challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.ACCEPTED);
 
   const { postTransaction } = require('../utils/transactionFeed');
-  const isWager = challenge.type === 'wager';
-  const tl = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+  const isCashMatch2 = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
+  const tl = isCashMatch2 ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
   const dn = challenge.display_number || challenge.id;
   postTransaction({ type: 'teammate_accepted', username: user.server_username, discordId: user.discord_id, challengeId: challenge.id, memo: `Joined team for ${tl} #${dn}` });
 
-  // Reply confirming acceptance — wager wording mentions held funds, XP doesn't
-  const acceptKey = isWager ? 'teammate.accept_msg_wager' : 'teammate.accept_msg_xp';
+  // Reply confirming acceptance — cash match wording mentions held funds, XP doesn't
+  const acceptKey = isCashMatch2 ? 'teammate.accept_msg_cash_match' : 'teammate.accept_msg_xp';
   await interaction.reply({ content: t(acceptKey, lang, { type: tl, num: dn }) });
 
   // Check if all players are now accepted
@@ -267,8 +267,8 @@ async function handleDecline(interaction, challenge, player, user) {
   challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.DECLINED);
 
   const { postTransaction } = require('../utils/transactionFeed');
-  const isWager = challenge.type === 'wager';
-  const dtl = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+  const isCashMatch3 = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
+  const dtl = isCashMatch3 ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
   const ddn = challenge.display_number || challenge.id;
   postTransaction({ type: 'teammate_declined', username: user.server_username, discordId: user.discord_id, challengeId: challenge.id, memo: `Declined team invite for ${dtl} #${ddn}` });
 
@@ -283,7 +283,7 @@ async function handleDecline(interaction, challenge, player, user) {
       const creatorDiscord = await interaction.client.users.fetch(creator.discord_id);
       if (creatorDiscord) {
         await creatorDiscord.send(
-          `Your ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challenge.id} has been cancelled because <@${user.discord_id}> declined the team invitation.`,
+          `Your ${challenge.type === CHALLENGE_TYPE.CASH_MATCH ? 'Cash Match' : 'XP Match'} #${challenge.display_number || challenge.id} has been cancelled because <@${user.discord_id}> declined the team invitation.`,
         ).catch(() => {
           // DMs may be disabled; this is non-critical
           console.log(`[TeammateResponse] Could not DM creator ${creator.discord_id} about decline`);

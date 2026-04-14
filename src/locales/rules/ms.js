@@ -1,7 +1,7 @@
 module.exports = {
   general: {
     title: 'Peraturan Server & Regulasi Match',
-    description: 'Dengan main apa-apa match (wager atau XP), kamu setuju dengan semua peraturan di bawah. Langgar peraturan ni boleh buat kamu kena ban dan kamu boleh hilang duit kamu.',
+    description: 'Dengan main apa-apa match (cash match atau XP), kamu setuju dengan semua peraturan di bawah. Langgar peraturan ni boleh buat kamu kena ban dan kamu boleh hilang duit kamu.',
   },
 
   gameSettings: {
@@ -115,9 +115,9 @@ module.exports = {
   noShow: {
     title: 'Peraturan No-Show',
     description: [
-      '**Wager Match:** 15 minit untuk muncul',
+      '**Cash Match:** 15 minit untuk muncul',
       '• No-show = forfeit — lawan menang automatik',
-      '• Outcome sama macam kalah match (lawan dapat pot)',
+      '• Outcome sama macam kalah match (lawan dapat match prize)',
       '',
       '**XP Challenge Match:** 15 minit untuk muncul',
       '• No-show = forfeit — lawan menang automatik',
@@ -133,23 +133,23 @@ module.exports = {
     ].join('\n'),
   },
 
-  wagerRules: {
-    title: 'Peraturan Wager Match',
+  cashMatchRules: {
+    title: 'Peraturan Cash Match',
     description: [
       '**Akaun:**',
       '• Kamu MESTI guna akaun COD Mobile yang didaftarkan (padan dengan UID yang didaftarkan)',
       '• Main guna akaun lain = kamu kalah match dan boleh kena ban',
       '',
       '**Match:**',
-      '• Sekali kedua-dua pihak accept wager, match mesti dimainkan — tak boleh patah balik',
+      '• Sekali kedua-dua pihak accept cash match, match mesti dimainkan — tak boleh patah balik',
       '• Kedua-dua captain mesti report result dengan jujur',
       '• Kalau kamu disconnect, match akan terus jalan — tak ada restart melainkan kedua-dua team setuju',
       '• Bot pilih map secara random — kamu tak boleh tukar sekali match dah start',
       '',
       '**Duit:**',
-      '• Kamu boleh wager antara $0.50 dan $100 per player',
+      '• Kamu boleh enter antara $0.50 dan $100 per player',
       '• Duit kamu akan dikunci semasa match — kamu akan dapat balik bila match selesai',
-      '• Winner akan bahagi full pot sama rata',
+      '• Winner akan bahagi match prize sama rata',
       '',
       '**Dispute:**',
       '• Kalau ada perbezaan pendapat, post bukti kamu (screenshot/recording) dalam match channel',
@@ -176,7 +176,7 @@ module.exports = {
       '',
       '**XP:**',
       '• Kalahkan team lebih kuat bagi kamu XP lebih, kalahkan team lebih lemah bagi XP kurang',
-      '• Semua XP kamu dari challenge, queue match, dan wager menang pergi ke ranking yang sama',
+      '• Semua XP kamu dari challenge, queue match, dan cash match menang pergi ke ranking yang sama',
       '',
       '**Dispute:**',
       '• Kalau ada perbezaan pendapat, post bukti kamu dalam match channel',

@@ -34,7 +34,7 @@ const challengeRepo = {
   },
 
   create({ type, creatorUserId, teamSize, gameModes, seriesLength, entryAmountUsdc, totalPotUsdc, isAnonymous, expiresAt }) {
-    // Get next display number for this type (separate sequences for wager vs xp)
+    // Get next display number for this type (separate sequences for cash_match vs xp)
     const countRow = db.prepare('SELECT COUNT(*) as c FROM challenges WHERE type = ?').get(type);
     const displayNumber = (countRow?.c || 0) + 1;
 

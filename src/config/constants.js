@@ -87,11 +87,6 @@ const TIMERS = {
   HEALTH_CHECK_INTERVAL: 10 * 60 * 1000,
 };
 
-// SOL thresholds (in lamports)
-const MIN_SOL_FOR_GAS = Math.floor(Number(process.env.MIN_SOL_FOR_GAS || 0.005) * 1_000_000_000);
-const ESCROW_SOL_WARNING = Math.floor(Number(process.env.ESCROW_SOL_WARNING_THRESHOLD || 0.05) * 1_000_000_000);
-const ESCROW_SOL_CRITICAL = Math.floor(Number(process.env.ESCROW_SOL_CRITICAL_THRESHOLD || 0.01) * 1_000_000_000);
-
 // Rate limit cooldowns (in milliseconds)
 const COOLDOWNS = {
   CREATE_WAGER: 10_000,
@@ -187,7 +182,7 @@ const MATCH_STATUS = {
 
 // Challenge types
 const CHALLENGE_TYPE = {
-  WAGER: 'wager',
+  CASH_MATCH: 'cash_match',
   XP: 'xp',
 };
 
@@ -229,9 +224,6 @@ module.exports = {
   LAMPORTS_PER_SOL,
   USDC_MINT_MAINNET,
   USDC_MINT_DEVNET,
-  MIN_SOL_FOR_GAS,
-  ESCROW_SOL_WARNING,
-  ESCROW_SOL_CRITICAL,
   COOLDOWNS,
   XP_MATCH,
   XP_WAGER,

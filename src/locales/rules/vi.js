@@ -1,7 +1,7 @@
 module.exports = {
   general: {
     title: 'Luật Server & Quy Định Match',
-    description: 'Khi chơi bất kỳ match nào (wager hay XP), bạn đồng ý với tất cả luật bên dưới. Vi phạm các luật này có thể bị ban và mất tiền trong ví.',
+    description: 'Khi chơi bất kỳ match nào (cash match hay XP), bạn đồng ý với tất cả luật bên dưới. Vi phạm các luật này có thể bị ban và mất tiền trong ví.',
   },
 
   gameSettings: {
@@ -115,9 +115,9 @@ module.exports = {
   noShow: {
     title: 'Luật No-Show',
     description: [
-      '**Wager Match:** 15 phút để xuất hiện',
+      '**Cash Match:** 15 phút để xuất hiện',
       '• No-show = forfeit — đối thủ thắng mặc định',
-      '• Kết quả giống như thua match (đối thủ lấy pot)',
+      '• Kết quả giống như thua match (đối thủ lấy giải thưởng match)',
       '',
       '**XP Challenge Match:** 15 phút để xuất hiện',
       '• No-show = forfeit — đối thủ thắng mặc định',
@@ -133,23 +133,23 @@ module.exports = {
     ].join('\n'),
   },
 
-  wagerRules: {
-    title: 'Luật Wager Match',
+  cashMatchRules: {
+    title: 'Luật Cash Match',
     description: [
       '**Tài khoản:**',
       '• Bạn PHẢI dùng tài khoản COD Mobile đã đăng ký (khớp với UID đã đăng ký)',
       '• Chơi bằng tài khoản khác = thua match và có thể bị ban',
       '',
       '**Match:**',
-      '• Khi cả hai bên đã accept wager, match bắt buộc phải chơi — không được rút lui',
+      '• Khi cả hai bên đã accept cash match, match bắt buộc phải chơi — không được rút lui',
       '• Cả hai captain phải báo kết quả trung thực',
       '• Nếu bạn bị disconnect, match vẫn tiếp tục — không restart trừ khi cả hai đội đồng ý',
       '• Bot chọn map ngẫu nhiên — không thể đổi khi match đã bắt đầu',
       '',
       '**Tiền:**',
-      '• Bạn có thể wager từ $0.50 đến $100 mỗi người chơi',
+      '• Bạn có thể vào từ $0.50 đến $100 mỗi người chơi',
       '• Tiền của bạn bị khóa trong suốt match — nhận lại khi match được giải quyết',
-      '• Người thắng chia đều pot',
+      '• Người thắng chia đều giải thưởng match',
       '',
       '**Dispute:**',
       '• Nếu có bất đồng, post bằng chứng (screenshot/video) trong match channel',
@@ -176,7 +176,7 @@ module.exports = {
       '',
       '**XP:**',
       '• Thắng đội mạnh hơn cho bạn nhiều XP hơn, thắng đội yếu hơn cho ít XP hơn',
-      '• Tất cả XP của bạn từ challenge, queue match, và thắng wager đều đi vào cùng một ranking',
+      '• Tất cả XP của bạn từ challenge, queue match, và thắng cash match đều đi vào cùng một ranking',
       '',
       '**Dispute:**',
       '• Nếu có bất đồng, post bằng chứng trong match channel',

@@ -17,7 +17,7 @@ const { t, langFor } = require('../locales/i18n');
 
 /**
  * Check if a member has dispute resolution permissions (ads, CEO,
- * owner, admin, or wager/XP staff). Ads, CEO, and owner have the
+ * owner, admin, or match/XP staff). Ads, CEO, and owner have the
  * same powers as admin everywhere in the bot.
  */
 function canResolveDisputes(member) {
@@ -528,10 +528,10 @@ async function handleAdminResolve(interaction) {
 
   if (winningTeam === 0) {
     // No Winner confirmation
-    const isWager = challenge && Number(challenge.total_pot_usdc) > 0;
-    const entryAmount = isWager ? (Number(challenge.entry_amount_usdc) / 1_000_000).toFixed(2) : '0';
-    const refundText = isWager
-      ? t('admin_resolve.refund_text_wager', lang, { amount: entryAmount })
+    const isCashMatch = challenge && Number(challenge.total_pot_usdc) > 0;
+    const entryAmount = isCashMatch ? (Number(challenge.entry_amount_usdc) / 1_000_000).toFixed(2) : '0';
+    const refundText = isCashMatch
+      ? t('admin_resolve.refund_text_cash_match', lang, { amount: entryAmount })
       : t('admin_resolve.refund_text_xp', lang);
 
     const confirmEmbed = new EmbedBuilder()
@@ -557,11 +557,11 @@ async function handleAdminResolve(interaction) {
     return u ? `<@${u.discord_id}> ${u.cod_ign ? `(${u.cod_ign})` : ''}` : 'Unknown';
   });
 
-  const potAmount = challenge && Number(challenge.total_pot_usdc) > 0
+  const prizeAmount = challenge && Number(challenge.total_pot_usdc) > 0
     ? (Number(challenge.total_pot_usdc) / 1_000_000).toFixed(2)
     : null;
-  const potText = potAmount
-    ? '\n\n' + t('admin_resolve.pot_will_be_paid', lang, { amount: potAmount })
+  const prizeText = prizeAmount
+    ? '\n\n' + t('admin_resolve.match_prize_will_be_paid', lang, { amount: prizeAmount })
     : '';
 
   const confirmEmbed = new EmbedBuilder()
@@ -571,7 +571,7 @@ async function handleAdminResolve(interaction) {
       t('admin_resolve.confirm_team_desc', lang, { team: winningTeam }),
       '', t('admin_resolve.winners_team', lang, { team: winningTeam }), ...winnerNames,
       '', t('admin_resolve.losers_team', lang, { team: losingTeam }), ...loserNames,
-      potText, '', t('admin_resolve.cannot_be_undone', lang),
+      prizeText, '', t('admin_resolve.cannot_be_undone', lang),
     ].join('\n'));
 
   const row = new ActionRowBuilder().addComponents(
@@ -653,8 +653,8 @@ async function handleAdminConfirmNoWinner(interaction) {
   });
 
   try {
-    // For wagers: refund all escrow funds back to players
-    if (challenge && challenge.type === 'wager' && Number(challenge.total_pot_usdc) > 0) {
+    // For cash matches: refund all escrow funds back to players
+    if (challenge && challenge.type === 'cash_match' && Number(challenge.total_pot_usdc) > 0) {
       const challengePlayerRepo2 = require('../database/repositories/challengePlayerRepo');
       const allPlayers = challengePlayerRepo2.findByChallengeId(match.challenge_id);
 
@@ -695,8 +695,8 @@ async function handleAdminConfirmNoWinner(interaction) {
       const { GAME_MODES } = require('../config/constants');
       const { formatUsdc } = require('../utils/embeds');
       const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
-      const isWagerMatch = challenge && challenge.type === 'wager' && Number(challenge.total_pot_usdc) > 0;
-      const matchTypeLabel = isWagerMatch ? 'Wager' : 'XP Match';
+      const isCashMatch = challenge && challenge.type === 'cash_match' && Number(challenge.total_pot_usdc) > 0;
+      const matchTypeLabel = isCashMatch ? 'Cash Match' : 'XP Match';
       const modeInfo = challenge ? GAME_MODES[challenge.game_modes] : null;
       const modeLabel = modeInfo ? modeInfo.label : (challenge?.game_modes || 'N/A');
 
@@ -713,7 +713,7 @@ async function handleAdminConfirmNoWinner(interaction) {
         return `<@${u.discord_id}> ${ign}`;
       }).filter(Boolean);
 
-      const refundText = isWagerMatch
+      const refundText = isCashMatch
         ? `**No Winner — ${formatUsdc(challenge.total_pot_usdc)} USDC refunded to all players**`
         : '**No Winner — match cancelled**';
 
@@ -738,7 +738,7 @@ async function handleAdminConfirmNoWinner(interaction) {
         )
         .setTimestamp();
 
-      await matchService.postResultToChannels(interaction.client, noWinnerEmbed, [], isWagerMatch, matchId);
+      await matchService.postResultToChannels(interaction.client, noWinnerEmbed, [], isCashMatch, matchId);
     } catch (err) {
       console.error(`[MatchResult] Failed to post no-winner result to results channels for match #${matchId}:`, err.message);
     }
@@ -806,8 +806,8 @@ async function postDisputeResult(client, matchId, winningTeam, resolverDiscordId
       ? '**No Winner** — All funds refunded'
       : `**Team ${winningTeam} wins**`;
 
-    const potText = challenge && Number(challenge.total_pot_usdc) > 0
-      ? `**Pot:** ${formatUsdc(challenge.total_pot_usdc)} USDC`
+    const prizeText = challenge && Number(challenge.total_pot_usdc) > 0
+      ? `**Match Prize:** ${formatUsdc(challenge.total_pot_usdc)} USDC`
       : 'XP Match';
 
     const resultEmbed = new EmbedBuilder()
@@ -819,7 +819,7 @@ async function postDisputeResult(client, matchId, winningTeam, resolverDiscordId
         '',
         `**Match Details**`,
         `Mode: ${modeLabel} | Bo${challenge?.series_length || '?'} | ${challenge?.team_size || '?'}v${challenge?.team_size || '?'}`,
-        potText,
+        prizeText,
         '',
         `**Team 1:**`,
         ...team1,

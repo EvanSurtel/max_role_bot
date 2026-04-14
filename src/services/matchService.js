@@ -21,7 +21,7 @@ function _captainLang(captainDiscordIds) {
 
 /**
  * Post a result embed to the regular results channels (all-results +
- * wager-results). Used by both the normal resolve flow AND the admin
+ * cash-match-results). Used by both the normal resolve flow AND the admin
  * dispute-resolution flow (including no-winner) so dispute outcomes
  * still appear in the regular results feed.
  *
@@ -29,7 +29,7 @@ function _captainLang(captainDiscordIds) {
  * because results channels are low-traffic admin channels that drop
  * out of cache after restarts.
  */
-async function postResultToChannels(client, resultEmbed, components, isWagerMatch, matchId) {
+async function postResultToChannels(client, resultEmbed, components, isCashMatch, matchId) {
   async function _resolve(channelId) {
     let ch = client.channels.cache.get(channelId);
     if (!ch) {
@@ -49,15 +49,15 @@ async function postResultToChannels(client, resultEmbed, components, isWagerMatc
     }
   }
 
-  if (isWagerMatch) {
+  if (isCashMatch) {
     const wagerResultsChannelId = process.env.WAGER_RESULTS_CHANNEL_ID;
     if (wagerResultsChannelId) {
       try {
         const ch = await _resolve(wagerResultsChannelId);
         if (ch) await ch.send({ embeds: [resultEmbed], components: components || [] });
-        else console.error(`[MatchService] wager-results channel ${wagerResultsChannelId} unreachable for match #${matchId}`);
+        else console.error(`[MatchService] cash-match-results channel ${wagerResultsChannelId} unreachable for match #${matchId}`);
       } catch (err) {
-        console.error(`[MatchService] Failed to post to wager-results for match #${matchId}:`, err.message);
+        console.error(`[MatchService] Failed to post to cash-match-results for match #${matchId}:`, err.message);
       }
     }
   }
@@ -129,7 +129,7 @@ async function createMatchChannels(client, challenge) {
   const category = await guild.channels.create({
     name: `Match #${challenge.id}`,
     type: ChannelType.GuildCategory,
-    reason: 'Wager bot match category',
+    reason: 'Match category',
   });
 
   // Create team 1 text channel
@@ -138,7 +138,7 @@ async function createMatchChannels(client, challenge) {
     type: ChannelType.GuildText,
     parent: category.id,
     permissionOverwrites: privateTextOverwrites(guild, team1DiscordIds, true),
-    reason: 'Wager bot match channel',
+    reason: 'Match channel',
   });
 
   // Create team 1 voice channel
@@ -147,7 +147,7 @@ async function createMatchChannels(client, challenge) {
     type: ChannelType.GuildVoice,
     parent: category.id,
     permissionOverwrites: privateVoiceOverwrites(guild, team1DiscordIds, true),
-    reason: 'Wager bot match channel',
+    reason: 'Match channel',
   });
 
   // Create team 2 text channel
@@ -156,7 +156,7 @@ async function createMatchChannels(client, challenge) {
     type: ChannelType.GuildText,
     parent: category.id,
     permissionOverwrites: privateTextOverwrites(guild, team2DiscordIds, true),
-    reason: 'Wager bot match channel',
+    reason: 'Match channel',
   });
 
   // Create team 2 voice channel
@@ -165,7 +165,7 @@ async function createMatchChannels(client, challenge) {
     type: ChannelType.GuildVoice,
     parent: category.id,
     permissionOverwrites: privateVoiceOverwrites(guild, team2DiscordIds, true),
-    reason: 'Wager bot match channel',
+    reason: 'Match channel',
   });
 
   // Create shared text channel
@@ -174,7 +174,7 @@ async function createMatchChannels(client, challenge) {
     type: ChannelType.GuildText,
     parent: category.id,
     permissionOverwrites: sharedOverwrites(guild, allDiscordIds),
-    reason: 'Wager bot match channel',
+    reason: 'Match channel',
   });
 
   // Create shared voice channel
@@ -183,7 +183,7 @@ async function createMatchChannels(client, challenge) {
     type: ChannelType.GuildVoice,
     parent: category.id,
     permissionOverwrites: sharedOverwrites(guild, allDiscordIds),
-    reason: 'Wager bot match channel',
+    reason: 'Match channel',
   });
 
   // Create voting channel (captains can view, only bot can send)
@@ -192,7 +192,7 @@ async function createMatchChannels(client, challenge) {
     type: ChannelType.GuildText,
     parent: category.id,
     permissionOverwrites: votingChannelOverwrites(guild, captainDiscordIds),
-    reason: 'Wager bot match voting channel',
+    reason: 'Match voting channel',
   });
 
   // Create match record in DB
@@ -261,15 +261,15 @@ async function createMatchChannels(client, challenge) {
   });
 
   // Build match info for welcome messages
-  const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
-  const potAmountFormatted = isWager ? (Number(challenge.total_pot_usdc) / 1_000_000).toFixed(2) : '0';
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
+  const prizeAmountFormatted = isCashMatch ? (Number(challenge.total_pot_usdc) / 1_000_000).toFixed(2) : '0';
 
-  const typeLabel1 = isWager ? t('challenge_create.type_wager', team1CaptainLang) : t('challenge_create.type_xp_match', team1CaptainLang);
-  const typeLabel2 = isWager ? t('challenge_create.type_wager', team2CaptainLang) : t('challenge_create.type_xp_match', team2CaptainLang);
-  const typeLabelShared = isWager ? t('challenge_create.type_wager', sharedLang) : t('challenge_create.type_xp_match', sharedLang);
-  const potText1 = isWager ? t('match_channel.pot_label', team1CaptainLang, { amount: potAmountFormatted }) : '';
-  const potText2 = isWager ? t('match_channel.pot_label', team2CaptainLang, { amount: potAmountFormatted }) : '';
-  const potTextShared = isWager ? t('match_channel.pot_label', sharedLang, { amount: potAmountFormatted }) : '';
+  const typeLabel1 = isCashMatch ? t('challenge_create.type_cash_match', team1CaptainLang) : t('challenge_create.type_xp_match', team1CaptainLang);
+  const typeLabel2 = isCashMatch ? t('challenge_create.type_cash_match', team2CaptainLang) : t('challenge_create.type_xp_match', team2CaptainLang);
+  const typeLabelShared = isCashMatch ? t('challenge_create.type_cash_match', sharedLang) : t('challenge_create.type_xp_match', sharedLang);
+  const prizeText1 = isCashMatch ? t('match_channel.pot_label', team1CaptainLang, { amount: prizeAmountFormatted }) : '';
+  const prizeText2 = isCashMatch ? t('match_channel.pot_label', team2CaptainLang, { amount: prizeAmountFormatted }) : '';
+  const prizeTextShared = isCashMatch ? t('match_channel.pot_label', sharedLang, { amount: prizeAmountFormatted }) : '';
 
   // Send welcome messages in team channels (each in their own captain's language)
   await team1Text.send({
@@ -277,7 +277,7 @@ async function createMatchChannels(client, challenge) {
       team: 1,
       type: typeLabel1,
       num: challenge.display_number || challenge.id,
-      pot_text: potText1,
+      pot_text: prizeText1,
     }),
   });
 
@@ -286,7 +286,7 @@ async function createMatchChannels(client, challenge) {
       team: 2,
       type: typeLabel2,
       num: challenge.display_number || challenge.id,
-      pot_text: potText2,
+      pot_text: prizeText2,
     }),
   });
 
@@ -317,7 +317,7 @@ async function createMatchChannels(client, challenge) {
       '',
       t('match_channel.shared_team1', sharedLang, { players: team1Lines.join(', ') }),
       t('match_channel.shared_team2', sharedLang, { players: team2Lines.join(', ') }),
-      potTextShared,
+      prizeTextShared,
       mapText,
       '',
       t('match_channel.shared_good_luck', sharedLang),
@@ -355,8 +355,8 @@ async function startMatch(client, challengeId) {
   // Create match channels FIRST (so we have the match ID for the contract)
   const match = await createMatchChannels(client, challenge);
 
-  // Transfer all held funds to escrow via smart contract (wager challenges only)
-  if (challenge.type === CHALLENGE_TYPE.WAGER && Number(challenge.entry_amount_usdc) > 0) {
+  // Transfer all held funds to escrow via smart contract (cash match challenges only)
+  if (challenge.type === CHALLENGE_TYPE.CASH_MATCH && Number(challenge.entry_amount_usdc) > 0) {
     try {
       // Call the smart contract: create match on-chain + pull USDC from each player.
       // Gas is sponsored by the Coinbase Paymaster — no ETH needed.
@@ -411,7 +411,7 @@ async function startMatch(client, challengeId) {
   console.log(`[MatchService] Auto-dispute timer set for match #${match.id}: ${Math.round(autoDisputeMs / 60000)} minutes`);
 
   const { postTransaction } = require('../utils/transactionFeed');
-  postTransaction({ type: 'match_started', challengeId, memo: `Match #${match.id} started | ${challenge.team_size}v${challenge.team_size} | ${challenge.game_modes} | Bo${challenge.series_length}${challenge.type === 'wager' ? ` | Pot: $${(Number(challenge.total_pot_usdc) / 1000000).toFixed(2)}` : ' | XP Match'}` });
+  postTransaction({ type: 'match_started', challengeId, memo: `Match #${match.id} started | ${challenge.team_size}v${challenge.team_size} | ${challenge.game_modes} | Bo${challenge.series_length}${challenge.type === 'cash_match' ? ` | Match Prize: $${(Number(challenge.total_pot_usdc) / 1000000).toFixed(2)}` : ' | XP Match'}` });
 
   // Start no-show reminder pings at 5min and 10min
   const playerDiscordIds = allPlayers.map(p => {
@@ -445,7 +445,7 @@ async function resolveMatch(client, matchId, winningTeam) {
   // the same outcome within ~100ms, or an admin confirm colliding
   // with the inactivity auto-dispute timer) could both pass the
   // "status !== COMPLETED" check and both call disburseWinnings →
-  // winners get paid 2x the pot.
+  // winners get paid 2x the match prize.
   //
   // Now we use matchRepo.atomicStatusTransition to flip the status
   // from the current live state (active / voting / disputed) to
@@ -474,7 +474,7 @@ async function resolveMatch(client, matchId, winningTeam) {
   const winningPlayers = challengePlayerRepo.findByChallengeAndTeam(match.challenge_id, winningTeam);
   const winnerUserIds = winningPlayers.map(p => p.user_id);
 
-  // Disburse winnings (wager challenges only).
+  // Disburse winnings (cash match challenges only).
   //
   // disburseWinnings returns `{ disbursements: [...] }` where each
   // entry is either `{userId, signature, amount}` (success) or
@@ -488,7 +488,7 @@ async function resolveMatch(client, matchId, winningTeam) {
   // status back to DISPUTED and alert the admin channel. The
   // stranded escrow funds become an admin-visible problem that
   // can be resolved manually instead of a silent loss.
-  if (challenge.type === CHALLENGE_TYPE.WAGER && Number(challenge.total_pot_usdc) > 0) {
+  if (challenge.type === CHALLENGE_TYPE.CASH_MATCH && Number(challenge.total_pot_usdc) > 0) {
     let disburseFailed = false;
     let disburseError = null;
     let disburseResult = null;
@@ -543,11 +543,11 @@ async function resolveMatch(client, matchId, winningTeam) {
   const allPlayers = challengePlayerRepo.findByChallengeId(match.challenge_id);
   const losingTeam = winningTeam === 1 ? 2 : 1;
   const losingPlayers = allPlayers.filter(p => p.team === losingTeam);
-  const isWagerMatch = challenge.type === CHALLENGE_TYPE.WAGER && Number(challenge.total_pot_usdc) > 0;
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH && Number(challenge.total_pot_usdc) > 0;
 
   // Calculate XP rewards based on match type
   let winXp, loseXp;
-  if (isWagerMatch) {
+  if (isCashMatch) {
     const rewards = calculateWagerXpRewards(challenge.entry_amount_usdc);
     winXp = rewards.winXp;
     loseXp = rewards.loseXp;
@@ -572,13 +572,13 @@ async function resolveMatch(client, matchId, winningTeam) {
   match._winXp = winXp;
   match._loseXp = loseXp;
 
-  // Compute per-player net earnings for wager matches
+  // Compute per-player net earnings for cash matches
   let perPlayerEarnings = '0';
-  if (isWagerMatch) {
-    const totalPot = BigInt(challenge.total_pot_usdc);
+  if (isCashMatch) {
+    const matchPrize = BigInt(challenge.total_pot_usdc);
     const winnerCount = BigInt(winningPlayers.length);
     const entryAmount = BigInt(challenge.entry_amount_usdc);
-    const share = totalPot / winnerCount;
+    const share = matchPrize / winnerCount;
     perPlayerEarnings = (share - entryAmount).toString();
   }
 
@@ -594,9 +594,9 @@ async function resolveMatch(client, matchId, winningTeam) {
       userRepo.addXp(player.user_id, winXp);
       userRepo.addWin(player.user_id);
       insertXpHistory.run(player.user_id, matchId, challenge.type, winXp, getCurrentSeason());
-      if (isWagerMatch) {
+      if (isCashMatch) {
         userRepo.addEarnings(player.user_id, perPlayerEarnings);
-        userRepo.addWagered(player.user_id, challenge.entry_amount_usdc);
+        userRepo.addEntered(player.user_id, challenge.entry_amount_usdc);
       }
     } catch (err) {
       console.error(`[MatchService] Failed to update stats for winner ${player.user_id}:`, err.message);
@@ -624,8 +624,8 @@ async function resolveMatch(client, matchId, winningTeam) {
         insertXpHistory.run(player.user_id, matchId, challenge.type, -loseXp, getCurrentSeason());
       }
       userRepo.addLoss(player.user_id);
-      if (isWagerMatch) {
-        userRepo.addWagered(player.user_id, challenge.entry_amount_usdc);
+      if (isCashMatch) {
+        userRepo.addEntered(player.user_id, challenge.entry_amount_usdc);
       }
     } catch (err) {
       console.error(`[MatchService] Failed to update stats for loser ${player.user_id}:`, err.message);
@@ -635,7 +635,7 @@ async function resolveMatch(client, matchId, winningTeam) {
     if (neatqueueService.isConfigured()) {
       const loseUser = userRepo.findById(player.user_id);
       if (loseUser) {
-        // For wagers: 0 XP loss (no point change), but still record the loss
+        // For cash matches: 0 XP loss (no point change), but still record the loss
         // For XP matches: subtract the ELO-calculated points
         if (loseXp > 0) {
           neatqueueService.addPoints(loseUser.discord_id, -loseXp).catch(err => {
@@ -653,8 +653,8 @@ async function resolveMatch(client, matchId, winningTeam) {
   const { postTransaction: postTx } = require('../utils/transactionFeed');
   const winnerNames = winningPlayers.map(p => { const u = userRepo.findById(p.user_id); return u?.server_username || '?'; }).join(', ');
   const loserNames = losingPlayers.map(p => { const u = userRepo.findById(p.user_id); return u?.server_username || '?'; }).join(', ');
-  const isWager2 = challenge.type === CHALLENGE_TYPE.WAGER && Number(challenge.total_pot_usdc) > 0;
-  postTx({ type: 'match_resolved', challengeId: match.challenge_id, memo: `Match #${matchId} | Team ${winningTeam} wins\nWinners: ${winnerNames} (+${winXp} XP${isWager2 ? `, +$${(Number(perPlayerEarnings) / 1000000).toFixed(2)} each` : ''})\nLosers: ${loserNames} (${loseXp > 0 ? `-${loseXp} XP` : '0 XP'})` });
+  const isCashMatch2 = challenge.type === CHALLENGE_TYPE.CASH_MATCH && Number(challenge.total_pot_usdc) > 0;
+  postTx({ type: 'match_resolved', challengeId: match.challenge_id, memo: `Match #${matchId} | Team ${winningTeam} wins\nWinners: ${winnerNames} (+${winXp} XP${isCashMatch2 ? `, +$${(Number(perPlayerEarnings) / 1000000).toFixed(2)} each` : ''})\nLosers: ${loserNames} (${loseXp > 0 ? `-${loseXp} XP` : '0 XP'})` });
 
   // Log each XP award
   for (const player of winningPlayers) {
@@ -673,7 +673,7 @@ async function resolveMatch(client, matchId, winningTeam) {
     try {
       const sharedChannel = client.channels.cache.get(match.shared_text_id);
       if (sharedChannel) {
-        const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+        const isCashMatchResult = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
         // Get captain languages for the shared message
         const allCaptains = allPlayers.filter(p => p.role === PLAYER_ROLE.CAPTAIN);
         const captainDiscordIdsForLang = allCaptains.map(p => {
@@ -681,9 +681,9 @@ async function resolveMatch(client, matchId, winningTeam) {
           return u ? u.discord_id : null;
         }).filter(Boolean);
         const sharedLang = _captainLang(captainDiscordIdsForLang);
-        const potAmount = (Number(challenge.total_pot_usdc) / 1_000_000).toFixed(2);
-        const potText = isWager
-          ? t('match_channel.result_pot_distributed', sharedLang, { amount: potAmount })
+        const prizeAmount = (Number(challenge.total_pot_usdc) / 1_000_000).toFixed(2);
+        const prizeText = isCashMatchResult
+          ? t('match_channel.result_pot_distributed', sharedLang, { amount: prizeAmount })
           : '';
 
         await sharedChannel.send({
@@ -691,7 +691,7 @@ async function resolveMatch(client, matchId, winningTeam) {
             t('match_channel.result_complete', sharedLang, { matchId }),
             '',
             t('match_channel.result_winner', sharedLang, { team: winningTeam }),
-            potText,
+            prizeText,
             '',
             t('match_channel.result_cleanup', sharedLang),
           ].join('\n'),
@@ -708,20 +708,20 @@ async function resolveMatch(client, matchId, winningTeam) {
 
   const modeInfo = GAME_MODES[challenge.game_modes];
   const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
-  const totalPot = Number(challenge.total_pot_usdc);
+  const matchPrize = Number(challenge.total_pot_usdc);
   const entryAmount = Number(challenge.entry_amount_usdc);
-  const perPlayerPayout = totalPot > 0 ? totalPot / winningPlayers.length : 0;
+  const perPlayerPayout = matchPrize > 0 ? matchPrize / winningPlayers.length : 0;
   const perPlayerProfit = perPlayerPayout - entryAmount;
   const displayWinXp = match._winXp || winXp;
   const displayLoseXp = match._loseXp || loseXp;
-  const matchTypeLabel = isWagerMatch ? 'Wager' : 'XP Match';
+  const matchTypeLabel = isCashMatch ? 'Cash Match' : 'XP Match';
 
   const winnerLines = [];
   for (const p of winningPlayers) {
     const u = userRepo.findById(p.user_id);
     if (!u) continue;
     const ign = u.cod_ign ? `(${u.cod_ign})` : '';
-    const moneyText = isWagerMatch ? `**+${formatUsdc(perPlayerProfit)} USDC** ` : '';
+    const moneyText = isCashMatch ? `**+${formatUsdc(perPlayerProfit)} USDC** ` : '';
     winnerLines.push(`<@${u.discord_id}> ${ign} — ${moneyText}+${displayWinXp} XP`);
   }
   const loserLines = [];
@@ -729,18 +729,18 @@ async function resolveMatch(client, matchId, winningTeam) {
     const u = userRepo.findById(p.user_id);
     if (!u) continue;
     const ign = u.cod_ign ? `(${u.cod_ign})` : '';
-    const moneyText = isWagerMatch ? `**-${formatUsdc(entryAmount)} USDC** ` : '';
+    const moneyText = isCashMatch ? `**-${formatUsdc(entryAmount)} USDC** ` : '';
     const xpText = displayLoseXp > 0 ? `-${displayLoseXp} XP` : '';
     loserLines.push(`<@${u.discord_id}> ${ign} — ${moneyText}${xpText}`);
   }
 
-  const titleLine = isWagerMatch
-    ? `**Team ${winningTeam} wins! Pot: ${formatUsdc(totalPot)} USDC**`
+  const titleLine = isCashMatch
+    ? `**Team ${winningTeam} wins! Match Prize: ${formatUsdc(matchPrize)} USDC**`
     : `**Team ${winningTeam} wins!**`;
 
   const resultEmbed = new EmbedBuilder()
     .setTitle(`${matchTypeLabel} #${matchId} — Result`)
-    .setColor(isWagerMatch ? 0xf1c40f : 0x3498db)
+    .setColor(isCashMatch ? 0xf1c40f : 0x3498db)
     .setDescription([titleLine, '', '**Winners**', ...winnerLines, '', '**Losers**', ...loserLines].join('\n'))
     .addFields(
       { name: 'Mode', value: modeLabel, inline: true },
@@ -749,7 +749,7 @@ async function resolveMatch(client, matchId, winningTeam) {
     )
     .setTimestamp();
 
-  if (isWagerMatch) {
+  if (isCashMatch) {
     resultEmbed.addFields({ name: 'Entry', value: `${formatUsdc(entryAmount)} per player`, inline: true });
   }
 
@@ -763,11 +763,11 @@ async function resolveMatch(client, matchId, winningTeam) {
     buildResultLanguageButton(matchId, resultDisplayLang),
   );
 
-  // Post to the regular results channels (all-results + wager-results).
+  // Post to the regular results channels (all-results + cash-match-results).
   // Routed through postResultToChannels so the cache-miss / fetch fallback
   // applies — these are low-traffic admin channels and frequently fall
   // out of the channels cache after a restart.
-  await postResultToChannels(client, resultEmbed, [langRow], isWagerMatch, matchId);
+  await postResultToChannels(client, resultEmbed, [langRow], isCashMatch, matchId);
 
   // Update nicknames with new XP and earnings
   const { updateNicknames } = require('../utils/nicknameUpdater');
@@ -823,7 +823,7 @@ async function cleanupChannels(client, matchId) {
     try {
       const channel = client.channels.cache.get(channelId);
       if (channel && channel.deletable) {
-        await channel.delete('Wager bot match cleanup');
+        await channel.delete('Match cleanup');
       }
     } catch (err) {
       console.error(`[MatchService] Failed to delete channel ${channelId}:`, err.message);
@@ -835,7 +835,7 @@ async function cleanupChannels(client, matchId) {
     try {
       const category = client.channels.cache.get(match.category_id);
       if (category && category.deletable) {
-        await category.delete('Wager bot match cleanup');
+        await category.delete('Match cleanup');
       }
     } catch (err) {
       console.error(`[MatchService] Failed to delete category ${match.category_id}:`, err.message);

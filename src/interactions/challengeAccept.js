@@ -54,7 +54,7 @@ async function handleButton(interaction) {
     });
   }
 
-  const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const entryUsdc = challenge.entry_amount_usdc;
 
   // Prevent accepting own challenge
@@ -63,7 +63,7 @@ async function handleButton(interaction) {
   }
 
   const { GAME_MODES } = require('../config/constants');
-  const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+  const typeLabel = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
   const displayNum = challenge.display_number || challengeId;
 
   // 1v1: show confirmation directly
@@ -71,7 +71,7 @@ async function handleButton(interaction) {
     const modeInfo = GAME_MODES[challenge.game_modes];
     const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
     const entryAmountFormatted = (Number(entryUsdc) / 1_000_000).toFixed(2);
-    const entryText = isWager ? `\n**${t('challenge_create.confirm_field_entry', lang)}:** $${entryAmountFormatted} USDC` : '';
+    const entryText = isCashMatch ? `\n**${t('challenge_create.confirm_field_entry', lang)}:** $${entryAmountFormatted} USDC` : '';
 
     const confirmEmbed = new EmbedBuilder()
       .setTitle(t('challenge_accept.confirm_title', lang))
@@ -85,7 +85,7 @@ async function handleButton(interaction) {
         `**${t('challenge_create.confirm_field_series', lang)}:** ${t('challenge_create.series_label', lang, { n: challenge.series_length })}`,
         entryText,
         '',
-        isWager ? t('challenge_accept.confirm_held_notice', lang, { amount: entryAmountFormatted }) : '',
+        isCashMatch ? t('challenge_accept.confirm_held_notice', lang, { amount: entryAmountFormatted }) : '',
         '',
         t('challenge_accept.confirm_question', lang),
       ].join('\n'));
@@ -151,7 +151,7 @@ async function handleConfirmedAccept(interaction) {
     return interaction.reply({ content: busy.reason, ephemeral: true });
   }
 
-  const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const entryUsdc = challenge.entry_amount_usdc;
 
   // 1v1 challenges — immediate acceptance
@@ -165,8 +165,8 @@ async function handleConfirmedAccept(interaction) {
         return interaction.editReply({ content: t('challenge_accept.already_accepted', lang) });
       }
 
-      // Check balance and hold funds (if wager)
-      if (isWager && Number(entryUsdc) > 0) {
+      // Check balance and hold funds (if cash match)
+      if (isCashMatch && Number(entryUsdc) > 0) {
         const entryAmount = (Number(entryUsdc) / 1_000_000).toFixed(2);
         if (!escrowManager.canAfford(user.id, entryUsdc)) {
           return interaction.editReply({
@@ -189,14 +189,14 @@ async function handleConfirmedAccept(interaction) {
         team: 2,
         role: PLAYER_ROLE.CAPTAIN,
         status: PLAYER_STATUS.ACCEPTED,
-        fundsHeld: (isWager && Number(entryUsdc) > 0) ? 1 : 0,
+        fundsHeld: (isCashMatch && Number(entryUsdc) > 0) ? 1 : 0,
       });
 
       // Set challenge acceptor
       challengeRepo.setAcceptor(challengeId, user.id);
 
       // Transfer ALL players' held funds to escrow
-      if (isWager && Number(entryUsdc) > 0) {
+      if (isCashMatch && Number(entryUsdc) > 0) {
         const allPlayers = challengePlayerRepo.findByChallengeId(challengeId);
         for (const player of allPlayers) {
           if (player.funds_held) {
@@ -217,9 +217,9 @@ async function handleConfirmedAccept(interaction) {
 
       // Log to admin feed
       const { postTransaction } = require('../utils/transactionFeed');
-      postTransaction({ type: 'challenge_accepted', username: user.server_username, discordId: discordId, challengeId, memo: `${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId} accepted by ${user.server_username} (1v1)` });
+      postTransaction({ type: 'challenge_accepted', username: user.server_username, discordId: discordId, challengeId, memo: `${challenge.type === 'cash_match' ? 'Cash Match' : 'XP Match'} #${challenge.display_number || challengeId} accepted by ${user.server_username} (1v1)` });
 
-      const typeLabelDone = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+      const typeLabelDone = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
       return interaction.editReply({
         content: t('challenge_accept.accepted_msg', lang, { type: typeLabelDone, num: challenge.display_number || challengeId }),
       });
@@ -247,7 +247,7 @@ async function handleConfirmedAccept(interaction) {
   );
 
   return interaction.reply({
-    content: `**Select your teammates for ${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId}:**\n\nTeam size: **${challenge.team_size}v${challenge.team_size}** — Pick **${teammatesNeeded}** teammate(s).`,
+    content: `**Select your teammates for ${challenge.type === 'cash_match' ? 'Cash Match' : 'XP Match'} #${challenge.display_number || challengeId}:**\n\nTeam size: **${challenge.team_size}v${challenge.team_size}** — Pick **${teammatesNeeded}** teammate(s).`,
     components: [selectRow],
     ephemeral: true,
   });
@@ -323,7 +323,7 @@ function buildAcceptTeammateReviewUI(flow, challenge, lang) {
 async function showAcceptanceConfirmation(interaction, flow, challenge, lang) {
   const discordId = interaction.user.id;
   const { GAME_MODES } = require('../config/constants');
-  const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const entryUsdc = challenge.entry_amount_usdc;
   const modeInfo = GAME_MODES[challenge.game_modes];
   const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
@@ -338,11 +338,11 @@ async function showAcceptanceConfirmation(interaction, flow, challenge, lang) {
   const team2Lines = [`<@${discordId}> (Captain)`];
   for (const tmId of flow.teammates) team2Lines.push(`<@${tmId}>`);
 
-  const entryText = isWager
-    ? `\n**${t('challenge_create.confirm_field_entry', lang)}:** ${formatUsdc(entryUsdc)} USDC ${t('challenge_create.per_player', lang)}\n**${t('challenge_create.confirm_field_pot', lang)}:** ${formatUsdc(Number(entryUsdc) * challenge.team_size * 2)} USDC`
+  const entryText = isCashMatch
+    ? `\n**${t('challenge_create.confirm_field_entry', lang)}:** ${formatUsdc(entryUsdc)} USDC ${t('challenge_create.per_player', lang)}\n**${t('challenge_create.confirm_field_match_prize', lang)}:** ${formatUsdc(Number(entryUsdc) * challenge.team_size * 2)} USDC`
     : '';
 
-  const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+  const typeLabel = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
 
   const confirmEmbed = new EmbedBuilder()
     .setTitle(t('challenge_accept.confirm_title', lang))
@@ -360,7 +360,7 @@ async function showAcceptanceConfirmation(interaction, flow, challenge, lang) {
       `**Team 2 (Your Team):**`,
       ...team2Lines,
       '',
-      isWager ? t('challenge_accept.confirm_held_notice', lang, { amount: formatUsdc(entryUsdc).replace('$', '') }) : '',
+      isCashMatch ? t('challenge_accept.confirm_held_notice', lang, { amount: formatUsdc(entryUsdc).replace('$', '') }) : '',
       '',
       t('challenge_accept.confirm_question_correct', lang),
     ].join('\n'));
@@ -580,7 +580,7 @@ async function handleTeamConfirmedAccept(interaction) {
   if (!user) return interaction.reply({ content: 'Not registered.', ephemeral: true });
 
   const selectedDiscordIds = flow.teammates;
-  const isWager = challenge.type === CHALLENGE_TYPE.WAGER;
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const entryUsdc = challenge.entry_amount_usdc;
 
   // Atomically claim the challenge BEFORE doing any money work, any
@@ -608,14 +608,14 @@ async function handleTeamConfirmedAccept(interaction) {
   await interaction.update({ content: 'Processing...', embeds: [], components: [] });
 
   try {
-    // Check acceptor's balance and hold funds (if wager)
-    if (isWager && Number(entryUsdc) > 0) {
+    // Check acceptor's balance and hold funds (if cash match)
+    if (isCashMatch && Number(entryUsdc) > 0) {
       if (!escrowManager.canAfford(user.id, entryUsdc)) {
         // Revert the status claim — we failed before any money moved
         challengeRepo.atomicStatusTransition(challengeId, CHALLENGE_STATUS.ACCEPTED, CHALLENGE_STATUS.OPEN);
         acceptFlows.delete(discordId);
         return interaction.editReply({
-          content: `Insufficient balance. You need **${formatUsdc(entryUsdc)} USDC** to accept this wager.`,
+          content: `Insufficient balance. You need **${formatUsdc(entryUsdc)} USDC** to accept this cash match.`,
           components: [],
         });
       }
@@ -640,7 +640,7 @@ async function handleTeamConfirmedAccept(interaction) {
       team: 2,
       role: PLAYER_ROLE.CAPTAIN,
       status: PLAYER_STATUS.ACCEPTED,
-      fundsHeld: (isWager && Number(entryUsdc) > 0) ? 1 : 0,
+      fundsHeld: (isCashMatch && Number(entryUsdc) > 0) ? 1 : 0,
     });
 
     // Add teammates as team 2 pending players
@@ -684,7 +684,7 @@ async function handleTeamConfirmedAccept(interaction) {
     const teammatesMention = selectedDiscordIds.map(id => `<@${id}>`).join(', ');
     return interaction.editReply({
       content: [
-        `**${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId} accepted!**`,
+        `**${challenge.type === 'cash_match' ? 'Cash Match' : 'XP Match'} #${challenge.display_number || challengeId} accepted!**`,
         '',
         `Your teammates (${teammatesMention}) have been notified.`,
         'Once all teammates accept, the match will begin and channels will be created.',
@@ -726,13 +726,13 @@ async function notifyTeam2Teammates(guild, challenge) {
 
       const playerDiscordId = user.discord_id;
       const lang = getLang(playerDiscordId);
-      const isWager = challenge.type === CT.WAGER;
+      const isCashMatch = challenge.type === CT.CASH_MATCH;
       const modeInfo = GAME_MODES[challenge.game_modes];
       const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
 
       const acceptor = userRepo.findById(challenge.acceptor_user_id);
       const acceptorMention = acceptor ? `<@${acceptor.discord_id}>` : 'Unknown';
-      const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+      const typeLabel = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
       const displayNum = challenge.display_number || challenge.id;
 
       const description = [
@@ -744,7 +744,7 @@ async function notifyTeam2Teammates(guild, challenge) {
         `**${t('notify_team.field_series', lang)}:** ${t('challenge_create.series_label', lang, { n: challenge.series_length })}`,
       ];
 
-      if (isWager) {
+      if (isCashMatch) {
         const entryAmount = (Number(challenge.entry_amount_usdc) / 1_000_000).toFixed(2);
         description.push(`**${t('notify_team.field_entry', lang)}:** ${t('notify_team.entry_per_player', lang, { amount: entryAmount })}`);
       }
@@ -765,7 +765,7 @@ async function notifyTeam2Teammates(guild, challenge) {
       const embedPayload = {
         title: t('notify_team.title', lang, { type: typeLabel, num: displayNum }),
         description: description.join('\n'),
-        color: isWager ? 0xf1c40f : 0x3498db,
+        color: isCashMatch ? 0xf1c40f : 0x3498db,
       };
 
       // ── Try DM first (conserve channel quota) ───────────────────

@@ -62,11 +62,13 @@ function buildHowItWorksEmbeds(lang = 'en') {
       .setDescription(t.funding.description));
   }
 
-  if (t.wager) {
+  // cashMatch is the current key; wager is the legacy key for untranslated locales
+  const cashMatchSection = t.cashMatch || t.wager;
+  if (cashMatchSection) {
     embeds.push(new EmbedBuilder()
-      .setTitle(t.wager.title)
+      .setTitle(cashMatchSection.title)
       .setColor(0xf1c40f)
-      .setDescription(t.wager.description));
+      .setDescription(cashMatchSection.description));
   }
 
   if (t.xp) {

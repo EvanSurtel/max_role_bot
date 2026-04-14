@@ -4,7 +4,7 @@ module.exports = {
     description: [
       'Cada jogador é colocado em um rank baseado no seu **XP da temporada**. Quanto mais XP você ganha, mais alto você sobe.',
       '',
-      'O XP vem de três fontes — **partidas da fila de XP**, **desafios de XP** e **vitórias em apostas**. Tudo conta pro seu total de XP da temporada.',
+      'O XP vem de três fontes — **partidas da fila de XP**, **desafios de XP** e **vitórias em cash match**. Tudo conta pro seu total de XP da temporada.',
       '',
       '**A cada nova temporada, todo mundo reseta pra 500 XP e começa a subir de novo.** Seus ganhos de todos os tempos continuam, mas o rank é briga nova a cada temporada.',
       '',

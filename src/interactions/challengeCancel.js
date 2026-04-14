@@ -47,10 +47,10 @@ async function handleButton(interaction) {
     });
   }
 
-  const isWager = challenge.type === 'wager';
-  const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+  const isCashMatch = challenge.type === 'cash_match';
+  const typeLabel = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
   const displayNum = challenge.display_number || challengeId;
-  const refundLine = isWager ? `\n\n${t('challenge_cancel.confirm_refund_notice', lang)}` : '';
+  const refundLine = isCashMatch ? `\n\n${t('challenge_cancel.confirm_refund_notice', lang)}` : '';
 
   const confirmEmbed = new EmbedBuilder()
     .setTitle(t('challenge_cancel.confirm_title', lang))
@@ -95,8 +95,8 @@ async function handleConfirmedCancel(interaction) {
     return interaction.reply({ content: t('challenge_cancel.cannot_cancel_now', lang), ephemeral: true });
   }
 
-  const isWager = challenge.type === 'wager';
-  const typeLabel = isWager ? t('challenge_create.type_wager', lang) : t('challenge_create.type_xp_match', lang);
+  const isCashMatch = challenge.type === 'cash_match';
+  const typeLabel = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
   const displayNum = challenge.display_number || challengeId;
 
   try {
@@ -106,9 +106,9 @@ async function handleConfirmedCancel(interaction) {
     await disableBoardMessage(interaction.client, challenge);
 
     const { postTransaction } = require('../utils/transactionFeed');
-    postTransaction({ type: 'challenge_cancelled', discordId: interaction.user.id, challengeId, memo: `${challenge.type === 'wager' ? 'Wager' : 'XP Match'} #${challenge.display_number || challengeId} cancelled by creator — all funds refunded` });
+    postTransaction({ type: 'challenge_cancelled', discordId: interaction.user.id, challengeId, memo: `${challenge.type === 'cash_match' ? 'Cash Match' : 'XP Match'} #${challenge.display_number || challengeId} cancelled by creator — all funds refunded` });
 
-    const cancelKey = isWager ? 'challenge_cancel.cancelled_with_refund' : 'challenge_cancel.cancelled';
+    const cancelKey = isCashMatch ? 'challenge_cancel.cancelled_with_refund' : 'challenge_cancel.cancelled';
     await interaction.followUp({
       content: t(cancelKey, lang, { type: typeLabel, num: displayNum }),
       ephemeral: true,
