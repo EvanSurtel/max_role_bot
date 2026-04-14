@@ -21,7 +21,7 @@
 //
 // What it touches:
 //   1. users table: total_wins, total_losses, xp_points,
-//      total_earnings_usdc, total_wagered_usdc — all reset to the
+//      total_earnings_usdc, total_entered_usdc — all reset to the
 //      clean-slate baseline (0 / 0 / 500 / 0 / 0)
 //   2. Every member in the guild with accepted_tos=1 gets their
 //      nickname rewritten via the same updateNickname helper the
@@ -44,7 +44,7 @@ async function main() {
         total_losses = 0,
         xp_points = 500,
         total_earnings_usdc = '0',
-        total_wagered_usdc = '0'
+        total_entered_usdc = '0'
     WHERE accepted_tos = 1
   `).run();
   console.log(`[Reset] ✓ ${result.changes} user stat row(s) reset in the DB`);
