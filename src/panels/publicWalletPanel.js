@@ -30,7 +30,7 @@ function buildPublicWalletPanel(lang = 'en') {
   const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('wallet_view_open')
-      .setEmoji('👛')
+      .setEmoji('💰')
       .setLabel(t('public_wallet.btn_view_wallet', lang))
       .setStyle(ButtonStyle.Success),
   );
