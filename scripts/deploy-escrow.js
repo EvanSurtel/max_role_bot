@@ -113,42 +113,23 @@ async function main() {
   const constructorData = iface.encodeDeploy([usdcAddress]);
   const deployData = bytecode + constructorData.slice(2); // remove 0x from constructor data
 
-  console.log('[Deploy] Sending deployment transaction via CDP...');
-
-  // CDP SDK accepts a pre-serialized hex string to skip viem serialization.
-  // We use viem directly to serialize a contract creation tx properly.
-  const { serializeTransaction } = require('viem');
-  const serialized = serializeTransaction({
-    type: 'eip1559',
-    chainId: chainId,
-    data: deployData,
-    value: 0n,
-    maxFeePerGas: 2000000000n,       // 2 gwei — plenty for Base
-    maxPriorityFeePerGas: 1000000n,  // 0.001 gwei
-    gas: 3000000n,                   // 3M gas — enough for contract deploy
-    nonce: 0,                        // CDP will override if needed
-  });
-
-  const { transactionHash } = await cdp.evm.sendTransaction({
-    address: owner.address,
-    network: cdpNetwork,
-    transaction: serialized,
-  });
-
-  console.log(`[Deploy] TX hash: ${transactionHash}`);
-  console.log('[Deploy] Waiting for confirmation...');
+  // CDP sendTransaction doesn't support contract creation (no `to` address).
+  // Export the owner account's private key and use ethers.js directly.
+  console.log('[Deploy] Exporting owner key for contract deployment...');
+  const privateKey = await cdp.evm.exportAccount({ address: owner.address });
 
   const rpcUrl = process.env.BASE_RPC_URL || (network === 'sepolia' ? 'https://sepolia.base.org' : 'https://mainnet.base.org');
   const provider = new ethers.JsonRpcProvider(rpcUrl, { name: network === 'sepolia' ? 'base-sepolia' : 'base', chainId });
-  const receipt = await provider.waitForTransaction(transactionHash, 1, 60000);
+  const deployer = new ethers.Wallet(privateKey, provider);
 
-  if (!receipt || !receipt.contractAddress) {
-    console.error('[Deploy] Deployment failed — no contract address in receipt');
-    console.error('Receipt:', JSON.stringify(receipt, null, 2));
-    process.exit(1);
-  }
+  console.log('[Deploy] Sending deployment transaction...');
+  const factory = new ethers.ContractFactory(abi, bytecode, deployer);
+  const contract = await factory.deploy(usdcAddress);
+  console.log(`[Deploy] TX hash: ${contract.deploymentTransaction().hash}`);
+  console.log('[Deploy] Waiting for confirmation...');
 
-  const deployedAddress = receipt.contractAddress;
+  await contract.waitForDeployment();
+  const deployedAddress = await contract.getAddress();
 
   console.log();
   console.log('═'.repeat(60));
