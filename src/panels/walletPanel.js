@@ -36,11 +36,8 @@ async function handleWalletViewOpen(interaction) {
     return interaction.reply({ content: t('common.wallet_not_found', lang), ephemeral: true });
   }
 
-  let ethBalance = '0';
-  try { ethBalance = await walletManager.getEthBalance(wallet.solana_address); } catch { /* */ }
-
   const { buildWalletView } = require('./walletPanelView');
-  const view = buildWalletView(wallet, user, lang, ethBalance);
+  const view = buildWalletView(wallet, user, lang);
 
   // _persist: true — the wallet ephemeral must not auto-delete so the user
   // can click Copy Address / Withdraw / History on it without losing it.
@@ -217,13 +214,10 @@ async function handleWalletSubButton(interaction) {
     // Re-render the ephemeral wallet view in place with fresh balance data.
     await interaction.deferUpdate();
 
-    let ethBalance = '0';
-    try { ethBalance = await walletManager.getEthBalance(wallet.solana_address); } catch { /* */ }
-
     // Re-fetch wallet to pick up any balance changes
     const freshWallet = walletRepo.findByUserId(user.id);
     const { buildWalletView } = require('./walletPanelView');
-    const view = buildWalletView(freshWallet, user, lang, ethBalance);
+    const view = buildWalletView(freshWallet, user, lang);
     return interaction.editReply(view);
   }
 

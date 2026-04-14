@@ -12,15 +12,10 @@ const { USDC_PER_UNIT } = require('../config/constants');
  * @param {object} wallet - wallet row from walletRepo
  * @param {object} user - user row from userRepo (for username + saved language)
  * @param {string} lang - language code
- * @param {string|null} gasBalance - ETH balance in wei (string), or null if unknown
  */
-function buildWalletView(wallet, user, lang, gasBalance = null) {
-  const { ethers } = require('ethers');
+function buildWalletView(wallet, user, lang) {
   const availableUsdc = (Number(wallet.balance_available) / USDC_PER_UNIT).toFixed(2);
   const heldUsdc = (Number(wallet.balance_held) / USDC_PER_UNIT).toFixed(2);
-  const gasFormatted = gasBalance !== null
-    ? `${ethers.formatEther(gasBalance)} ETH`
-    : '—';
 
   const username = (user && (user.server_username || user.cod_ign)) || 'Player';
 
@@ -31,7 +26,6 @@ function buildWalletView(wallet, user, lang, gasBalance = null) {
     .addFields(
       { name: t('wallet_embed.available', lang), value: `$${availableUsdc} USDC`, inline: true },
       { name: t('wallet_embed.held', lang), value: `$${heldUsdc} USDC`, inline: true },
-      { name: 'ETH (gas)', value: gasFormatted, inline: true },
     )
     .setFooter({ text: t('wallet_embed.footer', lang) })
     .setTimestamp();
@@ -42,7 +36,6 @@ function buildWalletView(wallet, user, lang, gasBalance = null) {
     new ButtonBuilder().setCustomId('wallet_copy_address').setLabel(t('wallet.btn_copy_address', lang)).setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('wallet_refresh').setLabel('🔄').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('wallet_withdraw').setLabel(t('wallet.btn_withdraw_usdc', lang)).setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('wallet_withdraw_sol').setLabel(t('wallet.btn_withdraw_sol', lang)).setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('wallet_history').setLabel(t('wallet.btn_history', lang)).setStyle(ButtonStyle.Secondary),
   );
 
