@@ -59,7 +59,6 @@ function buildAdminWalletViewEmbed(targetUser, wallet, solBalance, lang) {
     .addFields(
       { name: t('wallet_embed.available', lang), value: `$${availableUsdc} USDC`, inline: true },
       { name: t('wallet_embed.held', lang), value: `$${heldUsdc} USDC`, inline: true },
-      { name: t('wallet.sol_balance', lang), value: `${solFormatted} SOL`, inline: true },
       { name: t('admin_wallet_viewer.tx_count', lang), value: `${txCount}`, inline: true },
       { name: t('admin_wallet_viewer.activated', lang), value: wallet.is_activated ? '✅' : '❌', inline: true },
     )
@@ -106,9 +105,11 @@ async function handleAdminWalletViewSelect(interaction) {
 
   const embed = buildAdminWalletViewEmbed(targetUser, wallet, solBalance, lang);
 
-  // "View Transactions" button — encodes the target user's discord ID
-  // so the handler knows whose history to fetch.
   const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`admin_wallet_copy_${targetDiscordId}`)
+      .setLabel('📋 Copy Address')
+      .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`admin_wallet_history_${targetDiscordId}_0`)
       .setEmoji('📜')
@@ -239,6 +240,10 @@ async function handleAdminWalletBack(interaction) {
   const embed = buildAdminWalletViewEmbed(targetUser, wallet, solBalance, lang);
   const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
+      .setCustomId(`admin_wallet_copy_${targetDiscordId}`)
+      .setLabel('📋 Copy Address')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
       .setCustomId(`admin_wallet_history_${targetDiscordId}_0`)
       .setEmoji('📜')
       .setLabel(t('admin_wallet_viewer.btn_view_transactions', lang))
@@ -248,8 +253,34 @@ async function handleAdminWalletBack(interaction) {
   return interaction.update({ embeds: [embed], components: [actionRow] });
 }
 
+/**
+ * Copy address — sends the wallet address as plain text in an ephemeral
+ * so mobile users can long-press to copy.
+ */
+async function handleAdminWalletCopy(interaction) {
+  if (!isAdmin(interaction.member)) {
+    return interaction.reply({ content: 'Admin only.', ephemeral: true });
+  }
+
+  const targetDiscordId = interaction.customId.replace('admin_wallet_copy_', '');
+  const targetUser = userRepo.findByDiscordId(targetDiscordId);
+  if (!targetUser) {
+    return interaction.reply({ content: 'User not found.', ephemeral: true });
+  }
+  const wallet = walletRepo.findByUserId(targetUser.id);
+  if (!wallet) {
+    return interaction.reply({ content: 'No wallet.', ephemeral: true });
+  }
+
+  return interaction.reply({
+    content: wallet.solana_address,
+    ephemeral: true,
+  });
+}
+
 module.exports = {
   handleAdminWalletViewSelect,
   handleAdminWalletHistory,
   handleAdminWalletBack,
+  handleAdminWalletCopy,
 };

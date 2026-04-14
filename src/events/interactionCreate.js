@@ -332,6 +332,9 @@ module.exports = {
         if (id.startsWith('admin_wallet_back_')) {
           return await adminWalletViewer.handleAdminWalletBack(interaction);
         }
+        if (id.startsWith('admin_wallet_copy_')) {
+          return await adminWalletViewer.handleAdminWalletCopy(interaction);
+        }
         console.warn(`[Interaction] Unhandled button customId: ${id}`);
         return;
       }
