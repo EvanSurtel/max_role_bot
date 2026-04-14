@@ -482,15 +482,8 @@ async function _executeUsdcWithdraw(interaction, user, amountUsdc, address, lang
       return interaction.editReply({ content: t('common.insufficient_balance', lang, { available: availableFormatted }) });
     }
 
-    const senderKeypair = await walletManager.getKeypairFromEncrypted(
-      freshWallet.encrypted_private_key,
-      freshWallet.encryption_iv,
-      freshWallet.encryption_tag,
-      freshWallet.encryption_salt,
-    );
-
     const { signature } = await transactionService.transferUsdc(
-      senderKeypair,
+      freshWallet.solana_address,
       address,
       amountSmallest.toString(),
     );
@@ -622,14 +615,7 @@ async function _executeSolWithdraw(interaction, user, amountSol, address, lang) 
       });
     }
 
-    const senderWallet = await walletManager.getWalletFromEncrypted(
-      wallet.encrypted_private_key,
-      wallet.encryption_iv,
-      wallet.encryption_tag,
-      wallet.encryption_salt,
-    );
-
-    const { signature } = await transactionService.transferEth(senderWallet, address, amountWei);
+    const { signature } = await transactionService.transferEth(wallet.solana_address, address, amountWei);
 
     transactionRepo.create({
       type: 'eth_withdrawal',

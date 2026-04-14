@@ -1,51 +1,25 @@
 #!/usr/bin/env node
-// Create the owner CDP wallet for escrow contract admin calls.
-//
-// This wallet signs createMatch, resolveMatch, cancelMatch on the
-// escrow contract. Run once, then paste the output into your .env
-// as CDP_OWNER_WALLET_DATA.
-//
-// Usage:
-//   node scripts/create-owner-wallet.js
-//
-// Prerequisites:
-//   - CDP_API_KEY_NAME and CDP_API_KEY_SECRET set in .env
-
 require('dotenv').config();
-const { Coinbase, Wallet } = require('@coinbase/coinbase-sdk');
+const { CdpClient } = require('@coinbase/cdp-sdk');
 
 async function main() {
-  const apiKeyName = process.env.CDP_API_KEY_NAME;
-  const apiKeySecret = process.env.CDP_API_KEY_SECRET;
+  console.log('[OwnerWallet] Creating owner account...');
 
-  if (!apiKeyName || !apiKeySecret) {
-    console.error('CDP_API_KEY_NAME and CDP_API_KEY_SECRET must be set in .env');
-    process.exit(1);
-  }
-
-  Coinbase.configure({ apiKeyName, privateKey: apiKeySecret });
-
+  const cdp = new CdpClient();
   const network = (process.env.BASE_NETWORK || 'mainnet').toLowerCase();
-  const networkId = network === 'sepolia' ? 'base-sepolia' : 'base-mainnet';
+  const cdpNetwork = network === 'sepolia' ? 'base-sepolia' : 'base';
 
-  console.log(`[OwnerWallet] Creating owner wallet on ${networkId}...`);
-  const wallet = await Wallet.create({ networkId });
-
-  const defaultAddress = await wallet.getDefaultAddress();
-  const address = defaultAddress.getId();
-  console.log(`[OwnerWallet] Address: ${address}`);
-
-  const walletData = wallet.export();
-  const walletDataJson = JSON.stringify(walletData);
+  // Create a named account — idempotent, so re-running is safe
+  const account = await cdp.evm.getOrCreateAccount({ name: 'escrow-owner' });
 
   console.log();
   console.log('═'.repeat(60));
-  console.log('[OwnerWallet] Done! Add this to your .env:');
+  console.log(`[OwnerWallet] Done! Owner address: ${account.address}`);
   console.log();
-  console.log(`CDP_OWNER_WALLET_DATA=${walletDataJson}`);
+  console.log('Add this to your .env:');
+  console.log(`  CDP_OWNER_ADDRESS=${account.address}`);
   console.log();
-  console.log(`Owner wallet address: ${address}`);
-  console.log('This wallet will need to be set as the owner of the');
+  console.log('This account will need to be set as the owner of the');
   console.log('escrow contract (it is by default if it deploys the contract).');
   console.log('═'.repeat(60));
 }

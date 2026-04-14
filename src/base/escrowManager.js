@@ -7,14 +7,13 @@
 //   4. cancelMatch — refunds all players
 //
 // All on-chain calls are signed via CDP Smart Accounts. The bot's
-// owner CDP wallet signs contract calls (createMatch, resolve, cancel).
+// owner address is stored in CDP_OWNER_ADDRESS env var.
 // Each user's CDP wallet signs their approve() call during onboarding.
 // The Coinbase Paymaster sponsors gas for everything — no ETH needed.
 //
 // DB-level hold/release is preserved for the pre-escrow phase
 // (challenge accepted → match not yet started).
 
-const { Coinbase, Wallet } = require('@coinbase/coinbase-sdk');
 const { ethers } = require('ethers');
 const db = require('../database/db');
 const walletRepo = require('../database/repositories/walletRepo');
@@ -32,19 +31,10 @@ const ESCROW_ABI_JSON = [
   { name: 'cancelMatch', type: 'function', inputs: [{ name: 'matchId', type: 'uint256' }, { name: 'players', type: 'address[]' }, { name: 'refunds', type: 'uint256[]' }], outputs: [] },
 ];
 
-// Cache the bot's owner CDP wallet (used for contract admin calls)
-let _ownerWallet = null;
-
-async function _getOwnerWallet() {
-  if (_ownerWallet) return _ownerWallet;
-  // The owner wallet is the one that deployed the escrow contract.
-  // Store its exported data in CDP_OWNER_WALLET_DATA env var (encrypted
-  // JSON from wallet.export(), same format as user wallets).
-  const ownerData = process.env.CDP_OWNER_WALLET_DATA;
-  if (!ownerData) throw new Error('CDP_OWNER_WALLET_DATA not set — needed for escrow contract calls');
-  walletManager; // ensure CDP is initialized via the import side-effect
-  _ownerWallet = await Wallet.import(JSON.parse(ownerData));
-  return _ownerWallet;
+function _ownerAddress() {
+  const addr = process.env.CDP_OWNER_ADDRESS;
+  if (!addr) throw new Error('CDP_OWNER_ADDRESS not set — needed for escrow contract calls');
+  return addr;
 }
 
 function _escrowAddress() {
@@ -99,15 +89,8 @@ async function approveEscrowForUser(userId) {
   const walletRecord = walletRepo.findByUserId(userId);
   if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
 
-  const userCdpWallet = await walletManager.getWalletFromEncrypted(
-    walletRecord.encrypted_private_key,
-    walletRecord.encryption_iv,
-    walletRecord.encryption_tag,
-    walletRecord.encryption_salt,
-  );
-
   const { hash } = await transactionService.approveUsdc(
-    userCdpWallet,
+    walletRecord.solana_address,
     _escrowAddress(),
   );
 
@@ -118,9 +101,8 @@ async function approveEscrowForUser(userId) {
 // ─── On-chain: create match in the contract ────────────────────
 
 async function createOnChainMatch(matchId, entryAmountUsdc, playerCount) {
-  const ownerWallet = await _getOwnerWallet();
   const { hash } = await transactionService.invokeContract(
-    ownerWallet,
+    _ownerAddress(),
     _escrowAddress(),
     'createMatch',
     { matchId: String(matchId), entryAmount: String(entryAmountUsdc), playerCount: String(playerCount) },
@@ -137,9 +119,8 @@ async function depositToEscrow(userId, matchId, challengeId) {
   if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
 
   // The contract owner calls depositToEscrow which does transferFrom(player, contract, amount)
-  const ownerWallet = await _getOwnerWallet();
   const { hash } = await transactionService.invokeContract(
-    ownerWallet,
+    _ownerAddress(),
     _escrowAddress(),
     'depositToEscrow',
     { matchId: String(matchId), player: walletRecord.solana_address },
@@ -210,9 +191,8 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
 
   if (winnerAddresses.length === 0) throw new Error('No winners with wallets');
 
-  const ownerWallet = await _getOwnerWallet();
   const { hash } = await transactionService.invokeContract(
-    ownerWallet,
+    _ownerAddress(),
     _escrowAddress(),
     'resolveMatch',
     {
@@ -263,9 +243,8 @@ async function cancelOnChainMatch(matchId, challengeId, allPlayers, entryAmountU
 
   if (playerAddresses.length === 0) return;
 
-  const ownerWallet = await _getOwnerWallet();
   const { hash } = await transactionService.invokeContract(
-    ownerWallet,
+    _ownerAddress(),
     _escrowAddress(),
     'cancelMatch',
     {

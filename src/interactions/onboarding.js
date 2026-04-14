@@ -216,7 +216,7 @@ async function handleRegistrationModal(interaction) {
     // Generate Base wallet (Ethereum keypair)
     let wallet = walletRepo.findByUserId(user.id);
     if (!wallet) {
-      const { address, encryptedPrivateKey, iv, tag, salt } = await walletManager.generateWallet();
+      const { address, encryptedPrivateKey, iv, tag, salt } = await walletManager.generateWallet(user.id);
       wallet = walletRepo.create({
         userId: user.id,
         solanaAddress: address, // legacy column name — stores Base address

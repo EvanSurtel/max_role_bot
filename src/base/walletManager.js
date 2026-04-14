@@ -1,22 +1,20 @@
-// Base wallet management — CDP Smart Accounts (ERC-4337).
+// Base wallet management — CDP Server Accounts (@coinbase/cdp-sdk).
 //
-// Every user gets a Smart Account created via the Coinbase Developer
-// Platform (CDP) Smart Wallet API. Smart Accounts support gasless
-// transactions through the Coinbase Paymaster — users never need ETH.
+// Every user gets a CDP EVM account created via the new CdpClient SDK.
+// CDP manages private keys server-side — the bot never touches raw keys.
 //
-// The CDP SDK handles:
-//   - Smart Account creation (counterfactual — deployed on first tx)
-//   - Transaction signing (server-side signer key)
-//   - UserOperation bundling (submitted via CDP Bundler)
-//   - Gas sponsorship (Coinbase Paymaster auto-sponsors USDC transfers)
+// The new CDP SDK handles:
+//   - Account creation (cdp.evm.getOrCreateAccount)
+//   - Transaction signing (cdp.evm.sendTransaction)
+//   - Gas sponsorship (configured at the CDP project level)
 //
-// The bot stores the CDP wallet ID (encrypted) in the DB. To sign a
-// tx later, it re-loads the wallet from CDP using the stored ID.
+// The bot stores the CDP account name in the DB (in the legacy
+// encrypted_private_key column). No encryption is needed since CDP
+// holds the keys — iv, tag, salt are stored as empty strings.
 
-const { Coinbase, Wallet } = require('@coinbase/coinbase-sdk');
+const { CdpClient } = require('@coinbase/cdp-sdk');
 const { ethers } = require('ethers');
-const { encrypt, decrypt, generateSalt } = require('../utils/crypto');
-const { getProvider, getCdpNetworkId } = require('./connection');
+const { getProvider } = require('./connection');
 
 // Native USDC on Base — configurable for testnet.
 // Mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 (Circle native USDC)
@@ -32,70 +30,49 @@ const ERC20_ABI = [
   'function approve(address spender, uint256 amount) returns (bool)',
 ];
 
-// CDP SDK singleton — initialized on first use.
-let _cdpInitialized = false;
+// CdpClient singleton — lazy-initialized on first use.
+// Auto-reads CDP_API_KEY_ID, CDP_API_KEY_SECRET, CDP_WALLET_SECRET from env.
+let _cdpClient = null;
 
-function _ensureCdpInit() {
-  if (_cdpInitialized) return;
-  const apiKeyName = process.env.CDP_API_KEY_NAME;
-  const apiKeySecret = process.env.CDP_API_KEY_SECRET;
-  if (!apiKeyName || !apiKeySecret) {
-    throw new Error('CDP_API_KEY_NAME and CDP_API_KEY_SECRET must be set in .env');
-  }
-  Coinbase.configure({
-    apiKeyName,
-    privateKey: apiKeySecret,
-  });
-  _cdpInitialized = true;
+function getCdpClient() {
+  if (_cdpClient) return _cdpClient;
+  _cdpClient = new CdpClient();
+  return _cdpClient;
 }
 
 /**
- * Create a new CDP Smart Account for a user on Base.
+ * Create a new CDP EVM account for a user on Base.
  *
- * Returns the Smart Account address + the wallet data (encrypted)
- * that the bot needs to re-load the wallet later for signing.
+ * Returns the account address + the account name stored in the legacy
+ * encrypted_private_key column. Since CDP manages keys server-side,
+ * no encryption is needed — iv, tag, salt are empty strings.
  *
- * The wallet data is a JSON string containing the CDP wallet ID
- * and any metadata the SDK needs to reconstruct the signer.
+ * @param {string} [userId] — Discord user ID (used to build a unique account name)
  */
-async function generateWallet() {
-  _ensureCdpInit();
-
-  // Create a wallet on Base (mainnet or sepolia depending on BASE_NETWORK)
-  const wallet = await Wallet.create({ networkId: getCdpNetworkId() });
-
-  // The default address is the Smart Account address
-  const defaultAddress = await wallet.getDefaultAddress();
-  const address = defaultAddress.getId();
-
-  // Export the wallet data so we can re-import it later.
-  // This contains the wallet ID + seed — everything needed to sign.
-  const walletData = wallet.export();
-  const walletDataJson = JSON.stringify(walletData);
-
-  // Encrypt the wallet data for storage
-  const salt = generateSalt();
-  const { encrypted, iv, tag } = encrypt(walletDataJson, salt);
+async function generateWallet(userId) {
+  const cdp = getCdpClient();
+  const accountName = `user-${userId || Date.now()}`;
+  const account = await cdp.evm.getOrCreateAccount({ name: accountName });
 
   return {
-    address,
-    encryptedPrivateKey: encrypted,   // legacy column name — stores encrypted CDP wallet data
-    iv,
-    tag,
-    salt,
+    address: account.address,
+    encryptedPrivateKey: accountName, // store account name for reference
+    iv: '',
+    tag: '',
+    salt: '',
   };
 }
 
 /**
- * Re-load a CDP wallet from encrypted wallet data.
- * Returns the CDP Wallet object ready for signing.
+ * Legacy function — previously reconstructed a CDP wallet from encrypted data.
+ *
+ * With the new @coinbase/cdp-sdk, signing is done via cdp.evm.sendTransaction()
+ * using just the address. Callers that need to sign should use getCdpClient()
+ * directly. This function returns null for backward compatibility — callers
+ * that still reference it should be migrated to use the CdpClient directly.
  */
-async function getWalletFromEncrypted(encryptedData, iv, tag, salt) {
-  _ensureCdpInit();
-  const walletDataJson = decrypt(encryptedData, iv, tag, salt);
-  const walletData = JSON.parse(walletDataJson);
-  const wallet = await Wallet.import(walletData);
-  return wallet;
+async function getWalletFromEncrypted(/* encryptedData, iv, tag, salt */) {
+  return null;
 }
 
 /**
@@ -111,9 +88,8 @@ async function getUsdcBalance(address) {
 
 /**
  * Get the ETH balance of an address on Base.
- * Returns a string in wei. (Smart Account users don't need ETH
- * because the Paymaster sponsors gas, but we keep this for the
- * admin escrow panel and health checks.)
+ * Returns a string in wei. (Users don't need ETH because CDP sponsors gas,
+ * but we keep this for the admin escrow panel and health checks.)
  */
 async function getEthBalance(address) {
   const provider = getProvider();
@@ -150,6 +126,7 @@ function isAddressValid(address) {
 module.exports = {
   generateWallet,
   getWalletFromEncrypted,
+  getCdpClient,
   // Backward-compat aliases
   getKeypairFromEncrypted: getWalletFromEncrypted,
   getUsdcBalance,
