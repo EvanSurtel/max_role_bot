@@ -92,6 +92,7 @@ async function approveEscrowForUser(userId) {
   const { hash } = await transactionService.approveUsdc(
     walletRecord.solana_address,
     _escrowAddress(),
+    walletRecord.encrypted_private_key, // owner account name for Smart Account
   );
 
   console.log(`[Escrow] Approved escrow for user ${userId}: ${hash}`);

@@ -51,12 +51,17 @@ function getCdpClient() {
  */
 async function generateWallet(userId) {
   const cdp = getCdpClient();
-  const accountName = `user-${userId || Date.now()}`;
-  const account = await cdp.evm.getOrCreateAccount({ name: accountName });
+  const ownerName = `user-${userId || Date.now()}`;
+
+  // Create the EOA owner account (holds the signer key)
+  const owner = await cdp.evm.getOrCreateAccount({ name: ownerName });
+
+  // Create the Smart Account (ERC-4337) — gasless via Paymaster
+  const smartAccount = await cdp.evm.createSmartAccount({ owner });
 
   return {
-    address: account.address,
-    encryptedPrivateKey: accountName, // store account name for reference
+    address: smartAccount.address,
+    encryptedPrivateKey: ownerName, // store owner account name for signing
     iv: '',
     tag: '',
     salt: '',
