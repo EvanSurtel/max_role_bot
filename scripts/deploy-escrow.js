@@ -1,21 +1,20 @@
 #!/usr/bin/env node
-// Deploy WagerEscrow.sol to Base using ethers.js directly.
+// Deploy WagerEscrow.sol to Base using the CDP owner account.
 //
-// This does NOT use Hardhat or Foundry — it compiles and deploys
-// using just ethers.js + solc, so there's no additional toolchain
-// to install. The compiled ABI + bytecode are saved to
-// contracts/WagerEscrow.json for the bot to use at runtime.
+// Uses the CDP SDK to sign the deployment transaction — no MetaMask
+// or external wallet needed. The owner account (escrow-owner) is
+// funded with test ETH via the CDP faucet automatically on testnet.
 //
 // Usage:
 //   node scripts/deploy-escrow.js
 //
 // Prerequisites:
-//   - npm install solc (Solidity compiler)
-//   - DEPLOYER_PRIVATE_KEY set in .env (deployer pays gas)
-//   - BASE_RPC_URL set in .env
-//   - USDC_CONTRACT_ADDRESS set in .env
+//   - npm install solc
+//   - CDP_API_KEY_ID, CDP_API_KEY_SECRET, CDP_WALLET_SECRET set in .env
+//   - USDC_CONTRACT_ADDRESS set in .env (for testnet)
 
 require('dotenv').config();
+const { CdpClient } = require('@coinbase/cdp-sdk');
 const { ethers } = require('ethers');
 const solc = require('solc');
 const fs = require('fs');
@@ -24,26 +23,46 @@ const path = require('path');
 async function main() {
   console.log('[Deploy] Starting WagerEscrow deployment to Base...');
 
-  // ─── Load and compile the contract ───────────────────────
+  const cdp = new CdpClient();
+  const network = (process.env.BASE_NETWORK || 'mainnet').toLowerCase();
+  const cdpNetwork = network === 'sepolia' ? 'base-sepolia' : 'base';
+  const chainId = network === 'sepolia' ? 84532 : 8453;
+  const explorerUrl = network === 'sepolia' ? 'https://sepolia.basescan.org' : 'https://basescan.org';
+
+  // ─── Get or create the owner account ─────────────────────
+  const owner = await cdp.evm.getOrCreateAccount({ name: 'escrow-owner' });
+  console.log(`[Deploy] Owner address: ${owner.address}`);
+
+  // ─── Fund with test ETH on testnet ───────────────────────
+  if (network === 'sepolia') {
+    console.log('[Deploy] Requesting test ETH from faucet...');
+    try {
+      const faucet = await cdp.evm.requestFaucet({
+        address: owner.address,
+        network: 'base-sepolia',
+        token: 'eth',
+      });
+      console.log(`[Deploy] Faucet TX: ${faucet.transactionHash}`);
+      // Wait for faucet to land
+      const rpcUrl = process.env.BASE_RPC_URL || 'https://sepolia.base.org';
+      const provider = new ethers.JsonRpcProvider(rpcUrl, { name: 'base-sepolia', chainId });
+      await provider.waitForTransaction(faucet.transactionHash, 1, 30000);
+      console.log('[Deploy] Faucet confirmed');
+    } catch (err) {
+      console.warn(`[Deploy] Faucet request failed (may already have ETH): ${err.message}`);
+    }
+  }
+
+  // ─── Compile the contract ────────────────────────────────
   const contractPath = path.join(__dirname, '..', 'contracts', 'WagerEscrow.sol');
   const source = fs.readFileSync(contractPath, 'utf8');
 
-  // Resolve OpenZeppelin imports from node_modules
   const input = {
     language: 'Solidity',
-    sources: {
-      'WagerEscrow.sol': { content: source },
-    },
+    sources: { 'WagerEscrow.sol': { content: source } },
     settings: {
-      outputSelection: {
-        '*': {
-          '*': ['abi', 'evm.bytecode.object'],
-        },
-      },
-      optimizer: {
-        enabled: true,
-        runs: 200,
-      },
+      outputSelection: { '*': { '*': ['abi', 'evm.bytecode.object'] } },
+      optimizer: { enabled: true, runs: 200 },
     },
   };
 
@@ -65,7 +84,6 @@ async function main() {
       errors.forEach(e => console.error(e.formattedMessage));
       process.exit(1);
     }
-    // Print warnings but continue
     output.errors.filter(e => e.severity === 'warning').forEach(e => {
       console.warn('[Deploy] Warning:', e.message);
     });
@@ -79,50 +97,45 @@ async function main() {
 
   const abi = compiled.abi;
   const bytecode = '0x' + compiled.evm.bytecode.object;
+  console.log(`[Deploy] Compiled. ABI: ${abi.length} entries, Bytecode: ${bytecode.length} chars`);
 
-  console.log(`[Deploy] Compiled successfully. ABI: ${abi.length} entries, Bytecode: ${bytecode.length} chars`);
-
-  // Save the compiled ABI + bytecode for the bot to use
+  // Save artifact
   const artifactPath = path.join(__dirname, '..', 'contracts', 'WagerEscrow.json');
   fs.writeFileSync(artifactPath, JSON.stringify({ abi, bytecode }, null, 2));
   console.log(`[Deploy] Artifact saved to ${artifactPath}`);
 
-  // ─── Deploy ──────────────────────────────────────────────
-  const network = (process.env.BASE_NETWORK || 'mainnet').toLowerCase();
-  const chainId = network === 'sepolia' ? 84532 : 8453;
-  const defaultRpc = network === 'sepolia' ? 'https://sepolia.base.org' : 'https://mainnet.base.org';
-  const explorerUrl = network === 'sepolia' ? 'https://sepolia.basescan.org' : 'https://basescan.org';
-  const rpcUrl = process.env.BASE_RPC_URL || defaultRpc;
-  const provider = new ethers.JsonRpcProvider(rpcUrl, { name: network === 'sepolia' ? 'base-sepolia' : 'base', chainId });
-  console.log(`[Deploy] Network: ${network} (chain ${chainId})`);
-  const deployerKey = process.env.DEPLOYER_PRIVATE_KEY;
-  if (!deployerKey) {
-    console.error('[Deploy] DEPLOYER_PRIVATE_KEY not set in .env');
-    process.exit(1);
-  }
-
-  const deployer = new ethers.Wallet(deployerKey, provider);
-  console.log(`[Deploy] Deployer address: ${deployer.address}`);
-
-  const balance = await provider.getBalance(deployer.address);
-  console.log(`[Deploy] Deployer ETH balance: ${ethers.formatEther(balance)} ETH`);
-  if (balance < ethers.parseEther('0.001')) {
-    console.error('[Deploy] Deployer needs at least 0.001 ETH for deployment gas');
-    process.exit(1);
-  }
-
+  // ─── Deploy via CDP ──────────────────────────────────────
   const usdcAddress = process.env.USDC_CONTRACT_ADDRESS || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
   console.log(`[Deploy] USDC address: ${usdcAddress}`);
 
-  const factory = new ethers.ContractFactory(abi, bytecode, deployer);
-  console.log('[Deploy] Sending deployment transaction...');
+  // Encode constructor args (USDC address)
+  const iface = new ethers.Interface(abi);
+  const constructorData = iface.encodeDeploy([usdcAddress]);
+  const deployData = bytecode + constructorData.slice(2); // remove 0x from constructor data
 
-  const contract = await factory.deploy(usdcAddress);
-  console.log(`[Deploy] TX hash: ${contract.deploymentTransaction().hash}`);
+  console.log('[Deploy] Sending deployment transaction via CDP...');
+  const { transactionHash } = await cdp.evm.sendTransaction({
+    address: owner.address,
+    network: cdpNetwork,
+    transaction: {
+      data: deployData,
+    },
+  });
+
+  console.log(`[Deploy] TX hash: ${transactionHash}`);
   console.log('[Deploy] Waiting for confirmation...');
 
-  await contract.waitForDeployment();
-  const deployedAddress = await contract.getAddress();
+  const rpcUrl = process.env.BASE_RPC_URL || (network === 'sepolia' ? 'https://sepolia.base.org' : 'https://mainnet.base.org');
+  const provider = new ethers.JsonRpcProvider(rpcUrl, { name: network === 'sepolia' ? 'base-sepolia' : 'base', chainId });
+  const receipt = await provider.waitForTransaction(transactionHash, 1, 60000);
+
+  if (!receipt || !receipt.contractAddress) {
+    console.error('[Deploy] Deployment failed — no contract address in receipt');
+    console.error('Receipt:', JSON.stringify(receipt, null, 2));
+    process.exit(1);
+  }
+
+  const deployedAddress = receipt.contractAddress;
 
   console.log();
   console.log('═'.repeat(60));
