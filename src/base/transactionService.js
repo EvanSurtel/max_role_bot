@@ -21,7 +21,10 @@ function getCdpNetwork() {
  */
 async function _getSmartAccount(cdp, ownerName) {
   const owner = await cdp.evm.getOrCreateAccount({ name: ownerName });
-  const smartAccount = await cdp.evm.createSmartAccount({ owner });
+  const smartAccount = await cdp.evm.getOrCreateSmartAccount({
+    name: `smart-${ownerName}`,
+    owner,
+  });
   return smartAccount;
 }
 
@@ -43,8 +46,8 @@ async function transferUsdc(fromAddress, toAddress, amountSmallest, ownerAccount
       network: cdpNetwork,
       calls: [{ to: USDC_CONTRACT, value: 0n, data }],
     });
-    console.log(`[Base] USDC transfer ${amountSmallest} → ${toAddress} (gasless): ${result.userOperationHash}`);
-    return { hash: result.userOperationHash, signature: result.userOperationHash };
+    console.log(`[Base] USDC transfer ${amountSmallest} → ${toAddress} (gasless): ${result.userOpHash}`);
+    return { hash: result.userOpHash, signature: result.userOpHash };
   }
 
   // Fallback: regular sendTransaction (for owner/admin — needs ETH)
@@ -115,8 +118,8 @@ async function approveUsdc(fromAddress, spenderAddress, ownerAccountName) {
       network: cdpNetwork,
       calls: [{ to: USDC_CONTRACT, value: 0n, data }],
     });
-    console.log(`[Base] USDC approve(${spenderAddress}, MAX) gasless: ${result.userOperationHash}`);
-    return { hash: result.userOperationHash, signature: result.userOperationHash };
+    console.log(`[Base] USDC approve(${spenderAddress}, MAX) gasless: ${result.userOpHash}`);
+    return { hash: result.userOpHash, signature: result.userOpHash };
   }
 
   const { transactionHash } = await cdp.evm.sendTransaction({

@@ -56,8 +56,12 @@ async function generateWallet(userId) {
   // Create the EOA owner account (holds the signer key)
   const owner = await cdp.evm.getOrCreateAccount({ name: ownerName });
 
-  // Create the Smart Account (ERC-4337) — gasless via Paymaster
-  const smartAccount = await cdp.evm.createSmartAccount({ owner });
+  // Create the Smart Account (ERC-4337) — gasless via Paymaster.
+  // getOrCreateSmartAccount is idempotent: same name+owner → same address.
+  const smartAccount = await cdp.evm.getOrCreateSmartAccount({
+    name: `smart-${ownerName}`,
+    owner,
+  });
 
   return {
     address: smartAccount.address,
