@@ -1,12 +1,7 @@
-const { getEthBalance } = require('../base/walletManager');
-const { ethers } = require('ethers');
-const { ESCROW_SOL_WARNING, ESCROW_SOL_CRITICAL, TIMERS } = require('../config/constants');
+const { TIMERS } = require('../config/constants');
 const db = require('../database/db');
 
 let healthInterval = null;
-let lastWarningAt = 0;
-let lastCriticalAt = 0;
-let matchCreationDisabled = false;
 const startTime = Date.now();
 
 /**
@@ -32,61 +27,12 @@ function stopHealthChecks() {
 }
 
 /**
- * Check escrow wallet SOL balance and alert if low.
+ * Periodic health check.
+ * ETH balance check removed — CDP Smart Accounts + Coinbase Paymaster
+ * handle gas; the escrow contract itself never needs ETH.
  */
-async function checkEscrowHealth(client) {
-  const escrowAddr = process.env.ESCROW_CONTRACT_ADDRESS;
-  if (!escrowAddr) return;
-
-  let address;
-  try {
-    // Use escrow contract address directly
-    address = escrowAddr;
-  } catch (err) {
-    console.error('[Health] ESCROW_CONTRACT_ADDRESS not set:', err.message);
-    return;
-  }
-  const ethBalWei = BigInt(await getEthBalance(address));
-  const ethStr = ethers.formatEther(ethBalWei);
-  const alertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
-  const now = Date.now();
-
-  // Critical: < 0.0001 ETH (~$0.25) — disable new matches
-  const criticalWei = 100_000_000_000_000n; // 0.0001 ETH
-  if (ethBalWei < criticalWei) {
-    matchCreationDisabled = true;
-    if (now - lastCriticalAt > 30 * 60 * 1000) {
-      lastCriticalAt = now;
-      console.error(`[Health] CRITICAL: Escrow ETH balance is ${ethStr}. New matches disabled.`);
-      if (alertChannelId && client) {
-        const ch = client.channels.cache.get(alertChannelId);
-        if (ch) {
-          await ch.send(`**CRITICAL: Escrow wallet ETH balance is ${ethStr} ETH.** New match creation has been disabled until this is resolved. Deposit ETH on Base to: \`${address}\``);
-        }
-      }
-    }
-    return;
-  }
-
-  if (matchCreationDisabled) {
-    matchCreationDisabled = false;
-    console.log('[Health] Escrow ETH recovered above critical threshold. Matches re-enabled.');
-  }
-
-  // Warning: < 0.001 ETH (~$2.50)
-  const warningWei = 1_000_000_000_000_000n; // 0.001 ETH
-  if (ethBalWei < warningWei) {
-    if (now - lastWarningAt > 60 * 60 * 1000) {
-      lastWarningAt = now;
-      console.warn(`[Health] WARNING: Escrow ETH balance is ${ethStr}`);
-      if (alertChannelId && client) {
-        const ch = client.channels.cache.get(alertChannelId);
-        if (ch) {
-          await ch.send(`**Warning:** Escrow wallet ETH balance is low (${ethStr} ETH). Deposit ETH on Base to: \`${address}\``);
-        }
-      }
-    }
-  }
+async function checkEscrowHealth(_client) {
+  // No-op: gasless via CDP Paymaster, no ETH balance required.
 }
 
 /**
@@ -116,7 +62,7 @@ function getHealthSummary() {
     uptime: `${uptimeHours}h`,
     dbConnected: dbOk,
     solanaConnected: rpcOk,
-    matchCreationDisabled,
+    matchCreationDisabled: false,
     pendingTransactions: pendingTxCount,
     activeMatches,
   };
@@ -134,33 +80,22 @@ async function postDailySummary(client) {
 
   const summary = getHealthSummary();
 
-  let escrowEth = 'N/A';
-  try {
-    const escrowAddr = process.env.ESCROW_CONTRACT_ADDRESS;
-    if (key) {
-      const w = new ethers.Wallet(key);
-      const bal = await getEthBalance(w.address);
-      escrowEth = `${ethers.formatEther(bal)} ETH`;
-    }
-  } catch { /* */ }
-
   await ch.send([
     '**Daily Health Summary**',
     `Uptime: ${summary.uptime}`,
     `DB: ${summary.dbConnected ? 'OK' : 'ERROR'}`,
     `Base RPC: ${summary.solanaConnected ? 'OK' : 'ERROR'}`,
-    `Escrow ETH: ${escrowEth}`,
-    `Match creation: ${summary.matchCreationDisabled ? 'DISABLED' : 'enabled'}`,
     `Pending transactions: ${summary.pendingTransactions}`,
     `Active matches: ${summary.activeMatches}`,
   ].join('\n'));
 }
 
 /**
- * Whether new match creation is currently disabled due to low escrow SOL.
+ * Whether new match creation is currently disabled.
+ * Always false — CDP Paymaster handles gas; no ETH balance gating needed.
  */
 function isMatchCreationDisabled() {
-  return matchCreationDisabled;
+  return false;
 }
 
 module.exports = { startHealthChecks, stopHealthChecks, getHealthSummary, postDailySummary, isMatchCreationDisabled };

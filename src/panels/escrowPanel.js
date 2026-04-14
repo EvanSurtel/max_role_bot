@@ -466,9 +466,9 @@ async function _executeEscrowWithdrawConfirm(interaction) {
     return interaction.reply({ content: '⚠️ Invalid or blocked destination address.', ephemeral: true });
   }
 
-  const escrowSigner = null;
-  if (!escrowSigner) {
-    return interaction.reply({ content: '⚠️ Escrow wallet not configured.', ephemeral: true });
+  const escrowAddress = process.env.CDP_OWNER_ADDRESS;
+  if (!escrowAddress) {
+    return interaction.reply({ content: '⚠️ CDP_OWNER_ADDRESS not configured.', ephemeral: true });
   }
 
   // Swap confirmation for a "processing" notice while the on-chain
@@ -484,13 +484,13 @@ async function _executeEscrowWithdrawConfirm(interaction) {
   try {
     if (currency === 'sol') {
       const amountWei = ethers.parseEther(String(amount));
-      const { signature } = await transactionService.transferEth(escrowSigner, address, amountWei);
+      const { signature } = await transactionService.transferEth(escrowAddress, address, amountWei);
       postTransaction({
         type: 'eth_withdrawal',
         discordId: interaction.user.id,
         amount: `${amount}`,
         currency: 'ETH',
-        fromAddress: null?.address,
+        fromAddress: escrowAddress,
         toAddress: address,
         signature,
         memo: `🛠️ Admin escrow ETH withdraw by <@${interaction.user.id}>: ${amount} ETH`,
@@ -504,13 +504,13 @@ async function _executeEscrowWithdrawConfirm(interaction) {
 
     if (currency === 'usdc') {
       const amountSmallest = Math.floor(amount * USDC_PER_UNIT).toString();
-      const { signature } = await transactionService.transferUsdc(escrowSigner, address, amountSmallest);
+      const { signature } = await transactionService.transferUsdc(escrowAddress, address, amountSmallest);
       postTransaction({
         type: 'withdrawal',
         discordId: interaction.user.id,
         amount: `$${amount.toFixed(2)}`,
         currency: 'USDC',
-        fromAddress: null?.address,
+        fromAddress: escrowAddress,
         toAddress: address,
         signature,
         memo: `🛠️ Admin escrow USDC withdraw by <@${interaction.user.id}>: $${amount.toFixed(2)} USDC`,
