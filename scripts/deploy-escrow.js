@@ -114,14 +114,25 @@ async function main() {
   const deployData = bytecode + constructorData.slice(2); // remove 0x from constructor data
 
   console.log('[Deploy] Sending deployment transaction via CDP...');
+
+  // CDP SDK accepts a pre-serialized hex string to skip viem serialization.
+  // We use viem directly to serialize a contract creation tx properly.
+  const { serializeTransaction } = require('viem');
+  const serialized = serializeTransaction({
+    type: 'eip1559',
+    chainId: chainId,
+    data: deployData,
+    value: 0n,
+    maxFeePerGas: 2000000000n,       // 2 gwei — plenty for Base
+    maxPriorityFeePerGas: 1000000n,  // 0.001 gwei
+    gas: 3000000n,                   // 3M gas — enough for contract deploy
+    nonce: 0,                        // CDP will override if needed
+  });
+
   const { transactionHash } = await cdp.evm.sendTransaction({
     address: owner.address,
     network: cdpNetwork,
-    transaction: {
-      to: null,          // null = contract creation
-      value: '0x0',
-      data: deployData,
-    },
+    transaction: serialized,
   });
 
   console.log(`[Deploy] TX hash: ${transactionHash}`);
