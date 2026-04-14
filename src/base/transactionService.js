@@ -13,21 +13,25 @@ function getCdpNetwork() {
 }
 
 /**
- * Transfer USDC using the CDP account.transfer() helper.
- * Handles ERC-20 encoding internally — no manual ABI encoding needed.
+ * Transfer USDC via ABI-encoded ERC-20 transfer call.
+ * Uses our configured USDC_CONTRACT address (test token on Sepolia,
+ * native USDC on mainnet).
  */
 async function transferUsdc(fromAddress, toAddress, amountSmallest) {
   const cdp = getCdpClient();
   const cdpNetwork = getCdpNetwork();
 
-  // Get the account object so we can use .transfer()
-  const account = await cdp.evm.getAccount({ address: fromAddress });
+  const iface = new ethers.Interface(['function transfer(address to, uint256 amount) returns (bool)']);
+  const data = iface.encodeFunctionData('transfer', [toAddress, BigInt(amountSmallest)]);
 
-  const { transactionHash } = await account.transfer({
-    to: toAddress,
-    amount: BigInt(amountSmallest),
-    token: 'usdc',
+  const { transactionHash } = await cdp.evm.sendTransaction({
+    address: fromAddress,
     network: cdpNetwork,
+    transaction: {
+      to: USDC_CONTRACT,
+      value: 0n,
+      data,
+    },
   });
 
   console.log(`[Base] USDC transfer ${amountSmallest} → ${toAddress} confirmed: ${transactionHash}`);
