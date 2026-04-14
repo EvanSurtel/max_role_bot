@@ -1,15 +1,7 @@
 module.exports = {
   intro: {
     title: '🏆 Rank',
-    description: [
-      'ผู้เล่นทุกคนจะถูกจัดเข้า rank ตาม **XP ของ season** ของพวกเขา ยิ่งคุณเก็บ XP ได้มากเท่าไหร่ คุณก็ยิ่งไต่ขึ้นสูงขึ้นเท่านั้น',
-      '',
-      'XP มาจากสามแหล่ง — **แมตช์ XP queue**, **XP challenge**, และ **ชนะ cash match** ทุกอย่างนับรวมเข้าใน XP รวมของ season คุณ',
-      '',
-      '**ทุก season ใหม่ ทุกคนจะถูก reset กลับไปที่ 500 XP และเริ่มไต่อันดับใหม่** รายได้ตลอดกาลของคุณยังคงอยู่ แต่ rank เป็นการต่อสู้ใหม่ทุก season',
-      '',
-      'นี่คือแปด rank ที่คุณสามารถไปถึงได้ จากต่ำสุดไปสูงสุด:',
-    ].join('\n'),
+    description: 'Rank \u0e2d\u0e34\u0e07\u0e15\u0e32\u0e21 **XP \u0e02\u0e2d\u0e07 season** \u0e02\u0e2d\u0e07\u0e04\u0e38\u0e13 \u0e19\u0e35\u0e48\u0e04\u0e37\u0e2d\u0e41\u0e1b\u0e14\u0e23\u0e30\u0e14\u0e31\u0e1a:',
   },
 
   rank_title: '{name} — {range}',
@@ -22,34 +14,34 @@ module.exports = {
 
   bronze: {
     name: 'Bronze',
-    blurb: 'จุดเริ่มต้นของทุกคนในแต่ละ season ชนะสักสองสามแมตช์เพื่อหลุดออกมา',
+    blurb: '',
   },
   silver: {
     name: 'Silver',
-    blurb: 'คุณยืนได้ด้วยตัวเอง เก็บชัยชนะไปเรื่อย ๆ',
+    blurb: '',
   },
   gold: {
     name: 'Gold',
-    blurb: 'เหนือค่าเฉลี่ย คุณรู้ว่าตัวเองกำลังทำอะไรอยู่',
+    blurb: '',
   },
   platinum: {
     name: 'Platinum',
-    blurb: 'คู่แข่งระดับจริงจัง ผู้เล่นน้อยคนที่มาถึงตรงนี้',
+    blurb: '',
   },
   diamond: {
     name: 'Diamond',
-    blurb: 'ระดับท็อป คุณอยู่ในกลุ่มอีลีทแล้ว',
+    blurb: '',
   },
   sentinel: {
     name: 'Sentinel',
-    blurb: 'มือเก๋าผ่านศึก คนรู้จักชื่อคุณ',
+    blurb: '',
   },
   obsidian: {
     name: 'Obsidian',
-    blurb: 'อากาศเบาบาง มีแต่คนที่ทุ่มเทที่สุดเท่านั้นที่มาถึงตรงนี้',
+    blurb: '',
   },
   crowned: {
     name: 'Crowned',
-    blurb: 'ผู้เล่น 10 อันดับแรกของ XP leaderboard ประจำ season มงกุฎที่อิงตามตำแหน่ง — ต้องมีคนเสียไปก่อน คุณถึงจะได้มา',
+    blurb: '',
   },
 };

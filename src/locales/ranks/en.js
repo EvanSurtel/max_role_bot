@@ -1,15 +1,7 @@
 module.exports = {
   intro: {
     title: '🏆 Ranks',
-    description: [
-      'Every player is placed into a rank based on their **season XP**. The more XP you earn, the higher you climb.',
-      '',
-      'XP comes from three sources — **XP queue matches**, **XP challenges**, and **cash match wins**. All of it counts toward your season XP total.',
-      '',
-      '**Every new season, everyone resets to 500 XP and starts climbing again.** Your all-time earnings carry over, but rank is a fresh fight each season.',
-      '',
-      'Here are the eight ranks you can reach, from lowest to highest:',
-    ].join('\n'),
+    description: 'Ranks are based on your **season XP**. Here are the eight tiers:',
   },
 
   rank_title: '{name} — {range}',
@@ -22,34 +14,34 @@ module.exports = {
 
   bronze: {
     name: 'Bronze',
-    blurb: 'Where everyone starts each season. Win a few matches to break out.',
+    blurb: '',
   },
   silver: {
     name: 'Silver',
-    blurb: 'You\'re holding your own. Keep stacking wins.',
+    blurb: '',
   },
   gold: {
     name: 'Gold',
-    blurb: 'Above average. You know what you\'re doing.',
+    blurb: '',
   },
   platinum: {
     name: 'Platinum',
-    blurb: 'A serious competitor. Few players reach here.',
+    blurb: '',
   },
   diamond: {
     name: 'Diamond',
-    blurb: 'Top-tier. You\'re in the elite bracket now.',
+    blurb: '',
   },
   sentinel: {
     name: 'Sentinel',
-    blurb: 'Seasoned veteran. People know your name.',
+    blurb: '',
   },
   obsidian: {
     name: 'Obsidian',
-    blurb: 'Rare air. Only the most dedicated get here.',
+    blurb: '',
   },
   crowned: {
     name: 'Crowned',
-    blurb: 'The top 10 players on the season XP leaderboard. A position-based crown — someone has to lose it for you to gain it.',
+    blurb: '',
   },
 };

@@ -1,15 +1,7 @@
 module.exports = {
   intro: {
     title: '🏆 Rank',
-    description: [
-      'Mỗi người chơi được đặt vào một rank dựa trên **XP season** của họ. Càng kiếm được nhiều XP, bạn càng leo cao.',
-      '',
-      'XP đến từ ba nguồn — **match XP queue**, **XP challenge**, và **thắng cash match**. Tất cả đều được cộng vào tổng XP season của bạn.',
-      '',
-      '**Mỗi season mới, tất cả mọi người reset về 500 XP và bắt đầu leo lại.** Thu nhập mọi thời đại của bạn được giữ lại, nhưng rank là một cuộc chiến mới mỗi season.',
-      '',
-      'Đây là tám rank bạn có thể đạt được, từ thấp nhất đến cao nhất:',
-    ].join('\n'),
+    description: 'Rank d\u1ef1a tr\u00ean **XP season** c\u1ee7a b\u1ea1n. \u0110\u00e2y l\u00e0 t\u00e1m c\u1ea5p b\u1eadc:',
   },
 
   rank_title: '{name} — {range}',
@@ -22,34 +14,34 @@ module.exports = {
 
   bronze: {
     name: 'Bronze',
-    blurb: 'Nơi mọi người bắt đầu mỗi season. Thắng vài match để thoát ra.',
+    blurb: '',
   },
   silver: {
     name: 'Silver',
-    blurb: 'Bạn trụ vững được. Cứ tiếp tục gom chiến thắng.',
+    blurb: '',
   },
   gold: {
     name: 'Gold',
-    blurb: 'Trên mức trung bình. Bạn biết mình đang làm gì.',
+    blurb: '',
   },
   platinum: {
     name: 'Platinum',
-    blurb: 'Đối thủ đáng gờm. Ít người chơi lên được tới đây.',
+    blurb: '',
   },
   diamond: {
     name: 'Diamond',
-    blurb: 'Hạng top. Bạn đang ở nhóm elite rồi.',
+    blurb: '',
   },
   sentinel: {
     name: 'Sentinel',
-    blurb: 'Kỳ cựu dày dạn. Người ta biết tên bạn.',
+    blurb: '',
   },
   obsidian: {
     name: 'Obsidian',
-    blurb: 'Không khí loãng. Chỉ những người tận tụy nhất mới lên được đây.',
+    blurb: '',
   },
   crowned: {
     name: 'Crowned',
-    blurb: '10 người chơi đứng đầu bảng xếp hạng XP season. Vương miện dựa trên vị trí — phải có người mất nó thì bạn mới giành được.',
+    blurb: '',
   },
 };

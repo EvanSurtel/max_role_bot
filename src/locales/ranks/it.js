@@ -1,15 +1,7 @@
 module.exports = {
   intro: {
     title: '🏆 Ranghi',
-    description: [
-      'Ogni giocatore viene inserito in un rango in base al suo **XP di stagione**. Più XP guadagni, più sali.',
-      '',
-      'L\'XP arriva da tre fonti — **match in coda XP**, **sfide XP** e **vittorie in cash match**. Tutto conta per il tuo totale XP di stagione.',
-      '',
-      '**A ogni nuova stagione, tutti ripartono da 500 XP e ricominciano a salire.** I tuoi guadagni di sempre restano, ma il rango è una battaglia nuova a ogni stagione.',
-      '',
-      'Ecco gli otto ranghi che puoi raggiungere, dal più basso al più alto:',
-    ].join('\n'),
+    description: 'I ranghi si basano sul tuo **XP di stagione**. Ecco gli otto livelli:',
   },
 
   rank_title: '{name} — {range}',
@@ -22,34 +14,34 @@ module.exports = {
 
   bronze: {
     name: 'Bronzo',
-    blurb: 'Dove tutti iniziano ogni stagione. Vinci qualche match per uscirne.',
+    blurb: '',
   },
   silver: {
     name: 'Argento',
-    blurb: 'Te la cavi. Continua ad accumulare vittorie.',
+    blurb: '',
   },
   gold: {
     name: 'Oro',
-    blurb: 'Sopra la media. Sai quello che fai.',
+    blurb: '',
   },
   platinum: {
     name: 'Platino',
-    blurb: 'Un serio competitor. Pochi giocatori arrivano qui.',
+    blurb: '',
   },
   diamond: {
     name: 'Diamante',
-    blurb: 'Top assoluto. Sei nella fascia elite adesso.',
+    blurb: '',
   },
   sentinel: {
     name: 'Sentinella',
-    blurb: 'Veterano navigato. La gente conosce il tuo nome.',
+    blurb: '',
   },
   obsidian: {
     name: 'Ossidiana',
-    blurb: 'Aria rarefatta. Solo i più dediti arrivano qui.',
+    blurb: '',
   },
   crowned: {
     name: 'Incoronato',
-    blurb: 'I 10 migliori giocatori della classifica XP di stagione. Una corona basata sulla posizione — qualcuno deve perderla perché tu possa guadagnarla.',
+    blurb: '',
   },
 };

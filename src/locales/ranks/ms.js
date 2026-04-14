@@ -1,15 +1,7 @@
 module.exports = {
   intro: {
     title: '🏆 Rank',
-    description: [
-      'Setiap pemain ditempatkan dalam rank berdasarkan **XP season** mereka. Lagi banyak XP yang kamu dapat, lagi tinggi kamu naik.',
-      '',
-      'XP datang dari tiga sumber — **match XP queue**, **XP challenge**, dan **menang cash match**. Semua dikira ke total XP season kamu.',
-      '',
-      '**Setiap season baru, semua orang reset ke 500 XP dan mula mendaki semula.** Earnings sepanjang masa kamu dikekalkan, tapi rank adalah pertarungan baru setiap season.',
-      '',
-      'Ini lapan rank yang kamu boleh capai, dari paling rendah ke paling tinggi:',
-    ].join('\n'),
+    description: 'Rank berdasarkan **XP season** kamu. Ini lapan tahap:',
   },
 
   rank_title: '{name} — {range}',
@@ -22,34 +14,34 @@ module.exports = {
 
   bronze: {
     name: 'Bronze',
-    blurb: 'Tempat semua orang mula setiap season. Menang beberapa match untuk keluar dari sini.',
+    blurb: '',
   },
   silver: {
     name: 'Silver',
-    blurb: 'Kamu boleh bertahan. Teruskan kumpul kemenangan.',
+    blurb: '',
   },
   gold: {
     name: 'Gold',
-    blurb: 'Atas purata. Kamu tahu apa yang kamu buat.',
+    blurb: '',
   },
   platinum: {
     name: 'Platinum',
-    blurb: 'Pesaing yang serius. Sedikit saja pemain yang sampai di sini.',
+    blurb: '',
   },
   diamond: {
     name: 'Diamond',
-    blurb: 'Tahap teratas. Kamu dah dalam kumpulan elite sekarang.',
+    blurb: '',
   },
   sentinel: {
     name: 'Sentinel',
-    blurb: 'Veteran berpengalaman. Orang kenal nama kamu.',
+    blurb: '',
   },
   obsidian: {
     name: 'Obsidian',
-    blurb: 'Udara nipis. Hanya yang paling tekun sampai ke sini.',
+    blurb: '',
   },
   crowned: {
     name: 'Crowned',
-    blurb: '10 pemain teratas dalam leaderboard XP season. Mahkota berdasarkan kedudukan — seseorang perlu hilangkannya dulu barulah kamu boleh dapat.',
+    blurb: '',
   },
 };

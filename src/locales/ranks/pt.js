@@ -1,15 +1,7 @@
 module.exports = {
   intro: {
     title: '🏆 Ranks',
-    description: [
-      'Cada jogador é colocado em um rank baseado no seu **XP da temporada**. Quanto mais XP você ganha, mais alto você sobe.',
-      '',
-      'O XP vem de três fontes — **partidas da fila de XP**, **desafios de XP** e **vitórias em cash match**. Tudo conta pro seu total de XP da temporada.',
-      '',
-      '**A cada nova temporada, todo mundo reseta pra 500 XP e começa a subir de novo.** Seus ganhos de todos os tempos continuam, mas o rank é briga nova a cada temporada.',
-      '',
-      'Aqui estão os oito ranks que você pode alcançar, do mais baixo ao mais alto:',
-    ].join('\n'),
+    description: 'Os ranks se baseiam no seu **XP de temporada**. Aqui estao os oito niveis:',
   },
 
   rank_title: '{name} — {range}',
@@ -22,34 +14,34 @@ module.exports = {
 
   bronze: {
     name: 'Bronze',
-    blurb: 'Onde todo mundo começa a cada temporada. Vença algumas partidas pra sair daqui.',
+    blurb: '',
   },
   silver: {
     name: 'Prata',
-    blurb: 'Você tá se virando. Continua empilhando vitórias.',
+    blurb: '',
   },
   gold: {
     name: 'Ouro',
-    blurb: 'Acima da média. Você sabe o que tá fazendo.',
+    blurb: '',
   },
   platinum: {
     name: 'Platina',
-    blurb: 'Competidor sério. Poucos jogadores chegam aqui.',
+    blurb: '',
   },
   diamond: {
     name: 'Diamante',
-    blurb: 'Top de linha. Você tá na elite agora.',
+    blurb: '',
   },
   sentinel: {
     name: 'Sentinela',
-    blurb: 'Veterano experiente. O pessoal conhece teu nome.',
+    blurb: '',
   },
   obsidian: {
     name: 'Obsidiana',
-    blurb: 'Ar rarefeito. Só os mais dedicados chegam aqui.',
+    blurb: '',
   },
   crowned: {
     name: 'Coroado',
-    blurb: 'Os 10 melhores jogadores do leaderboard de XP da temporada. Uma coroa baseada em posição — alguém tem que perder pra você ganhar.',
+    blurb: '',
   },
 };

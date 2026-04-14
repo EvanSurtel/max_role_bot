@@ -1,15 +1,7 @@
 module.exports = {
   intro: {
     title: '🏆 Rangs',
-    description: [
-      'Chaque joueur est placé dans un rang selon son **XP de saison**. Plus vous gagnez d\'XP, plus vous montez.',
-      '',
-      'L\'XP vient de trois sources — **matchs en file XP**, **défis XP** et **victoires en cash match**. Tout compte dans votre total d\'XP de saison.',
-      '',
-      '**À chaque nouvelle saison, tout le monde repart à 500 XP et recommence à grimper.** Vos gains à vie sont conservés, mais le rang est une nouvelle bataille chaque saison.',
-      '',
-      'Voici les huit rangs que vous pouvez atteindre, du plus bas au plus haut :',
-    ].join('\n'),
+    description: 'Les rangs sont bas\u00e9s sur votre **XP de saison**. Voici les huit niveaux :',
   },
 
   rank_title: '{name} — {range}',
@@ -22,34 +14,34 @@ module.exports = {
 
   bronze: {
     name: 'Bronze',
-    blurb: 'Là où tout le monde commence chaque saison. Gagnez quelques matchs pour en sortir.',
+    blurb: '',
   },
   silver: {
     name: 'Argent',
-    blurb: 'Vous tenez votre place. Continuez à enchaîner les victoires.',
+    blurb: '',
   },
   gold: {
     name: 'Or',
-    blurb: 'Au-dessus de la moyenne. Vous savez ce que vous faites.',
+    blurb: '',
   },
   platinum: {
     name: 'Platine',
-    blurb: 'Un compétiteur sérieux. Peu de joueurs arrivent ici.',
+    blurb: '',
   },
   diamond: {
     name: 'Diamant',
-    blurb: 'Haut du panier. Vous êtes dans l\'élite maintenant.',
+    blurb: '',
   },
   sentinel: {
     name: 'Sentinelle',
-    blurb: 'Vétéran aguerri. Les gens connaissent votre nom.',
+    blurb: '',
   },
   obsidian: {
     name: 'Obsidienne',
-    blurb: 'Air raréfié. Seuls les plus dévoués arrivent jusque là.',
+    blurb: '',
   },
   crowned: {
     name: 'Couronné',
-    blurb: 'Les 10 meilleurs joueurs du classement XP de la saison. Une couronne basée sur la position — quelqu\'un doit la perdre pour que vous la gagniez.',
+    blurb: '',
   },
 };

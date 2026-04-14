@@ -1,15 +1,7 @@
 module.exports = {
   intro: {
     title: '🏆 Rangi',
-    description: [
-      'Każdy gracz jest przypisany do rangi na podstawie swojego **XP sezonu**. Im więcej XP zdobędziesz, tym wyżej się wspinasz.',
-      '',
-      'XP przychodzi z trzech źródeł — **meczów z kolejki XP**, **wyzwań XP** i **wygranych cash matchów**. Wszystko liczy się do twojego totalu XP sezonu.',
-      '',
-      '**Każdy nowy sezon wszyscy resetują się do 500 XP i zaczynają się wspinać od nowa.** Twoje zarobki z całego życia zostają, ale ranga to świeża walka co sezon.',
-      '',
-      'Oto osiem rang, które możesz osiągnąć, od najniższej do najwyższej:',
-    ].join('\n'),
+    description: 'Rangi opieraj\u0105 si\u0119 na twoim **XP sezonu**. Oto osiem poziom\u00f3w:',
   },
 
   rank_title: '{name} — {range}',
@@ -22,34 +14,34 @@ module.exports = {
 
   bronze: {
     name: 'Brąz',
-    blurb: 'Tu każdy zaczyna każdy sezon. Wygraj parę meczów żeby się stąd wyrwać.',
+    blurb: '',
   },
   silver: {
     name: 'Srebro',
-    blurb: 'Utrzymujesz się. Dalej zbieraj wygrane.',
+    blurb: '',
   },
   gold: {
     name: 'Złoto',
-    blurb: 'Ponad średnią. Wiesz co robisz.',
+    blurb: '',
   },
   platinum: {
     name: 'Platyna',
-    blurb: 'Poważny konkurent. Mało graczy tu dociera.',
+    blurb: '',
   },
   diamond: {
     name: 'Diament',
-    blurb: 'Najwyższa liga. Jesteś teraz w grupie elity.',
+    blurb: '',
   },
   sentinel: {
     name: 'Strażnik',
-    blurb: 'Doświadczony weteran. Ludzie znają twoje imię.',
+    blurb: '',
   },
   obsidian: {
     name: 'Obsydian',
-    blurb: 'Rzadkie powietrze. Docierają tu tylko najbardziej oddani.',
+    blurb: '',
   },
   crowned: {
     name: 'Koronowany',
-    blurb: 'Top 10 graczy z sezonowego leaderboardu XP. Korona oparta na pozycji — ktoś musi ją stracić, żebyś ty ją zdobył.',
+    blurb: '',
   },
 };

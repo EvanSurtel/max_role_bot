@@ -1,15 +1,7 @@
 module.exports = {
   intro: {
     title: '🏆 Rütbeler',
-    description: [
-      'Her oyuncu **sezon XP**\'sine göre bir rütbeye yerleştirilir. Ne kadar çok XP kazanırsan, o kadar yükseğe tırmanırsın.',
-      '',
-      'XP üç kaynaktan gelir — **XP queue maçları**, **XP challenge\'lar** ve **cash match zaferleri**. Hepsi sezon XP toplamına eklenir.',
-      '',
-      '**Her yeni sezon herkes 500 XP\'ye sıfırlanır ve tekrar tırmanmaya başlar.** Tüm zaman kazançların devam eder, ama rütbe her sezon yeni bir savaş.',
-      '',
-      'İşte ulaşabileceğin sekiz rütbe, düşükten yükseğe:',
-    ].join('\n'),
+    description: 'R\u00fctbeler **sezon XP**\'ine g\u00f6re belirlenir. \u0130\u015fte sekiz seviye:',
   },
 
   rank_title: '{name} — {range}',
@@ -22,34 +14,34 @@ module.exports = {
 
   bronze: {
     name: 'Bronz',
-    blurb: 'Her sezon herkesin başladığı yer. Çıkmak için birkaç maç kazan.',
+    blurb: '',
   },
   silver: {
     name: 'Gümüş',
-    blurb: 'Kendi başının çaresine bakıyorsun. Zaferleri yığmaya devam et.',
+    blurb: '',
   },
   gold: {
     name: 'Altın',
-    blurb: 'Ortalamanın üstü. Ne yaptığını biliyorsun.',
+    blurb: '',
   },
   platinum: {
     name: 'Platin',
-    blurb: 'Ciddi bir rakip. Buraya çok az oyuncu ulaşır.',
+    blurb: '',
   },
   diamond: {
     name: 'Elmas',
-    blurb: 'Üst seviye. Artık elit grupta sayılırsın.',
+    blurb: '',
   },
   sentinel: {
     name: 'Muhafız',
-    blurb: 'Tecrübeli veteran. İnsanlar adını biliyor.',
+    blurb: '',
   },
   obsidian: {
     name: 'Obsidyen',
-    blurb: 'Seyrek hava. Buraya sadece en kararlı olanlar ulaşır.',
+    blurb: '',
   },
   crowned: {
     name: 'Taçlandırılmış',
-    blurb: 'Sezon XP sıralamasındaki en iyi 10 oyuncu. Pozisyona dayalı bir taç — senin kazanman için birinin kaybetmesi gerekir.',
+    blurb: '',
   },
 };
