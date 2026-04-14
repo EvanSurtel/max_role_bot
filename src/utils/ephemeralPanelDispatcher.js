@@ -66,8 +66,8 @@ async function sendEphemeralPanelForCurrentChannel(interaction, newLang) {
   const channelId = interaction.channel?.id;
   if (!channelId) return;
 
-  const { SUPPORTED_LANGUAGES } = require('../locales/i18n');
-  const langName = SUPPORTED_LANGUAGES[newLang]?.nativeName || newLang;
+  const { SUPPORTED_LANGUAGES } = require('../locales/index');
+  const langName = (SUPPORTED_LANGUAGES && SUPPORTED_LANGUAGES[newLang]?.nativeName) || newLang;
   const pingContent = `<@${interaction.user.id}> ✓ Language set to **${langName}** — see below ↓`;
 
   try {
