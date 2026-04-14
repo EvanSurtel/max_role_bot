@@ -80,7 +80,7 @@ async function handleLanguagePickerSelect(interaction) {
 
   const langName = SUPPORTED_LANGUAGES[newLang].nativeName;
   await interaction.update({
-    content: t('onboarding.language_saved', newLang, { language: langName }),
+    content: `<@${discordId}> ${t('onboarding.language_saved', newLang, { language: langName })}\n↓ **Scroll down** to see this channel in your language.`,
     embeds: [],
     components: [],
   });

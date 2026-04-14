@@ -66,11 +66,17 @@ async function sendEphemeralPanelForCurrentChannel(interaction, newLang) {
   const channelId = interaction.channel?.id;
   if (!channelId) return;
 
+  const { SUPPORTED_LANGUAGES } = require('../locales/i18n');
+  const langName = SUPPORTED_LANGUAGES[newLang]?.nativeName || newLang;
+  const pingContent = `<@${interaction.user.id}> ✓ Language set to **${langName}** — see below ↓`;
+
   try {
     // Welcome channel → TOS + Accept/Decline buttons
     if (channelId === process.env.WELCOME_CHANNEL_ID) {
       const { buildWelcomePanel } = require('../panels/welcomePanel');
-      return interaction.editReply(buildWelcomePanel(newLang));
+      const panel = buildWelcomePanel(newLang);
+      panel.content = pingContent;
+      return interaction.editReply(panel);
     }
 
     // Lobby (wager channel)
@@ -94,13 +100,13 @@ async function sendEphemeralPanelForCurrentChannel(interaction, newLang) {
     // Rules channel → multi-message ephemeral
     if (channelId === process.env.RULES_CHANNEL_ID) {
       const { buildRulesEmbeds } = require('../panels/rulesPanel');
-      return _sendPackedEphemeral(interaction, buildRulesEmbeds(newLang));
+      return _sendPackedEphemeral(interaction, buildRulesEmbeds(newLang), pingContent);
     }
 
     // How It Works channel → multi-message ephemeral
     if (channelId === process.env.HOW_IT_WORKS_CHANNEL_ID) {
       const { buildHowItWorksEmbeds } = require('../panels/howItWorksPanel');
-      return _sendPackedEphemeral(interaction, buildHowItWorksEmbeds(newLang));
+      return _sendPackedEphemeral(interaction, buildHowItWorksEmbeds(newLang), pingContent);
     }
 
     // Ranks channel → build the panel WITHOUT thumbnails for the
@@ -144,12 +150,14 @@ async function sendEphemeralPanelForCurrentChannel(interaction, newLang) {
  * reply); additional chunks go via followUp (which the auto-replace
  * wrapper tracks as part of the same session).
  */
-async function _sendPackedEphemeral(interaction, embeds) {
+async function _sendPackedEphemeral(interaction, embeds, content = null) {
   const groups = _packEmbeds(embeds);
   if (groups.length === 0) return;
 
   // First chunk → editReply on the deferred ephemeral
-  await interaction.editReply({ embeds: groups[0] });
+  const firstReply = { embeds: groups[0] };
+  if (content) firstReply.content = content;
+  await interaction.editReply(firstReply);
 
   // Remaining chunks → ephemeral followUps (tracked by the wrapper)
   for (let i = 1; i < groups.length; i++) {
