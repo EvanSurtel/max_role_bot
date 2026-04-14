@@ -118,6 +118,8 @@ async function main() {
     address: owner.address,
     network: cdpNetwork,
     transaction: {
+      to: null,          // null = contract creation
+      value: '0x0',
       data: deployData,
     },
   });
