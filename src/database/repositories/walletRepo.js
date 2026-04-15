@@ -2,10 +2,10 @@ const db = require('../db');
 
 const stmts = {
   findByUserId: db.prepare('SELECT * FROM wallets WHERE user_id = ?'),
-  findByAddress: db.prepare('SELECT * FROM wallets WHERE solana_address = ?'),
+  findByAddress: db.prepare('SELECT * FROM wallets WHERE base_address = ?'),
   create: db.prepare(`
-    INSERT INTO wallets (user_id, solana_address, encrypted_private_key, encryption_iv, encryption_tag, encryption_salt)
-    VALUES (@userId, @solanaAddress, @encryptedPrivateKey, @encryptionIv, @encryptionTag, @encryptionSalt)
+    INSERT INTO wallets (user_id, base_address, encrypted_private_key, encryption_iv, encryption_tag, encryption_salt)
+    VALUES (@userId, @baseAddress, @encryptedPrivateKey, @encryptionIv, @encryptionTag, @encryptionSalt)
     RETURNING *
   `),
   updateBalance: db.prepare(`
@@ -93,8 +93,8 @@ const walletRepo = {
     return stmts.findByAddress.get(address) || null;
   },
 
-  create({ userId, solanaAddress, encryptedPrivateKey, encryptionIv, encryptionTag, encryptionSalt }) {
-    return stmts.create.get({ userId, solanaAddress, encryptedPrivateKey, encryptionIv, encryptionTag, encryptionSalt: encryptionSalt || null });
+  create({ userId, baseAddress, encryptedPrivateKey, encryptionIv, encryptionTag, encryptionSalt }) {
+    return stmts.create.get({ userId, baseAddress, encryptedPrivateKey, encryptionIv, encryptionTag, encryptionSalt: encryptionSalt || null });
   },
 
   updateBalance(userId, { balanceAvailable, balanceHeld }) {

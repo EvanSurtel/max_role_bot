@@ -22,7 +22,7 @@ function buildWalletView(wallet, user, lang) {
   const embed = new EmbedBuilder()
     .setTitle(t('wallet_embed.title', lang, { username }))
     .setColor(0x2ecc71)
-    .setDescription(t('wallet.deposit_info', lang, { address: wallet.solana_address }))
+    .setDescription(t('wallet.deposit_info', lang, { address: wallet.base_address }))
     .addFields(
       { name: t('wallet_embed.available', lang), value: `$${availableUsdc} USDC`, inline: true },
       { name: t('wallet_embed.held', lang), value: `$${heldUsdc} USDC`, inline: true },

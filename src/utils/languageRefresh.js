@@ -109,7 +109,7 @@ async function refreshWalletForUser(client, discordId) {
     const { buildWalletView } = require('../panels/walletPanelView');
 
     let solBalance = '0';
-    try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
+    try { solBalance = await walletManager.getEthBalance(wallet.base_address); } catch { /* */ }
 
     const view = buildWalletView(wallet, user, lang, solBalance);
     const ok = await _updatePanelInChannel(client, user.wallet_channel_id, view);

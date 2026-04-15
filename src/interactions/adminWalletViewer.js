@@ -54,7 +54,7 @@ function buildAdminWalletViewEmbed(targetUser, wallet, solBalance, lang) {
       targetUser.country_flag ? `**Country:** ${targetUser.country_flag}` : null,
       targetUser.language ? `**Language:** ${targetUser.language}` : null,
       '',
-      `**Wallet Address:**\n\`\`\`\n${wallet.solana_address}\n\`\`\``,
+      `**Wallet Address:**\n\`\`\`\n${wallet.base_address}\n\`\`\``,
     ].filter(Boolean).join('\n'))
     .addFields(
       { name: t('wallet_embed.available', lang), value: `$${availableUsdc} USDC`, inline: true },
@@ -101,7 +101,7 @@ async function handleAdminWalletViewSelect(interaction) {
   }
 
   let solBalance = '0';
-  try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
+  try { solBalance = await walletManager.getEthBalance(wallet.base_address); } catch { /* */ }
 
   const embed = buildAdminWalletViewEmbed(targetUser, wallet, solBalance, lang);
 
@@ -179,7 +179,7 @@ async function handleAdminWalletHistory(interaction) {
       : (tx.type === 'withdrawal' || tx.type === 'sol_withdrawal') ? '📤'
       : '🔄';
     const typeLabel = t(`tx_type.${tx.type}`, lang);
-    const sigShort = tx.solana_tx_signature ? ` \`${tx.solana_tx_signature.slice(0, 12)}...\`` : '';
+    const sigShort = tx.tx_hash ? ` \`${tx.tx_hash.slice(0, 12)}...\`` : '';
     return `${num}. ${icon} **${typeLabel}** — $${amountUsdc} USDC — ${date}${sigShort}`;
   });
 
@@ -235,7 +235,7 @@ async function handleAdminWalletBack(interaction) {
     return interaction.reply({ content: t('admin_wallet_viewer.no_wallet', lang), ephemeral: true });
   }
   let solBalance = '0';
-  try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
+  try { solBalance = await walletManager.getEthBalance(wallet.base_address); } catch { /* */ }
 
   const embed = buildAdminWalletViewEmbed(targetUser, wallet, solBalance, lang);
   const actionRow = new ActionRowBuilder().addComponents(
@@ -273,7 +273,7 @@ async function handleAdminWalletCopy(interaction) {
   }
 
   return interaction.reply({
-    content: wallet.solana_address,
+    content: wallet.base_address,
     ephemeral: true,
   });
 }

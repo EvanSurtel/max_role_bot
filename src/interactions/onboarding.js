@@ -265,7 +265,7 @@ async function handleRegistrationModal(interaction) {
       const { address, encryptedPrivateKey, iv, tag, salt } = await walletManager.generateWallet(user.id);
       wallet = walletRepo.create({
         userId: user.id,
-        solanaAddress: address,
+        baseAddress: address,
         encryptedPrivateKey,
         encryptionIv: iv,
         encryptionTag: tag,
@@ -370,7 +370,7 @@ async function handleRegistrationModal(interaction) {
               `**COD UID:** ${codUid}`,
               `**Region:** ${regionLabel}`,
               `**Country:** ${country}`,
-              `**Wallet:** \`${wallet.solana_address}\``,
+              `**Wallet:** \`${wallet.base_address}\``,
             ].join('\n'))
             .setTimestamp();
           await alertChannel.send({ embeds: [adminEmbed] });
@@ -388,7 +388,7 @@ async function handleRegistrationModal(interaction) {
         type: 'user_registered',
         username: displayName,
         discordId,
-        memo: `${country} ${displayName} | IGN: ${codIgn} | UID: ${codUid} | Region: ${regionLabel} | Wallet: ${wallet.solana_address}`,
+        memo: `${country} ${displayName} | IGN: ${codIgn} | UID: ${codUid} | Region: ${regionLabel} | Wallet: ${wallet.base_address}`,
       });
     } catch { /* */ }
 
@@ -562,7 +562,7 @@ async function handleWalletRefresh(interaction) {
   await interaction.deferUpdate();
 
   let solBalance = '0';
-  try { solBalance = await walletManager.getSolBalance(wallet.solana_address); } catch { /* */ }
+  try { solBalance = await walletManager.getEthBalance(wallet.base_address); } catch { /* */ }
 
   const lang = user.language || 'en';
   const view = buildWalletView(wallet, user, lang, solBalance);

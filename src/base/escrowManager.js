@@ -57,7 +57,7 @@ function holdFunds(userId, amountUsdc, challengeId) {
     transactionRepo.create({
       type: TRANSACTION_TYPE.HOLD || 'hold',
       userId, challengeId, amountUsdc,
-      solanaTxSignature: null, status: 'completed',
+      txHash: null, status: 'completed',
       memo: `Hold for challenge #${challengeId}`,
     });
     return true;
@@ -73,7 +73,7 @@ function releaseFunds(userId, amountUsdc, challengeId) {
     transactionRepo.create({
       type: TRANSACTION_TYPE.RELEASE || 'release',
       userId, challengeId, amountUsdc,
-      solanaTxSignature: null, status: 'completed',
+      txHash: null, status: 'completed',
       memo: `Release for challenge #${challengeId}`,
     });
     return true;
@@ -90,7 +90,7 @@ async function approveEscrowForUser(userId) {
   if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
 
   const { hash } = await transactionService.approveUsdc(
-    walletRecord.solana_address,
+    walletRecord.base_address,
     _escrowAddress(),
     walletRecord.encrypted_private_key, // owner account name for Smart Account
   );
@@ -124,7 +124,7 @@ async function depositToEscrow(userId, matchId, challengeId) {
     _ownerAddress(),
     _escrowAddress(),
     'depositToEscrow',
-    { matchId: String(matchId), player: walletRecord.solana_address },
+    { matchId: String(matchId), player: walletRecord.base_address },
     ESCROW_ABI_JSON,
   );
 
@@ -145,8 +145,8 @@ async function depositToEscrow(userId, matchId, challengeId) {
   transactionRepo.create({
     type: TRANSACTION_TYPE.ESCROW_IN || 'escrow_in',
     userId, challengeId, amountUsdc: entryAmount,
-    solanaTxSignature: hash,
-    fromAddress: walletRecord.solana_address,
+    txHash: hash,
+    fromAddress: walletRecord.base_address,
     toAddress: _escrowAddress(),
     status: 'completed',
     memo: `Escrow deposit for match #${matchId}`,
@@ -185,9 +185,9 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
       disbursements.push({ userId, error: 'no wallet' });
       continue;
     }
-    winnerAddresses.push(walletRecord.solana_address);
+    winnerAddresses.push(walletRecord.base_address);
     winnerAmounts.push(perPlayerShare.toString());
-    disbursements.push({ userId, address: walletRecord.solana_address, amount: perPlayerShare.toString() });
+    disbursements.push({ userId, address: walletRecord.base_address, amount: perPlayerShare.toString() });
   }
 
   if (winnerAddresses.length === 0) throw new Error('No winners with wallets');
@@ -213,7 +213,7 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
         type: TRANSACTION_TYPE.DISBURSEMENT || 'disbursement',
         userId: d.userId, challengeId,
         amountUsdc: d.amount,
-        solanaTxSignature: hash,
+        txHash: hash,
         fromAddress: _escrowAddress(),
         toAddress: d.address,
         status: 'completed',
@@ -238,7 +238,7 @@ async function cancelOnChainMatch(matchId, challengeId, allPlayers, entryAmountU
   for (const player of allPlayers) {
     const wallet = walletRepo.findByUserId(player.user_id);
     if (!wallet) continue;
-    playerAddresses.push(wallet.solana_address);
+    playerAddresses.push(wallet.base_address);
     refundAmounts.push(entryAmountUsdc);
   }
 
@@ -263,9 +263,9 @@ async function cancelOnChainMatch(matchId, challengeId, allPlayers, entryAmountU
         type: 'refund',
         userId: player.user_id, challengeId,
         amountUsdc: entryAmountUsdc,
-        solanaTxSignature: hash,
+        txHash: hash,
         fromAddress: _escrowAddress(),
-        toAddress: walletRepo.findByUserId(player.user_id)?.solana_address || '',
+        toAddress: walletRepo.findByUserId(player.user_id)?.base_address || '',
         status: 'completed',
         memo: `Refund for cancelled match #${matchId}`,
       });
@@ -301,7 +301,7 @@ function refundAll(challengeId) {
       walletRepo.releaseFunds(parseInt(userId), net.toString());
       transactionRepo.create({
         type: 'refund', userId: parseInt(userId), challengeId,
-        amountUsdc: net.toString(), solanaTxSignature: null,
+        amountUsdc: net.toString(), txHash: null,
         status: 'completed',
         memo: `Refund for cancelled challenge #${challengeId}`,
       });

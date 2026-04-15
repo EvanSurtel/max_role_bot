@@ -80,7 +80,7 @@ async function handleWalletSubButton(interaction) {
     // Onramp link (0% fee). Group B gets Changelly fiat on-ramp
     // (~4-5% fee). Falls back to generic if no region is set.
     const depositRegion = user.deposit_region || 'GROUP_B';
-    const address = wallet.solana_address; // legacy column name — stores Base address
+    const address = wallet.base_address;
 
     if (depositRegion === 'GROUP_A' && process.env.CDP_API_KEY) {
       // Coinbase Onramp URL — prefills the user's Base address + USDC
@@ -194,7 +194,7 @@ async function handleWalletSubButton(interaction) {
     // this shows a built-in Copy button in the top-right of the block; on
     // mobile the address inside can still be long-pressed to copy.
     return interaction.reply({
-      content: `\`\`\`\n${wallet.solana_address}\n\`\`\``,
+      content: `\`\`\`\n${wallet.base_address}\n\`\`\``,
       ephemeral: true,
     });
   }
@@ -226,7 +226,7 @@ async function handleWalletSubButton(interaction) {
     let ethDisplay = '0';
     let maxEth = '0';
     try {
-      const ethBalWei = BigInt(await walletManager.getEthBalance(wallet.solana_address));
+      const ethBalWei = BigInt(await walletManager.getEthBalance(wallet.base_address));
       ethDisplay = ethers.formatEther(ethBalWei);
       const reserveWei = 100_000_000_000_000n; // 0.0001 ETH
       const maxWei = ethBalWei > reserveWei ? ethBalWei - reserveWei : 0n;
@@ -477,7 +477,7 @@ async function _executeUsdcWithdraw(interaction, user, amountUsdc, address, lang
     }
 
     const { signature } = await transactionService.transferUsdc(
-      freshWallet.solana_address,
+      freshWallet.base_address,
       address,
       amountSmallest.toString(),
       freshWallet.encrypted_private_key, // owner account name for Smart Account
@@ -493,15 +493,15 @@ async function _executeUsdcWithdraw(interaction, user, amountUsdc, address, lang
       type: TRANSACTION_TYPE.WITHDRAWAL,
       userId: user.id,
       amountUsdc: amountSmallest.toString(),
-      solanaTxSignature: signature,
-      fromAddress: freshWallet.solana_address,
+      txHash: signature,
+      fromAddress: freshWallet.base_address,
       toAddress: address,
       status: 'completed',
       memo: `Withdrawal of $${amountUsdc} USDC`,
     });
 
     const { postTransaction } = require('../utils/transactionFeed');
-    postTransaction({ type: 'withdrawal', username: user.server_username, discordId: user.discord_id, amount: `$${amountUsdc.toFixed(2)}`, currency: 'USDC', fromAddress: freshWallet.solana_address, toAddress: address, signature, memo: `Withdrawal of $${amountUsdc.toFixed(2)} USDC` });
+    postTransaction({ type: 'withdrawal', username: user.server_username, discordId: user.discord_id, amount: `$${amountUsdc.toFixed(2)}`, currency: 'USDC', fromAddress: freshWallet.base_address, toAddress: address, signature, memo: `Withdrawal of $${amountUsdc.toFixed(2)} USDC` });
 
     walletRepo.releaseLock(user.id);
     return interaction.editReply({
@@ -597,7 +597,7 @@ async function _executeSolWithdraw(interaction, user, amountSol, address, lang) 
 
   try {
     const wallet = walletRepo.findByUserId(user.id);
-    const ethBalWei = BigInt(await walletManager.getEthBalance(wallet.solana_address));
+    const ethBalWei = BigInt(await walletManager.getEthBalance(wallet.base_address));
     // Minimal reserve — just enough for the gas cost of this tx.
     const reserveWei = 100_000_000_000_000n; // 0.0001 ETH
     if (amountWei > ethBalWei - reserveWei) {
@@ -610,21 +610,21 @@ async function _executeSolWithdraw(interaction, user, amountSol, address, lang) 
       });
     }
 
-    const { signature } = await transactionService.transferEth(wallet.solana_address, address, amountWei);
+    const { signature } = await transactionService.transferEth(wallet.base_address, address, amountWei);
 
     transactionRepo.create({
       type: 'eth_withdrawal',
       userId: user.id,
       amountUsdc: '0',
-      solanaTxSignature: signature,
-      fromAddress: wallet.solana_address,
+      txHash: signature,
+      fromAddress: wallet.base_address,
       toAddress: address,
       status: 'completed',
       memo: `ETH withdrawal: ${amountSol} ETH`,
     });
 
     const { postTransaction } = require('../utils/transactionFeed');
-    postTransaction({ type: 'eth_withdrawal', username: user.server_username, discordId: user.discord_id, amount: `${amountSol}`, currency: 'ETH', fromAddress: wallet.solana_address, toAddress: address, signature, memo: `ETH withdrawal: ${amountSol} ETH` });
+    postTransaction({ type: 'eth_withdrawal', username: user.server_username, discordId: user.discord_id, amount: `${amountSol}`, currency: 'ETH', fromAddress: wallet.base_address, toAddress: address, signature, memo: `ETH withdrawal: ${amountSol} ETH` });
 
     walletRepo.releaseLock(user.id);
     return interaction.editReply({
@@ -718,7 +718,7 @@ async function handleWithdrawSolMaxModal(interaction) {
 
   // Calculate max fresh right now
   const { ethers } = require('ethers');
-  const ethBalWei = BigInt(await walletManager.getEthBalance(wallet.solana_address));
+  const ethBalWei = BigInt(await walletManager.getEthBalance(wallet.base_address));
   const reserveWei = 100_000_000_000_000n; // 0.0001 ETH
   const maxWei = ethBalWei > reserveWei ? ethBalWei - reserveWei : 0n;
   if (maxWei <= 0n) {

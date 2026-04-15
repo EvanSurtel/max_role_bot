@@ -5,8 +5,8 @@ const stmts = {
   findByUserId: db.prepare('SELECT * FROM transactions WHERE user_id = ?'),
   findByChallengeId: db.prepare('SELECT * FROM transactions WHERE challenge_id = ?'),
   create: db.prepare(`
-    INSERT INTO transactions (type, user_id, challenge_id, amount_usdc, solana_tx_signature, from_address, to_address, status, memo)
-    VALUES (@type, @userId, @challengeId, @amountUsdc, @solanaTxSignature, @fromAddress, @toAddress, @status, @memo)
+    INSERT INTO transactions (type, user_id, challenge_id, amount_usdc, tx_hash, from_address, to_address, status, memo)
+    VALUES (@type, @userId, @challengeId, @amountUsdc, @txHash, @fromAddress, @toAddress, @status, @memo)
     RETURNING *
   `),
   updateStatus: db.prepare('UPDATE transactions SET status = ? WHERE id = ?'),
@@ -25,13 +25,13 @@ const transactionRepo = {
     return stmts.findByChallengeId.all(challengeId);
   },
 
-  create({ type, userId, challengeId, amountUsdc, solanaTxSignature, fromAddress, toAddress, status, memo }) {
+  create({ type, userId, challengeId, amountUsdc, txHash, fromAddress, toAddress, status, memo }) {
     return stmts.create.get({
       type,
       userId: userId || null,
       challengeId: challengeId || null,
       amountUsdc,
-      solanaTxSignature: solanaTxSignature || null,
+      txHash: txHash || null,
       fromAddress: fromAddress || null,
       toAddress: toAddress || null,
       status: status || 'pending',

@@ -78,7 +78,7 @@ function walletEmbed(wallet, user) {
       { name: 'Available', value: `${available} USDC`, inline: true },
       { name: 'Held in Matches', value: `${held} USDC`, inline: true },
       { name: 'Total', value: `${total} USDC`, inline: true },
-      { name: 'Deposit Address', value: `\`${wallet.solana_address}\`` },
+      { name: 'Deposit Address', value: `\`${wallet.base_address}\`` },
     )
     .setTimestamp();
 }

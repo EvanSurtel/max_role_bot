@@ -136,11 +136,11 @@ module.exports = {
   generateWallet,
   getWalletFromEncrypted,
   getCdpClient,
-  // Backward-compat aliases
+  // Backward-compat aliases (getSolBalance kept for any residual callers)
   getKeypairFromEncrypted: getWalletFromEncrypted,
   getUsdcBalance,
   getEthBalance,
-  getSolBalance: getEthBalance,
+  getSolBalance: getEthBalance, // deprecated — use getEthBalance directly
   isAddressValid,
   USDC_CONTRACT,
   USDC_DECIMALS,

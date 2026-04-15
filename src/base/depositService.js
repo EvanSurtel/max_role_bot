@@ -92,7 +92,7 @@ async function checkDeposits() {
       try {
         // Query Base for on-chain USDC balance
         const onChainBalance = BigInt(
-          await walletManager.getUsdcBalance(wallet.solana_address), // column name is legacy but stores Base address
+          await walletManager.getUsdcBalance(wallet.base_address),
         );
 
         if (onChainBalance === 0n) continue;
@@ -116,9 +116,9 @@ async function checkDeposits() {
           userId: wallet.user_id,
           challengeId: null,
           amountUsdc: delta.toString(),
-          solanaTxSignature: null,
+          txHash: null,
           fromAddress: null,
-          toAddress: wallet.solana_address,
+          toAddress: wallet.base_address,
           status: 'completed',
           memo: `Deposit detected: $${depositUsdc} USDC`,
         });
@@ -131,17 +131,17 @@ async function checkDeposits() {
           discordId: userRecord?.discord_id,
           amount: `$${depositUsdc}`,
           currency: 'USDC',
-          toAddress: wallet.solana_address,
+          toAddress: wallet.base_address,
           memo: `Deposit detected: $${depositUsdc} USDC`,
         });
 
         console.log(
           `[Deposits] Detected deposit of $${depositUsdc} USDC (${delta} units) ` +
-          `for user ${wallet.user_id} at ${wallet.solana_address}`,
+          `for user ${wallet.user_id} at ${wallet.base_address}`,
         );
       } catch (err) {
         console.error(
-          `[Deposits] Error checking wallet ${wallet.solana_address} (user ${wallet.user_id}):`,
+          `[Deposits] Error checking wallet ${wallet.base_address} (user ${wallet.user_id}):`,
           err.message || err,
         );
       }
