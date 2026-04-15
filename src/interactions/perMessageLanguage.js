@@ -87,12 +87,7 @@ async function handlePickLangForChallenge(interaction) {
   }
 
   const challengeId = parseInt(interaction.customId.replace('pml_pick_ch_', ''), 10);
-  const discordId = interaction.user.id;
-
-  // Save user's language
-  let user = userRepo.findByDiscordId(discordId);
-  if (!user) user = userRepo.create(discordId);
-  userRepo.setLanguage(discordId, newLang);
+  // Per-message only — do NOT save globally. Just re-render this message.
 
   // Look up the challenge
   const challenge = challengeRepo.findById(challengeId);
@@ -165,10 +160,7 @@ async function handlePickLangForResult(interaction) {
   const matchId = parseInt(interaction.customId.replace('pml_pick_res_', ''), 10);
   const discordId = interaction.user.id;
 
-  // Save user's language
-  let user = userRepo.findByDiscordId(discordId);
-  if (!user) user = userRepo.create(discordId);
-  userRepo.setLanguage(discordId, newLang);
+  // Per-message only — do NOT save globally. Just re-render this message.
 
   // Look up the match + challenge
   const match = matchRepo.findById(matchId);
