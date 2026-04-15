@@ -90,9 +90,9 @@ async function approveEscrowForUser(userId) {
   if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
 
   const { hash } = await transactionService.approveUsdc(
-    walletRecord.base_address,
+    walletRecord.address,
     _escrowAddress(),
-    walletRecord.encrypted_private_key, // owner account name for Smart Account
+    walletRecord.account_ref, // owner account name for Smart Account
   );
 
   console.log(`[Escrow] Approved escrow for user ${userId}: ${hash}`);
@@ -124,7 +124,7 @@ async function depositToEscrow(userId, matchId, challengeId) {
     _ownerAddress(),
     _escrowAddress(),
     'depositToEscrow',
-    { matchId: String(matchId), player: walletRecord.base_address },
+    { matchId: String(matchId), player: walletRecord.address },
     ESCROW_ABI_JSON,
   );
 
@@ -146,7 +146,7 @@ async function depositToEscrow(userId, matchId, challengeId) {
     type: TRANSACTION_TYPE.ESCROW_IN || 'escrow_in',
     userId, challengeId, amountUsdc: entryAmount,
     txHash: hash,
-    fromAddress: walletRecord.base_address,
+    fromAddress: walletRecord.address,
     toAddress: _escrowAddress(),
     status: 'completed',
     memo: `Escrow deposit for match #${matchId}`,
@@ -185,9 +185,9 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
       disbursements.push({ userId, error: 'no wallet' });
       continue;
     }
-    winnerAddresses.push(walletRecord.base_address);
+    winnerAddresses.push(walletRecord.address);
     winnerAmounts.push(perPlayerShare.toString());
-    disbursements.push({ userId, address: walletRecord.base_address, amount: perPlayerShare.toString() });
+    disbursements.push({ userId, address: walletRecord.address, amount: perPlayerShare.toString() });
   }
 
   if (winnerAddresses.length === 0) throw new Error('No winners with wallets');
@@ -238,7 +238,7 @@ async function cancelOnChainMatch(matchId, challengeId, allPlayers, entryAmountU
   for (const player of allPlayers) {
     const wallet = walletRepo.findByUserId(player.user_id);
     if (!wallet) continue;
-    playerAddresses.push(wallet.base_address);
+    playerAddresses.push(wallet.address);
     refundAmounts.push(entryAmountUsdc);
   }
 
@@ -265,7 +265,7 @@ async function cancelOnChainMatch(matchId, challengeId, allPlayers, entryAmountU
         amountUsdc: entryAmountUsdc,
         txHash: hash,
         fromAddress: _escrowAddress(),
-        toAddress: walletRepo.findByUserId(player.user_id)?.base_address || '',
+        toAddress: walletRepo.findByUserId(player.user_id)?.address || '',
         status: 'completed',
         memo: `Refund for cancelled match #${matchId}`,
       });

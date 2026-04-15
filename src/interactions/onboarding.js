@@ -262,14 +262,11 @@ async function handleRegistrationModal(interaction) {
     // Generate Base wallet
     let wallet = walletRepo.findByUserId(user.id);
     if (!wallet) {
-      const { address, encryptedPrivateKey, iv, tag, salt } = await walletManager.generateWallet(user.id);
+      const { address, accountRef } = await walletManager.generateWallet(user.id);
       wallet = walletRepo.create({
         userId: user.id,
-        baseAddress: address,
-        encryptedPrivateKey,
-        encryptionIv: iv,
-        encryptionTag: tag,
-        encryptionSalt: salt,
+        address,
+        accountRef,
       });
 
       try {
@@ -370,7 +367,7 @@ async function handleRegistrationModal(interaction) {
               `**COD UID:** ${codUid}`,
               `**Region:** ${regionLabel}`,
               `**Country:** ${country}`,
-              `**Wallet:** \`${wallet.base_address}\``,
+              `**Wallet:** \`${wallet.address}\``,
             ].join('\n'))
             .setTimestamp();
           await alertChannel.send({ embeds: [adminEmbed] });
@@ -388,7 +385,7 @@ async function handleRegistrationModal(interaction) {
         type: 'user_registered',
         username: displayName,
         discordId,
-        memo: `${country} ${displayName} | IGN: ${codIgn} | UID: ${codUid} | Region: ${regionLabel} | Wallet: ${wallet.base_address}`,
+        memo: `${country} ${displayName} | IGN: ${codIgn} | UID: ${codUid} | Region: ${regionLabel} | Wallet: ${wallet.address}`,
       });
     } catch { /* */ }
 
@@ -562,7 +559,7 @@ async function handleWalletRefresh(interaction) {
   await interaction.deferUpdate();
 
   let solBalance = '0';
-  try { solBalance = await walletManager.getEthBalance(wallet.base_address); } catch { /* */ }
+  try { solBalance = await walletManager.getEthBalance(wallet.address); } catch { /* */ }
 
   const lang = user.language || 'en';
   const view = buildWalletView(wallet, user, lang, solBalance);

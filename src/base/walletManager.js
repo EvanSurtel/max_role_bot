@@ -8,9 +8,9 @@
 //   - Transaction signing (cdp.evm.sendTransaction)
 //   - Gas sponsorship (configured at the CDP project level)
 //
-// The bot stores the CDP account name in the DB (in the legacy
-// encrypted_private_key column). No encryption is needed since CDP
-// holds the keys — iv, tag, salt are stored as empty strings.
+// The bot stores the CDP account name in the DB (in the account_ref
+// column). No encryption is needed since CDP holds the keys —
+// iv, tag, salt are stored as empty strings.
 
 const { CdpClient } = require('@coinbase/cdp-sdk');
 const { ethers } = require('ethers');
@@ -43,9 +43,9 @@ function getCdpClient() {
 /**
  * Create a new CDP EVM account for a user on Base.
  *
- * Returns the account address + the account name stored in the legacy
- * encrypted_private_key column. Since CDP manages keys server-side,
- * no encryption is needed — iv, tag, salt are empty strings.
+ * Returns the account address + the account name (accountRef).
+ * Since CDP manages keys server-side, no encryption is needed —
+ * iv, tag, salt are empty strings.
  *
  * @param {string} [userId] — Discord user ID (used to build a unique account name)
  */
@@ -65,7 +65,7 @@ async function generateWallet(userId) {
 
   return {
     address: smartAccount.address,
-    encryptedPrivateKey: ownerName, // store owner account name for signing
+    accountRef: ownerName, // store owner account name for signing
     iv: '',
     tag: '',
     salt: '',

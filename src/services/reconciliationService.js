@@ -21,7 +21,7 @@ async function reconcileAll() {
 
   for (const wallet of wallets) {
     try {
-      const onChainUsdc = BigInt(await walletManager.getUsdcBalance(wallet.base_address));
+      const onChainUsdc = BigInt(await walletManager.getUsdcBalance(wallet.address));
 
       if (onChainUsdc === 0n) continue;
 
@@ -34,7 +34,7 @@ async function reconcileAll() {
       if (diff !== 0n) {
         discrepancies++;
         console.warn(
-          `[Reconciliation] DISCREPANCY for wallet ${wallet.base_address} (user ${wallet.user_id}): ` +
+          `[Reconciliation] DISCREPANCY for wallet ${wallet.address} (user ${wallet.user_id}): ` +
           `on-chain=${onChainUsdc.toString()} USDC units, ` +
           `expected=${expected.toString()} USDC units ` +
           `(available=${available.toString()} + held=${held.toString()}), ` +
@@ -54,7 +54,7 @@ async function reconcileAll() {
             discordId: userRecord?.discord_id,
             amount: `${diff > 0n ? '+' : ''}${diffUsdc}`,
             currency: 'USDC',
-            toAddress: wallet.base_address,
+            toAddress: wallet.address,
             memo: `On-chain ${onChainUsdc.toString()} vs DB ${expected.toString()} (avail ${available.toString()} + held ${held.toString()}) — diff ${diff.toString()} units`,
           });
         } catch (feedErr) {
@@ -63,7 +63,7 @@ async function reconcileAll() {
       }
     } catch (err) {
       console.error(
-        `[Reconciliation] Error checking wallet ${wallet.base_address} (user ${wallet.user_id}):`,
+        `[Reconciliation] Error checking wallet ${wallet.address} (user ${wallet.user_id}):`,
         err.message || err
       );
     }
