@@ -106,7 +106,6 @@ async function main() {
     country: 'US',
     state: 'CA',
     walletAddress: testAddress,
-    walletExtraId: '',
     paymentMethod: 'card',
   };
   if (WEBHOOK_HOST) {

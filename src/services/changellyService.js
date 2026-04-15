@@ -99,9 +99,7 @@ async function createOrder({ userId, walletAddress, amountUsd, countryCode }) {
     amountFrom: String(amountUsd),
     country: countryCode,
     walletAddress,
-    walletExtraId: '',
     paymentMethod: 'card',
-    metadata: { blockchain: 'base' },
   };
 
   // Add webhook URL if configured
