@@ -554,6 +554,7 @@ async function _executeUsdcWithdraw(interaction, user, amountUsdc, address, lang
       freshWallet.address,
       address,
       amountSmallest.toString(),
+      { ownerRef: freshWallet.account_ref, smartRef: freshWallet.smart_account_ref },
     );
 
     const newAvailable = (freshAvailable - amountSmallest).toString();
@@ -683,7 +684,10 @@ async function _executeSolWithdraw(interaction, user, amountSol, address, lang) 
       });
     }
 
-    const { signature } = await transactionService.transferEth(wallet.address, address, amountWei);
+    const { signature } = await transactionService.transferEth(
+      wallet.address, address, amountWei,
+      { ownerRef: wallet.account_ref, smartRef: wallet.smart_account_ref },
+    );
 
     transactionRepo.create({
       type: 'eth_withdrawal',

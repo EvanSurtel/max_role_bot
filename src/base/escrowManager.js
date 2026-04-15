@@ -1,4 +1,4 @@
-// Base escrow manager — smart contract + CDP Smart Accounts.
+// Base escrow manager — smart contract interactions.
 //
 // Every match's USDC flows through the WagerEscrow.sol contract:
 //   1. createMatch — registers match on-chain
@@ -6,13 +6,14 @@
 //   3. resolveMatch — sends match prize to winners
 //   4. cancelMatch — refunds all players
 //
-// All on-chain calls are signed via CDP Smart Accounts. The bot's
-// owner address is stored in CDP_OWNER_ADDRESS env var.
-// Each user's CDP wallet signs their approve() call during onboarding.
-// The Coinbase Paymaster sponsors gas for everything — no ETH needed.
+// Owner-level calls (createMatch, depositToEscrow, resolveMatch, cancelMatch)
+// are signed by the bot's owner EOA (CDP_OWNER_ADDRESS env var).
+//
+// User-level calls (approve) use the user's CDP Smart Account when
+// available (gasless via Paymaster), with EOA fallback.
 //
 // DB-level hold/release is preserved for the pre-escrow phase
-// (challenge accepted → match not yet started).
+// (challenge accepted -> match not yet started).
 
 const { ethers } = require('ethers');
 const db = require('../database/db');
@@ -92,6 +93,7 @@ async function approveEscrowForUser(userId) {
   const { hash } = await transactionService.approveUsdc(
     walletRecord.address,
     _escrowAddress(),
+    { ownerRef: walletRecord.account_ref, smartRef: walletRecord.smart_account_ref },
   );
 
   console.log(`[Escrow] Approved escrow for user ${userId}: ${hash}`);

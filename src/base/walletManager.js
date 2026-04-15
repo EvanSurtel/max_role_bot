@@ -1,16 +1,24 @@
-// Base wallet management — CDP Server Accounts (@coinbase/cdp-sdk).
+// Base wallet management — CDP Smart Accounts (@coinbase/cdp-sdk).
 //
-// Every user gets a CDP EVM account created via the new CdpClient SDK.
-// CDP manages private keys server-side — the bot never touches raw keys.
+// Every user gets a CDP Smart Account (ERC-4337) with a CDP server
+// account as the owner. This gives us:
+//   - Gasless transactions via Paymaster (Base Sepolia = free, mainnet = CDP Paymaster)
+//   - Batched calls (multiple ERC-20 ops in one UserOp)
+//   - Server-side key management (bot never touches private keys)
 //
-// The new CDP SDK handles:
-//   - Account creation (cdp.evm.getOrCreateAccount)
-//   - Transaction signing (cdp.evm.sendTransaction)
-//   - Gas sponsorship (configured at the CDP project level)
+// Architecture:
+//   CDP EOA (owner) ---owns---> Smart Account (ERC-4337)
+//   The owner signs UserOps; the Smart Account is the on-chain address.
 //
-// The bot stores the CDP account name in the DB (in the account_ref
-// column). No encryption is needed since CDP holds the keys —
-// iv, tag, salt are stored as empty strings.
+// The bot stores:
+//   - address           = Smart Account address (the on-chain wallet users see)
+//   - account_ref       = owner account name (for getOrCreateAccount lookup)
+//   - smart_account_ref = Smart Account name (for getOrCreateSmartAccount lookup)
+//   - iv, tag, salt     = empty (CDP manages keys)
+//
+// Sending transactions:
+//   - Primary: cdp.evm.sendUserOperation() via Smart Account (gasless)
+//   - Fallback: cdp.evm.sendTransaction() via owner EOA (needs ETH for gas)
 
 const { CdpClient } = require('@coinbase/cdp-sdk');
 const { ethers } = require('ethers');
@@ -41,38 +49,51 @@ function getCdpClient() {
 }
 
 /**
- * Create a new CDP EVM account for a user on Base.
+ * Create a new CDP Smart Account for a user on Base.
  *
- * Returns the account address + the account name (accountRef).
- * Since CDP manages keys server-side, no encryption is needed —
- * iv, tag, salt are empty strings.
+ * Creates a CDP server account (EOA) as the owner, then creates a
+ * Smart Account owned by that EOA. The Smart Account address is what
+ * the user sees and receives deposits to.
  *
- * @param {string} [userId] — Discord user ID (used to build a unique account name)
+ * Returns:
+ *   address         = Smart Account address (on-chain wallet)
+ *   accountRef      = owner EOA account name
+ *   smartAccountRef = Smart Account name (for lookup)
+ *   iv, tag, salt   = empty (CDP manages keys)
+ *
+ * @param {string} [userId] — Discord user ID (used to build unique account names)
  */
 async function generateWallet(userId) {
   const cdp = getCdpClient();
-  const accountName = `user-${userId || Date.now()}`;
+  const ownerName = `owner-${userId || Date.now()}`;
+  const smartName = `smart-${userId || Date.now()}`;
 
-  // CDP EOA account — keys managed server-side.
-  // CDP Smart Accounts (ERC-4337) have a known sendUserOperation signature
-  // bug, so we use regular EOA accounts with auto-funded gas.
-  // Gas on Base is ~$0.01/tx — negligible cost.
-  const account = await cdp.evm.getOrCreateAccount({ name: accountName });
+  // Step 1: Create the owner EOA (CDP server account — keys in TEE)
+  const owner = await cdp.evm.getOrCreateAccount({ name: ownerName });
+  console.log(`[Wallet] Owner EOA created: ${owner.address} (${ownerName})`);
 
-  // Auto-fund with ETH for gas on testnet
+  // Step 2: Create the Smart Account (ERC-4337) owned by the EOA
+  const smartAccount = await cdp.evm.getOrCreateSmartAccount({
+    name: smartName,
+    owner,
+  });
+  console.log(`[Wallet] Smart Account created: ${smartAccount.address} (${smartName})`);
+
+  // Auto-fund owner with ETH for gas on testnet (fallback path)
   const network = (process.env.BASE_NETWORK || 'mainnet').toLowerCase();
   if (network === 'sepolia') {
     try {
-      await cdp.evm.requestFaucet({ address: account.address, network: 'base-sepolia', token: 'eth' });
-      console.log(`[Wallet] Faucet ETH sent to ${account.address}`);
+      await cdp.evm.requestFaucet({ address: owner.address, network: 'base-sepolia', token: 'eth' });
+      console.log(`[Wallet] Faucet ETH sent to owner ${owner.address}`);
     } catch (err) {
       console.warn(`[Wallet] Faucet failed (may already have ETH): ${err.message}`);
     }
   }
 
   return {
-    address: account.address,
-    accountRef: accountName,
+    address: smartAccount.address,
+    accountRef: ownerName,
+    smartAccountRef: smartName,
     iv: '',
     tag: '',
     salt: '',
@@ -80,12 +101,38 @@ async function generateWallet(userId) {
 }
 
 /**
+ * Reconstruct a Smart Account object from stored DB data.
+ *
+ * This retrieves the owner EOA by name, then retrieves or creates the
+ * Smart Account. Needed for signing UserOps on behalf of existing users.
+ *
+ * @param {string} ownerAccountName — The owner EOA account name (from account_ref column)
+ * @param {string} [smartAccountName] — The Smart Account name (from smart_account_ref column)
+ * @returns {{ owner, smartAccount }} — The CDP account objects
+ */
+async function getSmartAccountFromRef(ownerAccountName, smartAccountName) {
+  const cdp = getCdpClient();
+  const owner = await cdp.evm.getOrCreateAccount({ name: ownerAccountName });
+
+  if (smartAccountName) {
+    const smartAccount = await cdp.evm.getOrCreateSmartAccount({
+      name: smartAccountName,
+      owner,
+    });
+    return { owner, smartAccount };
+  }
+
+  // Fallback: if no smart account name stored, this is a legacy EOA-only wallet.
+  // Return null for smartAccount — callers should use sendTransaction fallback.
+  return { owner, smartAccount: null };
+}
+
+/**
  * Legacy function — previously reconstructed a CDP wallet from encrypted data.
  *
- * With the new @coinbase/cdp-sdk, signing is done via cdp.evm.sendTransaction()
- * using just the address. Callers that need to sign should use getCdpClient()
- * directly. This function returns null for backward compatibility — callers
- * that still reference it should be migrated to use the CdpClient directly.
+ * With the new @coinbase/cdp-sdk, signing is done via Smart Account
+ * UserOps or EOA sendTransaction. This function returns null for
+ * backward compatibility.
  */
 async function getWalletFromEncrypted(/* encryptedData, iv, tag, salt */) {
   return null;
@@ -142,6 +189,7 @@ function isAddressValid(address) {
 module.exports = {
   generateWallet,
   getWalletFromEncrypted,
+  getSmartAccountFromRef,
   getCdpClient,
   // Backward-compat aliases (getSolBalance kept for any residual callers)
   getKeypairFromEncrypted: getWalletFromEncrypted,

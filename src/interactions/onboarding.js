@@ -282,11 +282,12 @@ async function handleRegistrationModal(interaction) {
     // Generate Base wallet
     let wallet = walletRepo.findByUserId(user.id);
     if (!wallet) {
-      const { address, accountRef } = await walletManager.generateWallet(user.id);
+      const { address, accountRef, smartAccountRef } = await walletManager.generateWallet(user.id);
       wallet = walletRepo.create({
         userId: user.id,
         address,
         accountRef,
+        smartAccountRef,
       });
 
       try {

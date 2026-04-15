@@ -4,8 +4,8 @@ const stmts = {
   findByUserId: db.prepare('SELECT * FROM wallets WHERE user_id = ?'),
   findByAddress: db.prepare('SELECT * FROM wallets WHERE address = ?'),
   create: db.prepare(`
-    INSERT INTO wallets (user_id, address, account_ref, encryption_iv, encryption_tag, encryption_salt)
-    VALUES (@userId, @address, @accountRef, '', '', '')
+    INSERT INTO wallets (user_id, address, account_ref, smart_account_ref, encryption_iv, encryption_tag, encryption_salt)
+    VALUES (@userId, @address, @accountRef, @smartAccountRef, '', '', '')
     RETURNING *
   `),
   updateBalance: db.prepare(`
@@ -132,8 +132,8 @@ const walletRepo = {
     return stmts.findByAddress.get(address) || null;
   },
 
-  create({ userId, address, accountRef }) {
-    return stmts.create.get({ userId, address, accountRef });
+  create({ userId, address, accountRef, smartAccountRef }) {
+    return stmts.create.get({ userId, address, accountRef, smartAccountRef: smartAccountRef || null });
   },
 
   updateBalance(userId, { balanceAvailable, balanceHeld }) {
