@@ -125,6 +125,14 @@ async function createOnChainMatch(matchId, entryAmountUsdc, playerCount) {
     ESCROW_ABI_JSON,
   );
   console.log(`[Escrow] On-chain match #${matchId} created: ${hash}`);
+
+  // Wait for the transaction to be confirmed before proceeding
+  // to deposits — the match must exist on-chain first.
+  const provider = getProvider();
+  console.log(`[Escrow]   waiting for createMatch tx confirmation...`);
+  await provider.waitForTransaction(hash, 1, 30000);
+  console.log(`[Escrow]   createMatch confirmed on-chain`);
+
   return { hash };
 }
 
