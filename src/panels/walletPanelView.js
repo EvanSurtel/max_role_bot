@@ -34,9 +34,9 @@ function buildWalletView(wallet, user, lang) {
   // not here. The wallet panel still renders in the user's saved language.
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('wallet_deposit').setLabel('💵 Deposit').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('wallet_copy_address').setLabel(t('wallet.btn_copy_address', lang)).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('wallet_cashout').setLabel('💸 Cash Out').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('wallet_withdraw').setLabel('📤 Send').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('wallet_refresh').setLabel('🔄').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('wallet_withdraw').setLabel(t('wallet.btn_withdraw_usdc', lang)).setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('wallet_history').setLabel(t('wallet.btn_history', lang)).setStyle(ButtonStyle.Secondary),
   );
 

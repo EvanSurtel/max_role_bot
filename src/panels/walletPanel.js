@@ -189,6 +189,48 @@ async function handleWalletSubButton(interaction) {
     });
   }
 
+  if (id === 'wallet_cashout') {
+    const depositRegion = user.deposit_region || 'GROUP_B';
+    const address = wallet.address;
+
+    if (depositRegion === 'GROUP_A' && process.env.CDP_API_KEY) {
+      const cdpAppId = process.env.CDP_API_KEY;
+      const offrampUrl = `https://pay.coinbase.com/sell/select-asset?appId=${cdpAppId}&addresses={"${address}":["base"]}&assets=["USDC"]`;
+
+      const openButton = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setURL(offrampUrl).setLabel('Cash Out USDC').setStyle(ButtonStyle.Link),
+      );
+
+      return interaction.reply({
+        content: [
+          '**💸 Cash Out**',
+          '',
+          '1. Click the button below — it opens Coinbase',
+          '2. Select how much USDC to sell',
+          '3. Choose your payout method (bank, PayPal, etc.)',
+          '4. Cash arrives in your account within minutes',
+        ].join('\n'),
+        components: [openButton],
+        ephemeral: true,
+      });
+    }
+
+    // Group B — manual instructions
+    return interaction.reply({
+      content: [
+        '**💸 Cash Out**',
+        '',
+        'To convert your USDC to cash:',
+        '1. Click **Send** to withdraw USDC to an exchange (Binance, Coinbase, etc.)',
+        '2. Make sure to send to your exchange\'s **USDC deposit address on the Base network**',
+        '3. Once it arrives on the exchange, sell USDC for your local currency and withdraw to your bank',
+        '',
+        '⚠️ Always double-check the network is **Base** before sending.',
+      ].join('\n'),
+      ephemeral: true,
+    });
+  }
+
   if (id === 'wallet_copy_address') {
     // Wrap the address in a triple-backtick code block. On Discord desktop
     // this shows a built-in Copy button in the top-right of the block; on
