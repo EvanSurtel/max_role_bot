@@ -224,7 +224,7 @@ async function showReportConfirm(interaction, outcome) {
   // Check minimum time before reporting
   const { MIN_REPORT_MINUTES } = require('../config/constants');
   const challenge = challengeRepo.findById(match.challenge_id);
-  const minMinutes = MIN_REPORT_MINUTES[challenge?.series_length] || 5;
+  const minMinutes = MIN_REPORT_MINUTES[challenge?.series_length] ?? 5;
   const matchCreatedAt = new Date(match.created_at).getTime();
   const elapsedMinutes = (Date.now() - matchCreatedAt) / 60000;
 
