@@ -900,7 +900,7 @@ function startNoShowReminders(client, match, playerDiscordIds) {
       if (ch) {
         const pings = notInVoice.map(id => `<@${id}>`).join(' ');
         const lang = reminderLang();
-        await ch.send({ content: t('match_channel.no_show_warning_5', lang, { pings }) });
+        await ch.send({ content: t('match_channel.no_show_warning_5', lang, { pings }), components: [buildLanguageDropdownRow(lang)] });
       }
     } catch (err) {
       console.error(`[MatchService] No-show reminder (5min) failed:`, err.message);
@@ -920,7 +920,7 @@ function startNoShowReminders(client, match, playerDiscordIds) {
       if (ch) {
         const pings = notInVoice.map(id => `<@${id}>`).join(' ');
         const lang = reminderLang();
-        await ch.send({ content: t('match_channel.no_show_warning_10', lang, { pings }) });
+        await ch.send({ content: t('match_channel.no_show_warning_10', lang, { pings }), components: [buildLanguageDropdownRow(lang)] });
       }
     } catch (err) {
       console.error(`[MatchService] No-show reminder (10min) failed:`, err.message);
