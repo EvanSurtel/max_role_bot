@@ -38,13 +38,18 @@ function startWebhookServer(client) {
           const signature = req.headers['x-callback-signature'];
           const body = JSON.stringify(req.body);
 
-          // Convert base64 key to PEM if needed
+          // Key is base64-encoded PEM — decode it first
           let pemKey = callbackPubKey;
           if (!pemKey.includes('-----BEGIN')) {
-            pemKey = `-----BEGIN PUBLIC KEY-----\n${pemKey}\n-----END PUBLIC KEY-----`;
+            pemKey = Buffer.from(pemKey, 'base64').toString('utf8');
           }
 
-          const pubKeyObj = crypto.createPublicKey(pemKey);
+          // Convert PKCS#1 (RSA PUBLIC KEY) to PKCS#8 format if needed
+          const pubKeyObj = crypto.createPublicKey({
+            key: pemKey,
+            format: 'pem',
+            type: pemKey.includes('RSA PUBLIC KEY') ? 'pkcs1' : 'spki',
+          });
           const isValid = crypto.verify('sha256', Buffer.from(body), pubKeyObj, Buffer.from(signature, 'base64'));
           if (!isValid) {
             console.warn('[Changelly] Invalid webhook signature — rejecting');
