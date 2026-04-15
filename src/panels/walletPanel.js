@@ -554,7 +554,6 @@ async function _executeUsdcWithdraw(interaction, user, amountUsdc, address, lang
       freshWallet.address,
       address,
       amountSmallest.toString(),
-      freshWallet.account_ref, // owner account name for Smart Account
     );
 
     const newAvailable = (freshAvailable - amountSmallest).toString();

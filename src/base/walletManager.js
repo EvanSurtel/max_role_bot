@@ -51,21 +51,28 @@ function getCdpClient() {
  */
 async function generateWallet(userId) {
   const cdp = getCdpClient();
-  const ownerName = `user-${userId || Date.now()}`;
+  const accountName = `user-${userId || Date.now()}`;
 
-  // Create the EOA owner account (holds the signer key)
-  const owner = await cdp.evm.getOrCreateAccount({ name: ownerName });
+  // CDP EOA account — keys managed server-side.
+  // CDP Smart Accounts (ERC-4337) have a known sendUserOperation signature
+  // bug, so we use regular EOA accounts with auto-funded gas.
+  // Gas on Base is ~$0.01/tx — negligible cost.
+  const account = await cdp.evm.getOrCreateAccount({ name: accountName });
 
-  // Create the Smart Account (ERC-4337) — gasless via Paymaster.
-  // getOrCreateSmartAccount is idempotent: same name+owner → same address.
-  const smartAccount = await cdp.evm.getOrCreateSmartAccount({
-    name: `smart-${ownerName}`,
-    owner,
-  });
+  // Auto-fund with ETH for gas on testnet
+  const network = (process.env.BASE_NETWORK || 'mainnet').toLowerCase();
+  if (network === 'sepolia') {
+    try {
+      await cdp.evm.requestFaucet({ address: account.address, network: 'base-sepolia', token: 'eth' });
+      console.log(`[Wallet] Faucet ETH sent to ${account.address}`);
+    } catch (err) {
+      console.warn(`[Wallet] Faucet failed (may already have ETH): ${err.message}`);
+    }
+  }
 
   return {
-    address: smartAccount.address,
-    accountRef: ownerName, // store owner account name for signing
+    address: account.address,
+    accountRef: accountName,
     iv: '',
     tag: '',
     salt: '',

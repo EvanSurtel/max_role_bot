@@ -61,15 +61,19 @@ async function main() {
     process.exit(1);
   }
 
-  // ─── Step 1: Create two test Smart Accounts ─────────────
-  console.log('\n[1] Creating test Smart Accounts...');
-  const owner1 = await cdp.evm.getOrCreateAccount({ name: 'test-player-1' });
-  const smart1 = await cdp.evm.getOrCreateSmartAccount({ name: 'smart-test-player-1', owner: owner1 });
+  // ─── Step 1: Create two test EOA accounts ────────────────
+  console.log('\n[1] Creating test EOA accounts...');
+  const smart1 = await cdp.evm.getOrCreateAccount({ name: 'test-player-1' });
   console.log(`  Player 1: ${smart1.address}`);
 
-  const owner2 = await cdp.evm.getOrCreateAccount({ name: 'test-player-2' });
-  const smart2 = await cdp.evm.getOrCreateSmartAccount({ name: 'smart-test-player-2', owner: owner2 });
+  const smart2 = await cdp.evm.getOrCreateAccount({ name: 'test-player-2' });
   console.log(`  Player 2: ${smart2.address}`);
+
+  // Fund both with ETH for gas
+  try { await cdp.evm.requestFaucet({ address: smart1.address, network: 'base-sepolia', token: 'eth' }); } catch {}
+  try { await cdp.evm.requestFaucet({ address: smart2.address, network: 'base-sepolia', token: 'eth' }); } catch {}
+  console.log('  Faucet ETH sent, waiting for confirmation...');
+  await new Promise(r => setTimeout(r, 5000));
 
   // ─── Step 2: Fund both with test USDC ───────────────────
   console.log('\n[2] Funding test wallets with USDC...');
@@ -92,25 +96,22 @@ async function main() {
   console.log(`  Player 2 balance: ${(Number(bal2) / 1e6).toFixed(2)} USDC ${bal2 >= 2000000n ? '✅' : '❌'}`);
 
   // ─── Step 3: Approve escrow for both players ────────────
-  console.log('\n[3] Approving escrow contract (gasless via Smart Account)...');
+  console.log('\n[3] Approving escrow contract...');
   const approveData = new ethers.Interface(usdcAbi).encodeFunctionData('approve', [ESCROW_ADDR, ethers.MaxUint256]);
 
-  const ap1 = await cdp.evm.sendUserOperation({
-    smartAccount: smart1,
-    network: 'base-sepolia',
-    calls: [{ to: USDC_ADDR, value: 0n, data: approveData }],
+  const ap1 = await cdp.evm.sendTransaction({
+    address: smart1.address, network: 'base-sepolia',
+    transaction: { to: USDC_ADDR, value: 0n, data: approveData },
   });
-  console.log(`  Player 1 approved: ${ap1.userOpHash}`);
+  console.log(`  Player 1 approved: ${ap1.transactionHash}`);
 
-  const ap2 = await cdp.evm.sendUserOperation({
-    smartAccount: smart2,
-    network: 'base-sepolia',
-    calls: [{ to: USDC_ADDR, value: 0n, data: approveData }],
+  const ap2 = await cdp.evm.sendTransaction({
+    address: smart2.address, network: 'base-sepolia',
+    transaction: { to: USDC_ADDR, value: 0n, data: approveData },
   });
-  console.log(`  Player 2 approved: ${ap2.userOpHash}`);
+  console.log(`  Player 2 approved: ${ap2.transactionHash}`);
 
-  // Wait a bit for user ops to land
-  await new Promise(r => setTimeout(r, 5000));
+  await new Promise(r => setTimeout(r, 3000));
 
   const allow1 = await usdc.allowance(smart1.address, ESCROW_ADDR);
   const allow2 = await usdc.allowance(smart2.address, ESCROW_ADDR);

@@ -1,14 +1,11 @@
-// Base transaction service — CDP Smart Account UserOperations.
+// Base transaction service — CDP EOA accounts via sendTransaction.
 //
-// All user transactions go through sendUserOperation which is
-// gasless on Base Sepolia by default and uses the Coinbase Paymaster
-// on mainnet. Users never need ETH.
-//
-// Owner/admin transactions use regular sendTransaction (the owner
-// account has ETH from the faucet for contract calls).
+// CDP Smart Accounts (sendUserOperation) have a known signature bug.
+// All transactions use cdp.evm.sendTransaction with EOA accounts.
+// Gas on Base is ~$0.01/tx — auto-funded via faucet on testnet.
 
 const { ethers } = require('ethers');
-const { getCdpClient, USDC_CONTRACT, ERC20_ABI } = require('./walletManager');
+const { getCdpClient, USDC_CONTRACT } = require('./walletManager');
 const { getNetwork } = require('./connection');
 
 function getCdpNetwork() {
@@ -16,96 +13,26 @@ function getCdpNetwork() {
 }
 
 /**
- * Get the Smart Account object for a user address.
- * Needs the owner EOA account to reconstruct the Smart Account.
+ * Send a transaction with nonce retry (handles rapid sequential txs).
  */
-async function _getSmartAccount(cdp, ownerName) {
-  const owner = await cdp.evm.getOrCreateAccount({ name: ownerName });
-  const smartAccount = await cdp.evm.getOrCreateSmartAccount({
-    name: `smart-${ownerName}`,
-    owner,
-  });
-  return smartAccount;
-}
-
-/**
- * Transfer USDC from a user's Smart Account — gasless via Paymaster.
- */
-async function transferUsdc(fromAddress, toAddress, amountSmallest, ownerAccountName) {
+async function _sendTx(address, to, data, value = 0n) {
   const cdp = getCdpClient();
-  const cdpNetwork = getCdpNetwork();
+  const network = getCdpNetwork();
 
-  const iface = new ethers.Interface(['function transfer(address to, uint256 amount) returns (bool)']);
-  const data = iface.encodeFunctionData('transfer', [toAddress, BigInt(amountSmallest)]);
-
-  // If we have the owner account name, use Smart Account (gasless)
-  if (ownerAccountName) {
-    const smartAccount = await _getSmartAccount(cdp, ownerAccountName);
-    const result = await cdp.evm.sendUserOperation({
-      smartAccount,
-      network: cdpNetwork,
-      calls: [{ to: USDC_CONTRACT, value: 0n, data }],
-    });
-    console.log(`[Base] USDC transfer ${amountSmallest} → ${toAddress} (gasless): ${result.userOpHash}`);
-    return { hash: result.userOpHash, signature: result.userOpHash };
-  }
-
-  // Fallback: regular sendTransaction (for owner/admin — needs ETH)
-  const { transactionHash } = await cdp.evm.sendTransaction({
-    address: fromAddress,
-    network: cdpNetwork,
-    transaction: { to: USDC_CONTRACT, value: 0n, data },
-  });
-  console.log(`[Base] USDC transfer ${amountSmallest} → ${toAddress}: ${transactionHash}`);
-  return { hash: transactionHash, signature: transactionHash };
-}
-
-/**
- * Transfer ETH — admin only (users never send ETH).
- */
-async function transferEth(fromAddress, toAddress, amountWei) {
-  const cdp = getCdpClient();
-  const cdpNetwork = getCdpNetwork();
-
-  const { transactionHash } = await cdp.evm.sendTransaction({
-    address: fromAddress,
-    network: cdpNetwork,
-    transaction: { to: toAddress, value: BigInt(amountWei) },
-  });
-
-  console.log(`[Base] ETH transfer ${amountWei} wei → ${toAddress}: ${transactionHash}`);
-  return { hash: transactionHash, signature: transactionHash };
-}
-
-/**
- * Invoke a smart contract — uses regular sendTransaction (owner account).
- */
-async function invokeContract(fromAddress, contractAddress, method, args, abi) {
-  const cdp = getCdpClient();
-  const cdpNetwork = getCdpNetwork();
-
-  const abiEntry = abi.find(f => f.name === method);
-  if (!abiEntry) throw new Error(`Method '${method}' not found in ABI`);
-  const orderedArgs = abiEntry.inputs.map(i => args[i.name]);
-
-  const iface = new ethers.Interface(abi);
-  const data = iface.encodeFunctionData(method, orderedArgs);
-
-  // Retry once on "nonce too low" — transient error from rapid sequential txs
   let lastErr;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const { transactionHash } = await cdp.evm.sendTransaction({
-        address: fromAddress,
-        network: cdpNetwork,
-        transaction: { to: contractAddress, value: 0n, data },
+        address,
+        network,
+        transaction: { to, value, data: data || '0x' },
       });
-      console.log(`[Base] Contract call ${method} on ${contractAddress}: ${transactionHash}`);
-      return { hash: transactionHash, signature: transactionHash };
+      return transactionHash;
     } catch (err) {
       lastErr = err;
-      if (err.errorMessage?.includes('Nonce too low') || err.message?.includes('Nonce too low')) {
-        console.warn(`[Base] Nonce too low on ${method}, retrying (attempt ${attempt + 1}/3)...`);
+      const msg = err.errorMessage || err.message || '';
+      if (msg.includes('Nonce too low') || msg.includes('nonce')) {
+        console.warn(`[Base] Nonce issue, retrying (${attempt + 1}/3)...`);
         await new Promise(r => setTimeout(r, 2000));
         continue;
       }
@@ -115,41 +42,40 @@ async function invokeContract(fromAddress, contractAddress, method, args, abi) {
   throw lastErr;
 }
 
-/**
- * Approve escrow contract to spend USDC — gasless via Smart Account.
- */
-async function approveUsdc(fromAddress, spenderAddress, ownerAccountName) {
-  const cdp = getCdpClient();
-  const cdpNetwork = getCdpNetwork();
+async function transferUsdc(fromAddress, toAddress, amountSmallest) {
+  const iface = new ethers.Interface(['function transfer(address to, uint256 amount) returns (bool)']);
+  const data = iface.encodeFunctionData('transfer', [toAddress, BigInt(amountSmallest)]);
+  const hash = await _sendTx(fromAddress, USDC_CONTRACT, data);
+  console.log(`[Base] USDC transfer ${amountSmallest} → ${toAddress}: ${hash}`);
+  return { hash, signature: hash };
+}
 
+async function transferEth(fromAddress, toAddress, amountWei) {
+  const hash = await _sendTx(fromAddress, toAddress, '0x', BigInt(amountWei));
+  console.log(`[Base] ETH transfer ${amountWei} wei → ${toAddress}: ${hash}`);
+  return { hash, signature: hash };
+}
+
+async function invokeContract(fromAddress, contractAddress, method, args, abi) {
+  const abiEntry = abi.find(f => f.name === method);
+  if (!abiEntry) throw new Error(`Method '${method}' not found in ABI`);
+  const orderedArgs = abiEntry.inputs.map(i => args[i.name]);
+  const iface = new ethers.Interface(abi);
+  const data = iface.encodeFunctionData(method, orderedArgs);
+  const hash = await _sendTx(fromAddress, contractAddress, data);
+  console.log(`[Base] Contract call ${method} on ${contractAddress}: ${hash}`);
+  return { hash, signature: hash };
+}
+
+async function approveUsdc(fromAddress, spenderAddress) {
   const iface = new ethers.Interface(['function approve(address spender, uint256 value) returns (bool)']);
   const data = iface.encodeFunctionData('approve', [spenderAddress, ethers.MaxUint256]);
-
-  if (ownerAccountName) {
-    const smartAccount = await _getSmartAccount(cdp, ownerAccountName);
-    const result = await cdp.evm.sendUserOperation({
-      smartAccount,
-      network: cdpNetwork,
-      calls: [{ to: USDC_CONTRACT, value: 0n, data }],
-    });
-    console.log(`[Base] USDC approve(${spenderAddress}, MAX) gasless: ${result.userOpHash}`);
-    return { hash: result.userOpHash, signature: result.userOpHash };
-  }
-
-  const { transactionHash } = await cdp.evm.sendTransaction({
-    address: fromAddress,
-    network: cdpNetwork,
-    transaction: { to: USDC_CONTRACT, value: 0n, data },
-  });
-  console.log(`[Base] USDC approve(${spenderAddress}, MAX): ${transactionHash}`);
-  return { hash: transactionHash, signature: transactionHash };
+  const hash = await _sendTx(fromAddress, USDC_CONTRACT, data);
+  console.log(`[Base] USDC approve(${spenderAddress}, MAX): ${hash}`);
+  return { hash, signature: hash };
 }
 
 const transferSol = transferEth;
-
-function getHotWalletSigner() {
-  throw new Error('getHotWalletSigner() is deprecated. Use CDP SDK instead.');
-}
 
 module.exports = {
   transferUsdc,
@@ -157,5 +83,4 @@ module.exports = {
   transferSol,
   invokeContract,
   approveUsdc,
-  getHotWalletSigner,
 };
