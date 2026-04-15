@@ -313,6 +313,7 @@ module.exports = {
     failed_hold: '資金のロックに失敗しました。もう一度お試しください。',
     invalid_reference: '無効なチャレンジ参照です。',
     challenge_no_longer_exists: 'このチャレンジはもう存在しません。',
+    decline_creator_dm: 'あなたの{type} #{num}は{player}がチーム招待を辞退したためキャンセルされました。',
   },
 
   match_result: {
@@ -450,7 +451,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 言語',
-    description: '言語を選んでください。ボットからあなたに送られる**すべて**でこの言語が使われます — ウォレット、マッチチャンネル、通知、エラー、そのすべてです。\n\nこれが言語のメインスイッチです。ここで変更すると、ボット内のどこでもあなたの言語が変わります。',
+    description: '言語を選んでください:',
     footer: '言語設定はボット全体で保存されます',
     placeholder: '🌐 言語を選択',
   },

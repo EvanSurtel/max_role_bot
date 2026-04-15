@@ -38,14 +38,16 @@ async function notifyTeammates(guild, challenge) {
 
       const discordId = user.discord_id;
 
-      // Build challenge details embed in the recipient's language
-      const lang = getLang(discordId);
+      // Build challenge details embed in the CREATOR's language.
+      // If a creator makes a challenge in Spanish, their teammates are
+      // likely Spanish-speaking too, so use the creator's preference.
+      const creatorUser = userRepo.findById(challenge.creator_user_id);
+      const lang = creatorUser ? getLang(creatorUser.discord_id) : getLang(discordId);
       const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
       const modeInfo = GAME_MODES[challenge.game_modes];
       const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
 
-      const creator = userRepo.findById(challenge.creator_user_id);
-      const creatorMention = creator ? `<@${creator.discord_id}>` : 'Unknown';
+      const creatorMention = creatorUser ? `<@${creatorUser.discord_id}>` : 'Unknown';
       const typeLabel = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
       const displayNum = challenge.display_number || challenge.id;
 
@@ -129,7 +131,7 @@ async function notifyTeammates(guild, challenge) {
           challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.DECLINED);
           console.log(`[ChallengeService] Teammate ${player.user_id} timed out for challenge ${challenge.id}`);
 
-          const timeoutText = t('notify_team.timeout_msg', getLang(discordId));
+          const timeoutText = t('notify_team.timeout_msg', lang);
 
           if (fallbackChannel) {
             try { await fallbackChannel.send(timeoutText); } catch { /* channel gone */ }

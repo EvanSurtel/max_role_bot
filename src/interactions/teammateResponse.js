@@ -276,14 +276,22 @@ async function handleDecline(interaction, challenge, player, user) {
     content: t('teammate.decline_msg', lang, { type: dtl, type_lower: dtl.toLowerCase(), num: ddn }),
   });
 
-  // Notify the creator
+  // Notify the creator in their saved language
   try {
     const creator = userRepo.findById(challenge.creator_user_id);
     if (creator) {
       const creatorDiscord = await interaction.client.users.fetch(creator.discord_id);
       if (creatorDiscord) {
+        const { getLang } = require('../locales/i18n');
+        const creatorLang = getLang(creator.discord_id);
+        const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
+        const creatorTypeLabel = isCashMatch ? t('challenge_create.type_cash_match', creatorLang) : t('challenge_create.type_xp_match', creatorLang);
         await creatorDiscord.send(
-          `Your ${challenge.type === CHALLENGE_TYPE.CASH_MATCH ? 'Cash Match' : 'XP Match'} #${challenge.display_number || challenge.id} has been cancelled because <@${user.discord_id}> declined the team invitation.`,
+          t('teammate.decline_creator_dm', creatorLang, {
+            type: creatorTypeLabel,
+            num: challenge.display_number || challenge.id,
+            player: `<@${user.discord_id}>`,
+          }),
         ).catch(() => {
           // DMs may be disabled; this is non-critical
           console.log(`[TeammateResponse] Could not DM creator ${creator.discord_id} about decline`);

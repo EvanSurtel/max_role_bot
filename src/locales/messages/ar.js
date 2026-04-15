@@ -313,6 +313,7 @@ module.exports = {
     failed_hold: 'فشل في حجز أموالك. يرجى المحاولة مرة أخرى.',
     invalid_reference: 'مرجع تحدي غير صالح.',
     challenge_no_longer_exists: 'هذا التحدي لم يعد موجوداً.',
+    decline_creator_dm: 'تم إلغاء {type} #{num} الخاص بك لأن {player} رفض دعوة الفريق.',
   },
 
   match_result: {
@@ -450,7 +451,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 اللغة',
-    description: 'اختر لغتك. البوت راح يستخدم هذي اللغة في **كل شي** يرسله لك — محفظتك، قنوات المباريات، الإشعارات، الأخطاء، كل شي.\n\nهذا المفتاح الرئيسي للغة. لما تغيّره هنا تتغير اللغة في كل مكان في البوت بالنسبة لك.',
+    description: 'اختر لغتك:',
     footer: 'تفضيل اللغة محفوظ في البوت كله',
     placeholder: '🌐 اختر لغتك',
   },

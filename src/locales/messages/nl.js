@@ -314,6 +314,7 @@ module.exports = {
     failed_hold: 'Kon je fondsen niet vergrendelen. Probeer het opnieuw.',
     invalid_reference: 'Ongeldige uitdaging referentie.',
     challenge_no_longer_exists: 'Deze uitdaging bestaat niet meer.',
+    decline_creator_dm: 'Je {type} #{num} is geannuleerd omdat {player} de teamuitnodiging heeft afgewezen.',
   },
 
   match_result: {
@@ -451,7 +452,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Taal',
-    description: 'Kies je taal. De bot gebruikt deze taal voor **alles** wat hij naar je stuurt — je wallet, match channels, meldingen, errors, echt alles.\n\nDit is de hoofdschakelaar voor taal. Als je hem hier verandert, verandert de taal overal in de bot voor jou.',
+    description: 'Kies je taal:',
     footer: 'Je taalvoorkeur wordt opgeslagen in de hele bot',
     placeholder: '🌐 Kies je taal',
   },

@@ -313,6 +313,7 @@ module.exports = {
     failed_hold: 'ไม่สามารถล็อกเงินของคุณได้ กรุณาลองใหม่',
     invalid_reference: 'การอ้างอิง challenge ไม่ถูกต้อง',
     challenge_no_longer_exists: 'Challenge นี้ไม่มีอยู่แล้ว',
+    decline_creator_dm: '{type} #{num} ของคุณถูกยกเลิกเนื่องจาก {player} ปฏิเสธคำเชิญเข้าทีม',
   },
 
   match_result: {
@@ -450,7 +451,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 ภาษา',
-    description: 'เลือกภาษาของคุณ บอทจะใช้ภาษานี้กับ**ทุกอย่าง**ที่ส่งถึงคุณ — wallet ของคุณ, ช่อง match, การแจ้งเตือน, error, ทุกอย่างเลย\n\nนี่คือสวิตช์ภาษาหลัก เปลี่ยนที่นี่แล้วภาษาในบอททุกที่ก็จะเปลี่ยนตามให้คุณ',
+    description: 'เลือกภาษาของคุณ:',
     footer: 'การตั้งค่าภาษาของคุณจะถูกบันทึกไว้ทั่วทั้งบอท',
     placeholder: '🌐 เลือกภาษาของคุณ',
   },

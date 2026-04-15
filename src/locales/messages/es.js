@@ -313,6 +313,7 @@ module.exports = {
     failed_hold: 'No se pudieron bloquear tus fondos. Inténtalo de nuevo.',
     invalid_reference: 'Referencia de reto inválida.',
     challenge_no_longer_exists: 'Este reto ya no existe.',
+    decline_creator_dm: 'Tu {type} #{num} ha sido cancelado porque {player} rechazó la invitación al equipo.',
   },
 
   match_result: {
@@ -450,7 +451,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Idioma',
-    description: 'Elige tu idioma. El bot usará este idioma para **todo** lo que te envíe — tu billetera, los canales de partida, las notificaciones, los errores, todo.\n\nEste es el interruptor maestro de idioma. Cambiarlo aquí cambia el idioma en todo el bot para ti.',
+    description: 'Elige tu idioma:',
     footer: 'Tu preferencia de idioma se guarda en todo el bot',
     placeholder: '🌐 Elige tu idioma',
   },

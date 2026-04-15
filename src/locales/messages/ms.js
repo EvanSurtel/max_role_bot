@@ -313,6 +313,7 @@ module.exports = {
     failed_hold: 'Gagal kunci dana kamu. Sila cuba lagi.',
     invalid_reference: 'Rujukan challenge tidak sah.',
     challenge_no_longer_exists: 'Challenge ini tiada lagi.',
+    decline_creator_dm: '{type} #{num} kamu telah dibatalkan kerana {player} menolak jemputan pasukan.',
   },
 
   match_result: {
@@ -450,7 +451,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Bahasa',
-    description: 'Pilih bahasa kamu. Bot akan guna bahasa ini untuk **semua** yang dihantar kepada kamu — wallet kamu, channel match, notifikasi, error, semuanya.\n\nIni master switch bahasa. Tukar kat sini bermakna bahasa kat seluruh bot akan berubah untuk kamu.',
+    description: 'Pilih bahasa kamu:',
     footer: 'Pilihan bahasa kamu disimpan di seluruh bot',
     placeholder: '🌐 Pilih bahasa kamu',
   },

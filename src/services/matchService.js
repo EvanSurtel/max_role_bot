@@ -11,6 +11,7 @@ const { calculateXpMatchRewards, calculateWagerXpRewards } = require('../utils/x
 const { getCurrentSeason } = require('../panels/leaderboardPanel');
 const neatqueueService = require('./neatqueueService');
 const { t, getLang } = require('../locales/i18n');
+const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
 
 // For shared match channels, pick the language of the first captain found.
 // Falls back to English if no captain or no preference saved.
@@ -255,9 +256,10 @@ async function createMatchChannels(client, challenge) {
       .setStyle(ButtonStyle.Secondary),
   );
 
+  const voteLangRow = buildLanguageDropdownRow(sharedLang);
   await voteChannel.send({
     embeds: [reportEmbed],
-    components: [reportRow],
+    components: [reportRow, voteLangRow],
   });
 
   // Build match info for welcome messages
@@ -272,6 +274,7 @@ async function createMatchChannels(client, challenge) {
   const prizeTextShared = isCashMatch ? t('match_channel.pot_label', sharedLang, { amount: prizeAmountFormatted }) : '';
 
   // Send welcome messages in team channels (each in their own captain's language)
+  const team1LangRow = buildLanguageDropdownRow(team1CaptainLang);
   await team1Text.send({
     content: t('match_channel.team_welcome', team1CaptainLang, {
       team: 1,
@@ -279,8 +282,10 @@ async function createMatchChannels(client, challenge) {
       num: challenge.display_number || challenge.id,
       pot_text: prizeText1,
     }),
+    components: [team1LangRow],
   });
 
+  const team2LangRow = buildLanguageDropdownRow(team2CaptainLang);
   await team2Text.send({
     content: t('match_channel.team_welcome', team2CaptainLang, {
       team: 2,
@@ -288,6 +293,7 @@ async function createMatchChannels(client, challenge) {
       num: challenge.display_number || challenge.id,
       pot_text: prizeText2,
     }),
+    components: [team2LangRow],
   });
 
   // Generate random map picks for the series
@@ -307,6 +313,7 @@ async function createMatchChannels(client, challenge) {
   });
 
   // Shared chat welcome — uses first captain's language
+  const sharedLangRow = buildLanguageDropdownRow(sharedLang);
   await sharedText.send({
     content: [
       t('match_channel.shared_match_header', sharedLang, {
@@ -322,6 +329,7 @@ async function createMatchChannels(client, challenge) {
       '',
       t('match_channel.shared_good_luck', sharedLang),
     ].join('\n'),
+    components: [sharedLangRow],
   });
 
   // Update challenge status to in_progress
@@ -686,6 +694,7 @@ async function resolveMatch(client, matchId, winningTeam) {
           ? t('match_channel.result_pot_distributed', sharedLang, { amount: prizeAmount })
           : '';
 
+        const resultLangRow = buildLanguageDropdownRow(sharedLang);
         await sharedChannel.send({
           content: [
             t('match_channel.result_complete', sharedLang, { matchId }),
@@ -695,6 +704,7 @@ async function resolveMatch(client, matchId, winningTeam) {
             '',
             t('match_channel.result_cleanup', sharedLang),
           ].join('\n'),
+          components: [resultLangRow],
         });
       }
     } catch (err) {

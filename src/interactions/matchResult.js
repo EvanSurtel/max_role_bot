@@ -14,6 +14,7 @@ const userRepo = require('../database/repositories/userRepo');
 const matchService = require('../services/matchService');
 const { MATCH_STATUS, CHALLENGE_STATUS, PLAYER_ROLE } = require('../config/constants');
 const { t, langFor } = require('../locales/i18n');
+const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
 
 /**
  * Check if a member has dispute resolution permissions (ads, CEO,
@@ -375,8 +376,10 @@ async function handleReport(interaction, outcome) {
           const captainPlayer = allPlayersForLang.find(p => p.role === PLAYER_ROLE.CAPTAIN);
           const captainUser = captainPlayer ? userRepo.findById(captainPlayer.user_id) : null;
           const sharedLang = captainUser ? langFor({ user: { id: captainUser.discord_id }, locale: '' }) : 'en';
+          const agreeLangRow = buildLanguageDropdownRow(sharedLang);
           await voteChannel.send({
             content: t('match_channel.captains_agree', sharedLang, { team: winningTeam }),
+            components: [agreeLangRow],
           });
         }
         await matchService.resolveMatch(interaction.client, matchId, winningTeam);
@@ -393,8 +396,10 @@ async function handleReport(interaction, outcome) {
         const captainPlayer = allPlayersForLang.find(p => p.role === PLAYER_ROLE.CAPTAIN);
         const captainUser = captainPlayer ? userRepo.findById(captainPlayer.user_id) : null;
         const sharedLang = captainUser ? langFor({ user: { id: captainUser.discord_id }, locale: '' }) : 'en';
+        const disagreeLangRow = buildLanguageDropdownRow(sharedLang);
         await voteChannel.send({
           content: t('match_channel.captains_disagree', sharedLang, { t1: c1Vote, t2: c2Vote }),
+          components: [disagreeLangRow],
         });
       }
     }
@@ -460,6 +465,7 @@ async function triggerDispute(client, matchId) {
     if (adsRoleId) pings.push(`<@&${adsRoleId}>`);
     const staffPing = pings.length > 0 ? pings.join(' ') : 'Staff';
 
+    const disputeLangRow = buildLanguageDropdownRow(sharedLang);
     await sharedChannel.send({
       content: [
         t('match_channel.match_disputed_title', sharedLang),
@@ -470,6 +476,7 @@ async function triggerDispute(client, matchId) {
         '',
         t('match_channel.staff_review', sharedLang, { staff: staffPing }),
       ].join('\n'),
+      components: [disputeLangRow],
     });
 
     const adminRow = new ActionRowBuilder().addComponents(
@@ -478,7 +485,8 @@ async function triggerDispute(client, matchId) {
       new ButtonBuilder().setCustomId(`admin_resolve_nowinner_${matchId}`).setLabel(t('admin_resolve.btn_no_winner', sharedLang)).setStyle(ButtonStyle.Secondary),
     );
 
-    await sharedChannel.send({ content: t('admin_resolve.staff_panel_title', sharedLang), components: [adminRow] });
+    const adminLangRow = buildLanguageDropdownRow(sharedLang);
+    await sharedChannel.send({ content: t('admin_resolve.staff_panel_title', sharedLang), components: [adminRow, adminLangRow] });
   }
 
   const { postTransaction: ptx } = require('../utils/transactionFeed');

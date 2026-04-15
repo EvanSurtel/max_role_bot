@@ -314,6 +314,7 @@ module.exports = {
     failed_hold: 'Fonların kilitlenemedi. Lütfen tekrar dene.',
     invalid_reference: 'Geçersiz meydan okuma referansı.',
     challenge_no_longer_exists: 'Bu meydan okuma artık mevcut değil.',
+    decline_creator_dm: '{type} #{num} iptal edildi çünkü {player} takım davetini reddetti.',
   },
 
   match_result: {
@@ -451,7 +452,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Dil',
-    description: 'Dilini seç. Bot sana gönderdiği **her şey** için bu dili kullanacak — cüzdanın, maç kanalları, bildirimler, hatalar, hepsi.\n\nBu ana dil ayarı. Burada değiştirince botun her yerindeki dil senin için değişir.',
+    description: 'Dilini seç:',
     footer: 'Dil tercihin botun tamamında kaydediliyor',
     placeholder: '🌐 Dilini seç',
   },

@@ -313,6 +313,7 @@ module.exports = {
     failed_hold: 'Falha ao travar seus fundos. Tente novamente.',
     invalid_reference: 'Referência de desafio inválida.',
     challenge_no_longer_exists: 'Este desafio não existe mais.',
+    decline_creator_dm: 'Seu {type} #{num} foi cancelado porque {player} recusou o convite pro time.',
   },
 
   match_result: {
@@ -450,7 +451,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Idioma',
-    description: 'Escolha seu idioma. O bot vai usar esse idioma para **tudo** que enviar para você — sua carteira, canais de partida, notificações, erros, tudo.\n\nEsse é o interruptor principal de idioma. Mudar aqui muda o idioma em todo o bot pra você.',
+    description: 'Escolha seu idioma:',
     footer: 'Sua preferência de idioma fica salva em todo o bot',
     placeholder: '🌐 Escolha seu idioma',
   },

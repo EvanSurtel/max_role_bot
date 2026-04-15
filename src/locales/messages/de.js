@@ -313,6 +313,7 @@ module.exports = {
     failed_hold: 'Konnte deine Mittel nicht sperren. Versuch es nochmal.',
     invalid_reference: 'Ungültige Herausforderungsreferenz.',
     challenge_no_longer_exists: 'Diese Herausforderung existiert nicht mehr.',
+    decline_creator_dm: 'Dein {type} #{num} wurde abgebrochen, weil {player} die Team-Einladung abgelehnt hat.',
   },
 
   match_result: {
@@ -450,7 +451,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Sprache',
-    description: 'Wähl deine Sprache. Der Bot nutzt diese Sprache für **alles**, was er dir schickt — dein Wallet, Match-Channels, Benachrichtigungen, Fehler, einfach alles.\n\nDas ist der Haupt-Sprachschalter. Wenn du ihn hier änderst, ändert sich die Sprache überall im Bot für dich.',
+    description: 'Wähl deine Sprache:',
     footer: 'Deine Spracheinstellung wird im gesamten Bot gespeichert',
     placeholder: '🌐 Wähl deine Sprache',
   },

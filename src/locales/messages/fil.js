@@ -313,6 +313,7 @@ module.exports = {
     failed_hold: 'Nabigong i-lock ang funds mo. Pakisubukan muli.',
     invalid_reference: 'Invalid na challenge reference.',
     challenge_no_longer_exists: 'Wala na ang challenge na ito.',
+    decline_creator_dm: 'Na-cancel ang {type} #{num} mo dahil tinanggihan ni {player} ang team invitation.',
   },
 
   match_result: {
@@ -450,7 +451,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Language',
-    description: 'Piliin ang language mo. Gagamitin ng bot ang language na ito para sa **lahat** ng ipapadala sa\'yo — ang wallet mo, match channels, notifications, errors, lahat na.\n\nIto ang master language switch. Kapag pinalitan mo dito, magbabago ang language sa buong bot para sa\'yo.',
+    description: 'Piliin ang language mo:',
     footer: 'Naka-save ang language preference mo sa buong bot',
     placeholder: '🌐 Piliin ang language mo',
   },

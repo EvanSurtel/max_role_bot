@@ -314,6 +314,7 @@ module.exports = {
     failed_hold: 'Impossibile bloccare i tuoi fondi. Riprova.',
     invalid_reference: 'Riferimento sfida non valido.',
     challenge_no_longer_exists: 'Questa sfida non esiste più.',
+    decline_creator_dm: 'Il tuo {type} #{num} è stato annullato perché {player} ha rifiutato l\'invito al team.',
   },
 
   match_result: {
@@ -451,7 +452,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Lingua',
-    description: 'Scegli la tua lingua. Il bot userà questa lingua per **tutto** quello che ti manda — il tuo wallet, i canali di match, le notifiche, gli errori, proprio tutto.\n\nQuesto è l\'interruttore principale della lingua. Cambiandola qui cambi la lingua ovunque nel bot per te.',
+    description: 'Scegli la tua lingua:',
     footer: 'La tua preferenza di lingua è salvata in tutto il bot',
     placeholder: '🌐 Scegli la tua lingua',
   },

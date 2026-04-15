@@ -313,6 +313,7 @@ module.exports = {
     failed_hold: 'Không khóa được tiền của bạn. Vui lòng thử lại.',
     invalid_reference: 'Tham chiếu challenge không hợp lệ.',
     challenge_no_longer_exists: 'Challenge này không còn tồn tại.',
+    decline_creator_dm: '{type} #{num} của bạn đã bị hủy vì {player} từ chối lời mời vào đội.',
   },
 
   match_result: {
@@ -450,7 +451,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Ngôn ngữ',
-    description: 'Chọn ngôn ngữ của bạn. Bot sẽ dùng ngôn ngữ này cho **mọi thứ** gửi tới bạn — ví của bạn, kênh match, thông báo, lỗi, tất cả luôn.\n\nĐây là công tắc ngôn ngữ chính. Đổi ở đây là đổi ngôn ngữ ở khắp nơi trong bot cho bạn.',
+    description: 'Chọn ngôn ngữ của bạn:',
     footer: 'Lựa chọn ngôn ngữ của bạn được lưu trên toàn bộ bot',
     placeholder: '🌐 Chọn ngôn ngữ của bạn',
   },

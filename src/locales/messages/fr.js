@@ -313,6 +313,7 @@ module.exports = {
     failed_hold: 'Impossible de bloquer vos fonds. Réessayez.',
     invalid_reference: 'Référence de défi invalide.',
     challenge_no_longer_exists: 'Ce défi n\'existe plus.',
+    decline_creator_dm: 'Votre {type} #{num} a été annulé parce que {player} a refusé l\'invitation.',
   },
 
   match_result: {
@@ -450,7 +451,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Langue',
-    description: 'Choisissez votre langue. Le bot utilisera cette langue pour **tout** ce qu\'il vous envoie — votre portefeuille, les salons de match, les notifications, les erreurs, absolument tout.\n\nC\'est le réglage principal de langue. Le changer ici change la langue partout dans le bot pour vous.',
+    description: 'Choisissez votre langue :',
     footer: 'Votre préférence de langue est enregistrée dans tout le bot',
     placeholder: '🌐 Choisissez votre langue',
   },

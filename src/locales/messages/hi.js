@@ -313,6 +313,7 @@ module.exports = {
     failed_hold: 'तुम्हारे funds hold नहीं हो पाए। कृपया पुनः प्रयास करो।',
     invalid_reference: 'अमान्य challenge reference।',
     challenge_no_longer_exists: 'यह challenge अब मौजूद नहीं है।',
+    decline_creator_dm: 'तुम्हारा {type} #{num} cancel हो गया क्योंकि {player} ने team invitation decline कर दिया।',
   },
 
   match_result: {
@@ -450,7 +451,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Language',
-    description: 'अपनी language चुनो। Bot तुम्हें जो कुछ भी भेजेगा उस **सब चीज़** के लिए यही language use करेगा — तुम्हारा wallet, match channels, notifications, errors, सब कुछ।\n\nयह master language switch है। यहाँ change करोगे तो bot में हर जगह तुम्हारे लिए language बदल जाएगी।',
+    description: 'अपनी language चुनो:',
     footer: 'तुम्हारी language preference पूरे bot में save रहती है',
     placeholder: '🌐 अपनी language चुनो',
   },

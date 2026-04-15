@@ -313,6 +313,7 @@ module.exports = {
     failed_hold: '锁定你的资金失败。请重试。',
     invalid_reference: '无效的挑战引用。',
     challenge_no_longer_exists: '此挑战不再存在。',
+    decline_creator_dm: '你的{type} #{num}已被取消，因为{player}拒绝了队伍邀请。',
   },
 
   match_result: {
@@ -450,7 +451,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 语言',
-    description: '选择你的语言。机器人发送给你的**所有内容**都会使用这个语言——你的钱包、比赛频道、通知、错误提示,全部都是。\n\n这是语言总开关。在这里修改,机器人里所有地方的语言都会跟着变。',
+    description: '选择你的语言:',
     footer: '你的语言偏好会在整个机器人中保存',
     placeholder: '🌐 选择你的语言',
   },

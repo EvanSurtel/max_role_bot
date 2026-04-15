@@ -314,6 +314,7 @@ module.exports = {
     failed_hold: 'Nie udało się zablokować twoich środków. Spróbuj ponownie.',
     invalid_reference: 'Nieprawidłowe odniesienie do wyzwania.',
     challenge_no_longer_exists: 'To wyzwanie już nie istnieje.',
+    decline_creator_dm: 'Twoje {type} #{num} zostało anulowane, ponieważ {player} odrzucił zaproszenie do drużyny.',
   },
 
   match_result: {
@@ -451,7 +452,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Język',
-    description: 'Wybierz swój język. Bot będzie używał tego języka do **wszystkiego**, co ci wysyła — portfela, kanałów meczu, powiadomień, błędów, wszystkiego.\n\nTo główny przełącznik języka. Zmiana tutaj zmienia język wszędzie w bocie dla ciebie.',
+    description: 'Wybierz swój język:',
     footer: 'Twoja preferencja językowa jest zapisana w całym bocie',
     placeholder: '🌐 Wybierz swój język',
   },

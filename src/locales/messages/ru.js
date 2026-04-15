@@ -314,6 +314,7 @@ module.exports = {
     failed_hold: 'Не удалось заблокировать твои средства. Попробуй ещё раз.',
     invalid_reference: 'Неверная ссылка на челлендж.',
     challenge_no_longer_exists: 'Этот челлендж больше не существует.',
+    decline_creator_dm: 'Ваш {type} #{num} был отменён, потому что {player} отклонил приглашение в команду.',
   },
 
   match_result: {
@@ -451,7 +452,7 @@ module.exports = {
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Язык',
-    description: 'Выбери свой язык. Бот будет использовать этот язык для **всего**, что тебе отправляет — твой кошелёк, каналы матчей, уведомления, ошибки, вообще всё.\n\nЭто главный переключатель языка. Меняешь здесь — меняется язык везде в боте для тебя.',
+    description: 'Выбери свой язык:',
     footer: 'Твой выбор языка сохраняется во всём боте',
     placeholder: '🌐 Выбери свой язык',
   },
