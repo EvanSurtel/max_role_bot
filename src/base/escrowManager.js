@@ -119,6 +119,17 @@ async function depositToEscrow(userId, matchId, challengeId) {
   const walletRecord = walletRepo.findByUserId(userId);
   if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
 
+  // Verify the user's Smart Account has approved the escrow contract
+  const checkProvider = getProvider();
+  const allowanceAbi = ['function allowance(address owner, address spender) view returns (uint256)'];
+  const usdcContract = new ethers.Contract(walletManager.USDC_CONTRACT, allowanceAbi, checkProvider);
+  const allowance = await usdcContract.allowance(walletRecord.address, _escrowAddress());
+  if (allowance === 0n) {
+    // Try to approve now (retry from failed onboarding)
+    console.warn(`[Escrow] User ${userId} has no escrow allowance — retrying approval`);
+    await approveEscrowForUser(userId);
+  }
+
   // The contract owner calls depositToEscrow which does transferFrom(player, contract, amount)
   const { hash } = await transactionService.invokeContract(
     _ownerAddress(),

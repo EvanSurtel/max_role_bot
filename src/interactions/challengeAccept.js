@@ -195,22 +195,9 @@ async function handleConfirmedAccept(interaction) {
       // Set challenge acceptor
       challengeRepo.setAcceptor(challengeId, user.id);
 
-      // Transfer ALL players' held funds to escrow
-      if (isCashMatch && Number(entryUsdc) > 0) {
-        const allPlayers = challengePlayerRepo.findByChallengeId(challengeId);
-        for (const player of allPlayers) {
-          if (player.funds_held) {
-            try {
-              await escrowManager.transferToEscrow(player.user_id, entryUsdc, challengeId);
-            } catch (err) {
-              console.error(`[ChallengeAccept] Failed to transfer escrow for player ${player.user_id}:`, err.message);
-            }
-          }
-        }
-      }
-
-      // Create match channels
-      await matchService.createMatchChannels(interaction.client, challenge);
+      // Start match — creates channels + transfers funds to escrow contract.
+      // startMatch handles the full flow: channels → escrow → error recovery.
+      await matchService.startMatch(interaction.client, challengeId);
 
       // Edit the challenge board message to show "ACCEPTED" and disable the button
       await disableBoardMessage(interaction.client, challenge);
@@ -354,10 +341,10 @@ async function showAcceptanceConfirmation(interaction, flow, challenge, lang) {
       `**${t('challenge_create.confirm_field_mode', lang)}:** ${modeLabel} | ${t('challenge_create.series_label', lang, { n: challenge.series_length })} | ${challenge.team_size}v${challenge.team_size}`,
       entryText,
       '',
-      `**Team 1:**`,
+      `**${t('challenge_accept.team_1_header', lang)}:**`,
       ...team1Lines,
       '',
-      `**Team 2 (Your Team):**`,
+      `**${t('challenge_accept.team_2_your_header', lang)}:**`,
       ...team2Lines,
       '',
       isCashMatch ? t('challenge_accept.confirm_held_notice', lang, { amount: formatUsdc(entryUsdc).replace('$', '') }) : '',
