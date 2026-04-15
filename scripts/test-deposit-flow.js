@@ -124,11 +124,17 @@ async function main() {
 
     if (orderId) {
       // ─── Test 6: Advance order to completed (sandbox) ───
-      console.log('\n[6] Advancing order to "completed" (sandbox)...');
-      const advance = await changellyRequest('PATCH', `/sandbox/order/${orderId}`, {
-        status: 'completed',
-        amountTo: '49.50',
-      });
+      console.log('\n[6] Advancing order through statuses (sandbox)...');
+
+      // Advance: created → pending → hold
+      for (const status of ['pending', 'hold']) {
+        const adv = await changellyRequest('PATCH', `/sandbox/order/${orderId}`, { status });
+        console.log(`  ${status}: ${adv.status === 200 ? '✅' : adv.status}`);
+        if (adv.status !== 200) console.log(`    ${JSON.stringify(adv.data).slice(0, 100)}`);
+        await new Promise(r => setTimeout(r, 1000));
+      }
+
+      const advance = { status: 200 };
       console.log(`  Status: ${advance.status}`);
       if (advance.status === 200) {
         console.log(`  ✅ Order advanced to completed`);
