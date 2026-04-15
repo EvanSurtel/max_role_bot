@@ -82,7 +82,7 @@ async function main() {
 
   // ─── Test 4: Changelly — get offers ─────────────────────
   console.log('\n[4] Changelly offers for $50 USD → USDC...');
-  const offers = await changellyRequest('GET', '/offers?currencyFrom=USD&currencyTo=USDC&amountFrom=50&country=US&paymentMethod=card');
+  const offers = await changellyRequest('GET', '/offers?currencyFrom=USD&currencyTo=USDC&amountFrom=50&country=US&state=CA&paymentMethod=card');
   if (offers.status === 200) {
     const data = Array.isArray(offers.data) ? offers.data : [offers.data];
     console.log(`  ✅ ${data.length} offer(s) returned`);
@@ -99,10 +99,12 @@ async function main() {
   const orderBody = {
     externalOrderId: `test-${Date.now()}`,
     externalUserId: 'test-user-123',
+    providerCode: 'moonpay',
     currencyFrom: 'USD',
     currencyTo: 'USDC',
     amountFrom: '50',
     country: 'US',
+    state: 'CA',
     walletAddress: testAddress,
     walletExtraId: '',
     paymentMethod: 'card',
