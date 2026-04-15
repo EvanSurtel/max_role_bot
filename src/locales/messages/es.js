@@ -115,6 +115,7 @@ module.exports = {
     address: 'Dirección Base',
     available: 'Disponible',
     held: 'Bloqueado en Partidas',
+    pending: 'Pendiente (Retención por Disputa)',
     footer: 'Usa los botones de abajo para administrar tu billetera',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: 'Tranquilo. Reto no aceptado.',
     select_opponents_header: '**Selecciona tus compañeros para {type} #{num}:**\n\nTamaño de equipo: **{size}v{size}** — Elige **{count}** compañero(s).',
     team_1_header: '**Equipo 1:**',
-    team_2_header: '**Equipo 2 (Tu Equipo):**',
+    team_2_your_header: '**Equipo 2 (Tu Equipo):**',
     captain_label: '(Capitán)',
     accepted_msg: '¡Has aceptado {type} #{num}! Los canales de la partida han sido creados. ¡Buena suerte!',
     accept_team_msg: '**¡{type} #{num} aceptado!**\n\nTus compañeros ({teammates}) han sido notificados.\nUna vez que todos los compañeros acepten, la partida comenzará y se crearán los canales.',

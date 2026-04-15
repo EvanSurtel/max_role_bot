@@ -115,6 +115,7 @@ module.exports = {
     address: 'Adresse Base',
     available: 'Disponible',
     held: 'Bloqué dans les Matchs',
+    pending: 'En attente (Rétention de Litige)',
     footer: 'Utilisez les boutons ci-dessous pour gérer votre portefeuille',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: 'Pas de souci. Défi non accepté.',
     select_opponents_header: '**Sélectionnez vos coéquipiers pour {type} #{num} :**\n\nTaille d\'équipe : **{size}v{size}** — Choisissez **{count}** coéquipier(s).',
     team_1_header: '**Équipe 1 :**',
-    team_2_header: '**Équipe 2 (Votre Équipe) :**',
+    team_2_your_header: '**Équipe 2 (Votre Équipe) :**',
     captain_label: '(Capitaine)',
     accepted_msg: 'Vous avez accepté {type} #{num} ! Les salons du match ont été créés. Bonne chance !',
     accept_team_msg: '**{type} #{num} accepté !**\n\nVos coéquipiers ({teammates}) ont été notifiés.\nDès que tous les coéquipiers acceptent, le match commencera et les salons seront créés.',

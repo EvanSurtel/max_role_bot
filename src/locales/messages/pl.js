@@ -116,6 +116,7 @@ module.exports = {
     address: 'Adres Base',
     available: 'Dostępne',
     held: 'Zablokowane w Meczach',
+    pending: 'Oczekujące (Blokada Sporu)',
     footer: 'Użyj przycisków poniżej, aby zarządzać portfelem',
   },
 
@@ -267,7 +268,7 @@ module.exports = {
     nevermind_response: 'Nie ma sprawy. Wyzwanie nie zostało przyjęte.',
     select_opponents_header: '**Wybierz swoich kolegów z drużyny dla {type} #{num}:**\n\nRozmiar drużyny: **{size}v{size}** — Wybierz **{count}** kolegę/kolegów.',
     team_1_header: '**Drużyna 1:**',
-    team_2_header: '**Drużyna 2 (Twoja Drużyna):**',
+    team_2_your_header: '**Drużyna 2 (Twoja Drużyna):**',
     captain_label: '(Kapitan)',
     accepted_msg: 'Przyjąłeś {type} #{num}! Kanały meczu zostały stworzone. Powodzenia!',
     accept_team_msg: '**{type} #{num} przyjęte!**\n\nTwoi koledzy z drużyny ({teammates}) zostali powiadomieni.\nGdy wszyscy koledzy zaakceptują, mecz się rozpocznie i kanały zostaną utworzone.',

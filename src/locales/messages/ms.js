@@ -115,6 +115,7 @@ module.exports = {
     address: 'Alamat Base',
     available: 'Tersedia',
     held: 'Dikunci dalam Pertaruhan',
+    pending: 'Menunggu (Penahanan Pertikaian)',
     footer: 'Gunakan butang di bawah untuk uruskan dompet kamu',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: 'Tak apa. Challenge tidak diterima.',
     select_opponents_header: '**Pilih teammate kamu untuk {type} #{num}:**\n\nSaiz pasukan: **{size}v{size}** — Pilih **{count}** teammate.',
     team_1_header: '**Pasukan 1:**',
-    team_2_header: '**Pasukan 2 (Pasukan Kamu):**',
+    team_2_your_header: '**Pasukan 2 (Pasukan Kamu):**',
     captain_label: '(Kapten)',
     accepted_msg: 'Kamu sudah accept {type} #{num}! Channel match sudah dicipta. Semoga berjaya!',
     accept_team_msg: '**{type} #{num} diterima!**\n\nTeammate kamu ({teammates}) sudah dimaklumkan.\nSebaik sahaja semua teammate accept, match akan bermula dan channel akan dicipta.',

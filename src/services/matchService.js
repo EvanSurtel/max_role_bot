@@ -439,7 +439,7 @@ async function startMatch(client, challengeId) {
  * @param {number} matchId - The match ID.
  * @param {number} winningTeam - The winning team number (1 or 2).
  */
-async function resolveMatch(client, matchId, winningTeam) {
+async function resolveMatch(client, matchId, winningTeam, { fromDispute = false } = {}) {
   const match = matchRepo.findById(matchId);
   if (!match) {
     throw new Error(`Match ${matchId} not found`);
@@ -506,6 +506,7 @@ async function resolveMatch(client, matchId, winningTeam) {
         match.challenge_id,         // DB challenge ID for transaction records
         winnerUserIds,
         challenge.total_pot_usdc,
+        { fromDispute },
       );
       const failedPayouts = (disburseResult.disbursements || []).filter(d => d.error);
       const successPayouts = (disburseResult.disbursements || []).filter(d => d.signature);
@@ -536,6 +537,18 @@ async function resolveMatch(client, matchId, winningTeam) {
       });
       console.error(`[MatchService] CRITICAL: disbursement failed for match #${matchId}, status reverted. Admin action required.`);
       return;
+    }
+
+    // When resolved from a dispute, start a 36-hour hold timer for each
+    // winner. The timer handler will move funds from pending_balance to
+    // balance_available when it fires.
+    if (fromDispute) {
+      const timerService = require('./timerService');
+      const { TIMERS } = require('../config/constants');
+      for (const winnerId of winnerUserIds) {
+        timerService.createTimer('dispute_hold_release', winnerId, TIMERS.DISPUTE_HOLD);
+      }
+      console.log(`[MatchService] 36-hour dispute hold timers created for ${winnerUserIds.length} winner(s) of match #${matchId}`);
     }
   }
 

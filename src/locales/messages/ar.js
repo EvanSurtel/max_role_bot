@@ -115,6 +115,7 @@ module.exports = {
     address: 'عنوان Base',
     available: 'متاح',
     held: 'مقفل في المباريات',
+    pending: 'قيد الانتظار (تعليق النزاع)',
     footer: 'استخدم الأزرار أدناه لإدارة محفظتك',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: 'لا مشكلة. لم يتم قبول التحدي.',
     select_opponents_header: '**اختر زملاءك في الفريق لـ {type} #{num}:**\n\nحجم الفريق: **{size}v{size}** — اختر **{count}** زميل/زملاء.',
     team_1_header: '**الفريق 1:**',
-    team_2_header: '**الفريق 2 (فريقك):**',
+    team_2_your_header: '**الفريق 2 (فريقك):**',
     captain_label: '(القائد)',
     accepted_msg: 'لقد قبلت {type} #{num}! تم إنشاء قنوات المباراة. حظاً سعيداً!',
     accept_team_msg: '**تم قبول {type} #{num}!**\n\nتم إخطار زملائك ({teammates}).\nبمجرد قبول جميع الزملاء، ستبدأ المباراة وسيتم إنشاء القنوات.',

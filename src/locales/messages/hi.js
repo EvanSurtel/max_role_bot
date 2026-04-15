@@ -115,6 +115,7 @@ module.exports = {
     address: 'Base पता',
     available: 'उपलब्ध',
     held: 'बेट में लॉक',
+    pending: 'पेंडिंग (Dispute Hold)',
     footer: 'अपना वॉलेट manage करने के लिए नीचे के बटनों का उपयोग करो',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: 'कोई बात नहीं। Challenge accept नहीं हुआ।',
     select_opponents_header: '**{type} #{num} के लिए अपने teammates चुनो:**\n\nTeam size: **{size}v{size}** — **{count}** teammate चुनो।',
     team_1_header: '**Team 1:**',
-    team_2_header: '**Team 2 (तुम्हारी Team):**',
+    team_2_your_header: '**Team 2 (तुम्हारी Team):**',
     captain_label: '(Captain)',
     accepted_msg: 'तुमने {type} #{num} accept कर लिया! Match channels बन गए हैं। Good luck!',
     accept_team_msg: '**{type} #{num} accept हो गया!**\n\nतुम्हारे teammates ({teammates}) को notify कर दिया गया है।\nजैसे ही सभी teammates accept करेंगे, match शुरू हो जाएगा और channels बन जाएंगे।',

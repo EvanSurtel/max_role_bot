@@ -2,7 +2,7 @@ const challengeRepo = require('../database/repositories/challengeRepo');
 const userRepo = require('../database/repositories/userRepo');
 const challengeService = require('../services/challengeService');
 const { challengeEmbed } = require('../utils/embeds');
-const { CHALLENGE_STATUS } = require('../config/constants');
+const { CHALLENGE_STATUS, CHALLENGE_TYPE } = require('../config/constants');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { t, langFor } = require('../locales/i18n');
 
@@ -47,7 +47,7 @@ async function handleButton(interaction) {
     });
   }
 
-  const isCashMatch = challenge.type === 'cash_match';
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const typeLabel = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
   const displayNum = challenge.display_number || challengeId;
   const refundLine = isCashMatch ? `\n\n${t('challenge_cancel.confirm_refund_notice', lang)}` : '';
@@ -95,7 +95,7 @@ async function handleConfirmedCancel(interaction) {
     return interaction.reply({ content: t('challenge_cancel.cannot_cancel_now', lang), ephemeral: true });
   }
 
-  const isCashMatch = challenge.type === 'cash_match';
+  const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const typeLabel = isCashMatch ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
   const displayNum = challenge.display_number || challengeId;
 
@@ -106,7 +106,7 @@ async function handleConfirmedCancel(interaction) {
     await disableBoardMessage(interaction.client, challenge);
 
     const { postTransaction } = require('../utils/transactionFeed');
-    postTransaction({ type: 'challenge_cancelled', discordId: interaction.user.id, challengeId, memo: `${challenge.type === 'cash_match' ? 'Cash Match' : 'XP Match'} #${challenge.display_number || challengeId} cancelled by creator — all funds refunded` });
+    postTransaction({ type: 'challenge_cancelled', discordId: interaction.user.id, challengeId, memo: `${isCashMatch ? 'Cash Match' : 'XP Match'} #${displayNum} cancelled by creator — all funds refunded` });
 
     const cancelKey = isCashMatch ? 'challenge_cancel.cancelled_with_refund' : 'challenge_cancel.cancelled';
     await interaction.followUp({
@@ -134,17 +134,6 @@ async function disableBoardMessage(client, challenge) {
 
     // Delete the challenge from the board entirely
     await message.delete();
-    return;
-
-    const disabledRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`challenge_accept_${challenge.id}`)
-        .setLabel('Cancelled')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(true),
-    );
-
-    await message.edit({ embeds: [embed], components: [disabledRow] });
   } catch (err) {
     console.error(`[ChallengeCancel] Failed to update board message:`, err.message);
   }

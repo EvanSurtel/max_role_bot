@@ -115,6 +115,7 @@ module.exports = {
     address: 'Base 地址',
     available: '可用',
     held: '投注锁定中',
+    pending: '待处理（争议保留）',
     footer: '使用下方按钮管理你的钱包',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: '没问题。挑战未被接受。',
     select_opponents_header: '**为 {type} #{num} 选择你的队友:**\n\n队伍人数: **{size}v{size}** — 选择 **{count}** 名队友。',
     team_1_header: '**队伍 1:**',
-    team_2_header: '**队伍 2 (你的队伍):**',
+    team_2_your_header: '**队伍 2 (你的队伍):**',
     captain_label: '(队长)',
     accepted_msg: '你已接受 {type} #{num}!比赛频道已创建。祝你好运!',
     accept_team_msg: '**{type} #{num} 已接受!**\n\n你的队友 ({teammates}) 已收到通知。\n所有队友接受后,比赛将开始,频道将被创建。',

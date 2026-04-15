@@ -115,6 +115,7 @@ module.exports = {
     address: 'Base-Adresse',
     available: 'Verfügbar',
     held: 'In Matches Gesperrt',
+    pending: 'Ausstehend (Streitfall-Sperre)',
     footer: 'Nutze die Buttons unten, um deine Wallet zu verwalten',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: 'Kein Problem. Herausforderung nicht angenommen.',
     select_opponents_header: '**Wähle deine Teamkollegen für {type} #{num}:**\n\nTeamgröße: **{size}v{size}** — Wähl **{count}** Teamkollege(n).',
     team_1_header: '**Team 1:**',
-    team_2_header: '**Team 2 (Dein Team):**',
+    team_2_your_header: '**Team 2 (Dein Team):**',
     captain_label: '(Captain)',
     accepted_msg: 'Du hast {type} #{num} angenommen! Match-Channels wurden erstellt. Viel Glück!',
     accept_team_msg: '**{type} #{num} angenommen!**\n\nDeine Teamkollegen ({teammates}) wurden benachrichtigt.\nSobald alle Teamkollegen annehmen, beginnt das Match und Channels werden erstellt.',

@@ -115,6 +115,7 @@ module.exports = {
     address: 'Baseアドレス',
     available: '利用可能',
     held: 'マッチでロック中',
+    pending: '保留中（紛争ホールド）',
     footer: '下のボタンでウォレットを管理',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: '了解です。チャレンジは受諾されませんでした。',
     select_opponents_header: '**{type} #{num} のチームメイトを選択：**\n\nチームサイズ：**{size}v{size}** — **{count}** 人選んでください。',
     team_1_header: '**チーム1：**',
-    team_2_header: '**チーム2（あなたのチーム）：**',
+    team_2_your_header: '**チーム2（あなたのチーム）：**',
     captain_label: '（キャプテン）',
     accepted_msg: '{type} #{num} を受けました！マッチチャンネルが作成されました。幸運を！',
     accept_team_msg: '**{type} #{num} を受諾！**\n\nチームメイト ({teammates}) に通知しました。\n全員が承認したらマッチが開始され、チャンネルが作成されます。',

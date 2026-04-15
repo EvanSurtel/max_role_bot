@@ -84,6 +84,45 @@ const creditAvailableTx = db.transaction((userId, deltaUsdc) => {
   });
 });
 
+// Credit winnings to the user's pending_balance in the users table
+// (not balance_available in wallets). Used for the 36-hour dispute hold.
+const creditPendingTx = db.transaction((userId, deltaUsdc, releaseAt) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  if (!user) throw new Error('User not found');
+  const currentPending = BigInt(user.pending_balance || '0');
+  const delta = BigInt(deltaUsdc);
+  if (delta < 0n) throw new Error('creditPending delta must be non-negative');
+  db.prepare('UPDATE users SET pending_balance = ?, pending_release_at = ? WHERE id = ?').run(
+    (currentPending + delta).toString(),
+    releaseAt,
+    userId,
+  );
+});
+
+// Move all pending_balance to wallet balance_available. Called when the
+// 36-hour dispute hold timer fires.
+const releasePendingTx = db.transaction((userId) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  if (!user) throw new Error('User not found');
+  const pendingAmount = BigInt(user.pending_balance || '0');
+  if (pendingAmount <= 0n) return '0';
+
+  // Zero out pending balance and release timestamp
+  db.prepare("UPDATE users SET pending_balance = '0', pending_release_at = NULL WHERE id = ?").run(userId);
+
+  // Credit wallet available balance
+  const wallet = stmts.findByUserId.get(userId);
+  if (!wallet) throw new Error('Wallet not found');
+  const freshAvail = BigInt(wallet.balance_available);
+  stmts.setBalances.run({
+    userId,
+    balanceAvailable: (freshAvail + pendingAmount).toString(),
+    balanceHeld: wallet.balance_held,
+  });
+
+  return pendingAmount.toString();
+});
+
 const walletRepo = {
   findByUserId(userId) {
     return stmts.findByUserId.get(userId) || null;
@@ -129,6 +168,24 @@ const walletRepo = {
 
   getAll() {
     return stmts.getAll.all();
+  },
+
+  /**
+   * Credit winnings to the user's pending_balance (36-hour dispute hold).
+   * @param {number} userId - user ID
+   * @param {string} deltaUsdc - amount in smallest USDC units
+   * @param {string} releaseAt - ISO timestamp when the hold expires
+   */
+  creditPending(userId, deltaUsdc, releaseAt) {
+    return creditPendingTx(userId, deltaUsdc, releaseAt);
+  },
+
+  /**
+   * Move all pending_balance to wallet balance_available.
+   * Returns the amount that was released (string).
+   */
+  releasePending(userId) {
+    return releasePendingTx(userId);
   },
 
   /**

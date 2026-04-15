@@ -115,6 +115,7 @@ module.exports = {
     address: 'Alamat Base',
     available: 'Tersedia',
     held: 'Dikunci di Taruhan',
+    pending: 'Menunggu (Penahanan Sengketa)',
     footer: 'Gunakan tombol di bawah untuk mengelola wallet',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: 'Tidak masalah. Challenge tidak diterima.',
     select_opponents_header: '**Pilih teammate kamu untuk {type} #{num}:**\n\nUkuran tim: **{size}v{size}** — Pilih **{count}** teammate.',
     team_1_header: '**Tim 1:**',
-    team_2_header: '**Tim 2 (Tim Kamu):**',
+    team_2_your_header: '**Tim 2 (Tim Kamu):**',
     captain_label: '(Kapten)',
     accepted_msg: 'Kamu sudah accept {type} #{num}! Channel match sudah dibuat. Semoga berhasil!',
     accept_team_msg: '**{type} #{num} diterima!**\n\nTeammate kamu ({teammates}) sudah dinotifikasi.\nBegitu semua teammate accept, match akan dimulai dan channel akan dibuat.',

@@ -173,6 +173,7 @@ module.exports = {
     address: 'Base Address',
     available: 'Available',
     held: 'Held in Matches',
+    pending: 'Pending (Dispute Hold)',
     footer: 'Use the buttons below to manage your wallet',
   },
 

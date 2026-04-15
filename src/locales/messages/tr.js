@@ -116,6 +116,7 @@ module.exports = {
     address: 'Base Adresi',
     available: 'Kullanılabilir',
     held: 'Maçlarda Kilitli',
+    pending: 'Beklemede (Anlaşmazlık Kilidi)',
     footer: 'Cüzdanını yönetmek için aşağıdaki butonları kullan',
   },
 
@@ -267,7 +268,7 @@ module.exports = {
     nevermind_response: 'Sorun değil. Meydan okuma kabul edilmedi.',
     select_opponents_header: '**{type} #{num} için takım arkadaşlarını seç:**\n\nTakım boyutu: **{size}v{size}** — **{count}** takım arkadaşı seç.',
     team_1_header: '**Takım 1:**',
-    team_2_header: '**Takım 2 (Senin Takımın):**',
+    team_2_your_header: '**Takım 2 (Senin Takımın):**',
     captain_label: '(Kaptan)',
     accepted_msg: '{type} #{num}\'i kabul ettin! Maç kanalları oluşturuldu. Bol şans!',
     accept_team_msg: '**{type} #{num} kabul edildi!**\n\nTakım arkadaşların ({teammates}) bilgilendirildi.\nTüm takım arkadaşları kabul ettiğinde, maç başlayacak ve kanallar oluşturulacak.',

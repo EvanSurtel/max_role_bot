@@ -115,6 +115,7 @@ module.exports = {
     address: 'Base Address',
     available: 'Available',
     held: 'Naka-lock sa Pusta',
+    pending: 'Pending (Dispute Hold)',
     footer: 'Gamitin ang mga button sa baba para i-manage ang wallet mo',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: 'No problem. Hindi tinanggap ang challenge.',
     select_opponents_header: '**Piliin ang mga teammates mo para sa {type} #{num}:**\n\nTeam size: **{size}v{size}** — Pumili ng **{count}** teammate(s).',
     team_1_header: '**Team 1:**',
-    team_2_header: '**Team 2 (Team Mo):**',
+    team_2_your_header: '**Team 2 (Team Mo):**',
     captain_label: '(Kapitan)',
     accepted_msg: 'Tinanggap mo na ang {type} #{num}! Nagawa na ang mga match channels. Good luck!',
     accept_team_msg: '**Tinanggap na ang {type} #{num}!**\n\nNa-notify na ang mga teammates mo ({teammates}).\nKapag tinanggap na ng lahat ng teammates, magsisimula na ang match at gagawin ang mga channels.',

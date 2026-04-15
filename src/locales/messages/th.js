@@ -115,6 +115,7 @@ module.exports = {
     address: 'ที่อยู่ Base',
     available: 'ใช้ได้',
     held: 'ล็อกในเดิมพัน',
+    pending: 'รอดำเนินการ (ระงับข้อพิพาท)',
     footer: 'ใช้ปุ่มด้านล่างเพื่อจัดการกระเป๋าของคุณ',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: 'ไม่เป็นไร ไม่ได้รับ challenge',
     select_opponents_header: '**เลือก teammates ของคุณสำหรับ {type} #{num}:**\n\nขนาดทีม: **{size}v{size}** — เลือก **{count}** teammate(s)',
     team_1_header: '**Team 1:**',
-    team_2_header: '**Team 2 (ทีมของคุณ):**',
+    team_2_your_header: '**Team 2 (ทีมของคุณ):**',
     captain_label: '(กัปตัน)',
     accepted_msg: 'คุณรับ {type} #{num} แล้ว! ช่อง match ถูกสร้างแล้ว โชคดี!',
     accept_team_msg: '**{type} #{num} ถูกรับแล้ว!**\n\nแจ้ง teammates ของคุณ ({teammates}) แล้ว\nเมื่อ teammates ทั้งหมดรับแล้ว แมตช์จะเริ่มและช่องจะถูกสร้าง',

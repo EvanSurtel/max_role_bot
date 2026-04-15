@@ -16,17 +16,33 @@ const { USDC_PER_UNIT } = require('../config/constants');
 function buildWalletView(wallet, user, lang) {
   const availableUsdc = (Number(wallet.balance_available) / USDC_PER_UNIT).toFixed(2);
   const heldUsdc = (Number(wallet.balance_held) / USDC_PER_UNIT).toFixed(2);
+  const pendingUsdc = user && user.pending_balance ? (Number(user.pending_balance) / USDC_PER_UNIT).toFixed(2) : '0.00';
 
   const username = (user && (user.server_username || user.cod_ign)) || 'Player';
+
+  const fields = [
+    { name: t('wallet_embed.available', lang), value: `$${availableUsdc} USDC`, inline: true },
+    { name: t('wallet_embed.held', lang), value: `$${heldUsdc} USDC`, inline: true },
+  ];
+
+  // Show pending balance field only when there are funds in dispute hold
+  if (Number(pendingUsdc) > 0) {
+    const releaseAt = user.pending_release_at ? new Date(user.pending_release_at) : null;
+    const releaseText = releaseAt
+      ? ` (available <t:${Math.floor(releaseAt.getTime() / 1000)}:R>)`
+      : '';
+    fields.push({
+      name: t('wallet_embed.pending', lang),
+      value: `$${pendingUsdc} USDC${releaseText}`,
+      inline: true,
+    });
+  }
 
   const embed = new EmbedBuilder()
     .setTitle(t('wallet_embed.title', lang, { username }))
     .setColor(0x2ecc71)
     .setDescription(t('wallet.deposit_info', lang, { address: wallet.address }))
-    .addFields(
-      { name: t('wallet_embed.available', lang), value: `$${availableUsdc} USDC`, inline: true },
-      { name: t('wallet_embed.held', lang), value: `$${heldUsdc} USDC`, inline: true },
-    )
+    .addFields(...fields)
     .setFooter({ text: t('wallet_embed.footer', lang) })
     .setTimestamp();
 

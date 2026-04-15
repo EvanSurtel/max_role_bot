@@ -85,6 +85,7 @@ const TIMERS = {
   DEPOSIT_POLL_INTERVAL: 30 * 1000,
   MATCH_INACTIVITY: Number(process.env.MATCH_INACTIVITY_HOURS || 24) * 60 * 60 * 1000,
   HEALTH_CHECK_INTERVAL: 10 * 60 * 1000,
+  DISPUTE_HOLD: 36 * 60 * 60 * 1000, // 36 hours — winnings held after dispute resolution
 };
 
 // Rate limit cooldowns (in milliseconds)
@@ -207,6 +208,7 @@ const TRANSACTION_TYPE = {
   RELEASE: 'release',
   ESCROW_IN: 'escrow_in',
   DISBURSEMENT: 'disbursement',
+  DISPUTE_HOLD_CREDIT: 'dispute_hold_credit',
 };
 
 module.exports = {

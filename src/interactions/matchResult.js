@@ -609,7 +609,7 @@ async function handleAdminConfirm(interaction) {
   });
 
   try {
-    await matchService.resolveMatch(interaction.client, matchId, winningTeam);
+    await matchService.resolveMatch(interaction.client, matchId, winningTeam, { fromDispute: true });
 
     // Post dispute result to permanent dispute results channel
     await postDisputeResult(interaction.client, matchId, winningTeam, interaction.user.id);

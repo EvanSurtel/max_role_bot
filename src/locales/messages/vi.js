@@ -115,6 +115,7 @@ module.exports = {
     address: 'Địa chỉ Base',
     available: 'Khả dụng',
     held: 'Khóa Trong Cược',
+    pending: 'Chờ Xử Lý (Giữ Tranh Chấp)',
     footer: 'Dùng các nút bên dưới để quản lý ví của bạn',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: 'Không sao. Challenge không được chấp nhận.',
     select_opponents_header: '**Chọn đồng đội của bạn cho {type} #{num}:**\n\nKích thước đội: **{size}v{size}** — Chọn **{count}** đồng đội.',
     team_1_header: '**Đội 1:**',
-    team_2_header: '**Đội 2 (Đội Của Bạn):**',
+    team_2_your_header: '**Đội 2 (Đội Của Bạn):**',
     captain_label: '(Đội Trưởng)',
     accepted_msg: 'Bạn đã chấp nhận {type} #{num}! Các kênh trận đấu đã được tạo. Chúc may mắn!',
     accept_team_msg: '**{type} #{num} đã được chấp nhận!**\n\nĐồng đội của bạn ({teammates}) đã được thông báo.\nKhi tất cả đồng đội chấp nhận, trận đấu sẽ bắt đầu và các kênh sẽ được tạo.',

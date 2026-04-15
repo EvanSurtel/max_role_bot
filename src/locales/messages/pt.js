@@ -115,6 +115,7 @@ module.exports = {
     address: 'Endereço Base',
     available: 'Disponível',
     held: 'Travado em Partidas',
+    pending: 'Pendente (Retenção de Disputa)',
     footer: 'Use os botões abaixo pra gerenciar sua carteira',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: 'Tranquilo. Desafio não aceito.',
     select_opponents_header: '**Selecione seus parceiros pra {type} #{num}:**\n\nTamanho do time: **{size}v{size}** — Escolha **{count}** parceiro(s).',
     team_1_header: '**Time 1:**',
-    team_2_header: '**Time 2 (Seu Time):**',
+    team_2_your_header: '**Time 2 (Seu Time):**',
     captain_label: '(Capitão)',
     accepted_msg: 'Você aceitou {type} #{num}! Os canais da partida foram criados. Boa sorte!',
     accept_team_msg: '**{type} #{num} aceito!**\n\nSeus parceiros ({teammates}) foram notificados.\nAssim que todos os parceiros aceitarem, a partida começa e os canais serão criados.',

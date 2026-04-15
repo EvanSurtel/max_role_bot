@@ -116,6 +116,7 @@ module.exports = {
     address: 'Indirizzo Base',
     available: 'Disponibile',
     held: 'Bloccato in Partite',
+    pending: 'In Attesa (Blocco Disputa)',
     footer: 'Usa i pulsanti sotto per gestire il tuo wallet',
   },
 
@@ -267,7 +268,7 @@ module.exports = {
     nevermind_response: 'Nessun problema. Sfida non accettata.',
     select_opponents_header: '**Seleziona i tuoi compagni per {type} #{num}:**\n\nDimensione squadra: **{size}v{size}** — Scegli **{count}** compagno/i.',
     team_1_header: '**Squadra 1:**',
-    team_2_header: '**Squadra 2 (La Tua Squadra):**',
+    team_2_your_header: '**Squadra 2 (La Tua Squadra):**',
     captain_label: '(Capitano)',
     accepted_msg: 'Hai accettato {type} #{num}! I canali del match sono stati creati. Buona fortuna!',
     accept_team_msg: '**{type} #{num} accettata!**\n\nI tuoi compagni ({teammates}) sono stati avvisati.\nUna volta che tutti i compagni accettano, il match inizierà e i canali verranno creati.',

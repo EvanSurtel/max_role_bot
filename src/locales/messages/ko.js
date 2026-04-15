@@ -115,6 +115,7 @@ module.exports = {
     address: 'Base 주소',
     available: '사용 가능',
     held: '베팅에 잠김',
+    pending: '대기 중 (분쟁 보류)',
     footer: '아래 버튼으로 지갑을 관리하세요',
   },
 
@@ -266,7 +267,7 @@ module.exports = {
     nevermind_response: '괜찮아요. 챌린지가 수락되지 않았어요.',
     select_opponents_header: '**{type} #{num}을(를) 위한 팀원 선택:**\n\n팀 크기: **{size}v{size}** — **{count}**명을 선택하세요.',
     team_1_header: '**팀 1:**',
-    team_2_header: '**팀 2 (당신의 팀):**',
+    team_2_your_header: '**팀 2 (당신의 팀):**',
     captain_label: '(캡틴)',
     accepted_msg: '{type} #{num}을(를) 수락했어요! 매치 채널이 생성되었어요. 행운을 빌어요!',
     accept_team_msg: '**{type} #{num} 수락됨!**\n\n팀원({teammates})에게 알림을 보냈어요.\n모든 팀원이 수락하면 매치가 시작되고 채널이 생성돼요.',

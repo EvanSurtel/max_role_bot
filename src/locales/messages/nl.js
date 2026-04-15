@@ -116,6 +116,7 @@ module.exports = {
     address: 'Base Adres',
     available: 'Beschikbaar',
     held: 'Vergrendeld in Matches',
+    pending: 'In Afwachting (Geschilblokkering)',
     footer: 'Gebruik de knoppen hieronder om je wallet te beheren',
   },
 
@@ -267,7 +268,7 @@ module.exports = {
     nevermind_response: 'Geen probleem. Uitdaging niet geaccepteerd.',
     select_opponents_header: '**Selecteer je teammates voor {type} #{num}:**\n\nTeam grootte: **{size}v{size}** — Kies **{count}** teammate(s).',
     team_1_header: '**Team 1:**',
-    team_2_header: '**Team 2 (Jouw Team):**',
+    team_2_your_header: '**Team 2 (Jouw Team):**',
     captain_label: '(Captain)',
     accepted_msg: 'Je hebt {type} #{num} geaccepteerd! Match kanalen zijn aangemaakt. Veel succes!',
     accept_team_msg: '**{type} #{num} geaccepteerd!**\n\nJe teammates ({teammates}) zijn op de hoogte gebracht.\nZodra alle teammates accepteren begint de match en worden de kanalen aangemaakt.',

@@ -55,7 +55,7 @@ function holdFunds(userId, amountUsdc, challengeId) {
   try {
     walletRepo.holdFunds(userId, amountUsdc);
     transactionRepo.create({
-      type: TRANSACTION_TYPE.HOLD || 'hold',
+      type: TRANSACTION_TYPE.HOLD,
       userId, challengeId, amountUsdc,
       txHash: null, status: 'completed',
       memo: `Hold for challenge #${challengeId}`,
@@ -71,7 +71,7 @@ function releaseFunds(userId, amountUsdc, challengeId) {
   try {
     walletRepo.releaseFunds(userId, amountUsdc);
     transactionRepo.create({
-      type: TRANSACTION_TYPE.RELEASE || 'release',
+      type: TRANSACTION_TYPE.RELEASE,
       userId, challengeId, amountUsdc,
       txHash: null, status: 'completed',
       memo: `Release for challenge #${challengeId}`,
@@ -154,7 +154,7 @@ async function depositToEscrow(userId, matchId, challengeId) {
   });
 
   transactionRepo.create({
-    type: TRANSACTION_TYPE.ESCROW_IN || 'escrow_in',
+    type: TRANSACTION_TYPE.ESCROW_IN,
     userId, challengeId, amountUsdc: entryAmount,
     txHash: hash,
     fromAddress: walletRecord.address,
@@ -178,7 +178,7 @@ async function transferToEscrow(matchId, challengeId, allPlayers, entryAmountUsd
 
 // ─── On-chain: resolve match → pay winners ─────────────────────
 
-async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPotUsdc) {
+async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPotUsdc, { fromDispute = false } = {}) {
   if (!winningPlayerIds || winningPlayerIds.length === 0) {
     throw new Error('No winning player IDs provided');
   }
@@ -215,20 +215,33 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
     ESCROW_ABI_JSON,
   );
 
-  // Credit each winner's DB balance
+  // Credit each winner's DB balance.
+  // When fromDispute is true, winnings go to pending_balance with a
+  // 36-hour hold instead of being immediately available.
+  const { TIMERS } = require('../config/constants');
+  const releaseAt = fromDispute
+    ? new Date(Date.now() + TIMERS.DISPUTE_HOLD).toISOString()
+    : null;
+
   for (const d of disbursements) {
     if (d.error) continue;
     try {
-      walletRepo.creditAvailable(d.userId, d.amount);
+      if (fromDispute) {
+        walletRepo.creditPending(d.userId, d.amount, releaseAt);
+      } else {
+        walletRepo.creditAvailable(d.userId, d.amount);
+      }
       transactionRepo.create({
-        type: TRANSACTION_TYPE.DISBURSEMENT || 'disbursement',
+        type: fromDispute ? TRANSACTION_TYPE.DISPUTE_HOLD_CREDIT : TRANSACTION_TYPE.DISBURSEMENT,
         userId: d.userId, challengeId,
         amountUsdc: d.amount,
         txHash: hash,
         fromAddress: _escrowAddress(),
         toAddress: d.address,
-        status: 'completed',
-        memo: `Winnings for match #${matchId}`,
+        status: fromDispute ? 'pending_release' : 'completed',
+        memo: fromDispute
+          ? `Winnings for match #${matchId} (held 36h — dispute resolution)`
+          : `Winnings for match #${matchId}`,
       });
       d.hash = hash;
     } catch (err) {
@@ -236,7 +249,7 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
     }
   }
 
-  console.log(`[Escrow] Match #${matchId} resolved: ${winnerAddresses.length} winners. TX: ${hash}`);
+  console.log(`[Escrow] Match #${matchId} resolved: ${winnerAddresses.length} winners${fromDispute ? ' (36h hold)' : ''}. TX: ${hash}`);
   return { disbursements, hash };
 }
 

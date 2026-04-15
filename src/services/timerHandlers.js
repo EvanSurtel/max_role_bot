@@ -61,6 +61,35 @@ function registerAll(client) {
     console.log(`[TimerHandler] teammate_accept: challenge ${player.challenge_id} cancelled due to teammate timeout`);
   });
 
+  // --- dispute_hold_release: referenceId is userId ---
+  // Fires 36 hours after a dispute-resolved match pays out. Moves funds
+  // from the user's pending_balance to their wallet balance_available.
+  timerService.registerHandler('dispute_hold_release', async (userId) => {
+    const walletRepo = require('../database/repositories/walletRepo');
+    const transactionRepo = require('../database/repositories/transactionRepo');
+    const { TRANSACTION_TYPE } = require('../config/constants');
+
+    try {
+      const released = walletRepo.releasePending(userId);
+      if (BigInt(released) > 0n) {
+        transactionRepo.create({
+          type: TRANSACTION_TYPE.DISPUTE_HOLD_CREDIT,
+          userId,
+          challengeId: null,
+          amountUsdc: released,
+          txHash: null,
+          status: 'completed',
+          memo: `Dispute hold released — ${released} moved to available`,
+        });
+        console.log(`[TimerHandler] dispute_hold_release: released ${released} for user ${userId}`);
+      } else {
+        console.log(`[TimerHandler] dispute_hold_release: no pending balance for user ${userId}`);
+      }
+    } catch (err) {
+      console.error(`[TimerHandler] dispute_hold_release failed for user ${userId}:`, err.message);
+    }
+  });
+
   // --- match_inactivity: referenceId is matchId ---
   // Fires after estimated match duration + buffer if no result reported
   timerService.registerHandler('match_inactivity', async (matchId) => {
