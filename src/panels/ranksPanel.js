@@ -124,9 +124,19 @@ async function postRanksPanel(client, lang = 'en') {
       components: [buildLanguageDropdownRow(lang)],
     });
 
-    // Intro + 8 rank embeds = 9 total — fits in a single message
-    // (Discord allows up to 10 embeds per message).
-    await channel.send({ embeds, files });
+    // Send intro embed first
+    await channel.send({ embeds: [embeds[0]] });
+
+    // Send each rank as its own message (file size limit prevents
+    // sending all 8 emblems in one message — total exceeds 8MB)
+    for (let i = 1; i < embeds.length; i++) {
+      const tier = RANK_TIERS[i - 1];
+      const tierFile = files.find(f => f.name === tier.emblem);
+      await channel.send({
+        embeds: [embeds[i]],
+        files: tierFile ? [tierFile] : [],
+      });
+    }
 
     const missing = RANK_TIERS.length - files.length;
     if (missing > 0) {
