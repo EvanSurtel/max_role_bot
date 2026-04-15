@@ -1,84 +1,111 @@
 #!/usr/bin/env node
-// Diagnose Smart Account UserOp signature issue
+// Try every possible approach to make sendUserOperation work
 require('dotenv').config();
 const { CdpClient } = require('@coinbase/cdp-sdk');
+const { ethers } = require('ethers');
 
 (async () => {
-  console.log('CDP_API_KEY_ID:', process.env.CDP_API_KEY_ID ? 'SET' : 'NOT SET');
-  console.log('CDP_API_KEY_SECRET:', process.env.CDP_API_KEY_SECRET ? 'SET (' + process.env.CDP_API_KEY_SECRET.slice(0, 30) + '...)' : 'NOT SET');
-  console.log('CDP_WALLET_SECRET:', process.env.CDP_WALLET_SECRET ? 'SET (' + process.env.CDP_WALLET_SECRET.slice(0, 30) + '...)' : 'NOT SET');
-  console.log('CDP_PROJECT_ID:', process.env.CDP_PROJECT_ID || 'NOT SET');
-  console.log('');
-
   const cdp = new CdpClient();
+  const provider = new ethers.JsonRpcProvider('https://sepolia.base.org', { name: 'base-sepolia', chainId: 84532 });
+  const clientKey = process.env.CDP_CLIENT_API_KEY || '';
 
-  // Test 1: Can we create accounts? (proves API key works)
-  console.log('[1] Creating EOA account (tests API key)...');
-  const owner = await cdp.evm.createAccount();
-  console.log(`  ✅ Owner: ${owner.address}`);
-
-  // Test 2: Can we create smart accounts? (proves wallet secret works for creation)
-  console.log('[2] Creating Smart Account...');
-  const smart = await cdp.evm.createSmartAccount({ owner });
-  console.log(`  ✅ Smart: ${smart.address}`);
-  console.log(`  Owners: ${JSON.stringify(smart.owners?.map(o => o.address || o))}`);
-
-  // Test 3: Can we sign with the owner? (proves wallet secret works for signing)
-  console.log('[3] Testing owner.sign()...');
+  // Approach 1: Use the SDK's transfer method on a Smart Account
+  // The SDK README shows: smartAccount.transfer() — maybe this handles UserOps internally
+  console.log('=== Approach 1: Smart Account transfer() method ===');
   try {
-    const testHash = '0x' + '00'.repeat(32);
-    const sig = await owner.sign({ hash: testHash });
-    console.log(`  ✅ Signature: ${sig.slice(0, 20)}...`);
+    const owner1 = await cdp.evm.createAccount();
+    const smart1 = await cdp.evm.createSmartAccount({ owner: owner1 });
+    console.log(`Smart: ${smart1.address}`);
+
+    // Fund smart account with ETH first
+    await cdp.evm.requestFaucet({ address: smart1.address, network: 'base-sepolia', token: 'eth' });
+    console.log('Faucet sent, waiting...');
+    await new Promise(r => setTimeout(r, 8000));
+
+    const bal = await provider.getBalance(smart1.address);
+    console.log(`ETH balance: ${ethers.formatEther(bal)}`);
+
+    // Check if smart account has code deployed
+    const code = await provider.getCode(smart1.address);
+    console.log(`Contract deployed: ${code !== '0x' ? 'YES' : 'NO (counterfactual)'}`);
+
+    // Try transfer method if it exists
+    if (typeof smart1.transfer === 'function') {
+      console.log('transfer() method exists, trying...');
+      const result = await smart1.transfer({
+        to: owner1.address,
+        amount: 1n,
+        token: 'eth',
+        network: 'base-sepolia',
+      });
+      console.log(`✅ transfer() worked: ${result.transactionHash}`);
+    } else {
+      console.log('transfer() method not available on smart account');
+    }
   } catch (err) {
-    console.log(`  ❌ Sign failed: ${err.message}`);
+    console.log(`❌ ${err.errorMessage || err.message}`);
   }
 
-  // Test 4: Try sendUserOperation with detailed error
-  console.log('[4] Sending UserOperation...');
+  // Approach 2: Use sendTransaction on the smart account address directly
+  // Maybe CDP treats smart account addresses the same as EOA for sendTransaction
+  console.log('\n=== Approach 2: sendTransaction with smart account address ===');
   try {
-    const result = await cdp.evm.sendUserOperation({
-      smartAccount: smart,
+    const owner2 = await cdp.evm.createAccount();
+    const smart2 = await cdp.evm.createSmartAccount({ owner: owner2 });
+    console.log(`Smart: ${smart2.address}`);
+
+    await cdp.evm.requestFaucet({ address: smart2.address, network: 'base-sepolia', token: 'eth' });
+    await new Promise(r => setTimeout(r, 8000));
+
+    const result = await cdp.evm.sendTransaction({
+      address: smart2.address,
       network: 'base-sepolia',
-      calls: [{
+      transaction: {
         to: '0x0000000000000000000000000000000000000001',
         value: 0n,
         data: '0x',
-      }],
+      },
     });
-    console.log(`  ✅ SUCCESS! userOpHash: ${result.userOpHash}`);
+    console.log(`✅ sendTransaction on smart account worked: ${result.transactionHash}`);
   } catch (err) {
-    console.log(`  ❌ Failed: ${err.errorMessage || err.message}`);
-    if (err.correlationId) console.log(`  correlationId: ${err.correlationId}`);
-
-    // Try to manually replicate what the SDK does
-    console.log('\n[5] Manual debug — prepareUserOperation...');
-    try {
-      // Access the internal API client
-      const prepResult = await cdp._apiClients.evm.prepareUserOperation(smart.address, {
-        network: 'base-sepolia',
-        calls: [{
-          to: '0x0000000000000000000000000000000000000001',
-          data: '0x',
-          value: '0',
-        }],
-      });
-      console.log(`  ✅ Prepared OK. userOpHash: ${prepResult.userOpHash}`);
-
-      console.log('[6] Signing userOpHash with owner...');
-      const signature = await owner.sign({ hash: prepResult.userOpHash });
-      console.log(`  ✅ Signed: ${signature.slice(0, 20)}...`);
-
-      console.log('[7] Broadcasting signed UserOp...');
-      const broadcastResult = await cdp._apiClients.evm.sendUserOperation(
-        smart.address,
-        prepResult.userOpHash,
-        { signature },
-      );
-      console.log(`  ✅ Broadcast OK! Status: ${broadcastResult.status}`);
-    } catch (manualErr) {
-      console.log(`  ❌ Manual step failed: ${manualErr.errorMessage || manualErr.message}`);
-    }
+    console.log(`❌ ${err.errorMessage || err.message}`);
   }
-})().catch(err => {
-  console.error('Fatal:', err.message);
-});
+
+  // Approach 3: Just use EOA accounts with faucet ETH — no Smart Accounts
+  console.log('\n=== Approach 3: Regular EOA with faucet ETH ===');
+  try {
+    const eoa = await cdp.evm.getOrCreateAccount({ name: 'test-eoa-direct' });
+    console.log(`EOA: ${eoa.address}`);
+
+    await cdp.evm.requestFaucet({ address: eoa.address, network: 'base-sepolia', token: 'eth' });
+    await new Promise(r => setTimeout(r, 8000));
+
+    // Approve test USDC
+    const usdcAddr = process.env.USDC_CONTRACT_ADDRESS;
+    const escrowAddr = process.env.ESCROW_CONTRACT_ADDRESS;
+    if (usdcAddr && escrowAddr) {
+      const iface = new ethers.Interface(['function approve(address,uint256) returns (bool)']);
+      const data = iface.encodeFunctionData('approve', [escrowAddr, ethers.MaxUint256]);
+      const result = await cdp.evm.sendTransaction({
+        address: eoa.address,
+        network: 'base-sepolia',
+        transaction: { to: usdcAddr, value: 0n, data },
+      });
+      console.log(`✅ EOA approve worked: ${result.transactionHash}`);
+    } else {
+      const result = await cdp.evm.sendTransaction({
+        address: eoa.address,
+        network: 'base-sepolia',
+        transaction: { to: '0x0000000000000000000000000000000000000001', value: 0n, data: '0x' },
+      });
+      console.log(`✅ EOA sendTransaction worked: ${result.transactionHash}`);
+    }
+  } catch (err) {
+    console.log(`❌ ${err.errorMessage || err.message}`);
+  }
+
+  console.log('\n=== Summary ===');
+  console.log('If Approach 3 works, we use EOA accounts with auto-faucet on testnet.');
+  console.log('On mainnet, gas is $0.01/tx — bot auto-funds each user wallet.');
+  console.log('Smart Accounts can be revisited when CDP fixes the UserOp signature issue.');
+})().catch(console.error);
