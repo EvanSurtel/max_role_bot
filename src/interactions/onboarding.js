@@ -23,6 +23,24 @@ const SERVER_TO_REGION = {
   'vietnam': 'asia', 'india': 'asia', 'middle east': 'asia', 'oceania': 'asia',
 };
 
+// Flag emoji → ISO 3166-1 alpha-2 code (used for Changelly API)
+const FLAG_TO_ISO = {
+  '🇺🇸': 'US', '🇨🇦': 'CA', '🇬🇧': 'GB', '🇩🇪': 'DE', '🇫🇷': 'FR', '🇪🇸': 'ES',
+  '🇮🇹': 'IT', '🇳🇱': 'NL', '🇵🇱': 'PL', '🇵🇹': 'PT', '🇸🇪': 'SE', '🇧🇪': 'BE',
+  '🇦🇹': 'AT', '🇨🇭': 'CH', '🇮🇪': 'IE', '🇩🇰': 'DK', '🇫🇮': 'FI', '🇳🇴': 'NO',
+  '🇬🇷': 'GR', '🇷🇴': 'RO', '🇨🇿': 'CZ', '🇭🇺': 'HU', '🇷🇺': 'RU', '🇺🇦': 'UA',
+  '🇹🇷': 'TR', '🇧🇷': 'BR', '🇲🇽': 'MX', '🇦🇷': 'AR', '🇨🇴': 'CO', '🇨🇱': 'CL',
+  '🇵🇪': 'PE', '🇻🇪': 'VE', '🇪🇨': 'EC', '🇨🇷': 'CR', '🇵🇦': 'PA', '🇬🇹': 'GT',
+  '🇵🇷': 'PR', '🇩🇴': 'DO', '🇺🇾': 'UY', '🇧🇴': 'BO', '🇵🇾': 'PY', '🇭🇳': 'HN',
+  '🇸🇻': 'SV', '🇳🇮': 'NI', '🇨🇺': 'CU', '🇮🇳': 'IN', '🇵🇭': 'PH', '🇮🇩': 'ID',
+  '🇹🇭': 'TH', '🇻🇳': 'VN', '🇲🇾': 'MY', '🇸🇬': 'SG', '🇯🇵': 'JP', '🇰🇷': 'KR',
+  '🇨🇳': 'CN', '🇹🇼': 'TW', '🇵🇰': 'PK', '🇧🇩': 'BD', '🇱🇰': 'LK', '🇳🇵': 'NP',
+  '🇲🇲': 'MM', '🇰🇭': 'KH', '🇦🇺': 'AU', '🇳🇿': 'NZ', '🇸🇦': 'SA', '🇦🇪': 'AE',
+  '🇪🇬': 'EG', '🇶🇦': 'QA', '🇰🇼': 'KW', '🇧🇭': 'BH', '🇴🇲': 'OM', '🇯🇴': 'JO',
+  '🇱🇧': 'LB', '🇮🇶': 'IQ', '🇳🇬': 'NG', '🇿🇦': 'ZA', '🇰🇪': 'KE', '🇬🇭': 'GH',
+  '🇲🇦': 'MA', '🇹🇳': 'TN', '🇩🇿': 'DZ',
+};
+
 const COUNTRY_FLAGS = {
   na: [
     { label: '🇺🇸 United States', value: '🇺🇸' },
@@ -254,10 +272,12 @@ async function handleRegistrationModal(interaction) {
 
     const regionLabel = { na: 'NA', eu: 'EU', latam: 'LATAM', asia: 'Asia', mea: 'MEA' }[region] || region.toUpperCase();
 
+    const countryCode = FLAG_TO_ISO[country] || '';
+
     db.prepare(`
-      UPDATE users SET server_username = ?, cod_ign = ?, cod_uid = ?, cod_server = ?, country_flag = ?, region = ?, deposit_region = ?, tos_accepted_at = datetime('now')
+      UPDATE users SET server_username = ?, cod_ign = ?, cod_uid = ?, cod_server = ?, country_flag = ?, country_code = ?, region = ?, deposit_region = ?, tos_accepted_at = datetime('now')
       WHERE id = ?
-    `).run(displayName, codIgn, codUid, regionLabel, country, region, depositRegion, user.id);
+    `).run(displayName, codIgn, codUid, regionLabel, country, countryCode, region, depositRegion, user.id);
 
     // Generate Base wallet
     let wallet = walletRepo.findByUserId(user.id);
