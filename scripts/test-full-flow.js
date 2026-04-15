@@ -106,6 +106,9 @@ async function main() {
   console.log(`  Player 2 approved (gasless): ${ap2.userOpHash}`);
   await cdp.evm.waitForUserOperation({ smartAccountAddress: sa2.address, userOpHash: ap2.userOpHash });
 
+  // Wait for on-chain state to propagate
+  await new Promise(r => setTimeout(r, 3000));
+
   const allow1 = await usdc.allowance(sa1.address, ESCROW_ADDR);
   const allow2 = await usdc.allowance(sa2.address, ESCROW_ADDR);
   console.log(`  Player 1 allowance: ${allow1 > 0n ? '✅' : '❌ ZERO'}`);
