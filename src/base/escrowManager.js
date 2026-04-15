@@ -102,6 +102,21 @@ async function approveEscrowForUser(userId) {
 // ─── On-chain: create match in the contract ────────────────────
 
 async function createOnChainMatch(matchId, entryAmountUsdc, playerCount) {
+  console.log(`[Escrow] createOnChainMatch: matchId=${matchId} entry=${entryAmountUsdc} players=${playerCount}`);
+  console.log(`[Escrow]   owner=${_ownerAddress()} escrow=${_escrowAddress()}`);
+
+  // Static call first to get revert reason if it would fail
+  try {
+    const provider = getProvider();
+    const testAbi = ['function createMatch(uint256 matchId, uint256 entryAmount, uint8 playerCount)'];
+    const testContract = new ethers.Contract(_escrowAddress(), testAbi, provider);
+    await testContract.createMatch.staticCall(matchId, entryAmountUsdc, playerCount, { from: _ownerAddress() });
+    console.log(`[Escrow]   static call OK — proceeding with real tx`);
+  } catch (staticErr) {
+    console.error(`[Escrow]   static call REVERTED: ${staticErr.reason || staticErr.message}`);
+    throw new Error(`createMatch would revert: ${staticErr.reason || staticErr.message}`);
+  }
+
   const { hash } = await transactionService.invokeContract(
     _ownerAddress(),
     _escrowAddress(),
@@ -119,15 +134,37 @@ async function depositToEscrow(userId, matchId, challengeId) {
   const walletRecord = walletRepo.findByUserId(userId);
   if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
 
-  // Verify the user's Smart Account has approved the escrow contract
+  console.log(`[Escrow] depositToEscrow: user=${userId} match=${matchId} address=${walletRecord.address}`);
+
+  // Check on-chain USDC balance
   const checkProvider = getProvider();
+  const balAbi = ['function balanceOf(address) view returns (uint256)'];
+  const usdcForBal = new ethers.Contract(walletManager.USDC_CONTRACT, balAbi, checkProvider);
+  const onChainBal = await usdcForBal.balanceOf(walletRecord.address);
+  console.log(`[Escrow]   on-chain USDC: ${onChainBal.toString()} (${(Number(onChainBal) / 1e6).toFixed(2)} USDC)`);
+
+  // Verify the user's Smart Account has approved the escrow contract
   const allowanceAbi = ['function allowance(address owner, address spender) view returns (uint256)'];
   const usdcContract = new ethers.Contract(walletManager.USDC_CONTRACT, allowanceAbi, checkProvider);
   const allowance = await usdcContract.allowance(walletRecord.address, _escrowAddress());
+  console.log(`[Escrow]   allowance: ${allowance.toString()}`);
+
   if (allowance === 0n) {
-    // Try to approve now (retry from failed onboarding)
-    console.warn(`[Escrow] User ${userId} has no escrow allowance — retrying approval`);
+    console.warn(`[Escrow]   user ${userId} has no escrow allowance — retrying approval`);
     await approveEscrowForUser(userId);
+    const newAllowance = await usdcContract.allowance(walletRecord.address, _escrowAddress());
+    console.log(`[Escrow]   allowance after retry: ${newAllowance.toString()}`);
+  }
+
+  // Static call to check if depositToEscrow would revert
+  try {
+    const testAbi = ['function depositToEscrow(uint256 matchId, address player)'];
+    const testContract = new ethers.Contract(_escrowAddress(), testAbi, checkProvider);
+    await testContract.depositToEscrow.staticCall(matchId, walletRecord.address, { from: _ownerAddress() });
+    console.log(`[Escrow]   static call OK — proceeding with real tx`);
+  } catch (staticErr) {
+    console.error(`[Escrow]   static call REVERTED: ${staticErr.reason || staticErr.message}`);
+    throw new Error(`depositToEscrow would revert for user ${userId}: ${staticErr.reason || staticErr.message}`);
   }
 
   // The contract owner calls depositToEscrow which does transferFrom(player, contract, amount)
@@ -170,10 +207,16 @@ async function depositToEscrow(userId, matchId, challengeId) {
 // ─── On-chain: transfer all players' USDC to escrow ────────────
 
 async function transferToEscrow(matchId, challengeId, allPlayers, entryAmountUsdc, playerCount) {
+  console.log(`[Escrow] transferToEscrow: match=${matchId} challenge=${challengeId} entry=${entryAmountUsdc} players=${playerCount}`);
+  console.log(`[Escrow]   player IDs: ${allPlayers.map(p => p.user_id).join(', ')}`);
+
   await createOnChainMatch(matchId, entryAmountUsdc, playerCount);
+
   for (const player of allPlayers) {
+    console.log(`[Escrow]   depositing for player ${player.user_id}...`);
     await depositToEscrow(player.user_id, matchId, challengeId);
   }
+  console.log(`[Escrow] transferToEscrow complete for match #${matchId}`);
 }
 
 // ─── On-chain: resolve match → pay winners ─────────────────────
