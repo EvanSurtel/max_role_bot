@@ -79,6 +79,10 @@ async function _request(method, path, body = null) {
  * @returns {Promise<{orderId: string, redirectUrl: string}|null>}
  */
 async function createOrder({ userId, walletAddress, amountUsd, countryCode }) {
+  // Build webhook URL from server's public IP and port
+  const webhookPort = process.env.WEBHOOK_PORT || '3001';
+  const webhookHost = process.env.WEBHOOK_HOST || ''; // e.g., http://40.233.115.208:3001
+
   const body = {
     externalOrderId: `rank-${userId}-${Date.now()}`,
     externalUserId: userId,
@@ -91,6 +95,11 @@ async function createOrder({ userId, walletAddress, amountUsd, countryCode }) {
     paymentMethod: 'card',
     metadata: { blockchain: 'base' },
   };
+
+  // Add webhook URL if configured
+  if (webhookHost) {
+    body.callbackUrl = `${webhookHost}/api/changelly/webhook`;
+  }
 
   const data = await _request('POST', '/orders', body);
   if (!data) return null;
