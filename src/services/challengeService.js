@@ -196,8 +196,8 @@ async function postToBoard(client, challenge) {
   }
   const embed = challengeEmbed(challenge, !!challenge.is_anonymous, teamPlayers, displayLang);
 
-  // Build the accept + cancel + language buttons
-  const { buildChallengeLanguageButton } = require('../interactions/perMessageLanguage');
+  // Build the accept + cancel buttons + inline language dropdown
+  const { buildChallengeLanguageDropdown } = require('../interactions/perMessageLanguage');
   const { t } = require('../locales/i18n');
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -208,12 +208,12 @@ async function postToBoard(client, challenge) {
       .setCustomId(`challenge_cancel_${challenge.id}`)
       .setLabel(t('challenge_create.btn_cancel_challenge', displayLang))
       .setStyle(ButtonStyle.Danger),
-    buildChallengeLanguageButton(challenge.id, displayLang),
   );
+  const langRow = buildChallengeLanguageDropdown(challenge.id, displayLang);
 
   const message = await channel.send({
     embeds: [embed],
-    components: [row],
+    components: [row, langRow],
   });
 
   // Store message reference on the challenge

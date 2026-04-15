@@ -68,7 +68,7 @@ async function handleShowLangForChallenge(interaction) {
   const row = _buildPickerRow(`pml_pick_ch_${challengeId}`, lang);
 
   await interaction.reply({
-    content: t('language_panel.description', lang),
+    content: 'Pick a language to view this challenge:',
     components: [row],
     ephemeral: true,
     _persist: true,
@@ -146,7 +146,7 @@ async function handleShowLangForResult(interaction) {
   const row = _buildPickerRow(`pml_pick_res_${matchId}`, lang);
 
   await interaction.reply({
-    content: t('language_panel.description', lang),
+    content: 'Pick a language to view this result:',
     components: [row],
     ephemeral: true,
     _persist: true,
@@ -247,6 +247,21 @@ function buildResultLanguageButton(matchId, lang = 'en') {
     .setStyle(ButtonStyle.Secondary);
 }
 
+/**
+ * Build an inline language dropdown row for a challenge message.
+ * Skips the button click step — user picks language directly from the dropdown.
+ */
+function buildChallengeLanguageDropdown(challengeId, lang = 'en') {
+  return _buildPickerRow(`pml_pick_ch_${challengeId}`, lang);
+}
+
+/**
+ * Build an inline language dropdown row for a result message.
+ */
+function buildResultLanguageDropdown(matchId, lang = 'en') {
+  return _buildPickerRow(`pml_pick_res_${matchId}`, lang);
+}
+
 module.exports = {
   handleShowLangForChallenge,
   handlePickLangForChallenge,
@@ -254,4 +269,6 @@ module.exports = {
   handlePickLangForResult,
   buildChallengeLanguageButton,
   buildResultLanguageButton,
+  buildChallengeLanguageDropdown,
+  buildResultLanguageDropdown,
 };

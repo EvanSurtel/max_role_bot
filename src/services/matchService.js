@@ -753,15 +753,13 @@ async function resolveMatch(client, matchId, winningTeam) {
     resultEmbed.addFields({ name: 'Entry', value: `${formatUsdc(entryAmount)} per player`, inline: true });
   }
 
-  // Attach a 🌐 Language button so any viewer can re-render this
-  // specific result in their own language as a personal ephemeral.
+  // Inline language dropdown — user picks a language and gets an ephemeral
+  // of this specific result in that language.
   const { ActionRowBuilder } = require('discord.js');
-  const { buildResultLanguageButton } = require('../interactions/perMessageLanguage');
+  const { buildResultLanguageDropdown } = require('../interactions/perMessageLanguage');
   const { getBotDisplayLanguage } = require('../utils/languageRefresh');
   const resultDisplayLang = getBotDisplayLanguage();
-  const langRow = new ActionRowBuilder().addComponents(
-    buildResultLanguageButton(matchId, resultDisplayLang),
-  );
+  const langRow = buildResultLanguageDropdown(matchId, resultDisplayLang);
 
   // Post to the regular results channels (all-results + cash-match-results).
   // Routed through postResultToChannels so the cache-miss / fetch fallback
