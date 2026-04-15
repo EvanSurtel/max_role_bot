@@ -269,9 +269,9 @@ async function createMatchChannels(client, challenge) {
   const typeLabel1 = isCashMatch ? t('challenge_create.type_cash_match', team1CaptainLang) : t('challenge_create.type_xp_match', team1CaptainLang);
   const typeLabel2 = isCashMatch ? t('challenge_create.type_cash_match', team2CaptainLang) : t('challenge_create.type_xp_match', team2CaptainLang);
   const typeLabelShared = isCashMatch ? t('challenge_create.type_cash_match', sharedLang) : t('challenge_create.type_xp_match', sharedLang);
-  const prizeText1 = isCashMatch ? t('match_channel.pot_label', team1CaptainLang, { amount: prizeAmountFormatted }) : '';
-  const prizeText2 = isCashMatch ? t('match_channel.pot_label', team2CaptainLang, { amount: prizeAmountFormatted }) : '';
-  const prizeTextShared = isCashMatch ? t('match_channel.pot_label', sharedLang, { amount: prizeAmountFormatted }) : '';
+  const prizeText1 = isCashMatch ? t('match_channel.match_prize_label', team1CaptainLang, { amount: prizeAmountFormatted }) : '';
+  const prizeText2 = isCashMatch ? t('match_channel.match_prize_label', team2CaptainLang, { amount: prizeAmountFormatted }) : '';
+  const prizeTextShared = isCashMatch ? t('match_channel.match_prize_label', sharedLang, { amount: prizeAmountFormatted }) : '';
 
   // Send welcome messages in team channels (each in their own captain's language)
   const team1LangRow = buildLanguageDropdownRow(team1CaptainLang);
