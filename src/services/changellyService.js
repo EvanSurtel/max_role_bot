@@ -152,9 +152,49 @@ async function getAvailableCountries() {
   return _request('GET', '/available-countries');
 }
 
+/**
+ * Create a sell (off-ramp) order — user sells USDC for fiat.
+ * @param {Object} options
+ * @param {string} options.userId       - Discord user ID
+ * @param {string} options.walletAddress - Wallet address holding the USDC
+ * @param {number|string} options.amountUsdc - Amount of USDC to sell
+ * @param {string} options.countryCode  - ISO 3166-1 alpha-2 country code
+ * @returns {Promise<{orderId: string, redirectUrl: string}|null>}
+ */
+async function createSellOrder({ userId, walletAddress, amountUsdc, countryCode }) {
+  const webhookHost = process.env.WEBHOOK_HOST || '';
+
+  const body = {
+    externalOrderId: `rank-sell-${userId}-${Date.now()}`,
+    externalUserId: userId,
+    currencyFrom: 'USDC',
+    currencyTo: 'USD',
+    amountFrom: String(amountUsdc),
+    country: countryCode,
+    walletAddress,
+    paymentMethod: 'card',
+    metadata: { blockchain: 'base' },
+  };
+
+  if (webhookHost) {
+    body.callbackUrl = `${webhookHost}/api/changelly/webhook`;
+  }
+
+  const data = await _request('POST', '/orders', body);
+  if (!data) return null;
+
+  console.log(`[Changelly] Sell order created for user ${userId}: orderId=${data.orderId || data.id || 'unknown'}`);
+
+  return {
+    orderId: data.orderId || data.id,
+    redirectUrl: data.redirectUrl || data.paymentUrl || data.redirect_url,
+  };
+}
+
 module.exports = {
   isConfigured,
   createOrder,
+  createSellOrder,
   getOffers,
   validateAddress,
   getAvailableCountries,

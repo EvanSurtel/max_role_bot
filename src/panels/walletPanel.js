@@ -215,7 +215,41 @@ async function handleWalletSubButton(interaction) {
       });
     }
 
-    // Group B — manual instructions
+    // Group B — Changelly off-ramp
+    if (changelly.isConfigured()) {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+        const availableUsdc = (Number(wallet.balance_available) / USDC_PER_UNIT).toFixed(2);
+        const result = await changelly.createSellOrder({
+          userId: user.discord_id,
+          walletAddress: address,
+          amountUsdc: availableUsdc,
+          countryCode: user.country_code || 'US',
+        });
+
+        if (result?.redirectUrl) {
+          const openButton = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setURL(result.redirectUrl).setLabel('Cash Out USDC').setStyle(ButtonStyle.Link),
+          );
+
+          return interaction.editReply({
+            content: [
+              '**💸 Cash Out**',
+              '',
+              '1. Click the button below',
+              '2. Select how much USDC to sell',
+              '3. Choose your payout method',
+              '4. Cash arrives in your account',
+            ].join('\n'),
+            components: [openButton],
+          });
+        }
+      } catch (err) {
+        console.warn(`[Wallet] Changelly sell order failed: ${err.message}`);
+      }
+    }
+
+    // Fallback — manual instructions
     return interaction.reply({
       content: [
         '**💸 Cash Out**',
@@ -223,9 +257,7 @@ async function handleWalletSubButton(interaction) {
         'To convert your USDC to cash:',
         '1. Click **Send** to withdraw USDC to an exchange (Binance, Coinbase, etc.)',
         '2. Make sure to send to your exchange\'s **USDC deposit address on the Base network**',
-        '3. Once it arrives on the exchange, sell USDC for your local currency and withdraw to your bank',
-        '',
-        '⚠️ Always double-check the network is **Base** before sending.',
+        '3. Sell USDC for your local currency and withdraw to your bank',
       ].join('\n'),
       ephemeral: true,
     });
