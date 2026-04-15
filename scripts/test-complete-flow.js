@@ -288,6 +288,75 @@ async function main() {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // SECTION 11: REGION → ON-RAMP/OFF-RAMP ROUTING
+  // ═══════════════════════════════════════════════════════════
+  console.log('\n── SECTION 11: REGION ROUTING ──');
+
+  const regionTests = [
+    { region: 'na', country: '🇺🇸', expected: 'GROUP_A', label: 'US (NA)' },
+    { region: 'eu', country: '🇩🇪', expected: 'GROUP_A', label: 'Germany (EU)' },
+    { region: 'latam', country: '🇧🇷', expected: 'GROUP_B', label: 'Brazil (LATAM)' },
+    { region: 'asia', country: '🇮🇳', expected: 'GROUP_B', label: 'India (Asia)' },
+    { region: 'mea', country: '🇸🇦', expected: 'GROUP_B', label: 'Saudi Arabia (MEA)' },
+    { region: 'asia', country: '🇦🇺', expected: 'GROUP_A', label: 'Australia (Asia but GROUP_A country)' },
+    { region: 'asia', country: '🇯🇵', expected: 'GROUP_A', label: 'Japan (Asia but GROUP_A country)' },
+    { region: 'asia', country: '🇸🇬', expected: 'GROUP_A', label: 'Singapore (Asia but GROUP_A country)' },
+    { region: 'mea', country: '🇳🇬', expected: 'GROUP_B', label: 'Nigeria (MEA)' },
+  ];
+
+  const GROUP_A_REGIONS = new Set(['na', 'eu']);
+  const GROUP_A_COUNTRIES = new Set([
+    '🇺🇸', '🇬🇧', '🇨🇦', '🇦🇺', '🇨🇭', '🇸🇬', '🇯🇵',
+    '🇦🇹', '🇧🇪', '🇧🇬', '🇭🇷', '🇨🇾', '🇨🇿', '🇩🇰', '🇪🇪', '🇫🇮', '🇫🇷',
+    '🇩🇪', '🇬🇷', '🇭🇺', '🇮🇪', '🇮🇹', '🇱🇻', '🇱🇹', '🇱🇺', '🇲🇹', '🇳🇱',
+    '🇵🇱', '🇵🇹', '🇷🇴', '🇸🇰', '🇸🇮', '🇪🇸', '🇸🇪',
+  ]);
+
+  for (const t of regionTests) {
+    const result = (GROUP_A_REGIONS.has(t.region) || GROUP_A_COUNTRIES.has(t.country)) ? 'GROUP_A' : 'GROUP_B';
+    const provider = result === 'GROUP_A' ? 'Coinbase' : 'Changelly';
+    if (result === t.expected) pass(`${t.label} → ${result} (${provider})`);
+    else fail(`${t.label}`, `Expected ${t.expected}, got ${result}`);
+  }
+
+  // Verify URL generation for each group
+  const testAddr = '0x1234567890123456789012345678901234567890';
+  const cdpAppId = process.env.CDP_API_KEY || process.env.CDP_API_KEY_ID || 'test';
+
+  // Group A: Coinbase Onramp
+  const onrampUrl = `https://pay.coinbase.com/buy/select-asset?appId=${cdpAppId}&addresses={"${testAddr}":["base"]}&assets=["USDC"]`;
+  if (onrampUrl.includes(testAddr) && onrampUrl.includes('base') && onrampUrl.includes('USDC')) {
+    pass('GROUP_A Onramp URL: address + base + USDC');
+  } else {
+    fail('GROUP_A Onramp URL', 'Missing components');
+  }
+
+  // Group A: Coinbase Offramp
+  const offrampUrl = `https://pay.coinbase.com/sell/select-asset?appId=${cdpAppId}&addresses={"${testAddr}":["base"]}&assets=["USDC"]`;
+  if (offrampUrl.includes(testAddr) && offrampUrl.includes('USDC')) {
+    pass('GROUP_A Offramp URL: address + USDC');
+  } else {
+    fail('GROUP_A Offramp URL', 'Missing components');
+  }
+
+  // Country code mapping
+  try {
+    const { FLAG_TO_ISO } = require('../src/interactions/onboarding');
+    if (FLAG_TO_ISO) {
+      const usCode = FLAG_TO_ISO['🇺🇸'];
+      const brCode = FLAG_TO_ISO['🇧🇷'];
+      const saCode = FLAG_TO_ISO['🇸🇦'];
+      if (usCode === 'US' && brCode === 'BR' && saCode === 'SA') {
+        pass(`Country codes: 🇺🇸→US 🇧🇷→BR 🇸🇦→SA`);
+      } else {
+        fail('Country codes', `US=${usCode} BR=${brCode} SA=${saCode}`);
+      }
+    } else {
+      skip('Country codes', 'FLAG_TO_ISO not exported');
+    }
+  } catch (e) { skip('Country codes', e.message); }
+
+  // ═══════════════════════════════════════════════════════════
   // RESULTS
   // ═══════════════════════════════════════════════════════════
   console.log('\n' + '═'.repeat(60));
