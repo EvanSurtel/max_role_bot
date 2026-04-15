@@ -686,7 +686,6 @@ async function _executeSolWithdraw(interaction, user, amountSol, address, lang) 
 
     const { signature } = await transactionService.transferEth(
       wallet.address, address, amountWei,
-      { ownerRef: wallet.account_ref, smartRef: wallet.smart_account_ref },
     );
 
     transactionRepo.create({

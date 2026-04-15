@@ -1,21 +1,8 @@
-// Base transaction service — CDP Smart Accounts + EOA fallback.
+// Base transaction service — CDP Smart Accounts + Paymaster.
 //
-// Primary path: Smart Account UserOps via sendUserOperation (gasless).
-//   - Base Sepolia: gas subsidized by default (no paymasterUrl needed)
-//   - Base mainnet: gas sponsored via CDP Paymaster (auto-configured)
-//
-// Fallback path: EOA sendTransaction (needs ETH for gas).
-//   - Used when the wallet is a legacy EOA-only account
-//   - Used when the Smart Account UserOp fails
-//
-// The SDK provides two UserOp methods:
-//   1. cdp.evm.sendUserOperation() — 3-step: prepare -> sign -> send
-//   2. cdp.evm.prepareAndSendUserOperation() — 1-step: server handles all
-//
-// We use #1 (sendUserOperation) as primary since it works with both
-// CDP server accounts and external signers. If it fails, we try
-// #2 (prepareAndSendUserOperation) which only works with CDP server
-// account owners but handles signing entirely server-side.
+// ALL user transactions use Smart Account UserOps (gasless).
+// Owner/admin escrow calls use EOA sendTransaction (owner has ETH).
+// No EOA fallback for users — Paymaster handles all gas.
 
 const { ethers } = require('ethers');
 const { getCdpClient, getSmartAccountFromRef, USDC_CONTRACT } = require('./walletManager');
@@ -25,91 +12,50 @@ function getCdpNetwork() {
   return getNetwork() === 'sepolia' ? 'base-sepolia' : 'base';
 }
 
-// ─── Smart Account UserOp (gasless) ─────────────────────────
-
 /**
- * Send a UserOp via Smart Account. Tries sendUserOperation first,
- * falls back to prepareAndSendUserOperation if the signature fails.
- *
- * @param {object} smartAccount — CDP Smart Account object
- * @param {Array} calls — Array of { to, value, data } call objects
- * @returns {string} — Transaction hash
+ * Send a gasless UserOp via Smart Account + Paymaster.
+ * Uses prepareAndSendUserOperation (1-step server-side) as primary.
  */
 async function _sendUserOp(smartAccount, calls) {
   const cdp = getCdpClient();
   const network = getCdpNetwork();
 
-  // Attempt 1: sendUserOperation (3-step: prepare -> sign -> send)
-  try {
-    const result = await cdp.evm.sendUserOperation({
-      smartAccount,
-      network,
-      calls,
-    });
+  const result = await cdp.evm.prepareAndSendUserOperation({
+    smartAccount,
+    network,
+    calls: calls.map(c => ({
+      to: c.to,
+      value: c.value ?? 0n,
+      data: c.data || '0x',
+    })),
+  });
 
-    // Wait for the UserOp to complete and get the transaction hash
-    const receipt = await cdp.evm.waitForUserOperation({
-      smartAccountAddress: smartAccount.address,
-      userOpHash: result.userOpHash,
-    });
+  const receipt = await cdp.evm.waitForUserOperation({
+    smartAccountAddress: smartAccount.address,
+    userOpHash: result.userOpHash,
+  });
 
-    if (receipt.status === 'complete' && receipt.transactionHash) {
-      return receipt.transactionHash;
-    }
-
-    // If completed but no hash, return the userOpHash as fallback
-    return result.userOpHash;
-  } catch (err) {
-    const msg = err.errorMessage || err.message || '';
-    console.warn(`[Base] sendUserOperation failed: ${msg}`);
-
-    // If it's a signature error, try the server-side 1-step method
-    if (msg.includes('signature') || msg.includes('UserOp')) {
-      console.log('[Base] Retrying with prepareAndSendUserOperation (server-side)...');
-      try {
-        const result = await cdp.evm.prepareAndSendUserOperation({
-          smartAccount,
-          network,
-          calls: calls.map(c => ({
-            to: c.to,
-            value: c.value ?? 0n,
-            data: c.data || '0x',
-          })),
-        });
-
-        const receipt = await cdp.evm.waitForUserOperation({
-          smartAccountAddress: smartAccount.address,
-          userOpHash: result.userOpHash,
-        });
-
-        if (receipt.status === 'complete' && receipt.transactionHash) {
-          return receipt.transactionHash;
-        }
-        return result.userOpHash;
-      } catch (err2) {
-        console.error(`[Base] prepareAndSendUserOperation also failed: ${err2.errorMessage || err2.message}`);
-        throw err2;
-      }
-    }
-
-    throw err;
+  if (receipt.status === 'complete' && receipt.transactionHash) {
+    return receipt.transactionHash;
   }
+  return result.userOpHash;
 }
 
-// ─── EOA sendTransaction (fallback) ─────────────────────────
-
 /**
- * Send a transaction via EOA with nonce retry (handles rapid sequential txs).
+ * Send a transaction from the owner EOA (for escrow contract calls only).
+ * Owner account has ETH for gas — this is NOT used for user transactions.
  */
-async function _sendTx(address, to, data, value = 0n) {
+async function _sendOwnerTx(to, data, value = 0n) {
   const cdp = getCdpClient();
   const network = getCdpNetwork();
+  const ownerAddr = process.env.CDP_OWNER_ADDRESS;
+  if (!ownerAddr) throw new Error('CDP_OWNER_ADDRESS not set');
 
   let lastErr;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const { transactionHash } = await cdp.evm.sendTransaction({
-        address,
+        address: ownerAddr,
         network,
         transaction: { to, value, data: data || '0x' },
       });
@@ -128,81 +74,64 @@ async function _sendTx(address, to, data, value = 0n) {
   throw lastErr;
 }
 
-// ─── Hybrid send: Smart Account first, EOA fallback ────────
-
 /**
- * Send a call trying Smart Account UserOp first, falling back to EOA.
- *
- * @param {string} address — The wallet address (Smart Account or EOA)
- * @param {string} ownerAccountName — The owner EOA name (from account_ref)
- * @param {string} [smartAccountName] — The Smart Account name (from smart_account_ref)
- * @param {string} to — Target contract address
- * @param {string} data — Encoded calldata
- * @param {bigint} [value=0n] — ETH value in wei
- * @returns {string} — Transaction hash
+ * Get the Smart Account for a user from their stored refs.
  */
-async function _sendHybrid(address, ownerAccountName, smartAccountName, to, data, value = 0n) {
-  // Try Smart Account path first (gasless)
-  if (smartAccountName && ownerAccountName) {
-    try {
-      const { smartAccount } = await getSmartAccountFromRef(ownerAccountName, smartAccountName);
-      if (smartAccount) {
-        const hash = await _sendUserOp(smartAccount, [{ to, value, data: data || '0x' }]);
-        return hash;
-      }
-    } catch (err) {
-      console.warn(`[Base] Smart Account UserOp failed, falling back to EOA: ${err.message}`);
-    }
+async function _getUserSmartAccount(refs) {
+  if (!refs?.ownerRef || !refs?.smartRef) {
+    throw new Error('Smart Account refs required (ownerRef + smartRef)');
   }
-
-  // Fallback: EOA sendTransaction (needs ETH for gas)
-  // Use the owner account name to resolve the EOA address
-  if (ownerAccountName) {
-    try {
-      const { owner } = await getSmartAccountFromRef(ownerAccountName);
-      return await _sendTx(owner.address, to, data, value);
-    } catch (err) {
-      console.warn(`[Base] EOA via owner name failed: ${err.message}`);
-    }
-  }
-
-  // Last resort: try sendTransaction with the address directly
-  // (works for legacy EOA-only wallets where address === EOA address)
-  return await _sendTx(address, to, data, value);
+  const { smartAccount } = await getSmartAccountFromRef(refs.ownerRef, refs.smartRef);
+  if (!smartAccount) throw new Error('Smart Account not found');
+  return smartAccount;
 }
 
 // ─── Public API ─────────────────────────────────────────────
 
-async function transferUsdc(fromAddress, toAddress, amountSmallest, { ownerRef, smartRef } = {}) {
+/**
+ * Transfer USDC from a user's Smart Account (gasless).
+ */
+async function transferUsdc(fromAddress, toAddress, amountSmallest, refs) {
   const iface = new ethers.Interface(['function transfer(address to, uint256 amount) returns (bool)']);
   const data = iface.encodeFunctionData('transfer', [toAddress, BigInt(amountSmallest)]);
-  const hash = await _sendHybrid(fromAddress, ownerRef, smartRef, USDC_CONTRACT, data);
-  console.log(`[Base] USDC transfer ${amountSmallest} -> ${toAddress}: ${hash}`);
+  const sa = await _getUserSmartAccount(refs);
+  const hash = await _sendUserOp(sa, [{ to: USDC_CONTRACT, value: 0n, data }]);
+  console.log(`[Base] USDC transfer ${amountSmallest} → ${toAddress} (gasless): ${hash}`);
   return { hash, signature: hash };
 }
 
-async function transferEth(fromAddress, toAddress, amountWei, { ownerRef, smartRef } = {}) {
-  const hash = await _sendHybrid(fromAddress, ownerRef, smartRef, toAddress, '0x', BigInt(amountWei));
-  console.log(`[Base] ETH transfer ${amountWei} wei -> ${toAddress}: ${hash}`);
+/**
+ * Transfer ETH — owner only (for admin operations).
+ */
+async function transferEth(fromAddress, toAddress, amountWei) {
+  const hash = await _sendOwnerTx(toAddress, '0x', BigInt(amountWei));
+  console.log(`[Base] ETH transfer ${amountWei} wei → ${toAddress}: ${hash}`);
   return { hash, signature: hash };
 }
 
-async function invokeContract(fromAddress, contractAddress, method, args, abi, { ownerRef, smartRef } = {}) {
+/**
+ * Invoke escrow contract function (owner EOA — needs ETH).
+ */
+async function invokeContract(fromAddress, contractAddress, method, args, abi) {
   const abiEntry = abi.find(f => f.name === method);
   if (!abiEntry) throw new Error(`Method '${method}' not found in ABI`);
   const orderedArgs = abiEntry.inputs.map(i => args[i.name]);
   const iface = new ethers.Interface(abi);
   const data = iface.encodeFunctionData(method, orderedArgs);
-  const hash = await _sendHybrid(fromAddress, ownerRef, smartRef, contractAddress, data);
+  const hash = await _sendOwnerTx(contractAddress, data);
   console.log(`[Base] Contract call ${method} on ${contractAddress}: ${hash}`);
   return { hash, signature: hash };
 }
 
-async function approveUsdc(fromAddress, spenderAddress, { ownerRef, smartRef } = {}) {
+/**
+ * Approve escrow to spend USDC from a user's Smart Account (gasless).
+ */
+async function approveUsdc(fromAddress, spenderAddress, refs) {
   const iface = new ethers.Interface(['function approve(address spender, uint256 value) returns (bool)']);
   const data = iface.encodeFunctionData('approve', [spenderAddress, ethers.MaxUint256]);
-  const hash = await _sendHybrid(fromAddress, ownerRef, smartRef, USDC_CONTRACT, data);
-  console.log(`[Base] USDC approve(${spenderAddress}, MAX): ${hash}`);
+  const sa = await _getUserSmartAccount(refs);
+  const hash = await _sendUserOp(sa, [{ to: USDC_CONTRACT, value: 0n, data }]);
+  console.log(`[Base] USDC approve(${spenderAddress}, MAX) gasless: ${hash}`);
   return { hash, signature: hash };
 }
 
@@ -214,7 +143,4 @@ module.exports = {
   transferSol,
   invokeContract,
   approveUsdc,
-  // Expose for direct use by escrowManager etc.
-  _sendUserOp,
-  _sendTx,
 };
