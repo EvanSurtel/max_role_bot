@@ -100,7 +100,7 @@ module.exports = {
   // Public wallet channel panel (shared message everyone sees)
   public_wallet: {
     title: '💰 Ví',
-    description: 'Nhấn **Xem Ví Của Tôi** bên dưới để xem số dư, địa chỉ nạp, lịch sử giao dịch và quản lý tiền của bạn.\n\nThông tin ví của bạn là **riêng tư** — chỉ mình bạn mới có thể thấy số dư và các hành động của chính mình.',
+    description: 'Nhấn **Xem Ví Của Tôi** bên dưới để xem số dư, địa chỉ nạp, lịch sử giao dịch và quản lý tiền của bạn.',
     footer: 'USDC trên Base',
     btn_view_wallet: 'Xem Ví Của Tôi',
   },

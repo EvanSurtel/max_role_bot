@@ -100,7 +100,7 @@ module.exports = {
   // Public wallet channel panel (shared message everyone sees)
   public_wallet: {
     title: '💰 Dompet',
-    description: 'Klik **Lihat Dompet Saya** di bawah untuk lihat baki, alamat deposit, sejarah transaksi, dan urus dana kamu.\n\nMaklumat dompet kamu adalah **peribadi** — hanya kamu sahaja yang boleh lihat baki dan tindakan kamu sendiri.',
+    description: 'Klik **Lihat Dompet Saya** di bawah untuk lihat baki, alamat deposit, sejarah transaksi, dan urus dana kamu.',
     footer: 'USDC di Base',
     btn_view_wallet: 'Lihat Dompet Saya',
   },

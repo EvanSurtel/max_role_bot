@@ -100,7 +100,7 @@ module.exports = {
   // Public wallet channel panel (shared message everyone sees)
   public_wallet: {
     title: '💰 Carteira',
-    description: 'Clique em **Ver Minha Carteira** abaixo para ver seu saldo, endereço de depósito, histórico de transações e gerenciar seus fundos.\n\nAs informações da sua carteira são **privadas** — só você pode ver seu saldo e suas ações.',
+    description: 'Clique em **Ver Minha Carteira** abaixo para ver seu saldo, endereço de depósito, histórico de transações e gerenciar seus fundos.',
     footer: 'USDC na Base',
     btn_view_wallet: 'Ver Minha Carteira',
   },

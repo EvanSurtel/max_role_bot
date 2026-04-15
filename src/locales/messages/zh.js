@@ -100,7 +100,7 @@ module.exports = {
   // Public wallet channel panel (shared message everyone sees)
   public_wallet: {
     title: '💰 钱包',
-    description: '点击下方的 **查看我的钱包** 查看余额、充值地址、交易记录并管理你的资金。\n\n你的钱包信息是**私密**的 — 只有你自己能看到你的余额和操作。',
+    description: '点击下方的 **查看我的钱包** 查看余额、充值地址、交易记录并管理你的资金。',
     footer: 'Base 上的 USDC',
     btn_view_wallet: '查看我的钱包',
   },

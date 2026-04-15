@@ -100,7 +100,7 @@ module.exports = {
   // Public wallet channel panel (shared message everyone sees)
   public_wallet: {
     title: '💰 Wallet',
-    description: 'Klik **Lihat Wallet Saya** di bawah untuk melihat saldo, alamat setoran, riwayat transaksi, dan mengelola dana kamu.\n\nInfo wallet kamu **pribadi** — hanya kamu yang bisa melihat saldo dan aksi kamu sendiri.',
+    description: 'Klik **Lihat Wallet Saya** di bawah untuk melihat saldo, alamat setoran, riwayat transaksi, dan mengelola dana kamu.',
     footer: 'USDC di Base',
     btn_view_wallet: 'Lihat Wallet Saya',
   },

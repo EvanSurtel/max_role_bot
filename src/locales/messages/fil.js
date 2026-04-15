@@ -100,7 +100,7 @@ module.exports = {
   // Public wallet channel panel (shared message everyone sees)
   public_wallet: {
     title: '💰 Wallet',
-    description: 'I-click ang **Tingnan ang Wallet Ko** sa baba para makita ang balanse mo, deposit address, transaction history, at i-manage ang pondo mo.\n\nPrivate ang impormasyon ng wallet mo — ikaw lang ang makakakita ng sarili mong balanse at mga aksyon.',
+    description: 'I-click ang **Tingnan ang Wallet Ko** sa baba para makita ang balanse mo, deposit address, transaction history, at i-manage ang pondo mo.',
     footer: 'USDC sa Base',
     btn_view_wallet: 'Tingnan ang Wallet Ko',
   },

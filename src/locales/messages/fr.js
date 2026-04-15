@@ -100,7 +100,7 @@ module.exports = {
   // Public wallet channel panel (shared message everyone sees)
   public_wallet: {
     title: '💰 Portefeuille',
-    description: 'Cliquez sur **Voir Mon Portefeuille** ci-dessous pour voir votre solde, votre adresse de dépôt, votre historique de transactions et gérer vos fonds.\n\nLes infos de votre portefeuille sont **privées** — vous seul pouvez voir votre solde et vos actions.',
+    description: 'Cliquez sur **Voir Mon Portefeuille** ci-dessous pour voir votre solde, votre adresse de dépôt, votre historique de transactions et gérer vos fonds.',
     footer: 'USDC sur Base',
     btn_view_wallet: 'Voir Mon Portefeuille',
   },

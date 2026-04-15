@@ -101,7 +101,7 @@ module.exports = {
   // Public wallet channel panel (shared message everyone sees)
   public_wallet: {
     title: '💰 Cüzdan',
-    description: 'Bakiyeni, yatırım adresini, işlem geçmişini görmek ve paranı yönetmek için aşağıdaki **Cüzdanımı Gör** butonuna tıkla.\n\nCüzdan bilgilerin **gizlidir** — sadece sen kendi bakiyeni ve işlemlerini görebilirsin.',
+    description: 'Bakiyeni, yatırım adresini, işlem geçmişini görmek ve paranı yönetmek için aşağıdaki **Cüzdanımı Gör** butonuna tıkla.',
     footer: 'Base üzerinde USDC',
     btn_view_wallet: 'Cüzdanımı Gör',
   },

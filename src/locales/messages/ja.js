@@ -100,7 +100,7 @@ module.exports = {
   // Public wallet channel panel (shared message everyone sees)
   public_wallet: {
     title: '💰 ウォレット',
-    description: '下の **マイウォレットを表示** をクリックすると、残高、入金アドレス、取引履歴を確認し、資金を管理できます。\n\nウォレット情報は **プライベート** です — 自分の残高と操作は自分だけが見ることができます。',
+    description: '下の **マイウォレットを表示** をクリックすると、残高、入金アドレス、取引履歴を確認し、資金を管理できます。',
     footer: 'Base 上の USDC',
     btn_view_wallet: 'マイウォレットを表示',
   },

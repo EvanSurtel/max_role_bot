@@ -100,7 +100,7 @@ module.exports = {
   // Public wallet channel panel (shared message everyone sees)
   public_wallet: {
     title: '💰 المحفظة',
-    description: 'اضغط على **عرض محفظتي** أدناه لرؤية رصيدك، وعنوان الإيداع، وسجل المعاملات، ولإدارة أموالك.\n\nمعلومات محفظتك **خاصة** — أنت فقط من يمكنه رؤية رصيدك وإجراءاتك.',
+    description: 'اضغط على **عرض محفظتي** أدناه لرؤية رصيدك، وعنوان الإيداع، وسجل المعاملات، ولإدارة أموالك.',
     footer: 'USDC على Base',
     btn_view_wallet: 'عرض محفظتي',
   },

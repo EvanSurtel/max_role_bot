@@ -101,7 +101,7 @@ module.exports = {
   // Public wallet channel panel (shared message everyone sees)
   public_wallet: {
     title: '💰 Portfel',
-    description: 'Kliknij **Zobacz Mój Portfel** poniżej, aby zobaczyć saldo, adres wpłaty, historię transakcji i zarządzać środkami.\n\nInformacje o twoim portfelu są **prywatne** — tylko ty możesz zobaczyć własne saldo i akcje.',
+    description: 'Kliknij **Zobacz Mój Portfel** poniżej, aby zobaczyć saldo, adres wpłaty, historię transakcji i zarządzać środkami.',
     footer: 'USDC na Base',
     btn_view_wallet: 'Zobacz Mój Portfel',
   },

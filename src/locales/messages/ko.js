@@ -100,7 +100,7 @@ module.exports = {
   // Public wallet channel panel (shared message everyone sees)
   public_wallet: {
     title: '💰 지갑',
-    description: '아래의 **내 지갑 보기** 버튼을 클릭하면 잔액, 입금 주소, 거래 내역을 확인하고 자금을 관리할 수 있어요.\n\n지갑 정보는 **비공개** 예요 — 본인의 잔액과 작업은 본인만 볼 수 있어요.',
+    description: '아래의 **내 지갑 보기** 버튼을 클릭하면 잔액, 입금 주소, 거래 내역을 확인하고 자금을 관리할 수 있어요.',
     footer: 'Base의 USDC',
     btn_view_wallet: '내 지갑 보기',
   },
