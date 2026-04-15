@@ -66,7 +66,7 @@ client.once('ready', async () => {
     // it just listens on WEBHOOK_PORT and 401s unsigned requests.
     try {
       const { startWebhookServer } = require('./services/webhookServer');
-      startWebhookServer();
+      startWebhookServer(client);
     } catch (err) {
       console.error('[Boot] Webhook server failed to start:', err.message);
     }

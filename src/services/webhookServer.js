@@ -1,13 +1,16 @@
-// Webhook HTTP server — handles Changelly fiat on-ramp callbacks
-// and health checks. Runs on WEBHOOK_PORT (default 3001).
+// Webhook HTTP server — handles Changelly fiat on-ramp callbacks.
+// DMs the user on status changes (processing, completed, failed).
 
 const express = require('express');
+const { EmbedBuilder } = require('discord.js');
 
 let app = null;
 let server = null;
+let discordClient = null;
 
-function startWebhookServer() {
+function startWebhookServer(client) {
   if (server) return;
+  discordClient = client;
 
   const port = parseInt(process.env.WEBHOOK_PORT || '3001', 10);
   if (!port || Number.isNaN(port)) {
@@ -23,30 +26,78 @@ function startWebhookServer() {
   });
 
   // ─── Changelly Fiat On-Ramp Webhook ─────────────────────────
-  // Changelly sends POST requests with transaction status updates.
-  // When a fiat purchase completes, the user's USDC arrives at their
-  // wallet on Base — the deposit poller picks it up automatically.
-  // This webhook just logs the status for tracking/debugging.
-  app.post('/api/changelly/webhook', (req, res) => {
-    // Always respond 200 so Changelly doesn't retry
+  app.post('/api/changelly/webhook', async (req, res) => {
     res.status(200).json({ ok: true });
 
     try {
       const payload = req.body;
-      const { externalOrderId, externalUserId, status, currencyTo, amountTo, payoutAddress } = payload || {};
+      const {
+        externalOrderId,
+        externalUserId, // Discord user ID
+        status,
+        currencyTo,
+        amountTo,
+        payoutAddress,
+      } = payload || {};
 
-      console.log(`[Changelly] Webhook: order=${externalOrderId} user=${externalUserId} status=${status} amount=${amountTo} ${currencyTo} → ${payoutAddress}`);
+      console.log(`[Changelly] Webhook: order=${externalOrderId} user=${externalUserId} status=${status} amount=${amountTo} ${currencyTo}`);
 
-      if (status === 'completed' || status === 'finished') {
-        console.log(`[Changelly] ✅ Order ${externalOrderId} completed — ${amountTo} ${currencyTo} sent to ${payoutAddress}`);
-        // The deposit poller will detect the USDC balance increase
-        // and credit the user's DB balance automatically.
-        // No manual action needed here.
-      } else if (status === 'failed' || status === 'expired' || status === 'refunded') {
-        console.warn(`[Changelly] ❌ Order ${externalOrderId} ${status} for user ${externalUserId}`);
+      if (!externalUserId || !discordClient) return;
+
+      // DM the user based on status
+      try {
+        const user = await discordClient.users.fetch(externalUserId);
+        if (!user) return;
+
+        let embed;
+
+        if (status === 'completed' || status === 'finished') {
+          embed = new EmbedBuilder()
+            .setTitle('Deposit Complete')
+            .setColor(0x2ecc71)
+            .setDescription(`Your purchase of **${amountTo || '?'} ${currencyTo || 'USDC'}** has been completed.\n\nThe funds will appear in your wallet balance shortly.`)
+            .setTimestamp();
+
+        } else if (status === 'processing' || status === 'exchanging' || status === 'sending') {
+          embed = new EmbedBuilder()
+            .setTitle('Deposit Processing')
+            .setColor(0xf1c40f)
+            .setDescription(`Your purchase of **${amountTo || '?'} ${currencyTo || 'USDC'}** is being processed.\n\nThis usually takes a few minutes.`)
+            .setTimestamp();
+
+        } else if (status === 'failed') {
+          embed = new EmbedBuilder()
+            .setTitle('Deposit Failed')
+            .setColor(0xe74c3c)
+            .setDescription('Your deposit could not be completed. No funds were charged.\n\nPlease try again or use a different payment method.')
+            .setTimestamp();
+
+        } else if (status === 'expired') {
+          embed = new EmbedBuilder()
+            .setTitle('Deposit Expired')
+            .setColor(0xe74c3c)
+            .setDescription('Your deposit session expired before payment was completed.\n\nPlease start a new deposit from your wallet.')
+            .setTimestamp();
+
+        } else if (status === 'refunded') {
+          embed = new EmbedBuilder()
+            .setTitle('Deposit Refunded')
+            .setColor(0xe67e22)
+            .setDescription('Your deposit has been refunded. The funds will be returned to your original payment method.')
+            .setTimestamp();
+
+        } else {
+          // Unknown status — don't DM
+          return;
+        }
+
+        await user.send({ embeds: [embed] });
+        console.log(`[Changelly] DM sent to ${externalUserId}: ${status}`);
+      } catch (dmErr) {
+        console.warn(`[Changelly] Could not DM user ${externalUserId}: ${dmErr.message}`);
       }
     } catch (err) {
-      console.error('[Changelly] Webhook parse error:', err.message);
+      console.error('[Changelly] Webhook error:', err.message);
     }
   });
 
@@ -64,6 +115,7 @@ function stopWebhookServer() {
     server.close(() => console.log('[Webhook] Stopped'));
     server = null;
     app = null;
+    discordClient = null;
   }
 }
 
