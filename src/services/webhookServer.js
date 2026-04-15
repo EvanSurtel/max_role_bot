@@ -30,6 +30,20 @@ function startWebhookServer(client) {
     res.status(200).json({ ok: true });
 
     try {
+      // Verify the callback signature if the public key is configured
+      const callbackPubKey = process.env.CHANGELLY_CALLBACK_PUBLIC_KEY;
+      if (callbackPubKey && req.headers['x-callback-signature']) {
+        const crypto = require('crypto');
+        const signature = req.headers['x-callback-signature'];
+        const body = JSON.stringify(req.body);
+        const verify = crypto.createVerify('RSA-SHA256');
+        verify.update(body);
+        if (!verify.verify(callbackPubKey, signature, 'base64')) {
+          console.warn('[Changelly] Invalid webhook signature — rejecting');
+          return;
+        }
+      }
+
       const payload = req.body;
       const {
         externalOrderId,
