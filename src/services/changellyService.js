@@ -19,14 +19,23 @@ function isConfigured() {
 }
 
 /**
- * Create HMAC SHA256 signature of the request body.
+ * Create RSA-SHA256 signature of the full URL + request body.
+ * Changelly requires: sign(fullUrl + JSON.stringify(body || {}))
  */
-function _sign(body) {
-  const payload = typeof body === 'string' ? body : JSON.stringify(body);
+function _sign(fullUrl, body) {
+  const privateKeyObject = crypto.createPrivateKey({
+    key: getApiSecret(),
+    type: 'pkcs1',
+    format: 'pem',
+    encoding: 'base64',
+  });
+
+  const message = body || {};
+  const payload = fullUrl + JSON.stringify(message);
+
   return crypto
-    .createHmac('sha256', getApiSecret())
-    .update(payload)
-    .digest('hex');
+    .sign('sha256', Buffer.from(payload), privateKeyObject)
+    .toString('base64');
 }
 
 /**
@@ -39,17 +48,16 @@ async function _request(method, path, body = null) {
   }
 
   const url = `${getApiUrl()}${path}`;
-  const serializedBody = body ? JSON.stringify(body) : '';
 
   const headers = {
     'Content-Type': 'application/json',
     'X-Api-Key': getApiKey(),
-    'X-Api-Signature': _sign(serializedBody),
+    'X-Api-Signature': _sign(url, body),
   };
 
   const options = { method, headers };
   if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
-    options.body = serializedBody;
+    options.body = JSON.stringify(body);
   }
 
   try {

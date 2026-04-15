@@ -18,21 +18,27 @@ const CHANGELLY_URL = process.env.CHANGELLY_FIAT_API_URL || 'https://fiat-api.ch
 const WEBHOOK_HOST = process.env.WEBHOOK_HOST || '';
 const WEBHOOK_PORT = process.env.WEBHOOK_PORT || '3001';
 
-function sign(body) {
-  const payload = typeof body === 'string' ? body : JSON.stringify(body);
-  return crypto.createHmac('sha256', CHANGELLY_SECRET).update(payload).digest('hex');
+function sign(fullUrl, body) {
+  const privateKeyObject = crypto.createPrivateKey({
+    key: CHANGELLY_SECRET,
+    type: 'pkcs1',
+    format: 'pem',
+    encoding: 'base64',
+  });
+  const message = body || {};
+  const payload = fullUrl + JSON.stringify(message);
+  return crypto.sign('sha256', Buffer.from(payload), privateKeyObject).toString('base64');
 }
 
 async function changellyRequest(method, path, body = null) {
   const url = `${CHANGELLY_URL}${path}`;
-  const serialized = body ? JSON.stringify(body) : '';
   const headers = {
     'Content-Type': 'application/json',
     'X-Api-Key': CHANGELLY_KEY,
-    'X-Api-Signature': sign(serialized),
+    'X-Api-Signature': sign(url, body),
   };
   const opts = { method, headers };
-  if (body) opts.body = serialized;
+  if (body) opts.body = JSON.stringify(body);
 
   const res = await fetch(url, opts);
   const text = await res.text();
