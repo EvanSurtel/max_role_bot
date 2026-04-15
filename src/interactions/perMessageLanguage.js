@@ -92,10 +92,9 @@ async function handlePickLangForChallenge(interaction) {
   // Look up the challenge
   const challenge = challengeRepo.findById(challengeId);
   if (!challenge) {
-    return interaction.update({
+    return interaction.reply({
       content: t('per_message_lang.not_found', newLang),
-      components: [],
-      embeds: [],
+      ephemeral: true,
     });
   }
 
@@ -110,7 +109,9 @@ async function handlePickLangForChallenge(interaction) {
   }
   const embed = challengeEmbed(challenge, !!challenge.is_anonymous, teamPlayers, newLang);
 
-  // Functional Accept + Cancel buttons in the user's new language
+  // Functional Accept + Cancel buttons — same challenge ID, so accepting
+  // from this ephemeral or the original board message both affect the
+  // same challenge (no double-accept possible).
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`challenge_accept_${challenge.id}`)
@@ -122,10 +123,11 @@ async function handlePickLangForChallenge(interaction) {
       .setStyle(ButtonStyle.Danger),
   );
 
-  return interaction.update({
-    content: '',
+  // Ephemeral copy — original shared message stays untouched
+  return interaction.reply({
     embeds: [embed],
     components: [row],
+    ephemeral: true,
   });
 }
 
@@ -165,18 +167,16 @@ async function handlePickLangForResult(interaction) {
   // Look up the match + challenge
   const match = matchRepo.findById(matchId);
   if (!match) {
-    return interaction.update({
+    return interaction.reply({
       content: t('per_message_lang.not_found', newLang),
-      components: [],
-      embeds: [],
+      ephemeral: true,
     });
   }
   const challenge = challengeRepo.findById(match.challenge_id);
   if (!challenge) {
-    return interaction.update({
+    return interaction.reply({
       content: t('per_message_lang.not_found', newLang),
-      components: [],
-      embeds: [],
+      ephemeral: true,
     });
   }
 
@@ -210,10 +210,10 @@ async function handlePickLangForResult(interaction) {
     newLang,
   );
 
-  return interaction.update({
-    content: '',
+  // Ephemeral copy — original shared message stays untouched
+  return interaction.reply({
     embeds: [embed],
-    components: [],
+    ephemeral: true,
   });
 }
 

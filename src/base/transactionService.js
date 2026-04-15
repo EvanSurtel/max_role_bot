@@ -91,14 +91,28 @@ async function invokeContract(fromAddress, contractAddress, method, args, abi) {
   const iface = new ethers.Interface(abi);
   const data = iface.encodeFunctionData(method, orderedArgs);
 
-  const { transactionHash } = await cdp.evm.sendTransaction({
-    address: fromAddress,
-    network: cdpNetwork,
-    transaction: { to: contractAddress, value: 0n, data },
-  });
-
-  console.log(`[Base] Contract call ${method} on ${contractAddress}: ${transactionHash}`);
-  return { hash: transactionHash, signature: transactionHash };
+  // Retry once on "nonce too low" — transient error from rapid sequential txs
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { transactionHash } = await cdp.evm.sendTransaction({
+        address: fromAddress,
+        network: cdpNetwork,
+        transaction: { to: contractAddress, value: 0n, data },
+      });
+      console.log(`[Base] Contract call ${method} on ${contractAddress}: ${transactionHash}`);
+      return { hash: transactionHash, signature: transactionHash };
+    } catch (err) {
+      lastErr = err;
+      if (err.errorMessage?.includes('Nonce too low') || err.message?.includes('Nonce too low')) {
+        console.warn(`[Base] Nonce too low on ${method}, retrying (attempt ${attempt + 1}/3)...`);
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 /**
