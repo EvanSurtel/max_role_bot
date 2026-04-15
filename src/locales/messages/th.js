@@ -519,7 +519,7 @@ module.exports = {
     no_show_warning_10: '{pings}\n\n**คำเตือนสุดท้าย — คุณมีเวลา 5 นาทีในการเข้าร่วมช่อง voice ไม่งั้นจะถูก forfeit** เวลาที่เหลือ: **5 นาที**',
     result_complete: '**Match #{matchId} จบแล้ว!**',
     result_winner: '**ผู้ชนะ: Team {team}**',
-    result_pot_distributed: '\nรางวัลแมตช์ ${amount} USDC ถูกแจกจ่ายให้ผู้ชนะแล้ว',
+    result_match_prize_distributed: '\nรางวัลแมตช์ ${amount} USDC ถูกแจกจ่ายให้ผู้ชนะแล้ว',
     result_cleanup: 'ช่องเหล่านี้จะถูกล้างใน 5 นาที GG!',
     captains_agree: 'กัปตันทั้งสองเห็นด้วย: **Team {team} ชนะ!** กำลังตัดสินแมตช์...',
     captains_disagree: '**กัปตันไม่เห็นด้วย!** Team 1 บอกว่า Team {t1} ชนะ Team 2 บอกว่า Team {t2} ชนะ แมตช์ตอนนี้ **disputed**',

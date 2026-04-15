@@ -704,7 +704,7 @@ async function resolveMatch(client, matchId, winningTeam, { fromDispute = false 
         const sharedLang = _captainLang(captainDiscordIdsForLang);
         const prizeAmount = (Number(challenge.total_pot_usdc) / 1_000_000).toFixed(2);
         const prizeText = isCashMatchResult
-          ? t('match_channel.result_pot_distributed', sharedLang, { amount: prizeAmount })
+          ? t('match_channel.result_match_prize_distributed', sharedLang, { amount: prizeAmount })
           : '';
 
         const resultLangRow = buildLanguageDropdownRow(sharedLang);

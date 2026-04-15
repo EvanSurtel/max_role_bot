@@ -92,8 +92,6 @@ const userRepo = {
     return addEnteredTx(id, amountUsdc);
   },
 
-  // Backward-compat alias
-  addWagered: (...args) => userRepo.addEntered(...args),
 
   getXpLeaderboard(limit = 10) {
     return stmts.getXpLeaderboard.all(limit);

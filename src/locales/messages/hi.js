@@ -519,7 +519,7 @@ module.exports = {
     no_show_warning_10: '{pings}\n\n**आखिरी चेतावनी — तुम्हारे पास voice channel join करने के लिए 5 minutes हैं वरना तुम्हें forfeit कर दिया जाएगा।** बचा समय: **5 minutes**।',
     result_complete: '**Match #{matchId} पूरा!**',
     result_winner: '**Winner: Team {team}**',
-    result_pot_distributed: '\n**${amount} USDC** का match prize winners को distribute कर दिया गया है।',
+    result_match_prize_distributed: '\n**${amount} USDC** का match prize winners को distribute कर दिया गया है।',
     result_cleanup: 'ये channels 5 minutes में clean up हो जाएंगे। GG!',
     captains_agree: 'दोनों captains सहमत हैं: **Team {team} जीत गई!** Match resolve कर रहे हैं...',
     captains_disagree: '**Captains असहमत हैं!** Team 1 कहती है Team {t1} जीती, Team 2 कहती है Team {t2} जीती। Match अब **disputed** है।',

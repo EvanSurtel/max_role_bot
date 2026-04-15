@@ -519,7 +519,7 @@ module.exports = {
     no_show_warning_10: '{pings}\n\n**CẢNH BÁO CUỐI — Bạn còn 5 phút để vào kênh voice nếu không sẽ bị xử thua.** Thời gian còn lại: **5 phút**.',
     result_complete: '**Trận #{matchId} Hoàn Thành!**',
     result_winner: '**Người Thắng: Đội {team}**',
-    result_pot_distributed: '\nGiải thưởng trận **${amount} USDC** đã được phân phối cho người thắng.',
+    result_match_prize_distributed: '\nGiải thưởng trận **${amount} USDC** đã được phân phối cho người thắng.',
     result_cleanup: 'Các kênh này sẽ được dọn dẹp trong 5 phút. GG!',
     captains_agree: 'Cả hai đội trưởng đồng ý: **Đội {team} thắng!** Đang giải quyết trận đấu...',
     captains_disagree: '**Hai đội trưởng không đồng ý!** Đội 1 nói Đội {t1} thắng, Đội 2 nói Đội {t2} thắng. Trận đấu giờ là **dispute**.',

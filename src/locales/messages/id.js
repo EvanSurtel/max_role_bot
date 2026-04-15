@@ -519,7 +519,7 @@ module.exports = {
     no_show_warning_10: '{pings}\n\n**PERINGATAN TERAKHIR — Kamu punya 5 menit untuk masuk voice channel atau kamu akan dinyatakan forfeit.** Waktu tersisa: **5 menit**.',
     result_complete: '**Match #{matchId} Selesai!**',
     result_winner: '**Pemenang: Tim {team}**',
-    result_pot_distributed: '\nHadiah pertandingan **${amount} USDC** sudah didistribusikan ke pemenang.',
+    result_match_prize_distributed: '\nHadiah pertandingan **${amount} USDC** sudah didistribusikan ke pemenang.',
     result_cleanup: 'Channel ini akan dibersihkan dalam 5 menit. GG!',
     captains_agree: 'Kedua kapten setuju: **Tim {team} menang!** Menyelesaikan match...',
     captains_disagree: '**Kapten tidak setuju!** Tim 1 bilang Tim {t1} menang, Tim 2 bilang Tim {t2} menang. Match sekarang **dispute**.',

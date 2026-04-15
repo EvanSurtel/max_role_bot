@@ -519,7 +519,7 @@ module.exports = {
     no_show_warning_10: '{pings}\n\n**FINAL WARNING — May 5 minutes ka na lang para sumali sa voice channel o ma-fo-forfeit ka.** Time remaining: **5 minutes**.',
     result_complete: '**Tapos na ang Match #{matchId}!**',
     result_winner: '**Winner: Team {team}**',
-    result_pot_distributed: '\nNa-distribute na ang match prize na **${amount} USDC** sa mga winners.',
+    result_match_prize_distributed: '\nNa-distribute na ang match prize na **${amount} USDC** sa mga winners.',
     result_cleanup: 'Made-delete ang mga channels na ito sa loob ng 5 minutes. GG!',
     captains_agree: 'Pareho ang sabi ng dalawang captain: **Nanalo ang Team {team}!** Riniresolba ang match...',
     captains_disagree: '**Hindi sang-ayon ang mga captain!** Sabi ng Team 1 nanalo ang Team {t1}, sabi ng Team 2 nanalo ang Team {t2}. **Disputed** na ang match.',
