@@ -128,19 +128,31 @@ async function main() {
   console.log('\n[5] Depositing players into escrow...');
 
   const dep1 = await escrowWithOwner.depositToEscrow(matchId, sa1.address);
-  await dep1.wait();
+  await dep1.wait(1);
   console.log(`  Player 1 deposited: ${dep1.hash} ✅`);
 
+  // Wait between deposits to avoid nonce issues
+  await new Promise(r => setTimeout(r, 3000));
+
   const dep2 = await escrowWithOwner.depositToEscrow(matchId, sa2.address);
-  await dep2.wait();
+  await dep2.wait(1);
   console.log(`  Player 2 deposited: ${dep2.hash} ✅`);
 
+  // Wait for on-chain state to propagate
+  await new Promise(r => setTimeout(r, 3000));
+
   const matchData = await escrow.matches(matchId);
-  console.log(`  On-chain: deposits=${matchData[2]} total=${matchData[3]} ✅`);
+  const totalDeposited = matchData[3];
+  console.log(`  On-chain: deposits=${matchData[2]} total=${totalDeposited}`);
+  if (Number(matchData[2]) !== 2) {
+    console.error(`  ❌ Expected 2 deposits, got ${matchData[2]}`);
+    process.exit(1);
+  }
+  console.log(`  ✅`);
 
   // ─── Step 6: Resolve match (player 1 wins) ─────────────
   console.log('\n[6] Resolving match (player 1 wins)...');
-  const resolveTx = await escrowWithOwner.resolveMatch(matchId, [sa1.address], [4000000n]);
+  const resolveTx = await escrowWithOwner.resolveMatch(matchId, [sa1.address], [totalDeposited]);
   await resolveTx.wait();
   console.log(`  Match resolved: ${resolveTx.hash} ✅`);
 
