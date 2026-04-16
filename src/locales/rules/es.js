@@ -115,6 +115,12 @@ module.exports = {
   noShow: {
     title: 'Reglas de No Presentarse',
     description: [
+      '**Qué cuenta como no presentarse:**',
+      'Un jugador se considera "no-show" si **cualquiera** de lo siguiente es verdad:',
+      '• No se unió a los canales de voz de la partida (equipo o compartido)',
+      '• No responde en el canal de texto de la partida',
+      '• No se unió a la sala privada del juego creada por otro jugador del reto',
+      '',
       '**Cash Matches:** 15 minutos para presentarte',
       '• No presentarse = forfeit — el rival gana automáticamente',
       '• Mismo resultado que perder la partida (el rival se lleva el premio del match)',

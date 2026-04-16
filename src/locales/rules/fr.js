@@ -115,6 +115,12 @@ module.exports = {
   noShow: {
     title: 'Règles de Non-Présentation',
     description: [
+      '**Ce qui compte comme une non-présentation :**',
+      'Un joueur est considéré comme non-présenté si **l\'une** des situations suivantes est vraie :',
+      '• Il n\'a pas rejoint les canaux vocaux du match (équipe ou partagé)',
+      '• Il ne répond pas dans le canal texte du match',
+      '• Il n\'a pas rejoint le lobby privé en jeu créé par un autre joueur du défi',
+      '',
       '**Cash Matches :** 15 minutes pour se présenter',
       '• Non-présentation = forfait — l\'adversaire gagne par défaut',
       '• Même résultat que perdre le match (l\'adversaire récupère le prix du match)',

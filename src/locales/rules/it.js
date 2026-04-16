@@ -115,6 +115,12 @@ module.exports = {
   noShow: {
     title: 'Regole di Mancata Presentazione',
     description: [
+      '**Cosa conta come mancata presentazione:**',
+      'Un giocatore è considerato mancata presentazione se **una qualsiasi** di queste condizioni è vera:',
+      '• Non è entrato nei canali vocali del match (team o condiviso)',
+      '• Non risponde nel canale testuale del match',
+      '• Non è entrato nella lobby privata in-game creata da un altro giocatore della sfida',
+      '',
       '**Cash Match:** 15 minuti per presentarsi',
       '• Mancata presentazione = forfait — l\'avversario vince di default',
       '• Stesso risultato che perdere il match (l\'avversario si prende il premio del match)',

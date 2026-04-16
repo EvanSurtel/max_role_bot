@@ -115,6 +115,12 @@ module.exports = {
   noShow: {
     title: 'Luật No-Show',
     description: [
+      '**Cái gì được tính là no-show:**',
+      'Người chơi bị tính là no-show nếu **bất kỳ** điều nào sau đây đúng:',
+      '• Chưa join voice channel của match (team hoặc shared)',
+      '• Không phản hồi trong text channel của match',
+      '• Chưa join private lobby trong game do người chơi khác trong challenge tạo',
+      '',
       '**Cash Match:** 15 phút để xuất hiện',
       '• No-show = forfeit — đối thủ thắng mặc định',
       '• Kết quả giống như thua match (đối thủ lấy giải thưởng match)',

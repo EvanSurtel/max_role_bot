@@ -115,6 +115,12 @@ module.exports = {
   noShow: {
     title: 'Regras de Não Comparecimento',
     description: [
+      '**O que conta como não comparecimento:**',
+      'Um jogador é considerado "no-show" se **qualquer** das situações abaixo for verdadeira:',
+      '• Não entrou nos canais de voz da partida (equipe ou compartilhado)',
+      '• Não responde no canal de texto da partida',
+      '• Não entrou no lobby privado in-game criado por outro jogador do desafio',
+      '',
       '**Cash Matches:** 15 minutos pra aparecer',
       '• Não aparecer = W.O. — adversário ganha automaticamente',
       '• Mesmo resultado que perder a partida (adversário leva o prêmio do match)',

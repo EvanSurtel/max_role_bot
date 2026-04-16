@@ -115,6 +115,12 @@ module.exports = {
   noShow: {
     title: 'Peraturan No-Show',
     description: [
+      '**Apa yang dikira sebagai no-show:**',
+      'Player dikira no-show kalau **mana-mana** perkara ini betul:',
+      '• Belum join voice channel match (team atau shared)',
+      '• Tidak responsive dalam text channel match',
+      '• Belum join in-game private lobby yang dibuat player lain dalam challenge',
+      '',
       '**Cash Match:** 15 minit untuk muncul',
       '• No-show = forfeit — lawan menang automatik',
       '• Outcome sama macam kalah match (lawan dapat match prize)',

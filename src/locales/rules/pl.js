@@ -115,6 +115,12 @@ module.exports = {
   noShow: {
     title: 'Zasady Nieobecności',
     description: [
+      '**Co liczy się jako nieobecność:**',
+      'Gracz jest uznawany za nieobecnego, jeśli **którakolwiek** z poniższych sytuacji ma miejsce:',
+      '• Nie dołączył do kanałów głosowych meczu (drużyny ani shared)',
+      '• Nie odpowiada na kanale tekstowym meczu',
+      '• Nie dołączył do prywatnego lobby w grze utworzonego przez innego gracza wyzwania',
+      '',
       '**Cash Matches:** 15 minut, żeby się pojawić',
       '• Brak obecności = walkower — przeciwnik wygrywa domyślnie',
       '• Ten sam wynik co przegrana meczu (przeciwnik zgarnia nagrodę za match)',

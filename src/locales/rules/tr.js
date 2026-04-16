@@ -115,6 +115,12 @@ module.exports = {
   noShow: {
     title: 'No-Show Kuralları',
     description: [
+      '**No-show sayılan durumlar:**',
+      'Aşağıdakilerden **herhangi biri** doğruysa oyuncu no-show sayılır:',
+      '• Maç voice kanallarına (takım veya shared) katılmadıysa',
+      '• Maç text kanalında cevap vermiyorsa',
+      '• Challenge\'daki başka bir oyuncunun oluşturduğu oyun içi private lobby\'ye katılmadıysa',
+      '',
       '**Cash Match:** Gelmek için 15 dakika',
       '• Gelmemek = forfeit — rakip otomatik kazanır',
       '• Maçı kaybetmekle aynı sonuç (rakip maç ödülünü alır)',

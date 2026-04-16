@@ -115,6 +115,12 @@ module.exports = {
   noShow: {
     title: 'No-Show-Regeln',
     description: [
+      '**Was zählt als No-Show:**',
+      'Ein Spieler gilt als No-Show, wenn **irgendetwas** davon zutrifft:',
+      '• Sie sind keinem Match-Voice-Channel (Team oder Shared) beigetreten',
+      '• Sie reagieren nicht im Match-Text-Channel',
+      '• Sie sind nicht der In-Game Private Lobby beigetreten, die ein anderer Spieler in der Challenge erstellt hat',
+      '',
       '**Cash Matches:** 15 Minuten zum Auftauchen',
       '• No-Show = Forfeit — Gegner gewinnt automatisch',
       '• Gleiches Ergebnis wie ein verlorenes Match (Gegner bekommt den Match-Preis)',

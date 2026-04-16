@@ -115,6 +115,12 @@ module.exports = {
   noShow: {
     title: 'No-Show Rules',
     description: [
+      '**Ano ang counts as no-show:**',
+      'Ang player ay considered no-show kung **kahit alin** sa mga ito ay totoo:',
+      '• Hindi sila nag-join sa match voice channels (team o shared)',
+      '• Hindi sila responsive sa match text channel',
+      '• Hindi sila nag-join sa in-game private lobby na ginawa ng ibang player sa challenge',
+      '',
       '**Cash Matches:** 15 minutes para sumipot',
       '• No-show = forfeit — automatic na panalo ang kalaban',
       '• Same outcome sa pagkatalo sa match (yung kalaban ang kukuha ng match prize)',
