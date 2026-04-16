@@ -21,12 +21,21 @@
 //
 // What it touches:
 //   1. users table: total_wins, total_losses, xp_points,
-//      total_earnings_usdc, total_entered_usdc — all reset to the
-//      clean-slate baseline (0 / 0 / 500 / 0 / 0)
-//   2. Every member in the guild with accepted_tos=1 gets their
+//      total_earnings_usdc, total_entered_usdc, pending_balance,
+//      pending_release_at — all reset to the clean-slate baseline
+//      (0 / 0 / 500 / 0 / 0 / 0 / NULL)
+//   2. wallets table: balance_available, balance_held — zeroed.
+//      CDP Smart Accounts are per-network, so a wallet that held
+//      testnet USDC is a DIFFERENT address on mainnet (zero balance
+//      on-chain). Without zeroing the DB columns, users would see
+//      phantom balances they can't actually withdraw.
+//   3. challenge_players: funds_held=0 on every row tied to a
+//      terminal-state challenge (completed/cancelled/expired/
+//      disputed). Cleans up any orphan holds left by partial runs.
+//   4. Every member in the guild with accepted_tos=1 gets their
 //      nickname rewritten via the same updateNickname helper the
 //      bot uses post-match
-//   3. If NeatQueue is configured, every user is setPoints'd back
+//   5. If NeatQueue is configured, every user is setPoints'd back
 //      to exactly 500 (uses the new additive-safe helper, not the
 //      legacy addPoints that stacked on existing values)
 
@@ -36,18 +45,56 @@ const { Client, GatewayIntentBits } = require('discord.js');
 async function main() {
   console.log('[Reset] Mainnet cutover reset starting...');
 
-  // ─── 1. DB: reset all user stats ───────────────────────────
+  // ─── 1. DB: reset all user stats + wallet balances + holds ──
+  //
+  // Wrapped in a single transaction so the entire cutover either
+  // lands or rolls back. A half-reset DB would be worse than no
+  // reset — you'd have stats zeroed but balances stuck.
   const db = require('../src/database/db');
-  const result = db.prepare(`
-    UPDATE users
-    SET total_wins = 0,
-        total_losses = 0,
-        xp_points = 500,
-        total_earnings_usdc = '0',
-        total_entered_usdc = '0'
-    WHERE accepted_tos = 1
-  `).run();
-  console.log(`[Reset] ✓ ${result.changes} user stat row(s) reset in the DB`);
+  const resetTx = db.transaction(() => {
+    const userRes = db.prepare(`
+      UPDATE users
+      SET total_wins = 0,
+          total_losses = 0,
+          xp_points = 500,
+          total_earnings_usdc = '0',
+          total_entered_usdc = '0',
+          pending_balance = '0',
+          pending_release_at = NULL
+      WHERE accepted_tos = 1
+    `).run();
+
+    // Zero wallet balances. CDP Smart Accounts differ per network,
+    // so mainnet wallets start with 0 USDC on-chain. DB columns
+    // must match that fresh state or every user will appear to
+    // have phantom testnet money.
+    const walletRes = db.prepare(`
+      UPDATE wallets
+      SET balance_available = '0',
+          balance_held = '0'
+    `).run();
+
+    // Release any holds tied to terminal-state challenges. A
+    // regular reset shouldn't need this, but a partial reset or a
+    // failed release in the past could leave funds_held=1 rows
+    // hanging around and they'd confuse the reconciliation check.
+    const orphanRes = db.prepare(`
+      UPDATE challenge_players
+      SET funds_held = 0
+      WHERE funds_held = 1
+        AND challenge_id IN (
+          SELECT id FROM challenges
+          WHERE status IN ('completed', 'cancelled', 'expired', 'disputed')
+        )
+    `).run();
+
+    return { userRes, walletRes, orphanRes };
+  });
+
+  const { userRes, walletRes, orphanRes } = resetTx();
+  console.log(`[Reset] ✓ ${userRes.changes} user stat row(s) reset`);
+  console.log(`[Reset] ✓ ${walletRes.changes} wallet balance(s) zeroed`);
+  console.log(`[Reset] ✓ ${orphanRes.changes} orphan hold(s) cleared`);
 
   // ─── 2. Log in as the bot to refresh Discord nicknames ─────
   if (!process.env.BOT_TOKEN) {
