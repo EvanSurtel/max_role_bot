@@ -147,7 +147,7 @@ async function handleButton(interaction) {
 
     const existingUser = userRepo.findByDiscordId(discordId);
     if (existingUser && existingUser.accepted_tos === 1) {
-      return interaction.reply({ content: t('onboarding.already_registered', lang), ephemeral: true });
+      return interaction.reply({ content: t('onboarding.already_registered', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
 
     // Step 1: Region dropdown

@@ -102,7 +102,7 @@ async function handleDisputeSelect(interaction) {
 
   const match = matchRepo.findById(matchId);
   if (!match) return interaction.reply({ content: t('common.match_not_found', lang), ephemeral: true });
-  if (match.status === MATCH_STATUS.DISPUTED) return interaction.reply({ content: t('dispute.already_disputed', lang), ephemeral: true });
+  if (match.status === MATCH_STATUS.DISPUTED) return interaction.reply({ content: t('dispute.already_disputed', lang), ephemeral: true, _autoDeleteMs: 60_000 });
   // Completed matches are already paid out and cannot be re-opened.
   if (match.status === MATCH_STATUS.COMPLETED) {
     return interaction.reply({

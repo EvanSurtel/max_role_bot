@@ -259,7 +259,7 @@ async function createMatchChannels(client, challenge) {
   const voteLangRow = buildLanguageDropdownRow(sharedLang);
   await voteChannel.send({
     embeds: [reportEmbed],
-    components: [reportRow, voteLangRow],
+    components: [reportRow, ...voteLangRow],
   });
 
   // Build match info for welcome messages
@@ -282,7 +282,7 @@ async function createMatchChannels(client, challenge) {
       num: challenge.display_number || challenge.id,
       pot_text: prizeText1,
     }),
-    components: [team1LangRow],
+    components: [...team1LangRow],
   });
 
   const team2LangRow = buildLanguageDropdownRow(team2CaptainLang);
@@ -293,7 +293,7 @@ async function createMatchChannels(client, challenge) {
       num: challenge.display_number || challenge.id,
       pot_text: prizeText2,
     }),
-    components: [team2LangRow],
+    components: [...team2LangRow],
   });
 
   // Generate random map picks for the series
@@ -329,7 +329,7 @@ async function createMatchChannels(client, challenge) {
       '',
       t('match_channel.shared_good_luck', sharedLang),
     ].join('\n'),
-    components: [sharedLangRow],
+    components: [...sharedLangRow],
   });
 
   // Update challenge status to in_progress
@@ -717,7 +717,7 @@ async function resolveMatch(client, matchId, winningTeam, { fromDispute = false 
             '',
             t('match_channel.result_cleanup', sharedLang),
           ].join('\n'),
-          components: [resultLangRow],
+          components: [...resultLangRow],
         });
       }
     } catch (err) {
@@ -913,7 +913,7 @@ function startNoShowReminders(client, match, playerDiscordIds) {
       if (ch) {
         const pings = notInVoice.map(id => `<@${id}>`).join(' ');
         const lang = reminderLang();
-        await ch.send({ content: t('match_channel.no_show_warning_5', lang, { pings }), components: [buildLanguageDropdownRow(lang)] });
+        await ch.send({ content: t('match_channel.no_show_warning_5', lang, { pings }), components: [...buildLanguageDropdownRow(lang)] });
       }
     } catch (err) {
       console.error(`[MatchService] No-show reminder (5min) failed:`, err.message);
@@ -933,7 +933,7 @@ function startNoShowReminders(client, match, playerDiscordIds) {
       if (ch) {
         const pings = notInVoice.map(id => `<@${id}>`).join(' ');
         const lang = reminderLang();
-        await ch.send({ content: t('match_channel.no_show_warning_10', lang, { pings }), components: [buildLanguageDropdownRow(lang)] });
+        await ch.send({ content: t('match_channel.no_show_warning_10', lang, { pings }), components: [...buildLanguageDropdownRow(lang)] });
       }
     } catch (err) {
       console.error(`[MatchService] No-show reminder (10min) failed:`, err.message);

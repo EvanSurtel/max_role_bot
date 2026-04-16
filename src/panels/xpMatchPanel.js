@@ -19,7 +19,7 @@ function buildXpMatchPanel(lang = 'en') {
       .setStyle(ButtonStyle.Primary),
   );
 
-  return { embeds: [embed], components: [actionRow, buildLanguageDropdownRow(lang)] };
+  return { embeds: [embed], components: [actionRow, ...buildLanguageDropdownRow(lang)] };
 }
 
 /**

@@ -12,7 +12,7 @@ const challengeRepo = require('../database/repositories/challengeRepo');
 const challengePlayerRepo = require('../database/repositories/challengePlayerRepo');
 const userRepo = require('../database/repositories/userRepo');
 const matchService = require('../services/matchService');
-const { MATCH_STATUS, CHALLENGE_STATUS, PLAYER_ROLE } = require('../config/constants');
+const { MATCH_STATUS, CHALLENGE_STATUS, PLAYER_ROLE, CHALLENGE_TYPE } = require('../config/constants');
 const { t, langFor } = require('../locales/i18n');
 const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
 
@@ -253,10 +253,10 @@ async function showReportConfirm(interaction, outcome) {
   }
 
   if (captainTeam === 1 && match.captain1_vote !== null) {
-    return interaction.reply({ content: t('match_result.you_already_reported', lang), ephemeral: true });
+    return interaction.reply({ content: t('match_result.you_already_reported', lang), ephemeral: true, _autoDeleteMs: 60_000 });
   }
   if (captainTeam === 2 && match.captain2_vote !== null) {
-    return interaction.reply({ content: t('match_result.you_already_reported', lang), ephemeral: true });
+    return interaction.reply({ content: t('match_result.you_already_reported', lang), ephemeral: true, _autoDeleteMs: 60_000 });
   }
 
   const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
@@ -317,10 +317,10 @@ async function handleReport(interaction, outcome) {
 
   // Check if this captain already reported
   if (captainTeam === 1 && match.captain1_vote !== null) {
-    return interaction.reply({ content: t('match_result.you_already_reported_waiting', lang), ephemeral: true });
+    return interaction.reply({ content: t('match_result.you_already_reported_waiting', lang), ephemeral: true, _autoDeleteMs: 60_000 });
   }
   if (captainTeam === 2 && match.captain2_vote !== null) {
-    return interaction.reply({ content: t('match_result.you_already_reported_waiting', lang), ephemeral: true });
+    return interaction.reply({ content: t('match_result.you_already_reported_waiting', lang), ephemeral: true, _autoDeleteMs: 60_000 });
   }
 
   // Determine what team this captain says won
@@ -379,7 +379,7 @@ async function handleReport(interaction, outcome) {
           const agreeLangRow = buildLanguageDropdownRow(sharedLang);
           await voteChannel.send({
             content: t('match_channel.captains_agree', sharedLang, { team: winningTeam }),
-            components: [agreeLangRow],
+            components: [...agreeLangRow],
           });
         }
         await matchService.resolveMatch(interaction.client, matchId, winningTeam);
@@ -399,7 +399,7 @@ async function handleReport(interaction, outcome) {
         const disagreeLangRow = buildLanguageDropdownRow(sharedLang);
         await voteChannel.send({
           content: t('match_channel.captains_disagree', sharedLang, { t1: c1Vote, t2: c2Vote }),
-          components: [disagreeLangRow],
+          components: [...disagreeLangRow],
         });
       }
     }
@@ -456,9 +456,15 @@ async function triggerDispute(client, matchId) {
     const adminRoleId = process.env.ADMIN_ROLE_ID;
     const wagerStaffId = process.env.WAGER_STAFF_ROLE_ID;
     const xpStaffId = process.env.XP_STAFF_ROLE_ID;
+
+    // Staff ping scope depends on match type:
+    //   - Cash match disputes ping WAGER staff only (+ admins/owner/ceo/ads).
+    //     XP staff don't handle cash disputes.
+    //   - XP match disputes ping BOTH wager and XP staff.
+    const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
     const pings = [];
     if (wagerStaffId) pings.push(`<@&${wagerStaffId}>`);
-    if (xpStaffId) pings.push(`<@&${xpStaffId}>`);
+    if (xpStaffId && !isCashMatch) pings.push(`<@&${xpStaffId}>`);
     if (adminRoleId) pings.push(`<@&${adminRoleId}>`);
     if (ownerRoleId) pings.push(`<@&${ownerRoleId}>`);
     if (ceoRoleId) pings.push(`<@&${ceoRoleId}>`);
@@ -476,7 +482,7 @@ async function triggerDispute(client, matchId) {
         '',
         t('match_channel.staff_review', sharedLang, { staff: staffPing }),
       ].join('\n'),
-      components: [disputeLangRow],
+      components: [...disputeLangRow],
     });
 
     const adminRow = new ActionRowBuilder().addComponents(
@@ -486,7 +492,7 @@ async function triggerDispute(client, matchId) {
     );
 
     const adminLangRow = buildLanguageDropdownRow(sharedLang);
-    await sharedChannel.send({ content: t('admin_resolve.staff_panel_title', sharedLang), components: [adminRow, adminLangRow] });
+    await sharedChannel.send({ content: t('admin_resolve.staff_panel_title', sharedLang), components: [adminRow, ...adminLangRow] });
   }
 
   const { postTransaction: ptx } = require('../utils/transactionFeed');

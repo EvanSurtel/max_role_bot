@@ -25,7 +25,7 @@ function buildLobbyPanel(lang = 'en') {
       .setStyle(ButtonStyle.Danger),
   );
 
-  return { embeds: [embed], components: [actionRow, buildLanguageDropdownRow(lang)] };
+  return { embeds: [embed], components: [actionRow, ...buildLanguageDropdownRow(lang)] };
 }
 
 /**

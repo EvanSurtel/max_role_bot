@@ -100,7 +100,7 @@ async function postRulesPanel(client, lang = 'en') {
     // of "at the top". A standalone dropdown message fixes that.
     await channel.send({
       content: '🌐 Pick a language to view the rules in:',
-      components: [buildLanguageDropdownRow(lang)],
+      components: [...buildLanguageDropdownRow(lang)],
     });
 
     // Discord max 10 embeds per message — split if needed

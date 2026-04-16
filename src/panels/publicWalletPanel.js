@@ -35,7 +35,7 @@ function buildPublicWalletPanel(lang = 'en') {
       .setStyle(ButtonStyle.Success),
   );
 
-  return { embeds: [embed], components: [actionRow, buildLanguageDropdownRow(lang)] };
+  return { embeds: [embed], components: [actionRow, ...buildLanguageDropdownRow(lang)] };
 }
 
 /**

@@ -51,6 +51,7 @@ async function handleButton(interaction) {
     return interaction.reply({
       content: t('common.you_already_in_challenge', lang),
       ephemeral: true,
+      _autoDeleteMs: 60_000,
     });
   }
 
@@ -59,7 +60,7 @@ async function handleButton(interaction) {
 
   // Prevent accepting own challenge
   if (challenge.creator_user_id === user.id) {
-    return interaction.reply({ content: t('common.cannot_accept_own', lang), ephemeral: true });
+    return interaction.reply({ content: t('common.cannot_accept_own', lang), ephemeral: true, _autoDeleteMs: 60_000 });
   }
 
   const { GAME_MODES } = require('../config/constants');
@@ -407,26 +408,26 @@ async function handleUserSelect(interaction) {
 
     // Reject self-selection
     if (selectedDiscordIds.includes(discordId)) {
-      return interaction.reply({ content: t('common.cannot_select_yourself', lang), ephemeral: true });
+      return interaction.reply({ content: t('common.cannot_select_yourself', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
 
     // Validate each picked teammate
     const { isPlayerBusy } = require('../utils/playerStatus');
     for (const teammateDiscordId of selectedDiscordIds) {
       if (flow.teammates.includes(teammateDiscordId)) {
-        return interaction.reply({ content: t('common.teammate_already_in', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true });
+        return interaction.reply({ content: t('common.teammate_already_in', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true, _autoDeleteMs: 60_000 });
       }
       const teammateUser = userRepo.findByDiscordId(teammateDiscordId);
       if (!teammateUser || !teammateUser.cod_uid) {
-        return interaction.reply({ content: t('common.teammate_not_registered', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true });
+        return interaction.reply({ content: t('common.teammate_not_registered', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true, _autoDeleteMs: 60_000 });
       }
       const existing = challengePlayerRepo.findByChallengeAndUser(challengeId, teammateUser.id);
       if (existing) {
-        return interaction.reply({ content: t('common.teammate_already_in', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true });
+        return interaction.reply({ content: t('common.teammate_already_in', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true, _autoDeleteMs: 60_000 });
       }
       const busy = isPlayerBusy(teammateUser.id);
       if (busy.busy) {
-        return interaction.reply({ content: t('common.teammate_busy', lang, { user: `<@${teammateDiscordId}>`, reason: busy.reason }), ephemeral: true });
+        return interaction.reply({ content: t('common.teammate_busy', lang, { user: `<@${teammateDiscordId}>`, reason: busy.reason }), ephemeral: true, _autoDeleteMs: 60_000 });
       }
     }
 
@@ -461,7 +462,7 @@ async function handleRemoveTeammate(interaction) {
 
   const flow = acceptFlows.get(discordId);
   if (!flow || flow.challengeId !== challengeId) {
-    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
   }
 
   const challenge = challengeRepo.findById(challengeId);
@@ -485,7 +486,7 @@ async function handleAddMoreTeammate(interaction) {
 
   const flow = acceptFlows.get(discordId);
   if (!flow || flow.challengeId !== challengeId) {
-    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
   }
 
   const challenge = challengeRepo.findById(challengeId);
@@ -525,7 +526,7 @@ async function handleContinueTeammates(interaction) {
 
   const flow = acceptFlows.get(discordId);
   if (!flow || flow.challengeId !== challengeId) {
-    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
   }
 
   const challenge = challengeRepo.findById(challengeId);

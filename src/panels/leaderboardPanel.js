@@ -147,7 +147,7 @@ async function buildXpPanel(region = 'global', view = 'season', seasonOverride =
     new ButtonBuilder().setCustomId('lb_admin_adjust_wl').setLabel(t('leaderboard_panel.btn_adjust_wl', lang)).setStyle(ButtonStyle.Danger),
   );
 
-  return { embeds: [embed], components: [row1, row2, row3, buildLanguageDropdownRow(lang)] };
+  return { embeds: [embed], components: [row1, row2, row3, ...buildLanguageDropdownRow(lang)] };
 }
 
 // ─── Earnings Leaderboard (one channel, region dropdown) ─────────
@@ -197,7 +197,7 @@ async function buildEarningsPanel(region = 'global', lang = 'en', page = 1) {
     new ButtonBuilder().setCustomId('lb_admin_adjust_earnings').setLabel(t('leaderboard_panel.btn_adjust_earnings', lang)).setStyle(ButtonStyle.Danger),
   );
 
-  return { embeds: [embed], components: [row1, row2, buildLanguageDropdownRow(lang)] };
+  return { embeds: [embed], components: [row1, row2, ...buildLanguageDropdownRow(lang)] };
 }
 
 // ─── Post Panels on Startup ─────────────────────────────────────

@@ -18,7 +18,7 @@ function buildWelcomeLanguagePicker(_lang = 'en') {
     .setTitle('🌐 Language / Idioma / Idioma / Sprache / Langue / 言語 / 语言')
     .setColor(0x3498db);
 
-  return { embeds: [embed], components: [buildLanguageDropdownRow(_lang)] };
+  return { embeds: [embed], components: [...buildLanguageDropdownRow(_lang)] };
 }
 
 /**

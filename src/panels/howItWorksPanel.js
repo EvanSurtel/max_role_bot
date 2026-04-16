@@ -127,7 +127,7 @@ async function postHowItWorksPanel(client, lang = 'en') {
     // first chunk — defeating the purpose of "at the top".
     await channel.send({
       content: '🌐 Pick a language to view this guide in:',
-      components: [buildLanguageDropdownRow(lang)],
+      components: [...buildLanguageDropdownRow(lang)],
     });
 
     // Greedily pack embeds into messages so each stays under Discord's

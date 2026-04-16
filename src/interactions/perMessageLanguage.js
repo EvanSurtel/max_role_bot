@@ -44,7 +44,9 @@ function _buildPickerRow(customId, currentLang) {
     description: label,
     value: code,
     emoji,
-    default: code === currentLang,
+    // No `default` marking — Discord select menus don't fire when
+    // the picked value hasn't changed, and we want re-picking the
+    // same language to re-render the ephemeral.
   }));
 
   return new ActionRowBuilder().addComponents(

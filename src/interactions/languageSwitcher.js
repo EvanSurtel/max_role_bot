@@ -35,7 +35,9 @@ async function handleShowLanguagePicker(interaction) {
     description: label,
     value: code,
     emoji,
-    default: code === lang,
+    // No `default: code === lang` — Discord select menus only fire
+    // when the value CHANGES. Leaving no default means picking the
+    // user's current language still fires and re-renders.
   }));
 
   const selectRow = new ActionRowBuilder().addComponents(
@@ -131,8 +133,29 @@ async function handleInlineLanguageSelect(interaction) {
   await sendEphemeralPanelForCurrentChannel(interaction, newLang);
 }
 
+/**
+ * Handle the 🔄 Refresh button next to the inline language dropdown.
+ *
+ * Re-renders the current channel's panel in whatever language is
+ * already saved on the user's row. This is the escape hatch when
+ * they dismissed a previous ephemeral and want it back in their
+ * current language — picking the same language again from the
+ * dropdown also works, but the button is a more obvious affordance.
+ */
+async function handleLanguageRefresh(interaction) {
+  const lang = langFor(interaction);
+
+  // Same replace-in-channel + dispatcher flow as inline-select, minus
+  // the DB save (nothing changes, we're just re-rendering).
+  await interaction.deferReply({ ephemeral: true });
+
+  const { sendEphemeralPanelForCurrentChannel } = require('../utils/ephemeralPanelDispatcher');
+  await sendEphemeralPanelForCurrentChannel(interaction, lang);
+}
+
 module.exports = {
   handleShowLanguagePicker,
   handleLanguagePickerSelect,
   handleInlineLanguageSelect,
+  handleLanguageRefresh,
 };

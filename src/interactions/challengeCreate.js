@@ -258,7 +258,7 @@ async function handleButton(interaction) {
   if (id === 'match_confirm_create') {
     const flow = getLiveFlow(userId);
     if (!flow) {
-      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
     return finalizeChallengeCreation(interaction, flow, flow.pendingAmount || 0);
   }
@@ -267,7 +267,7 @@ async function handleButton(interaction) {
   if (id === 'match_prev') {
     const flow = getLiveFlow(userId);
     if (!flow) {
-      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
 
     let prevStep = flow.step - 1;
@@ -391,7 +391,7 @@ async function handleButton(interaction) {
   if (id.startsWith('match_remove_tm_')) {
     const flow = getLiveFlow(userId);
     if (!flow) {
-      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
     const removedId = id.replace('match_remove_tm_', '');
     flow.teammates = flow.teammates.filter(d => d !== removedId);
@@ -406,7 +406,7 @@ async function handleButton(interaction) {
   if (id === 'match_add_more_tm') {
     const flow = getLiveFlow(userId);
     if (!flow) {
-      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
     const remaining = (flow.teamSize - 1) - flow.teammates.length;
     if (remaining <= 0) {
@@ -431,7 +431,7 @@ async function handleButton(interaction) {
   if (id === 'match_tm_continue') {
     const flow = getLiveFlow(userId);
     if (!flow) {
-      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
     if (flow.teammates.length !== flow.teamSize - 1) {
       return interaction.reply({ content: t('challenge_create.need_exact_teammates', lang, { n: flow.teamSize - 1 }), ephemeral: true });
@@ -443,7 +443,7 @@ async function handleButton(interaction) {
   if (id.startsWith('match_teamsize_')) {
     const flow = getLiveFlow(userId);
     if (!flow) {
-      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
 
     const teamSize = parseInt(id.split('_')[2], 10);
@@ -465,7 +465,7 @@ async function handleButton(interaction) {
   if (id.startsWith('match_mode_')) {
     const flow = getLiveFlow(userId);
     if (!flow) {
-      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
 
     const mode = id.replace('match_mode_', '');
@@ -494,7 +494,7 @@ async function handleButton(interaction) {
   if (id.startsWith('match_series_')) {
     const flow = getLiveFlow(userId);
     if (!flow) {
-      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
 
     const series = parseInt(id.split('_')[2], 10);
@@ -533,7 +533,7 @@ async function handleButton(interaction) {
   if (id === 'match_vis_anon' || id === 'match_vis_named') {
     const flow = getLiveFlow(userId);
     if (!flow) {
-      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+      return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
 
     flow.anonymous = id === 'match_vis_anon';
@@ -573,7 +573,7 @@ async function handleModal(interaction) {
   const lang = langFor(interaction);
   const flow = getLiveFlow(userId);
   if (!flow) {
-    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
   }
 
   if (interaction.customId === 'entry_amount') {
@@ -603,7 +603,7 @@ async function handleUserSelect(interaction) {
   const lang = langFor(interaction);
   const flow = getLiveFlow(userId);
   if (!flow) {
-    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true });
+    return interaction.reply({ content: t('common.session_expired_simple', lang), ephemeral: true, _autoDeleteMs: 60_000 });
   }
 
   if (interaction.customId === 'select_teammates') {
@@ -611,7 +611,7 @@ async function handleUserSelect(interaction) {
 
     // Reject self-selection
     if (selectedUsers.includes(userId)) {
-      return interaction.reply({ content: t('common.cannot_select_yourself', lang), ephemeral: true });
+      return interaction.reply({ content: t('common.cannot_select_yourself', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
 
     // Check each teammate is registered, not busy, and not already in the list
@@ -619,15 +619,15 @@ async function handleUserSelect(interaction) {
     const { isPlayerBusy } = require('../utils/playerStatus');
     for (const teammateDiscordId of selectedUsers) {
       if (flow.teammates.includes(teammateDiscordId)) {
-        return interaction.reply({ content: t('common.teammate_already_in', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true });
+        return interaction.reply({ content: t('common.teammate_already_in', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true, _autoDeleteMs: 60_000 });
       }
       const tmUser = userRepo.findByDiscordId(teammateDiscordId);
       if (!tmUser || !tmUser.cod_uid) {
-        return interaction.reply({ content: t('common.teammate_not_registered', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true });
+        return interaction.reply({ content: t('common.teammate_not_registered', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true, _autoDeleteMs: 60_000 });
       }
       const busy = isPlayerBusy(tmUser.id);
       if (busy.busy) {
-        return interaction.reply({ content: t('common.teammate_busy', lang, { user: `<@${teammateDiscordId}>`, reason: busy.reason }), ephemeral: true });
+        return interaction.reply({ content: t('common.teammate_busy', lang, { user: `<@${teammateDiscordId}>`, reason: busy.reason }), ephemeral: true, _autoDeleteMs: 60_000 });
       }
     }
 

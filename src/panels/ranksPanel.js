@@ -126,7 +126,7 @@ async function postRanksPanel(client, lang = 'en') {
     console.log('[Panel] Ranks: sending language dropdown...');
     await channel.send({
       content: '🌐 Pick a language to view this in:',
-      components: [buildLanguageDropdownRow(lang)],
+      components: [...buildLanguageDropdownRow(lang)],
     });
 
     // Send intro embed first
