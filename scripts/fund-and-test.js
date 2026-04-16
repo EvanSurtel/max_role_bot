@@ -180,6 +180,7 @@ async function main() {
   console.log(`\n[8] Creating 2v2 match #${matchId2v2} ($3 entry, 4 players)...`);
   const cm2 = await escrow.createMatch(matchId2v2, entry2v2, 4);
   await cm2.wait();
+  await new Promise(r => setTimeout(r, 3000));
   console.log(`  Match created ✅`);
 
   console.log('\n[9] Depositing all 4 players...');
@@ -225,6 +226,7 @@ async function main() {
   console.log(`\n[12] Creating dispute match #${matchIdDispute} ($2 entry, 1v1)...`);
   const cmd = await escrow.createMatch(matchIdDispute, entryDispute, 2);
   await cmd.wait();
+  await new Promise(r => setTimeout(r, 3000));
   console.log(`  Match created ✅`);
 
   console.log('\n[13] Depositing both players...');
