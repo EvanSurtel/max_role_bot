@@ -12,12 +12,21 @@ const { USDC_PER_UNIT } = require('../config/constants');
 async function updateNickname(client, userId) {
   try {
     const user = userRepo.findById(userId);
-    if (!user) return;
+    if (!user) {
+      console.warn(`[Nickname] User id=${userId} not found in DB`);
+      return;
+    }
 
     const guild = client.guilds.cache.get(process.env.GUILD_ID);
-    if (!guild) return;
+    if (!guild) {
+      console.warn(`[Nickname] Guild ${process.env.GUILD_ID} not in cache`);
+      return;
+    }
 
-    const member = await guild.members.fetch(user.discord_id).catch(() => null);
+    const member = await guild.members.fetch(user.discord_id).catch(err => {
+      console.warn(`[Nickname] Could not fetch member ${user.discord_id}: ${err.message}`);
+      return null;
+    });
     if (!member) return;
 
     const flag = user.country_flag || '';
@@ -36,10 +45,33 @@ async function updateNickname(client, userId) {
       nickname = `${displayName.slice(0, Math.max(1, maxName))}${flagPart}${statsPart}`;
     }
 
-    await member.setNickname(nickname).catch(err => {
-      // Can't set nickname on server owner or higher-role users
-      console.warn(`[Nickname] Could not update for ${user.discord_id}:`, err.message);
-    });
+    // Skip no-op writes — Discord counts setNickname against the per-
+    // guild rate limit even if the value didn't change.
+    if (member.nickname === nickname) return;
+
+    // Detect the most common reason setNickname silently fails: the
+    // target member has a role equal to or higher than the bot's top
+    // role, OR is the server owner. Discord rejects these with
+    // "Missing Permissions" which looks like a generic failure in the
+    // logs. Pre-check so we log a clear, actionable message.
+    const botMember = guild.members.me;
+    if (member.id === guild.ownerId) {
+      console.warn(`[Nickname] Cannot update ${user.discord_id} — they are the server owner (Discord API forbids bots changing owner nicknames). Current nick stuck at: "${member.nickname || member.user.username}"`);
+      return;
+    }
+    if (botMember && member.roles.highest.position >= botMember.roles.highest.position) {
+      console.warn(`[Nickname] Cannot update ${user.discord_id} (${displayName}) — their highest role position (${member.roles.highest.name}/${member.roles.highest.position}) is >= bot's highest role (${botMember.roles.highest.name}/${botMember.roles.highest.position}). Move the bot's role ABOVE the user's rank/admin roles in Server Settings → Roles. Current nick stuck at: "${member.nickname || member.user.username}"`);
+      return;
+    }
+
+    try {
+      await member.setNickname(nickname);
+      console.log(`[Nickname] Updated ${user.discord_id} (${displayName}) → "${nickname}"`);
+    } catch (err) {
+      // Generic fallback if the hierarchy check missed something —
+      // e.g. the bot role is missing the Manage Nicknames permission.
+      console.warn(`[Nickname] setNickname failed for ${user.discord_id} (${displayName}) → "${nickname}": ${err.message} (code=${err.code || 'n/a'}). Check bot has Manage Nicknames permission AND its role is above the user's role.`);
+    }
   } catch (err) {
     console.error(`[Nickname] Error updating user ${userId}:`, err.message);
   }
