@@ -37,13 +37,14 @@ const MATCH_TIMERS = {
   REPORT_BUFFER: 30,    // Minutes after estimate + window before auto-dispute
 };
 
-// Minimum minutes before captains can report results (prevents spam)
-// TODO: Re-enable for production: 1: 5, 3: 10, 5: 15, 7: 20
+// Minimum minutes before captains can report results (prevents
+// accidental/fraudulent instant-report). Scales with series length
+// since longer series legitimately take longer to play out.
 const MIN_REPORT_MINUTES = {
-  1: 0,    // DISABLED FOR TESTING
-  3: 0,
-  5: 0,
-  7: 0,
+  1: 5,     // Bo1 — 5 min minimum
+  3: 10,    // Bo3 — 10 min minimum
+  5: 15,    // Bo5 — 15 min minimum
+  7: 20,    // Bo7 — 20 min minimum
 };
 
 // Mode rotation orders for series

@@ -30,9 +30,14 @@ function startWebhookServer(client) {
     res.status(200).json({ ok: true });
 
     try {
-      // Verify the callback signature if the public key is configured
+      // Verify the callback signature if the public key is configured.
+      // On mainnet we REJECT invalid signatures (return early without
+      // processing). On sepolia we log and continue since sandbox can
+      // use different signing modes during Changelly testing.
+      const isMainnet = (process.env.BASE_NETWORK || 'mainnet').toLowerCase() !== 'sepolia';
       const callbackPubKey = process.env.CHANGELLY_CALLBACK_PUBLIC_KEY;
       if (callbackPubKey && req.headers['x-callback-signature']) {
+        let sigVerified = false;
         try {
           const crypto = require('crypto');
           const signature = req.headers['x-callback-signature'];
@@ -50,13 +55,19 @@ function startWebhookServer(client) {
             format: 'pem',
             type: pemKey.includes('RSA PUBLIC KEY') ? 'pkcs1' : 'spki',
           });
-          const isValid = crypto.verify('sha256', Buffer.from(body), pubKeyObj, Buffer.from(signature, 'base64'));
-          if (!isValid) {
-            console.warn('[Changelly] Invalid webhook signature — processing anyway (sandbox may use different signing)');
-          }
+          sigVerified = crypto.verify('sha256', Buffer.from(body), pubKeyObj, Buffer.from(signature, 'base64'));
         } catch (verifyErr) {
-          console.warn(`[Changelly] Signature verification error: ${verifyErr.message} — processing anyway`);
+          console.warn(`[Changelly] Signature verification error: ${verifyErr.message}`);
         }
+        if (!sigVerified) {
+          if (isMainnet) {
+            console.error('[Changelly] REJECTED webhook — invalid signature on mainnet. Not processing.');
+            return;
+          }
+          console.warn('[Changelly] Invalid signature on testnet — processing anyway (sandbox signing mode)');
+        }
+      } else if (isMainnet && !callbackPubKey) {
+        console.warn('[Changelly] CHANGELLY_CALLBACK_PUBLIC_KEY not set on mainnet — any caller can forge webhooks. Configure production public key.');
       }
 
       const payload = req.body;
