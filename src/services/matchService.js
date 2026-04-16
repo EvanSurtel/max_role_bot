@@ -509,7 +509,7 @@ async function resolveMatch(client, matchId, winningTeam, { fromDispute = false 
         { fromDispute },
       );
       const failedPayouts = (disburseResult.disbursements || []).filter(d => d.error);
-      const successPayouts = (disburseResult.disbursements || []).filter(d => d.signature);
+      const successPayouts = (disburseResult.disbursements || []).filter(d => d.hash || d.signature);
       if (failedPayouts.length > 0 || successPayouts.length < winnerUserIds.length) {
         disburseFailed = true;
         disburseError = failedPayouts.length > 0
