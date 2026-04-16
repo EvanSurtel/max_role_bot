@@ -110,12 +110,21 @@ async function main() {
     const txs = findTxByUser.all(w.user_id);
     let onChainExpected = 0n;
     const byType = {};
+    let pendingOnchainCount = 0;
     for (const t of txs) {
       if (t.status && t.status === 'failed') continue;
+      // pending_onchain = bot logged intent but DB credit hasn't
+      // caught up yet (poller will reconcile). Skip for expected
+      // balance math but count for the report.
+      if (t.status === 'pending_onchain') {
+        pendingOnchainCount++;
+        continue;
+      }
       byType[t.type] = (byType[t.type] || 0n) + BigInt(t.amount_usdc || '0');
       switch (t.type) {
         case 'deposit':
         case 'disbursement':
+        case 'refund':
           onChainExpected += BigInt(t.amount_usdc || '0');
           break;
         case 'escrow_in':

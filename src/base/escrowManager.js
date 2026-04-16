@@ -255,103 +255,196 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
 
   if (winnerAddresses.length === 0) throw new Error('No winners with wallets');
 
-  const { hash } = await transactionService.invokeContract(
-    _ownerAddress(),
-    _escrowAddress(),
-    'resolveMatch',
-    {
-      matchId: String(matchId),
-      winners: winnerAddresses,
-      amounts: winnerAmounts,
-    },
-    ESCROW_ABI_JSON,
-  );
+  const txType = fromDispute ? TRANSACTION_TYPE.DISPUTE_HOLD_CREDIT : TRANSACTION_TYPE.DISBURSEMENT;
+  const baseMemo = fromDispute
+    ? `Winnings for match #${matchId} (held 36h — dispute resolution)`
+    : `Winnings for match #${matchId}`;
 
-  // Credit each winner's DB balance.
-  // When fromDispute is true, winnings go to pending_balance with a
-  // 36-hour hold instead of being immediately available.
+  // Pre-log intent BEFORE the on-chain tx. If the bot crashes between
+  // the tx landing and the DB credit, the poller can pick the delta
+  // up and reconcile it against these rows instead of mis-tagging it
+  // as a fresh deposit. Status starts as 'pending_onchain'; flipped
+  // to 'completed' (or 'pending_release' for dispute holds) after
+  // the DB credit succeeds below.
+  for (const d of disbursements) {
+    if (d.error) continue;
+    try {
+      const row = transactionRepo.create({
+        type: txType,
+        userId: d.userId, challengeId,
+        amountUsdc: d.amount,
+        txHash: null,
+        fromAddress: _escrowAddress(),
+        toAddress: d.address,
+        status: 'pending_onchain',
+        memo: `${baseMemo} — tx pending`,
+      });
+      d.pendingTxId = row.id;
+    } catch (err) {
+      console.error(`[Escrow] Failed to pre-log disbursement for user ${d.userId}:`, err.message);
+      d.error = err.message;
+    }
+  }
+
+  // Send the on-chain tx.
+  let onChainHash;
+  try {
+    const result = await transactionService.invokeContract(
+      _ownerAddress(),
+      _escrowAddress(),
+      'resolveMatch',
+      {
+        matchId: String(matchId),
+        winners: winnerAddresses,
+        amounts: winnerAmounts,
+      },
+      ESCROW_ABI_JSON,
+    );
+    onChainHash = result.hash;
+  } catch (err) {
+    // On-chain call failed entirely — mark the pre-logged rows as
+    // failed so they don't get matched by the poller later.
+    for (const d of disbursements) {
+      if (d.pendingTxId) {
+        try {
+          transactionRepo.updateStatusAndHash(d.pendingTxId, 'failed', null, `${baseMemo} — on-chain call failed: ${err.message}`);
+        } catch { /* ignore */ }
+      }
+    }
+    throw err;
+  }
+
+  // Credit each winner's DB balance + flip the pre-logged row to
+  // completed (or pending_release for dispute holds). If the DB
+  // credit throws for some reason, we leave the row as 'pending_onchain'
+  // so the poller can fix it up when the delta is observed.
   const { TIMERS } = require('../config/constants');
   const releaseAt = fromDispute
     ? new Date(Date.now() + TIMERS.DISPUTE_HOLD).toISOString()
     : null;
 
   for (const d of disbursements) {
-    if (d.error) continue;
+    if (d.error || !d.pendingTxId) continue;
     try {
       if (fromDispute) {
         walletRepo.creditPending(d.userId, d.amount, releaseAt);
       } else {
         walletRepo.creditAvailable(d.userId, d.amount);
       }
-      transactionRepo.create({
-        type: fromDispute ? TRANSACTION_TYPE.DISPUTE_HOLD_CREDIT : TRANSACTION_TYPE.DISBURSEMENT,
-        userId: d.userId, challengeId,
-        amountUsdc: d.amount,
-        txHash: hash,
-        fromAddress: _escrowAddress(),
-        toAddress: d.address,
-        status: fromDispute ? 'pending_release' : 'completed',
-        memo: fromDispute
-          ? `Winnings for match #${matchId} (held 36h — dispute resolution)`
-          : `Winnings for match #${matchId}`,
-      });
-      d.hash = hash;
+      transactionRepo.updateStatusAndHash(
+        d.pendingTxId,
+        fromDispute ? 'pending_release' : 'completed',
+        onChainHash,
+        baseMemo,
+      );
+      d.hash = onChainHash;
     } catch (err) {
       d.error = err.message;
+      console.error(`[Escrow] CRITICAL: DB credit failed AFTER on-chain disbursement for user ${d.userId} match #${matchId}: ${err.message}. On-chain funds WERE sent (tx=${onChainHash}). Deposit poller will reconcile via the pending_onchain transaction row id=${d.pendingTxId}.`);
+      // Still record the tx hash on the pending row so the poller can
+      // tie the on-chain funds back to this intent.
+      try {
+        transactionRepo.updateStatusAndHash(
+          d.pendingTxId,
+          'pending_onchain',
+          onChainHash,
+          `${baseMemo} — DB credit FAILED after on-chain send: ${err.message}`,
+        );
+      } catch { /* ignore */ }
     }
   }
 
-  console.log(`[Escrow] Match #${matchId} resolved: ${winnerAddresses.length} winners${fromDispute ? ' (36h hold)' : ''}. TX: ${hash}`);
-  return { disbursements, hash };
+  console.log(`[Escrow] Match #${matchId} resolved: ${winnerAddresses.length} winners${fromDispute ? ' (36h hold)' : ''}. TX: ${onChainHash}`);
+  return { disbursements, hash: onChainHash };
 }
 
 // ─── On-chain: cancel match → refund all ───────────────────────
 
 async function cancelOnChainMatch(matchId, challengeId, allPlayers, entryAmountUsdc) {
+  const playerRows = [];
   const playerAddresses = [];
   const refundAmounts = [];
 
   for (const player of allPlayers) {
     const wallet = walletRepo.findByUserId(player.user_id);
     if (!wallet) continue;
+    playerRows.push({ userId: player.user_id, address: wallet.address });
     playerAddresses.push(wallet.address);
     refundAmounts.push(entryAmountUsdc);
   }
 
   if (playerAddresses.length === 0) return;
 
-  const { hash } = await transactionService.invokeContract(
-    _ownerAddress(),
-    _escrowAddress(),
-    'cancelMatch',
-    {
-      matchId: String(matchId),
-      players: playerAddresses,
-      refunds: refundAmounts,
-    },
-    ESCROW_ABI_JSON,
-  );
+  const baseMemo = `Refund for cancelled match #${matchId}`;
 
-  for (const player of allPlayers) {
+  // Pre-log each refund intent BEFORE the on-chain tx (see
+  // disburseWinnings for rationale). If the bot crashes between tx
+  // and DB credit, the poller reconciles via these rows.
+  for (const p of playerRows) {
     try {
-      walletRepo.creditAvailable(player.user_id, entryAmountUsdc);
-      transactionRepo.create({
+      const row = transactionRepo.create({
         type: 'refund',
-        userId: player.user_id, challengeId,
+        userId: p.userId, challengeId,
         amountUsdc: entryAmountUsdc,
-        txHash: hash,
+        txHash: null,
         fromAddress: _escrowAddress(),
-        toAddress: walletRepo.findByUserId(player.user_id)?.address || '',
-        status: 'completed',
-        memo: `Refund for cancelled match #${matchId}`,
+        toAddress: p.address,
+        status: 'pending_onchain',
+        memo: `${baseMemo} — tx pending`,
       });
+      p.pendingTxId = row.id;
     } catch (err) {
-      console.error(`[Escrow] Credit refund failed for user ${player.user_id}:`, err.message);
+      console.error(`[Escrow] Failed to pre-log refund for user ${p.userId}:`, err.message);
+      p.error = err.message;
     }
   }
 
-  console.log(`[Escrow] Match #${matchId} cancelled. ${playerAddresses.length} refunded. TX: ${hash}`);
-  return { hash };
+  // Send the on-chain cancel.
+  let onChainHash;
+  try {
+    const result = await transactionService.invokeContract(
+      _ownerAddress(),
+      _escrowAddress(),
+      'cancelMatch',
+      {
+        matchId: String(matchId),
+        players: playerAddresses,
+        refunds: refundAmounts,
+      },
+      ESCROW_ABI_JSON,
+    );
+    onChainHash = result.hash;
+  } catch (err) {
+    for (const p of playerRows) {
+      if (p.pendingTxId) {
+        try {
+          transactionRepo.updateStatusAndHash(p.pendingTxId, 'failed', null, `${baseMemo} — on-chain call failed: ${err.message}`);
+        } catch { /* ignore */ }
+      }
+    }
+    throw err;
+  }
+
+  for (const p of playerRows) {
+    if (p.error || !p.pendingTxId) continue;
+    try {
+      walletRepo.creditAvailable(p.userId, entryAmountUsdc);
+      transactionRepo.updateStatusAndHash(p.pendingTxId, 'completed', onChainHash, baseMemo);
+    } catch (err) {
+      console.error(`[Escrow] CRITICAL: DB credit failed AFTER on-chain refund for user ${p.userId} match #${matchId}: ${err.message}. On-chain funds WERE sent (tx=${onChainHash}). Deposit poller will reconcile via pending_onchain row id=${p.pendingTxId}.`);
+      try {
+        transactionRepo.updateStatusAndHash(
+          p.pendingTxId,
+          'pending_onchain',
+          onChainHash,
+          `${baseMemo} — DB credit FAILED after on-chain send: ${err.message}`,
+        );
+      } catch { /* ignore */ }
+    }
+  }
+
+  console.log(`[Escrow] Match #${matchId} cancelled. ${playerAddresses.length} refunded. TX: ${onChainHash}`);
+  return { hash: onChainHash };
 }
 
 // ─── DB-level refund (pre-escrow, never hit chain) ─────────────

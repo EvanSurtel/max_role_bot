@@ -27,6 +27,49 @@ const _creditStmt = db.prepare(
 );
 
 /**
+ * Given a delta the poller detected and a list of pending_onchain
+ * inflow rows for the same user, try to match them up.
+ *
+ * Returns:
+ *   {
+ *     fullyReconciled: bool    — delta == sum of matched rows exactly
+ *     partiallyReconciled: bool — some rows matched but delta != sum
+ *     matchedRows: [rows]       — rows explained by the delta
+ *     residual: BigInt          — USDC still unaccounted for (delta − sum)
+ *   }
+ *
+ * Matching is greedy: walks rows oldest-first, includes a row if
+ * adding it doesn't push the running total past the delta. This
+ * works for the common case (single pending inflow equals the
+ * delta) and the multi-winner case (several winners of the same
+ * match all getting their share paid in the same on-chain tx).
+ */
+function _reconcilePendingInflows(delta, pendingRows) {
+  if (!pendingRows || pendingRows.length === 0) {
+    return { fullyReconciled: false, partiallyReconciled: false, matchedRows: [], residual: delta };
+  }
+
+  let running = 0n;
+  const matched = [];
+  for (const row of pendingRows) {
+    const amt = BigInt(row.amount_usdc || '0');
+    if (running + amt <= delta) {
+      matched.push(row);
+      running += amt;
+      if (running === delta) break;
+    }
+  }
+
+  const residual = delta - running;
+  return {
+    fullyReconciled: residual === 0n && matched.length > 0,
+    partiallyReconciled: residual > 0n && matched.length > 0,
+    matchedRows: matched,
+    residual,
+  };
+}
+
+/**
  * Credit a deposit atomically with a fresh DB read.
  * Returns the delta credited (BigInt), or 0n if nothing to credit.
  */
@@ -102,7 +145,8 @@ async function checkDeposits() {
         const snapshotHeld = BigInt(wallet.balance_held);
         if (onChainBalance <= snapshotAvail + snapshotHeld) continue;
 
-        // Atomic credit with fresh DB read
+        // Atomic credit with fresh DB read. Returns the delta that
+        // was applied (already += to balance_available).
         const delta = _creditDepositTx(wallet.user_id, onChainBalance);
         if (delta <= 0n) continue;
 
@@ -110,33 +154,95 @@ async function checkDeposits() {
           walletRepo.activate(wallet.user_id);
         }
 
-        const depositUsdc = (Number(delta) / USDC_PER_UNIT).toFixed(2);
+        // Before labeling this delta as a fresh DEPOSIT, check whether
+        // it's actually a partially-applied INFLOW from the bot itself
+        // (match disbursement, cancel refund, or dispute-hold credit)
+        // where the on-chain tx landed but the DB credit failed. In
+        // that case the escrowManager left a pending_onchain row we
+        // can reconcile to instead of double-logging.
+        const pendingInflows = transactionRepo.findPendingInflowsForUser(wallet.user_id, 1800);
+        const reconciled = _reconcilePendingInflows(delta, pendingInflows);
+
+        const usdcFmt = (Number(delta) / USDC_PER_UNIT).toFixed(2);
+        const userRecord = require('../database/repositories/userRepo').findById(wallet.user_id);
+        const { postTransaction } = require('../utils/transactionFeed');
+
+        if (reconciled.fullyReconciled) {
+          // Entire delta explained by one-or-more pending_onchain
+          // disbursement/refund rows. Flip them to completed and
+          // DON'T log a duplicate DEPOSIT. Admin feed gets a
+          // RECONCILED post so you can see what happened.
+          for (const row of reconciled.matchedRows) {
+            const newStatus = row.type === TRANSACTION_TYPE.DISPUTE_HOLD_CREDIT ? 'pending_release' : 'completed';
+            transactionRepo.updateStatusAndHash(
+              row.id,
+              newStatus,
+              row.tx_hash,
+              `${row.memo || ''} — reconciled by poller`,
+            );
+          }
+
+          await postTransaction({
+            type: 'reconciled_inflow',
+            username: userRecord?.server_username,
+            discordId: userRecord?.discord_id,
+            amount: `$${usdcFmt}`,
+            currency: 'USDC',
+            toAddress: wallet.address,
+            memo: `Reconciled $${usdcFmt} USDC to ${reconciled.matchedRows.length} pending ${reconciled.matchedRows.map(r => r.type).join('/')} row(s). On-chain tx arrived after DB credit path failed — now consistent.`,
+          });
+
+          console.log(`[Deposits] Reconciled $${usdcFmt} USDC (${delta} units) for user ${wallet.user_id} against ${reconciled.matchedRows.length} pending inflow(s)`);
+          continue;
+        }
+
+        if (reconciled.partiallyReconciled) {
+          // We matched some but not all. Flip the matched ones, log
+          // the remainder as DEPOSIT with a flag.
+          for (const row of reconciled.matchedRows) {
+            const newStatus = row.type === TRANSACTION_TYPE.DISPUTE_HOLD_CREDIT ? 'pending_release' : 'completed';
+            transactionRepo.updateStatusAndHash(
+              row.id,
+              newStatus,
+              row.tx_hash,
+              `${row.memo || ''} — reconciled by poller (partial)`,
+            );
+          }
+        }
+
+        const residual = reconciled.residual;
+        const residualUsdc = (Number(residual) / USDC_PER_UNIT).toFixed(2);
+
+        // Anything left over = genuine external deposit (or something
+        // we can't account for — flagged for review).
         transactionRepo.create({
           type: TRANSACTION_TYPE.DEPOSIT,
           userId: wallet.user_id,
           challengeId: null,
-          amountUsdc: delta.toString(),
+          amountUsdc: residual.toString(),
           txHash: null,
           fromAddress: null,
           toAddress: wallet.address,
           status: 'completed',
-          memo: `Deposit detected: $${depositUsdc} USDC`,
+          memo: reconciled.partiallyReconciled
+            ? `Deposit detected: $${residualUsdc} USDC (remaining after reconciling pending inflows)`
+            : `Deposit detected: $${residualUsdc} USDC (no matching pending inflow — external source)`,
         });
 
-        const { postTransaction } = require('../utils/transactionFeed');
-        const userRecord = require('../database/repositories/userRepo').findById(wallet.user_id);
         await postTransaction({
           type: 'deposit',
           username: userRecord?.server_username,
           discordId: userRecord?.discord_id,
-          amount: `$${depositUsdc}`,
+          amount: `$${residualUsdc}`,
           currency: 'USDC',
           toAddress: wallet.address,
-          memo: `Deposit detected: $${depositUsdc} USDC`,
+          memo: reconciled.partiallyReconciled
+            ? `Deposit (residual after reconciliation): $${residualUsdc} USDC`
+            : `Deposit: $${residualUsdc} USDC — external source (no matching pending inflow in last 30 min)`,
         });
 
         console.log(
-          `[Deposits] Detected deposit of $${depositUsdc} USDC (${delta} units) ` +
+          `[Deposits] Detected ${reconciled.partiallyReconciled ? 'residual ' : ''}deposit of $${residualUsdc} USDC (${residual} units) ` +
           `for user ${wallet.user_id} at ${wallet.address}`,
         );
       } catch (err) {
