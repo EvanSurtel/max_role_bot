@@ -3,6 +3,7 @@ const db = require('../db');
 const stmts = {
   findById: db.prepare('SELECT * FROM matches WHERE id = ?'),
   findByChallengeId: db.prepare('SELECT * FROM matches WHERE challenge_id = ?'),
+  findByChannelId: db.prepare(`SELECT * FROM matches WHERE team1_text_id = ? OR team2_text_id = ? OR shared_text_id = ? OR voting_channel_id = ? OR team1_voice_id = ? OR team2_voice_id = ? OR shared_voice_id = ? LIMIT 1`),
   create: db.prepare(`
     INSERT INTO matches (challenge_id, category_id)
     VALUES (@challengeId, @categoryId)
@@ -101,6 +102,10 @@ const matchRepo = {
    * @param {string} newStatus
    * @returns {boolean}
    */
+  findByChannelId(channelId) {
+    return stmts.findByChannelId.get(channelId, channelId, channelId, channelId, channelId, channelId, channelId);
+  },
+
   atomicStatusTransition(id, expectedStatuses, newStatus) {
     const allowed = Array.isArray(expectedStatuses) ? expectedStatuses : [expectedStatuses];
     const tx = db.transaction(() => {

@@ -132,12 +132,69 @@ async function sendEphemeralPanelForCurrentChannel(interaction, newLang) {
       return interaction.editReply(await buildEarningsPanel('global', newLang));
     }
 
+    // Match channels (dynamically created) — check if there's a match
+    // associated with this channel and re-render the welcome message.
+    try {
+      const matchRepo = require('../database/repositories/matchRepo');
+      const match = matchRepo.findByChannelId(channelId);
+      if (match) {
+        const challengeRepo = require('../database/repositories/challengeRepo');
+        const challengePlayerRepo = require('../database/repositories/challengePlayerRepo');
+        const userRepo = require('../database/repositories/userRepo');
+        const { t } = require('../locales/i18n');
+        const { CHALLENGE_TYPE, GAME_MODES } = require('../config/constants');
+
+        const challenge = challengeRepo.findById(match.challenge_id);
+        if (challenge) {
+          const allPlayers = challengePlayerRepo.findByChallengeId(challenge.id);
+          const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
+          const modeInfo = GAME_MODES[challenge.game_modes];
+          const modeLabel = modeInfo ? modeInfo.label : challenge.game_modes;
+          const typeLabel = isCashMatch
+            ? t('challenge_create.type_cash_match', newLang)
+            : t('challenge_create.type_xp_match', newLang);
+
+          const team1 = allPlayers.filter(p => p.team === 1).map(p => {
+            const u = userRepo.findById(p.user_id);
+            return u ? `<@${u.discord_id}>${p.role === 'captain' ? ` (${t('challenge_accept.captain_label', newLang)})` : ''}` : '?';
+          });
+          const team2 = allPlayers.filter(p => p.team === 2).map(p => {
+            const u = userRepo.findById(p.user_id);
+            return u ? `<@${u.discord_id}>${p.role === 'captain' ? ` (${t('challenge_accept.captain_label', newLang)})` : ''}` : '?';
+          });
+
+          const lines = [
+            `**${typeLabel} #${match.id}**`,
+            '',
+            `**${t('challenge_accept.team_1_header', newLang)}:** ${team1.join(', ')}`,
+            `**${t('challenge_accept.team_2_your_header', newLang)}:** ${team2.join(', ')}`,
+          ];
+
+          if (isCashMatch) {
+            const { USDC_PER_UNIT } = require('../config/constants');
+            const prize = (Number(challenge.total_pot_usdc) / USDC_PER_UNIT).toFixed(2);
+            lines.push('', `**${t('match_channel.match_prize_label', newLang, { amount: prize })}**`);
+          }
+
+          lines.push('', `**${t('match_channel.mode_label', newLang)}:** ${modeLabel}`);
+          lines.push(`**${t('match_channel.series_label', newLang)}:** ${t('challenge_create.series_label', newLang, { n: challenge.series_length })}`);
+
+          const { EmbedBuilder } = require('discord.js');
+          const embed = new EmbedBuilder()
+            .setTitle(`${typeLabel} #${match.id}`)
+            .setColor(isCashMatch ? 0xe67e22 : 0x5865F2)
+            .setDescription(lines.join('\n'));
+
+          return interaction.editReply({ embeds: [embed] });
+        }
+      }
+    } catch { /* not a match channel */ }
+
     // Unknown channel — just confirm the language was saved
     const { t } = require('../locales/i18n');
-    const { SUPPORTED_LANGUAGES } = require('../locales');
-    const langName = SUPPORTED_LANGUAGES[newLang]?.nativeName || newLang;
+    const langName2 = (SUPPORTED_LANGUAGES && SUPPORTED_LANGUAGES[newLang]?.nativeName) || newLang;
     return interaction.editReply({
-      content: t('onboarding.language_saved', newLang, { language: langName }),
+      content: t('onboarding.language_saved', newLang, { language: langName2 }),
     });
   } catch (err) {
     console.error('[EphPanel] Failed to send ephemeral panel:', err.message);
