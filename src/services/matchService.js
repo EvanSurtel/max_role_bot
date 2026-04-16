@@ -670,6 +670,21 @@ async function resolveMatch(client, matchId, winningTeam, { fromDispute = false 
     }
   }
 
+  // Update Discord nicknames with new XP/earnings BEFORE posting the
+  // result message. The result message contains @-mentions of the
+  // players — if nicknames haven't updated yet, viewers would see
+  // stale pre-match XP/earnings in the mention pills next to
+  // "Winners:" / "Losers:". Awaiting here costs 1-2s per player
+  // (Discord API rate limits) but keeps the numbers accurate at the
+  // moment anyone first sees the result.
+  const { updateNicknames } = require('../utils/nicknameUpdater');
+  const allPlayerIds = allPlayers.map(p => p.user_id);
+  try {
+    await updateNicknames(client, allPlayerIds);
+  } catch (err) {
+    console.error(`[MatchService] Nickname pre-result update failed:`, err.message);
+  }
+
   // Log resolution to admin feed
   const { postTransaction: postTx } = require('../utils/transactionFeed');
   const winnerNames = winningPlayers.map(p => { const u = userRepo.findById(p.user_id); return u?.server_username || '?'; }).join(', ');
@@ -790,13 +805,8 @@ async function resolveMatch(client, matchId, winningTeam, { fromDispute = false 
   // out of the channels cache after a restart.
   await postResultToChannels(client, resultEmbed, [langRow], isCashMatch, matchId);
 
-  // Update nicknames with new XP and earnings
-  const { updateNicknames } = require('../utils/nicknameUpdater');
-  const allPlayerIds = allPlayers.map(p => p.user_id);
-  updateNicknames(client, allPlayerIds).catch(err => {
-    console.error(`[MatchService] Nickname update failed:`, err.message);
-  });
-
+  // Nickname update already ran before the shared-channel result
+  // post (so the @-mentions in the result show current stats).
   // Sync rank roles for every match participant — the match may
   // have bumped someone into a new tier (or knocked them out of
   // the Crowned top 10).
