@@ -41,6 +41,34 @@ async function handleCreateDispute(interaction) {
     return interaction.reply({ content: t('dispute.no_recent', lang), ephemeral: true });
   }
 
+  // Build detailed match list with info for each match
+  const matchLines = recentMatches.map(m => {
+    const typeLabel = m.type === 'cash_match' ? t('challenge_create.type_cash_match', lang) : t('challenge_create.type_xp_match', lang);
+    const num = m.display_number || m.id;
+    const modeInfo = GAME_MODES[m.game_modes];
+    const modeLabel = modeInfo ? modeInfo.label : m.game_modes;
+    const prizeText = Number(m.total_pot_usdc) > 0 ? ` | ${formatUsdc(m.total_pot_usdc)} USDC` : '';
+    const statusText = m.status === 'disputed' ? ' (already disputed)' : '';
+
+    // Get team players
+    const players = challengePlayerRepo.findByChallengeId(m.challenge_id);
+    const team1 = players.filter(p => p.team === 1).map(p => {
+      const u = userRepo.findById(p.user_id);
+      return u ? u.server_username || u.cod_ign : '?';
+    }).join(', ');
+    const team2 = players.filter(p => p.team === 2).map(p => {
+      const u = userRepo.findById(p.user_id);
+      return u ? u.server_username || u.cod_ign : '?';
+    }).join(', ');
+
+    return `**${typeLabel} #${num}**${statusText}\n${modeLabel} | Bo${m.series_length} | ${m.team_size}v${m.team_size}${prizeText}\nTeam 1: ${team1}\nTeam 2: ${team2}`;
+  });
+
+  const embed = new EmbedBuilder()
+    .setTitle(t('dispute.create_title', lang))
+    .setColor(0xe74c3c)
+    .setDescription(t('dispute.create_desc', lang) + '\n\n' + matchLines.join('\n\n'));
+
   const rows = [];
   for (let i = 0; i < recentMatches.length; i += 5) {
     const chunk = recentMatches.slice(i, i + 5);
@@ -48,10 +76,9 @@ async function handleCreateDispute(interaction) {
       ...chunk.map(m => {
         const typeLabel = m.type === 'cash_match' ? 'Cash' : 'XP';
         const num = m.display_number || m.id;
-        const prizeAmount = Number(m.total_pot_usdc) > 0 ? ` ${formatUsdc(m.total_pot_usdc)}` : '';
         return new ButtonBuilder()
           .setCustomId(`dispute_select_${m.id}`)
-          .setLabel(`${typeLabel} #${num}${prizeAmount}`)
+          .setLabel(`Dispute ${typeLabel} #${num}`)
           .setStyle(m.status === 'disputed' ? ButtonStyle.Secondary : ButtonStyle.Danger);
       }),
     );
@@ -59,7 +86,7 @@ async function handleCreateDispute(interaction) {
   }
 
   return interaction.reply({
-    embeds: [new EmbedBuilder().setTitle(t('dispute.create_title', lang)).setColor(0xe74c3c).setDescription(t('dispute.create_desc', lang))],
+    embeds: [embed],
     components: rows,
     ephemeral: true,
   });
