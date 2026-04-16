@@ -69,8 +69,8 @@ function buildRanksPanel(lang = 'en', { withThumbnails = true } = {}) {
 
     const embed = new EmbedBuilder()
       .setTitle(titleLine)
-      .setColor(tier.color)
-      .setDescription(locale.blurb);
+      .setColor(tier.color);
+    if (locale.blurb) embed.setDescription(locale.blurb);
 
     if (withThumbnails && tier.emblem) {
       const emblemPath = path.join(ASSETS_DIR, tier.emblem);
@@ -111,18 +111,12 @@ async function postRanksPanel(client, lang = 'en') {
   }
 
   try {
-    console.log('[Panel] Ranks: clearing old messages...');
-    const messages = await channel.messages.fetch({ limit: 50 });
-    const botMessages = messages.filter(m => m.author.id === client.user.id);
-    if (botMessages.size > 0) {
-      // Bulk delete if possible (faster, handles up to 100 messages < 14 days old)
-      try {
-        await channel.bulkDelete(botMessages);
-      } catch {
-        // Fallback to individual delete for old messages
-        for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
-      }
-    }
+    // Clear old bot messages (ignore errors — channel might have system messages)
+    try {
+      const messages = await channel.messages.fetch({ limit: 50 });
+      const botMessages = messages.filter(m => m.author.id === client.user.id);
+      for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
+    } catch { /* channel might not allow fetch — just post fresh */ }
 
     console.log('[Panel] Ranks: building panel...');
     const { embeds, files } = buildRanksPanel(lang);
