@@ -17,6 +17,7 @@ const escrowAbi = [
   'function createMatch(uint256,uint256,uint8)',
   'function depositToEscrow(uint256,address)',
   'function resolveMatch(uint256,address[],uint256[])',
+  'function cancelMatch(uint256,address[],uint256[])',
   'function matches(uint256) view returns (uint256,uint8,uint8,uint256,bool,bool)',
 ];
 
