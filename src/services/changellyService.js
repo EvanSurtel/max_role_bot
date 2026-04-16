@@ -18,23 +18,69 @@ function isConfigured() {
   return Boolean(getApiKey()) && Boolean(getApiSecret());
 }
 
+// Cached parsed key object — parsing is non-trivial and the key
+// never changes at runtime, so we do it once and reuse.
+let _cachedPrivateKey = null;
+let _cachedSecretSource = null;
+
+/**
+ * Decode whatever format Changelly gave you into a usable Node
+ * KeyObject. Accepts all of:
+ *
+ *   1. Raw PEM with -----BEGIN (RSA )?PRIVATE KEY----- markers,
+ *      literal newlines in the env var
+ *   2. Raw PEM with \n escape sequences (common when pasted into
+ *      .env without newlines)
+ *   3. Single-line base64-encoded PEM (most common prod format)
+ *   4. Already-decoded PKCS#1 or PKCS#8 — Node autodetects both
+ *
+ * This saves you from having to run openssl conversions — paste
+ * whatever Changelly sent and we figure it out.
+ */
+function _parsePrivateKey(raw) {
+  if (!raw) throw new Error('CHANGELLY_FIAT_API_SECRET is empty');
+
+  // Normalize: if it doesn't look like PEM, try base64-decode first.
+  let pem = raw.trim();
+  if (!pem.includes('-----BEGIN')) {
+    try {
+      const decoded = Buffer.from(pem, 'base64').toString('utf8');
+      if (decoded.includes('-----BEGIN')) {
+        pem = decoded;
+      }
+    } catch { /* fall through */ }
+  }
+
+  // Some .env editors swap actual newlines for literal `\n` — undo that.
+  if (pem.includes('\\n') && !pem.includes('\n-----END')) {
+    pem = pem.replace(/\\n/g, '\n');
+  }
+
+  if (!pem.includes('-----BEGIN')) {
+    throw new Error('CHANGELLY_FIAT_API_SECRET does not look like a PEM key (no -----BEGIN marker after base64 decode). Check the value you pasted.');
+  }
+
+  // Node's createPrivateKey auto-detects PKCS#1 (BEGIN RSA PRIVATE KEY)
+  // vs PKCS#8 (BEGIN PRIVATE KEY) when format='pem' and no type is set.
+  return crypto.createPrivateKey({ key: pem, format: 'pem' });
+}
+
 /**
  * Create RSA-SHA256 signature of the full URL + request body.
  * Changelly requires: sign(fullUrl + JSON.stringify(body || {}))
  */
 function _sign(fullUrl, body) {
-  const privateKeyObject = crypto.createPrivateKey({
-    key: getApiSecret(),
-    type: 'pkcs1',
-    format: 'pem',
-    encoding: 'base64',
-  });
+  const secret = getApiSecret();
+  if (secret !== _cachedSecretSource) {
+    _cachedPrivateKey = _parsePrivateKey(secret);
+    _cachedSecretSource = secret;
+  }
 
   const message = body || {};
   const payload = fullUrl + JSON.stringify(message);
 
   return crypto
-    .sign('sha256', Buffer.from(payload), privateKeyObject)
+    .sign('sha256', Buffer.from(payload), _cachedPrivateKey)
     .toString('base64');
 }
 
