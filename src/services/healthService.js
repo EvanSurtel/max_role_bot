@@ -61,7 +61,7 @@ function getHealthSummary() {
   return {
     uptime: `${uptimeHours}h`,
     dbConnected: dbOk,
-    solanaConnected: rpcOk,
+    rpcConnected: rpcOk,
     matchCreationDisabled: false,
     pendingTransactions: pendingTxCount,
     activeMatches,
@@ -84,7 +84,7 @@ async function postDailySummary(client) {
     '**Daily Health Summary**',
     `Uptime: ${summary.uptime}`,
     `DB: ${summary.dbConnected ? 'OK' : 'ERROR'}`,
-    `Base RPC: ${summary.solanaConnected ? 'OK' : 'ERROR'}`,
+    `Base RPC: ${summary.rpcConnected ? 'OK' : 'ERROR'}`,
     `Pending transactions: ${summary.pendingTransactions}`,
     `Active matches: ${summary.activeMatches}`,
   ].join('\n'));

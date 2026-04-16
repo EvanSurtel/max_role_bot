@@ -504,7 +504,15 @@ async function _executeEscrowWithdrawConfirm(interaction) {
 
     if (currency === 'usdc') {
       const amountSmallest = Math.floor(amount * USDC_PER_UNIT).toString();
-      const { signature } = await transactionService.transferUsdc(escrowAddress, address, amountSmallest);
+      // Admin withdrawal uses invokeContract (owner EOA) since escrow is not a Smart Account
+      const { ethers } = require('ethers');
+      const iface = new ethers.Interface(['function transfer(address to, uint256 amount) returns (bool)']);
+      const data = iface.encodeFunctionData('transfer', [address, BigInt(amountSmallest)]);
+      const { signature } = await transactionService.invokeContract(
+        escrowAddress, walletManager.USDC_CONTRACT, 'transfer',
+        { to: address, amount: amountSmallest },
+        [{ name: 'transfer', type: 'function', inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] }],
+      );
       postTransaction({
         type: 'withdrawal',
         discordId: interaction.user.id,
