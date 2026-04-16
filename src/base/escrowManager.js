@@ -90,6 +90,28 @@ async function approveEscrowForUser(userId) {
   const walletRecord = walletRepo.findByUserId(userId);
   if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
 
+  // Idempotency guard: skip the on-chain approve if the user already
+  // has a large allowance to the escrow. We approve MAX_UINT256, so
+  // any existing allowance > 1 billion USDC units (1000 USDC) is a
+  // strong signal the prior approve already landed — no need to
+  // sponsor a redundant UserOp through the Paymaster. This is the
+  // "Max 1 approve ever" rule enforced at the source: it's cheap on
+  // the chain (one eth_call) and saves real money on the Paymaster.
+  try {
+    const provider = getProvider();
+    const allowanceAbi = ['function allowance(address owner, address spender) view returns (uint256)'];
+    const usdcContract = new ethers.Contract(walletManager.USDC_CONTRACT, allowanceAbi, provider);
+    const current = await usdcContract.allowance(walletRecord.address, _escrowAddress());
+    // 1 billion in USDC smallest units = 1,000 USDC. Any existing
+    // approval above that is plainly a prior MAX approval.
+    if (current > 1_000_000_000n) {
+      console.log(`[Escrow] User ${userId} already has sufficient escrow allowance (${current.toString()}) — skipping approve UserOp`);
+      return { hash: null, skipped: true };
+    }
+  } catch (err) {
+    console.warn(`[Escrow] Pre-approve allowance check failed for user ${userId} (will approve anyway):`, err.message);
+  }
+
   const { hash } = await transactionService.approveUsdc(
     walletRecord.address,
     _escrowAddress(),
@@ -97,7 +119,7 @@ async function approveEscrowForUser(userId) {
   );
 
   console.log(`[Escrow] Approved escrow for user ${userId}: ${hash}`);
-  return { hash };
+  return { hash, skipped: false };
 }
 
 // ─── On-chain: create match in the contract ────────────────────

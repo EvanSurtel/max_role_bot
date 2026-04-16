@@ -89,11 +89,34 @@ const TIMERS = {
   DISPUTE_HOLD: 36 * 60 * 60 * 1000, // 36 hours — winnings held after dispute resolution
 };
 
-// Rate limit cooldowns (in milliseconds)
+// Rate limit cooldowns (in milliseconds) — minimum time between
+// repeated calls of the same action by the same user.
 const COOLDOWNS = {
   CREATE_WAGER: 10_000,
   WITHDRAW: 30_000,
   SUBMIT_EVIDENCE: 5_000,
+};
+
+// Quota caps (rolling window). Each limit defines how many times a
+// user can perform an action within `windowMs` before being blocked.
+// Resets on bot restart (in-memory), which is fine — any sustained
+// abuser hits the limit again on the next attempt.
+//
+// Also applied:
+//   - ONCHAIN_COOLDOWN_MS: global minimum gap between ANY two
+//     on-chain-triggering actions from the same user (withdraw,
+//     match entry, etc.). Prevents rapid-fire griefing that could
+//     burn Paymaster credits or owner ETH.
+const LIMITS = {
+  WITHDRAW_PER_24H:        { max: 3,  windowMs: 24 * 60 * 60 * 1000 },
+  MATCH_ENTRY_PER_24H:     { max: 10, windowMs: 24 * 60 * 60 * 1000 },
+  WALLET_REFRESH_PER_HOUR: { max: 5,  windowMs:      60 * 60 * 1000 },
+  ONCHAIN_COOLDOWN_MS: 60_000,
+  // Abuse detection: if a user hits ANY rate limit this many times
+  // inside this window, the bot pings the admin alerts channel with
+  // their ID as a potential abuser signal.
+  ABUSE_THRESHOLD: 10,
+  ABUSE_WINDOW_MS: 15 * 60 * 1000,
 };
 
 // Base / USDC
@@ -228,6 +251,7 @@ module.exports = {
   USDC_MINT_MAINNET,
   USDC_MINT_DEVNET,
   COOLDOWNS,
+  LIMITS,
   XP_MATCH,
   XP_WAGER,
   RANK_TIERS,

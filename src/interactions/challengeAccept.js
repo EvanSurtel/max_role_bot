@@ -152,6 +152,16 @@ async function handleConfirmedAccept(interaction) {
     return interaction.reply({ content: busy.reason, ephemeral: true });
   }
 
+  // Rate limit: same bucket as match create. Accepting a match
+  // triggers the escrow createMatch + depositToEscrow on-chain
+  // calls, so it costs real gas regardless of whether it was a
+  // create or accept on the user's side.
+  const rateLimiter = require('../utils/rateLimiter');
+  const guard = rateLimiter.guardOnchainAction(discordId, 'MATCH_ENTRY_PER_24H', 'Match entry');
+  if (guard.blocked) {
+    return interaction.reply({ content: guard.message, ephemeral: true, _autoDeleteMs: 60_000 });
+  }
+
   const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const entryUsdc = challenge.entry_amount_usdc;
 
@@ -202,6 +212,10 @@ async function handleConfirmedAccept(interaction) {
 
       // Edit the challenge board message to show "ACCEPTED" and disable the button
       await disableBoardMessage(interaction.client, challenge);
+
+      // Record rate-limit hit on success — the on-chain tx actually landed.
+      rateLimiter.recordOnchainAction(discordId);
+      rateLimiter.recordQuota(discordId, 'MATCH_ENTRY_PER_24H');
 
       // Log to admin feed
       const { postTransaction } = require('../utils/transactionFeed');
@@ -567,6 +581,15 @@ async function handleTeamConfirmedAccept(interaction) {
   const user = userRepo.findByDiscordId(discordId);
   if (!user) return interaction.reply({ content: 'Not registered.', ephemeral: true });
 
+  // Rate limit: same bucket as 1v1 accept + match create. Team
+  // acceptance triggers the escrow on-chain flow for all players
+  // once the last teammate confirms.
+  const rateLimiter = require('../utils/rateLimiter');
+  const guard = rateLimiter.guardOnchainAction(discordId, 'MATCH_ENTRY_PER_24H', 'Match entry (team)');
+  if (guard.blocked) {
+    return interaction.reply({ content: guard.message, ephemeral: true, _autoDeleteMs: 60_000 });
+  }
+
   const selectedDiscordIds = flow.teammates;
   const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const entryUsdc = challenge.entry_amount_usdc;
@@ -664,6 +687,13 @@ async function handleTeamConfirmedAccept(interaction) {
 
     // Clean up acceptFlows
     acceptFlows.delete(discordId);
+
+    // Record rate-limit hit on successful team accept. The actual
+    // on-chain escrow tx happens later when the last teammate
+    // confirms (via matchService.startMatch), but from THIS user's
+    // perspective they've committed a match entry.
+    rateLimiter.recordOnchainAction(discordId);
+    rateLimiter.recordQuota(discordId, 'MATCH_ENTRY_PER_24H');
 
     // Edit the challenge board message to show "ACCEPTED" and disable the button
     await disableBoardMessage(interaction.client, challenge);

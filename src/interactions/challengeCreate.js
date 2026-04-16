@@ -751,6 +751,19 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
   }
   finalizingUsers.add(userId);
 
+  // Rate limit: 10 match entries / 24h + 60s global on-chain cooldown.
+  // Match entries cost real owner-EOA ETH (createMatch + depositToEscrow)
+  // and potential Paymaster gas (if user op was involved in approval
+  // retry), so unlimited create spam burns funds fast.
+  const rateLimiter = require('../utils/rateLimiter');
+  const guard = rateLimiter.guardOnchainAction(userId, 'MATCH_ENTRY_PER_24H', 'Match entry');
+  if (guard.blocked) {
+    finalizingUsers.delete(userId);
+    return interaction.reply
+      ? interaction.reply({ content: guard.message, ephemeral: true, _autoDeleteMs: 60_000 })
+      : null;
+  }
+
   // Defer update — we'll edit the ephemeral with the final summary
   await interaction.deferUpdate();
 
@@ -883,6 +896,11 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
         ? t('challenge_create.create_summary_waiting_teammates', lang)
         : t('challenge_create.create_summary_live_board', lang),
     ].join('\n');
+
+    // Rate-limit hit recorded on success — failed attempts don't
+    // consume the user's daily match-entry quota.
+    rateLimiter.recordOnchainAction(userId);
+    rateLimiter.recordQuota(userId, 'MATCH_ENTRY_PER_24H');
 
     activeFlows.delete(userId);
     finalizingUsers.delete(userId);

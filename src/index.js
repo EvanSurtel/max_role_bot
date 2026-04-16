@@ -45,6 +45,12 @@ client.once('ready', async () => {
     const { setClient: setTxFeedClient } = require('./utils/transactionFeed');
     setTxFeedClient(client);
 
+    // Hand the Discord client to the rate limiter so it can post
+    // abuse-signal alerts to ADMIN_ALERTS_CHANNEL_ID when a user
+    // trips rate limits repeatedly inside the abuse window.
+    const { setClient: setRateLimiterClient } = require('./utils/rateLimiter');
+    setRateLimiterClient(client);
+
     // Initialize Base connection
     const { getProvider } = require('./base/connection');
     getProvider();

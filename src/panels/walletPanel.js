@@ -306,6 +306,21 @@ async function handleWalletSubButton(interaction) {
   }
 
   if (id === 'wallet_refresh') {
+    // Rate limit: 5 manual refreshes / hour. Not on-chain (just a
+    // DB re-read), but stops button-mashing and gives abuse signal.
+    const rateLimiter = require('../utils/rateLimiter');
+    const q = rateLimiter.checkQuota(user.discord_id, 'WALLET_REFRESH_PER_HOUR');
+    if (q.blocked) {
+      rateLimiter.trackBlock(user.discord_id, `wallet_refresh (${q.hits}/${q.max})`);
+      const mins = Math.ceil(q.remainingSeconds / 60);
+      return interaction.reply({
+        content: `🔄 Too many refreshes. Wallet balance auto-updates every 30s in the background. Try again in ${mins} min.`,
+        ephemeral: true,
+        _autoDeleteMs: 60_000,
+      });
+    }
+    rateLimiter.recordQuota(user.discord_id, 'WALLET_REFRESH_PER_HOUR');
+
     // Re-render the ephemeral wallet view in place with fresh balance data.
     await interaction.deferUpdate();
 
@@ -558,6 +573,15 @@ async function handleWithdrawModal(interaction) {
 async function _executeUsdcWithdraw(interaction, user, amountUsdc, address, lang) {
   const amountSmallest = Math.floor(amountUsdc * USDC_PER_UNIT);
 
+  // Rate limit: 3 withdrawals / 24h + 60s global on-chain cooldown.
+  // Hits are recorded on success (after the on-chain tx) so that a
+  // failed attempt doesn't count against the user's quota.
+  const rateLimiter = require('../utils/rateLimiter');
+  const guard = rateLimiter.guardOnchainAction(user.discord_id, 'WITHDRAW_PER_24H', 'Withdraw');
+  if (guard.blocked) {
+    return interaction.editReply({ content: guard.message, embeds: [], components: [] });
+  }
+
   if (!walletRepo.acquireLock(user.id)) {
     return interaction.editReply({ content: t('common.please_wait', lang) });
   }
@@ -597,6 +621,11 @@ async function _executeUsdcWithdraw(interaction, user, amountUsdc, address, lang
 
     const { postTransaction } = require('../utils/transactionFeed');
     postTransaction({ type: 'withdrawal', username: user.server_username, discordId: user.discord_id, amount: `$${amountUsdc.toFixed(2)}`, currency: 'USDC', fromAddress: freshWallet.address, toAddress: address, signature, memo: `Withdrawal of $${amountUsdc.toFixed(2)} USDC` });
+
+    // Record rate-limit hit only after the on-chain tx + DB updates
+    // succeed. Failed attempts don't consume the quota.
+    rateLimiter.recordOnchainAction(user.discord_id);
+    rateLimiter.recordQuota(user.discord_id, 'WITHDRAW_PER_24H');
 
     walletRepo.releaseLock(user.id);
     return interaction.editReply({
