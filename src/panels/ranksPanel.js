@@ -146,6 +146,8 @@ async function postRanksPanel(client, lang = 'en') {
     }
   } catch (err) {
     console.error('[Panel] Failed to post ranks panel:', err.message);
+    if (err.code) console.error('[Panel] Discord error code:', err.code);
+    if (err.rawError) console.error('[Panel] Raw error:', JSON.stringify(err.rawError));
   }
 }
 
