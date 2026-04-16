@@ -142,13 +142,13 @@ const RANK_TIERS = [
   // change a hex here to change the card background wash, top/bottom
   // bars, and tier-name text color in one place. Any 24-bit RGB is
   // valid (0x000000–0xffffff).
-  { key: 'bronze',   minXp: 0,     color: 0xa96d2e, emblem: 'bronze.png' },
-  { key: 'silver',   minXp: 1000,  color: 0xa8b0b5, emblem: 'silver.png' },
-  { key: 'gold',     minXp: 2500,  color: 0xd4a017, emblem: 'gold.png' },
-  { key: 'platinum', minXp: 5000,  color: 0x8cbfbd, emblem: 'platinum.png' },
-  { key: 'diamond',  minXp: 6000,  color: 0x2eaaff, emblem: 'diamond.png' },
-  { key: 'sentinel', minXp: 6750,  color: 0xd81818, emblem: 'sentinal.png' },
-  { key: 'obsidian', minXp: 7500,  color: 0x7a2db8, emblem: 'obsidian.png' },
+  { key: 'bronze',   minXp: 0,    color: 0xa96d2e, emblem: 'bronze.png' },
+  { key: 'silver',   minXp: 750,  color: 0xa8b0b5, emblem: 'silver.png' },
+  { key: 'gold',     minXp: 1500, color: 0xd4a017, emblem: 'gold.png' },
+  { key: 'platinum', minXp: 2250, color: 0x8cbfbd, emblem: 'platinum.png' },
+  { key: 'diamond',  minXp: 3000, color: 0x2eaaff, emblem: 'diamond.png' },
+  { key: 'sentinel', minXp: 3750, color: 0xd81818, emblem: 'sentinal.png' },
+  { key: 'obsidian', minXp: 4500, color: 0x7a2db8, emblem: 'obsidian.png' },
   // Crowned is the top 10 players on the season XP leaderboard —
   // position-based, NOT an XP threshold. topN overrides the XP
   // range display on the ranks panel. The minXp is left in as a

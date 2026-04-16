@@ -162,7 +162,7 @@ async function syncRank(client, userId, leaderboard = undefined) {
 
     const crowned = _positionBasedTier();
     const topN = crowned?.topN || 10;
-    const obsidianMinXp = RANK_TIERS.find(t => t.key === 'obsidian')?.minXp || 7500;
+    const obsidianMinXp = RANK_TIERS.find(t => t.key === 'obsidian')?.minXp || 4500;
 
     // Prefer NeatQueue's stored value; fall back to local xp_points.
     let userPoints = null;
@@ -172,7 +172,7 @@ async function syncRank(client, userId, leaderboard = undefined) {
       const hit = _lookupInLeaderboard(lb, user.discord_id, topN);
       if (hit) {
         userPoints = hit.points;
-        // Crowned = first N users who reached Obsidian level (7500+ XP).
+        // Crowned = first N users who reached Obsidian level (4500+ XP).
         // Filter leaderboard to only Obsidian+ players, then check top N.
         const obsidianPlayers = lb.filter(e => e.points >= obsidianMinXp);
         inTopN = obsidianPlayers.length > 0
@@ -182,7 +182,7 @@ async function syncRank(client, userId, leaderboard = undefined) {
 
     if (userPoints === null) {
       userPoints = user.xp_points || 0;
-      // Crowned = first N users who reached Obsidian (7500+ XP).
+      // Crowned = first N users who reached Obsidian (4500+ XP).
       // Must have Obsidian-level XP AND be in the first 10 to reach it.
       try {
         if (userPoints >= obsidianMinXp) {

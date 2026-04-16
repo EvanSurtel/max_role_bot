@@ -83,15 +83,16 @@ async function handleRankPreview(message) {
   const tRanks = getLocale('ranks', lang);
 
   // Roughly mid-band XP value for each non-Crowned tier so the
-  // "Season XP" stat looks plausible.
+  // "Season XP" stat looks plausible. Tiers are 750 XP wide, so each
+  // value sits roughly in the middle of its band.
   const sampleXp = {
-    bronze:   500,
-    silver:   1750,
-    gold:     3750,
-    platinum: 5500,
-    diamond:  6375,
-    sentinel: 7125,
-    obsidian: 10000,
+    bronze:   375,
+    silver:   1125,
+    gold:     1875,
+    platinum: 2625,
+    diamond:  3375,
+    sentinel: 4125,
+    obsidian: 5000,
   };
 
   // Intro line first, then each card posted as its own message so the
