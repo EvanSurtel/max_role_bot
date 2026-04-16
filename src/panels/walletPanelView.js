@@ -48,10 +48,13 @@ function buildWalletView(wallet, user, lang) {
 
   // Language picker is in the welcome panel and dedicated language channel,
   // not here. The wallet panel still renders in the user's saved language.
+  // Single "Withdraw" button — opens a choice screen where the user
+  // picks between cashing out to fiat (Coinbase/Changelly offramp) or
+  // sending USDC to any wallet address on Base. Keeps the wallet
+  // surface clean and matches the deposit pattern (one click in).
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('wallet_deposit').setLabel('💵 Deposit').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('wallet_cashout').setLabel('💸 Cash Out').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('wallet_withdraw').setLabel('📤 Send').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('wallet_withdraw_menu').setLabel(t('wallet.btn_withdraw', lang)).setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('wallet_refresh').setLabel('🔄').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('wallet_history').setLabel(t('wallet.btn_history', lang)).setStyle(ButtonStyle.Secondary),
   );

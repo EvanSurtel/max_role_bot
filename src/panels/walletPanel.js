@@ -189,6 +189,27 @@ async function handleWalletSubButton(interaction) {
     });
   }
 
+  // Withdraw menu — pick between cash-to-fiat (offramp) or send-to-wallet.
+  // Both subflows are existing handlers (wallet_cashout / wallet_withdraw),
+  // we just give the user the choice instead of two top-level buttons.
+  if (id === 'wallet_withdraw_menu') {
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('wallet_cashout')
+        .setLabel(t('wallet.withdraw_choice_btn_fiat', lang))
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('wallet_withdraw')
+        .setLabel(t('wallet.withdraw_choice_btn_send', lang))
+        .setStyle(ButtonStyle.Secondary),
+    );
+    return interaction.reply({
+      content: t('wallet.withdraw_choice_prompt', lang),
+      components: [row],
+      ephemeral: true,
+    });
+  }
+
   if (id === 'wallet_cashout') {
     const depositRegion = user.deposit_region || 'GROUP_B';
     const address = wallet.address;
