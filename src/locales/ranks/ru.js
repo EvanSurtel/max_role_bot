@@ -41,7 +41,7 @@ module.exports = {
     blurb: '',
   },
   crowned: {
-    name: 'Коронованный',
+    name: 'Top 10',
     blurb: '',
   },
 };

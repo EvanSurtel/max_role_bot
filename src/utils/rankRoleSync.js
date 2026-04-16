@@ -162,6 +162,7 @@ async function syncRank(client, userId, leaderboard = undefined) {
 
     const crowned = _positionBasedTier();
     const topN = crowned?.topN || 10;
+    const obsidianMinXp = RANK_TIERS.find(t => t.key === 'obsidian')?.minXp || 7500;
 
     // Prefer NeatQueue's stored value; fall back to local xp_points.
     let userPoints = null;
@@ -171,22 +172,24 @@ async function syncRank(client, userId, leaderboard = undefined) {
       const hit = _lookupInLeaderboard(lb, user.discord_id, topN);
       if (hit) {
         userPoints = hit.points;
-        inTopN = hit.inTopN;
+        // Crowned = first N users who reached Obsidian level (7500+ XP).
+        // Filter leaderboard to only Obsidian+ players, then check top N.
+        const obsidianPlayers = lb.filter(e => e.points >= obsidianMinXp);
+        inTopN = obsidianPlayers.length > 0
+          && obsidianPlayers.slice(0, topN).some(e => e.userId === String(user.discord_id));
       }
     }
 
     if (userPoints === null) {
       userPoints = user.xp_points || 0;
-      // Fallback top-N check against local xp_points when NeatQueue
-      // couldn't tell us. Uses a direct SQL query for the top N.
+      // Crowned = first N users who reached Obsidian (7500+ XP).
+      // Must have Obsidian-level XP AND be in the first 10 to reach it.
       try {
-        const totalUsers = db.prepare('SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1').get().cnt;
-        // Only award Crowned if there are more users than topN slots
-        if (totalUsers > topN) {
-          const rows = db.prepare(
-            'SELECT id FROM users WHERE accepted_tos = 1 ORDER BY xp_points DESC LIMIT ?'
-          ).all(topN);
-          inTopN = rows.some(r => r.id === userId);
+        if (userPoints >= obsidianMinXp) {
+          const obsidianUsers = db.prepare(
+            'SELECT id FROM users WHERE accepted_tos = 1 AND xp_points >= ? ORDER BY xp_points DESC LIMIT ?'
+          ).all(obsidianMinXp, topN);
+          inTopN = obsidianUsers.some(r => r.id === userId);
         }
       } catch { /* ignore */ }
     }
