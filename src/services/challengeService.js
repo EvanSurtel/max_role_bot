@@ -193,7 +193,7 @@ async function postToBoard(client, challenge) {
     const players = challengePlayerRepo.findByChallengeAndTeam(challenge.id, 1);
     teamPlayers = players.map(p => {
       const u = userRepo.findById(p.user_id);
-      return u ? { discord_id: u.discord_id, cod_ign: u.cod_ign } : null;
+      return u ? { discord_id: u.discord_id, cod_ign: u.cod_ign, server_username: u.server_username } : null;
     }).filter(Boolean);
   }
   const embed = challengeEmbed(challenge, !!challenge.is_anonymous, teamPlayers, displayLang);

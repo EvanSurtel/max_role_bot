@@ -49,7 +49,17 @@ function challengeEmbed(challenge, isAnonymous, teamPlayers, lang = 'en') {
   }
 
   if (!isAnonymous && teamPlayers && teamPlayers.length > 0) {
-    const playerList = teamPlayers.map(p => `<@${p.discord_id}>${p.cod_ign ? ` (${p.cod_ign})` : ''}`).join('\n');
+    // Render plain-text name first (always visible) then mention at
+    // the end for click-through. Discord's <@id> resolver in embed
+    // field values is inconsistent — sometimes renders as a pill,
+    // sometimes as raw `<@123456>` text — so we never rely on it
+    // alone. Primary source is server_username (Discord nickname at
+    // registration); falls back to cod_ign if that's null.
+    const playerList = teamPlayers.map(p => {
+      const name = p.server_username || p.cod_ign || 'Player';
+      const ignTag = p.cod_ign && p.cod_ign !== name ? ` (${p.cod_ign})` : '';
+      return `**${name}**${ignTag} — <@${p.discord_id}>`;
+    }).join('\n');
     embed.addFields({ name: t('challenge_create.challenger', lang), value: playerList });
   } else if (!isAnonymous) {
     embed.setFooter({ text: t('challenge_create.created_by_user', lang, { id: challenge.creator_user_id }) });
