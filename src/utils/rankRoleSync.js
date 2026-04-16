@@ -180,10 +180,14 @@ async function syncRank(client, userId, leaderboard = undefined) {
       // Fallback top-N check against local xp_points when NeatQueue
       // couldn't tell us. Uses a direct SQL query for the top N.
       try {
-        const rows = db.prepare(
-          'SELECT id FROM users WHERE accepted_tos = 1 ORDER BY xp_points DESC LIMIT ?'
-        ).all(topN);
-        inTopN = rows.some(r => r.id === userId);
+        const totalUsers = db.prepare('SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1').get().cnt;
+        // Only award Crowned if there are more users than topN slots
+        if (totalUsers > topN) {
+          const rows = db.prepare(
+            'SELECT id FROM users WHERE accepted_tos = 1 ORDER BY xp_points DESC LIMIT ?'
+          ).all(topN);
+          inTopN = rows.some(r => r.id === userId);
+        }
       } catch { /* ignore */ }
     }
 
