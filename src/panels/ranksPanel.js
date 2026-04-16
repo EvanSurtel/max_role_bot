@@ -111,27 +111,39 @@ async function postRanksPanel(client, lang = 'en') {
   }
 
   try {
+    console.log('[Panel] Ranks: clearing old messages...');
     const messages = await channel.messages.fetch({ limit: 50 });
     const botMessages = messages.filter(m => m.author.id === client.user.id);
-    for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
+    if (botMessages.size > 0) {
+      // Bulk delete if possible (faster, handles up to 100 messages < 14 days old)
+      try {
+        await channel.bulkDelete(botMessages);
+      } catch {
+        // Fallback to individual delete for old messages
+        for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
+      }
+    }
 
+    console.log('[Panel] Ranks: building panel...');
     const { embeds, files } = buildRanksPanel(lang);
+    console.log(`[Panel] Ranks: ${embeds.length} embeds, ${files.length} files`);
 
-    // Language dropdown as its OWN message at the top, matching the
-    // rules / howItWorks channel layout.
+    // Language dropdown
+    console.log('[Panel] Ranks: sending language dropdown...');
     await channel.send({
       content: '🌐 Pick a language to view this in:',
       components: [buildLanguageDropdownRow(lang)],
     });
 
     // Send intro embed first
+    console.log('[Panel] Ranks: sending intro...');
     await channel.send({ embeds: [embeds[0]] });
 
-    // Send each rank as its own message (file size limit prevents
-    // sending all 8 emblems in one message — total exceeds 8MB)
+    // Send each rank as its own message
     for (let i = 1; i < embeds.length; i++) {
       const tier = RANK_TIERS[i - 1];
       const tierFile = files.find(f => f.name === tier.emblem);
+      console.log(`[Panel] Ranks: sending ${tier.key} (file: ${tierFile ? tierFile.name : 'none'})...`);
       await channel.send({
         embeds: [embeds[i]],
         files: tierFile ? [tierFile] : [],
