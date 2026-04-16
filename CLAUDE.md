@@ -100,7 +100,7 @@ programs/
 - **DB columns**: `solana_address` and `solana_tx_signature` are legacy column names that store Base addresses and tx hashes.
 - **Wallet security**: CDP Smart Accounts — keys held by Coinbase, never stored locally. The `encryption_iv` / `encryption_tag` / `encryption_salt` columns on the wallets table are legacy from the XRP/Solana era (always empty strings on CDP). No local encryption, no ENCRYPTION_KEY env var needed.
 - **Escrow model**: Hold = DB-level balance lock. Match start = smart contract pulls USDC via transferFrom. Resolve = smart contract sends to winners.
-- **Gas**: Base gas is ~$0.01-0.05 per tx in ETH. Gas funder wallet auto-tops-up user wallets.
+- **Gas**: 100% gasless at runtime via CDP Paymaster. Two kinds of Smart Accounts: user Smart Accounts for USDC approve/transfer, and a dedicated `escrow-owner-smart` Smart Account that's the on-chain owner of the escrow contract. All admin calls (createMatch, depositToEscrow, resolveMatch, cancelMatch) route through `_sendOwnerTx` → UserOp → Paymaster → zero gas cost. The `escrow-owner` EOA signs ONE transaction ever — the deploy + ownership transfer — then goes dormant forever. Do not revert owner calls back to EOA `sendTransaction`.
 - **Race conditions**: walletRepo.acquireLock() for wallet ops, challengeRepo/matchRepo.atomicStatusTransition() for challenge/match state transitions
 - **Admin roles**: ADMIN_ROLE_ID, OWNER_ROLE_ID, CEO_ROLE_ID, ADS_ROLE_ID — all admin-equivalent for permissions + alert pings
 

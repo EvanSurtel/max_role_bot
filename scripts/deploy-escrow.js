@@ -29,9 +29,17 @@ async function main() {
   const chainId = network === 'sepolia' ? 84532 : 8453;
   const explorerUrl = network === 'sepolia' ? 'https://sepolia.basescan.org' : 'https://basescan.org';
 
-  // ─── Get or create the owner account ─────────────────────
+  // ─── Get or create owner EOA + Smart Account ─────────────
+  // EOA: signs the one-time deployment + transferOwnership.
+  // Smart Account: becomes the on-chain owner after deploy. All
+  // future admin calls go through it via Paymaster (gasless).
   const owner = await cdp.evm.getOrCreateAccount({ name: 'escrow-owner' });
-  console.log(`[Deploy] Owner address: ${owner.address}`);
+  const smartAccount = await cdp.evm.getOrCreateSmartAccount({
+    name: 'escrow-owner-smart',
+    owner,
+  });
+  console.log(`[Deploy] Deployer EOA: ${owner.address}`);
+  console.log(`[Deploy] Smart Account (will become owner): ${smartAccount.address}`);
 
   // ─── Fund with test ETH on testnet ───────────────────────
   if (network === 'sepolia') {
@@ -131,14 +139,41 @@ async function main() {
   await contract.waitForDeployment();
   const deployedAddress = await contract.getAddress();
 
-  console.log();
-  console.log('═'.repeat(60));
   console.log(`[Deploy] ✅ WagerEscrow deployed at: ${deployedAddress}`);
   console.log(`[Deploy] View on BaseScan: ${explorerUrl}/address/${deployedAddress}`);
   console.log();
-  console.log('Add this to your .env:');
+
+  // ─── Transfer ownership from EOA to Smart Account ──────────────
+  // After this, the EOA never signs another tx for this contract.
+  // The Smart Account becomes the only authorized caller of
+  // createMatch / resolveMatch / cancelMatch, and every one of
+  // those calls is gasless via the CDP Paymaster.
+  console.log('[Deploy] Transferring ownership to the Smart Account (gasless-ready)...');
+  const transferTx = await contract.transferOwnership(smartAccount.address);
+  console.log(`[Deploy]   transferOwnership TX: ${transferTx.hash}`);
+  await transferTx.wait(1);
+
+  // Sanity-check the new owner on-chain
+  const newOwner = await contract.owner();
+  if (newOwner.toLowerCase() !== smartAccount.address.toLowerCase()) {
+    throw new Error(`Ownership transfer failed. On-chain owner=${newOwner}, expected=${smartAccount.address}`);
+  }
+  console.log(`[Deploy] ✅ Ownership transferred to Smart Account`);
+  console.log();
+
+  console.log('═'.repeat(72));
+  console.log(`[Deploy] ✅ Deployment complete`);
+  console.log(`[Deploy] Contract:      ${deployedAddress}`);
+  console.log(`[Deploy] Owner (Smart): ${smartAccount.address}`);
+  console.log(`[Deploy] View on BaseScan: ${explorerUrl}/address/${deployedAddress}`);
+  console.log();
+  console.log('Add these to your .env:');
   console.log(`  ESCROW_CONTRACT_ADDRESS=${deployedAddress}`);
-  console.log('═'.repeat(60));
+  console.log(`  CDP_OWNER_ADDRESS=${smartAccount.address}`);
+  console.log();
+  console.log('From now on the EOA is DORMANT. All escrow admin calls route');
+  console.log('through the Smart Account via Paymaster — zero gas cost.');
+  console.log('═'.repeat(72));
 }
 
 main().catch(err => {

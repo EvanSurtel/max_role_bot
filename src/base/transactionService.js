@@ -1,8 +1,13 @@
 // Base transaction service — CDP Smart Accounts + Paymaster.
 //
-// ALL user transactions use Smart Account UserOps (gasless).
-// Owner/admin escrow calls use EOA sendTransaction (owner has ETH).
-// No EOA fallback for users — Paymaster handles all gas.
+// ALL transactions use Smart Account UserOps (gasless via Paymaster):
+//   - User USDC approve / transfer → user's Smart Account
+//   - Escrow admin calls (createMatch / resolveMatch / cancelMatch /
+//     depositToEscrow) → `escrow-owner-smart` Smart Account
+//
+// The `escrow-owner` EOA is DORMANT after deploy. It signed the
+// one-time deploy + transferOwnership tx, then never again. No ETH
+// balance required at runtime anywhere.
 
 const { ethers } = require('ethers');
 const { getCdpClient, getSmartAccountFromRef, USDC_CONTRACT } = require('./walletManager');
@@ -10,6 +15,17 @@ const { getNetwork } = require('./connection');
 
 function getCdpNetwork() {
   return getNetwork() === 'sepolia' ? 'base-sepolia' : 'base';
+}
+
+// Cached escrow-owner Smart Account so we don't re-fetch per call.
+let _escrowOwnerSmart = null;
+
+async function _getEscrowOwnerSmartAccount() {
+  if (_escrowOwnerSmart) return _escrowOwnerSmart;
+  const { smartAccount } = await getSmartAccountFromRef('escrow-owner', 'escrow-owner-smart');
+  if (!smartAccount) throw new Error('Could not load escrow-owner-smart — run scripts/create-owner-wallet.js first.');
+  _escrowOwnerSmart = smartAccount;
+  return smartAccount;
 }
 
 /**
@@ -42,36 +58,19 @@ async function _sendUserOp(smartAccount, calls) {
 }
 
 /**
- * Send a transaction from the owner EOA (for escrow contract calls only).
- * Owner account has ETH for gas — this is NOT used for user transactions.
+ * Send an escrow admin call via the owner Smart Account's UserOp
+ * flow — Paymaster-sponsored, no ETH required.
+ *
+ * Signature mirrors the old _sendOwnerTx(to, data, value) for drop-in
+ * replacement at call sites.
  */
 async function _sendOwnerTx(to, data, value = 0n) {
-  const cdp = getCdpClient();
-  const network = getCdpNetwork();
-  const ownerAddr = process.env.CDP_OWNER_ADDRESS;
-  if (!ownerAddr) throw new Error('CDP_OWNER_ADDRESS not set');
-
-  let lastErr;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const { transactionHash } = await cdp.evm.sendTransaction({
-        address: ownerAddr,
-        network,
-        transaction: { to, value, data: data || '0x' },
-      });
-      return transactionHash;
-    } catch (err) {
-      lastErr = err;
-      const msg = err.errorMessage || err.message || '';
-      if (msg.includes('Nonce too low') || msg.includes('nonce')) {
-        console.warn(`[Base] Nonce issue, retrying (${attempt + 1}/3)...`);
-        await new Promise(r => setTimeout(r, 2000));
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw lastErr;
+  const smartAccount = await _getEscrowOwnerSmartAccount();
+  return await _sendUserOp(smartAccount, [{
+    to,
+    value: BigInt(value || 0n),
+    data: data || '0x',
+  }]);
 }
 
 /**
@@ -101,7 +100,9 @@ async function transferUsdc(fromAddress, toAddress, amountSmallest, refs) {
 }
 
 /**
- * Transfer ETH — owner only (for admin operations).
+ * Transfer ETH — via the escrow-owner Smart Account (Paymaster-sponsored).
+ * Kept for legacy admin panel ETH moves; in practice no ETH should
+ * ever live in the owner account anymore.
  */
 async function transferEth(fromAddress, toAddress, amountWei) {
   const hash = await _sendOwnerTx(toAddress, '0x', BigInt(amountWei));
@@ -110,7 +111,9 @@ async function transferEth(fromAddress, toAddress, amountWei) {
 }
 
 /**
- * Invoke escrow contract function (owner EOA — needs ETH).
+ * Invoke an escrow contract function as the on-chain owner.
+ * Routed through the escrow-owner Smart Account's UserOp flow → gas
+ * sponsored by the CDP Paymaster. No ETH balance required anywhere.
  */
 async function invokeContract(fromAddress, contractAddress, method, args, abi) {
   const abiEntry = abi.find(f => f.name === method);
