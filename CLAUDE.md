@@ -98,7 +98,7 @@ programs/
 - **No DMs for notifications** — Use private server channels (DM-first for teammate invites with channel fallback)
 - **Amounts**: Stored as strings in USDC smallest units (6 decimals: 1 USDC = 1000000). Use `BigInt` for arithmetic.
 - **DB columns**: `solana_address` and `solana_tx_signature` are legacy column names that store Base addresses and tx hashes.
-- **Wallet security**: Per-user salt → HKDF key derivation → AES-256-GCM encryption. Stored as `encrypted_private_key` + `encryption_iv` + `encryption_tag` + `encryption_salt`
+- **Wallet security**: CDP Smart Accounts — keys held by Coinbase, never stored locally. The `encryption_iv` / `encryption_tag` / `encryption_salt` columns on the wallets table are legacy from the XRP/Solana era (always empty strings on CDP). No local encryption, no ENCRYPTION_KEY env var needed.
 - **Escrow model**: Hold = DB-level balance lock. Match start = smart contract pulls USDC via transferFrom. Resolve = smart contract sends to winners.
 - **Gas**: Base gas is ~$0.01-0.05 per tx in ETH. Gas funder wallet auto-tops-up user wallets.
 - **Race conditions**: walletRepo.acquireLock() for wallet ops, challengeRepo/matchRepo.atomicStatusTransition() for challenge/match state transitions
