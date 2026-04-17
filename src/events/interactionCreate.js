@@ -351,8 +351,8 @@ module.exports = {
         if (id.startsWith('season_')) {
           return await seasonPanel.handleSeasonButton(interaction);
         }
-        // Ranked queue join/leave/refresh buttons
-        if (id === 'ranked_queue_join' || id === 'ranked_queue_leave' || id === 'ranked_queue_refresh') {
+        // Ranked queue join/leave buttons
+        if (id === 'ranked_queue_join' || id === 'ranked_queue_leave') {
           return await queuePanel.handleQueueButton(interaction);
         }
         // Queue match phase buttons (captain pick, role select, report, sub, DQ, etc.)
