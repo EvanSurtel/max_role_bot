@@ -140,6 +140,9 @@ client.once('ready', async () => {
     const { postRanksPanel } = require('./panels/ranksPanel');
     await postRanksPanel(client, displayLang);
 
+    const { postQueuePanel } = require('./panels/queuePanel');
+    await postQueuePanel(client, displayLang);
+
     // (Dedicated language channel was removed — every shared panel has
     // an inline language dropdown now, so a separate channel was redundant.)
 

@@ -14,6 +14,7 @@ const queueStatsPanel = require('../panels/queueStatsPanel');
 const wagerStatsPanel = require('../panels/wagerStatsPanel');
 const seasonPanel = require('../panels/seasonPanel');
 const escrowPanel = require('../panels/escrowPanel');
+const queuePanel = require('../panels/queuePanel');
 const { isWalletChannel } = require('../utils/ephemeralReply');
 
 // Per-(user, channel) "current live ephemeral session" tracking. When
@@ -346,6 +347,10 @@ module.exports = {
         // Season management buttons
         if (id.startsWith('season_')) {
           return await seasonPanel.handleSeasonButton(interaction);
+        }
+        // Ranked queue join/leave/refresh buttons
+        if (id === 'ranked_queue_join' || id === 'ranked_queue_leave' || id === 'ranked_queue_refresh') {
+          return await queuePanel.handleQueueButton(interaction);
         }
         // Queue stats navigation/refresh buttons
         if (id.startsWith('qs_prev_') || id.startsWith('qs_next_') || id.startsWith('qs_first_') || id.startsWith('qs_last_') || id.startsWith('qs_refresh_')) {
