@@ -4,14 +4,12 @@ const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
 
 // ─── Stat type definitions ──────────────────────────────────────
 const STAT_TYPES = [
-  { value: 'season_xp',  label: 'Season XP',          sortField: 'season_xp',  format: (v) => v.toLocaleString() },
-  { value: 'alltime_xp', label: 'All-Time XP',        sortField: 'xp_points',  format: (v) => v.toLocaleString() },
-  { value: 'earnings',   label: 'Earnings ($)',        sortField: 'earnings',   format: (v) => `$${(v / 1_000_000).toFixed(2)}` },
-  { value: 'wagered',    label: 'Amount Wagered ($)',  sortField: 'entered',    format: (v) => `$${(v / 1_000_000).toFixed(2)}` },
-  { value: 'wins',       label: 'Wins',               sortField: 'total_wins', format: (v) => v.toLocaleString() },
-  { value: 'losses',     label: 'Losses',             sortField: 'total_losses', format: (v) => v.toLocaleString() },
-  { value: 'games',      label: 'Games',              sortField: 'games',      format: (v) => v.toLocaleString() },
-  { value: 'winrate',    label: 'Winrate',            sortField: 'winrate',    format: (v) => `${v.toFixed(1)}%` },
+  { value: 'earnings',    label: 'Earnings ($)' },
+  { value: 'wagered',     label: 'Amount Wagered ($)' },
+  { value: 'cash_wins',   label: 'Cash Match Wins' },
+  { value: 'cash_losses', label: 'Cash Match Losses' },
+  { value: 'cash_games',  label: 'Cash Match Games' },
+  { value: 'cash_winrate', label: 'Cash Match Winrate' },
 ];
 
 const PER_PAGE = 10;
@@ -49,7 +47,7 @@ function _setCache(stat, page, data) {
 // ─── Fetch leaderboard data from local DB ───────────────────────
 
 /**
- * Fetch a page of wager leaderboard data from the local SQLite DB.
+ * Fetch a page of cash match leaderboard data from the local SQLite DB.
  *
  * Returns { entries: [...], totalCount, totalPages } or null on error.
  */
@@ -63,63 +61,13 @@ function fetchLeaderboardPage(stat, page) {
   let totalCount = 0;
 
   try {
-    if (stat === 'season_xp') {
-      const { getCurrentSeason } = require('./leaderboardPanel');
-      const season = getCurrentSeason();
-
-      totalCount = db.prepare(`
-        SELECT COUNT(*) as cnt FROM (
-          SELECT u.id, COALESCE(SUM(xh.xp_amount), 0) as season_xp
-          FROM users u LEFT JOIN xp_history xh ON xh.user_id = u.id AND xh.season = ?
-          WHERE u.accepted_tos = 1
-          GROUP BY u.id HAVING season_xp > 0
-        )
-      `).get(season).cnt;
-
-      const rows = db.prepare(`
-        SELECT u.discord_id, u.server_username, u.cod_ign,
-               u.total_wins, u.total_losses,
-               COALESCE(SUM(xh.xp_amount), 0) as season_xp
-        FROM users u LEFT JOIN xp_history xh ON xh.user_id = u.id AND xh.season = ?
-        WHERE u.accepted_tos = 1
-        GROUP BY u.id HAVING season_xp > 0
-        ORDER BY season_xp DESC LIMIT ? OFFSET ?
-      `).all(season, PER_PAGE, offset);
-
-      entries = rows.map(r => ({
-        discord_id: r.discord_id,
-        name: r.server_username || r.cod_ign || 'Unknown',
-        total_wins: r.total_wins,
-        total_losses: r.total_losses,
-        stat_value: r.season_xp,
-      }));
-
-    } else if (stat === 'alltime_xp') {
-      totalCount = db.prepare(
-        `SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1 AND xp_points > 0`
-      ).get().cnt;
-
-      const rows = db.prepare(
-        `SELECT discord_id, server_username, cod_ign, total_wins, total_losses, xp_points
-         FROM users WHERE accepted_tos = 1 AND xp_points > 0
-         ORDER BY xp_points DESC LIMIT ? OFFSET ?`
-      ).all(PER_PAGE, offset);
-
-      entries = rows.map(r => ({
-        discord_id: r.discord_id,
-        name: r.server_username || r.cod_ign || 'Unknown',
-        total_wins: r.total_wins,
-        total_losses: r.total_losses,
-        stat_value: r.xp_points,
-      }));
-
-    } else if (stat === 'earnings') {
+    if (stat === 'earnings') {
       totalCount = db.prepare(
         `SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1 AND CAST(total_earnings_usdc AS INTEGER) > 0`
       ).get().cnt;
 
       const rows = db.prepare(
-        `SELECT discord_id, server_username, cod_ign, total_wins, total_losses,
+        `SELECT discord_id, server_username, cod_ign, cash_wins, cash_losses,
                 CAST(total_earnings_usdc AS INTEGER) as earnings
          FROM users WHERE accepted_tos = 1 AND CAST(total_earnings_usdc AS INTEGER) > 0
          ORDER BY CAST(total_earnings_usdc AS INTEGER) DESC LIMIT ? OFFSET ?`
@@ -128,8 +76,8 @@ function fetchLeaderboardPage(stat, page) {
       entries = rows.map(r => ({
         discord_id: r.discord_id,
         name: r.server_username || r.cod_ign || 'Unknown',
-        total_wins: r.total_wins,
-        total_losses: r.total_losses,
+        cash_wins: r.cash_wins,
+        cash_losses: r.cash_losses,
         stat_value: r.earnings,
       }));
 
@@ -139,7 +87,7 @@ function fetchLeaderboardPage(stat, page) {
       ).get().cnt;
 
       const rows = db.prepare(
-        `SELECT discord_id, server_username, cod_ign, total_wins, total_losses,
+        `SELECT discord_id, server_username, cod_ign, cash_wins, cash_losses,
                 CAST(total_entered_usdc AS INTEGER) as entered
          FROM users WHERE accepted_tos = 1 AND CAST(total_entered_usdc AS INTEGER) > 0
          ORDER BY CAST(total_entered_usdc AS INTEGER) DESC LIMIT ? OFFSET ?`
@@ -148,88 +96,88 @@ function fetchLeaderboardPage(stat, page) {
       entries = rows.map(r => ({
         discord_id: r.discord_id,
         name: r.server_username || r.cod_ign || 'Unknown',
-        total_wins: r.total_wins,
-        total_losses: r.total_losses,
+        cash_wins: r.cash_wins,
+        cash_losses: r.cash_losses,
         stat_value: r.entered,
       }));
 
-    } else if (stat === 'wins') {
+    } else if (stat === 'cash_wins') {
       totalCount = db.prepare(
-        `SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1 AND total_wins > 0`
+        `SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1 AND cash_wins > 0`
       ).get().cnt;
 
       const rows = db.prepare(
-        `SELECT discord_id, server_username, cod_ign, total_wins, total_losses
-         FROM users WHERE accepted_tos = 1 AND total_wins > 0
-         ORDER BY total_wins DESC LIMIT ? OFFSET ?`
+        `SELECT discord_id, server_username, cod_ign, cash_wins, cash_losses
+         FROM users WHERE accepted_tos = 1 AND cash_wins > 0
+         ORDER BY cash_wins DESC LIMIT ? OFFSET ?`
       ).all(PER_PAGE, offset);
 
       entries = rows.map(r => ({
         discord_id: r.discord_id,
         name: r.server_username || r.cod_ign || 'Unknown',
-        total_wins: r.total_wins,
-        total_losses: r.total_losses,
-        stat_value: r.total_wins,
+        cash_wins: r.cash_wins,
+        cash_losses: r.cash_losses,
+        stat_value: r.cash_wins,
       }));
 
-    } else if (stat === 'losses') {
+    } else if (stat === 'cash_losses') {
       totalCount = db.prepare(
-        `SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1 AND total_losses > 0`
+        `SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1 AND cash_losses > 0`
       ).get().cnt;
 
       const rows = db.prepare(
-        `SELECT discord_id, server_username, cod_ign, total_wins, total_losses
-         FROM users WHERE accepted_tos = 1 AND total_losses > 0
-         ORDER BY total_losses DESC LIMIT ? OFFSET ?`
+        `SELECT discord_id, server_username, cod_ign, cash_wins, cash_losses
+         FROM users WHERE accepted_tos = 1 AND cash_losses > 0
+         ORDER BY cash_losses DESC LIMIT ? OFFSET ?`
       ).all(PER_PAGE, offset);
 
       entries = rows.map(r => ({
         discord_id: r.discord_id,
         name: r.server_username || r.cod_ign || 'Unknown',
-        total_wins: r.total_wins,
-        total_losses: r.total_losses,
-        stat_value: r.total_losses,
+        cash_wins: r.cash_wins,
+        cash_losses: r.cash_losses,
+        stat_value: r.cash_losses,
       }));
 
-    } else if (stat === 'games') {
+    } else if (stat === 'cash_games') {
       totalCount = db.prepare(
-        `SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1 AND (total_wins + total_losses) > 0`
+        `SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1 AND (cash_wins + cash_losses) > 0`
       ).get().cnt;
 
       const rows = db.prepare(
-        `SELECT discord_id, server_username, cod_ign, total_wins, total_losses,
-                (total_wins + total_losses) as games
-         FROM users WHERE accepted_tos = 1 AND (total_wins + total_losses) > 0
-         ORDER BY games DESC LIMIT ? OFFSET ?`
+        `SELECT discord_id, server_username, cod_ign, cash_wins, cash_losses,
+                (cash_wins + cash_losses) as cash_games
+         FROM users WHERE accepted_tos = 1 AND (cash_wins + cash_losses) > 0
+         ORDER BY cash_games DESC LIMIT ? OFFSET ?`
       ).all(PER_PAGE, offset);
 
       entries = rows.map(r => ({
         discord_id: r.discord_id,
         name: r.server_username || r.cod_ign || 'Unknown',
-        total_wins: r.total_wins,
-        total_losses: r.total_losses,
-        stat_value: r.games,
+        cash_wins: r.cash_wins,
+        cash_losses: r.cash_losses,
+        stat_value: r.cash_games,
       }));
 
-    } else if (stat === 'winrate') {
-      // Filter to players with at least 5 games to avoid inflated winrates
+    } else if (stat === 'cash_winrate') {
+      // Filter to players with at least 5 cash match games to avoid inflated winrates
       totalCount = db.prepare(
-        `SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1 AND (total_wins + total_losses) >= 5`
+        `SELECT COUNT(*) as cnt FROM users WHERE accepted_tos = 1 AND (cash_wins + cash_losses) >= 5`
       ).get().cnt;
 
       const rows = db.prepare(
-        `SELECT discord_id, server_username, cod_ign, total_wins, total_losses,
-                CAST(total_wins AS REAL) / (total_wins + total_losses) * 100.0 as winrate
-         FROM users WHERE accepted_tos = 1 AND (total_wins + total_losses) >= 5
-         ORDER BY winrate DESC LIMIT ? OFFSET ?`
+        `SELECT discord_id, server_username, cod_ign, cash_wins, cash_losses,
+                CAST(cash_wins AS REAL) / (cash_wins + cash_losses) * 100.0 as cash_winrate
+         FROM users WHERE accepted_tos = 1 AND (cash_wins + cash_losses) >= 5
+         ORDER BY cash_winrate DESC LIMIT ? OFFSET ?`
       ).all(PER_PAGE, offset);
 
       entries = rows.map(r => ({
         discord_id: r.discord_id,
         name: r.server_username || r.cod_ign || 'Unknown',
-        total_wins: r.total_wins,
-        total_losses: r.total_losses,
-        stat_value: r.winrate,
+        cash_wins: r.cash_wins,
+        cash_losses: r.cash_losses,
+        stat_value: r.cash_winrate,
       }));
     }
   } catch (err) {
@@ -260,34 +208,29 @@ function buildLeaderboardEmbed(stat, entries, page, totalPages, lang) {
       const pos = offset + i;
       const medal = rankEmoji(pos);
       const mention = e.discord_id ? `<@${e.discord_id}>` : `**${e.name}**`;
-      const record = `(${e.total_wins}W-${e.total_losses}L)`;
+      const record = `(${e.cash_wins}W-${e.cash_losses}L)`;
 
       let statDisplay;
-      if (stat === 'season_xp' || stat === 'alltime_xp') {
-        statDisplay = `**${statDef.format(e.stat_value)} XP** ${record}`;
-      } else if (stat === 'earnings' || stat === 'wagered') {
-        statDisplay = `**${statDef.format(e.stat_value)}** earned ${record}`;
-      } else if (stat === 'winrate') {
-        statDisplay = `**${statDef.format(e.stat_value)}** ${record}`;
+      if (stat === 'earnings') {
+        const dollars = `$${(e.stat_value / 1_000_000).toFixed(2)}`;
+        statDisplay = `**${dollars}** ${record}`;
+      } else if (stat === 'wagered') {
+        const dollars = `$${(e.stat_value / 1_000_000).toFixed(2)}`;
+        statDisplay = `**${dollars}** wagered`;
+      } else if (stat === 'cash_winrate') {
+        statDisplay = `**${e.stat_value.toFixed(1)}%** ${record}`;
       } else {
-        statDisplay = `**${statDef.format(e.stat_value)}** ${record}`;
+        // cash_wins, cash_losses, cash_games
+        statDisplay = `**${e.stat_value.toLocaleString()}** ${record}`;
       }
 
       return `${medal} ${mention} — ${statDisplay}`;
     });
   }
 
-  // Add season label for season_xp view
-  let description = lines.join('\n');
-  if (stat === 'season_xp') {
-    const { getCurrentSeason } = require('./leaderboardPanel');
-    const season = getCurrentSeason();
-    description = `${t('wager_stats.season_label', lang, { season })}\n\n${description}`;
-  }
-
   const embed = new EmbedBuilder()
     .setTitle(title)
-    .setDescription(description)
+    .setDescription(lines.join('\n'))
     .setColor(0xf1c40f)
     .setFooter({ text: `${t('wager_stats.footer_page', lang, { page, total: totalPages })} | ${t('wager_stats.footer_source', lang)}` })
     .setTimestamp();
@@ -343,12 +286,12 @@ function buildComponents(stat, page, totalPages, lang) {
 
 // ─── Build the full panel payload ───────────────────────────────
 
-function buildWagerStatsPayload(stat = 'season_xp', page = 1, lang = 'en') {
+function buildWagerStatsPayload(stat = 'earnings', page = 1, lang = 'en') {
   const result = fetchLeaderboardPage(stat, page);
   if (!result) {
     // DB error fallback
     const embed = new EmbedBuilder()
-      .setTitle(t('wager_stats.title', lang, { stat: 'Wager Stats' }))
+      .setTitle(t('wager_stats.title', lang, { stat: 'Cash Match Stats' }))
       .setDescription(t('wager_stats.no_data', lang))
       .setColor(0xed4245)
       .setTimestamp();
@@ -387,7 +330,7 @@ async function postWagerStatsPanel(client, lang = 'en') {
       }
     }
 
-    const payload = buildWagerStatsPayload('season_xp', 1, lang);
+    const payload = buildWagerStatsPayload('earnings', 1, lang);
     await ch.send(payload);
     console.log(`[Panel] Posted wager stats panel (${lang})`);
   } catch (err) {
@@ -415,9 +358,9 @@ async function handleWagerStatsSelect(interaction) {
  */
 function _parseNavId(customId) {
   const parts = customId.split('_');
-  // ws_prev_season_xp_1 → ['ws', 'prev', 'season', 'xp', '1']
-  // ws_refresh_alltime_xp_2 → ['ws', 'refresh', 'alltime', 'xp', '2']
-  // ws_first_earnings_3 → ['ws', 'first', 'earnings', '3']
+  // ws_prev_earnings_1 → ['ws', 'prev', 'earnings', '1']
+  // ws_refresh_cash_wins_2 → ['ws', 'refresh', 'cash', 'wins', '2']
+  // ws_first_cash_winrate_3 → ['ws', 'first', 'cash', 'winrate', '3']
   const action = parts[1]; // prev, next, first, last, refresh
   const currentPage = parseInt(parts[parts.length - 1], 10) || 1;
   // stat is everything between action and page

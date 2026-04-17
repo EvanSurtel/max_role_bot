@@ -516,10 +516,10 @@ module.exports = {
     title: 'Rank $ {stat} Leaderboard',
     select_stat: 'Select Stat',
     no_data: 'No players on this leaderboard yet.',
-    unavailable_title: 'Queue Stats Unavailable',
-    unavailable_desc: 'Queue stats are temporarily unavailable. NeatQueue\'s API may be down.\nTry again in a few minutes.',
+    unavailable_title: 'XP Stats Unavailable',
+    unavailable_desc: 'XP stats are temporarily unavailable. Try again in a few minutes.',
     footer_page: 'Page {page}/{totalPages}',
-    footer_source: 'Source: NeatQueue',
+    footer_source: 'Rank $ Match Stats',
   },
 
   // Dedicated language channel panel — explains the master language switch
@@ -636,11 +636,10 @@ module.exports = {
 
   // Wager Stats panel — local DB leaderboard view
   wager_stats: {
-    title: 'Rank $ {stat} Leaderboard',
+    title: 'Rank $ Cash Match {stat} Leaderboard',
     select_stat: 'Select stat type',
     no_data: 'No player data available yet.',
     footer_page: 'Page {page}/{total}',
-    footer_source: 'Rank $ Wager Stats',
-    season_label: 'Season: {season}',
+    footer_source: 'Rank $ Cash Match Stats',
   },
 };

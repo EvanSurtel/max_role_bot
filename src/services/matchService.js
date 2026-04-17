@@ -662,6 +662,7 @@ async function resolveMatch(client, matchId, winningTeam, { fromDispute = false 
       if (isCashMatch) {
         userRepo.addEarnings(player.user_id, perPlayerEarnings);
         userRepo.addEntered(player.user_id, challenge.entry_amount_usdc);
+        userRepo.incrementCashWin(player.user_id);
       }
     } catch (err) {
       console.error(`[MatchService] Failed to update stats for winner ${player.user_id}:`, err.message);
@@ -691,6 +692,7 @@ async function resolveMatch(client, matchId, winningTeam, { fromDispute = false 
       userRepo.addLoss(player.user_id);
       if (isCashMatch) {
         userRepo.addEntered(player.user_id, challenge.entry_amount_usdc);
+        userRepo.incrementCashLoss(player.user_id);
       }
     } catch (err) {
       console.error(`[MatchService] Failed to update stats for loser ${player.user_id}:`, err.message);

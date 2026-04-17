@@ -27,6 +27,8 @@ const stmts = {
   getEarningsLeaderboard: db.prepare(
     'SELECT * FROM users WHERE accepted_tos = 1 AND CAST(total_earnings_usdc AS INTEGER) > 0 ORDER BY CAST(total_earnings_usdc AS INTEGER) DESC LIMIT ?'
   ),
+  incrementCashWin: db.prepare('UPDATE users SET cash_wins = cash_wins + 1 WHERE id = ?'),
+  incrementCashLoss: db.prepare('UPDATE users SET cash_losses = cash_losses + 1 WHERE id = ?'),
 };
 
 const addEarningsTx = db.transaction((id, amountUsdc) => {
@@ -100,6 +102,9 @@ const userRepo = {
   getEarningsLeaderboard(limit = 10) {
     return stmts.getEarningsLeaderboard.all(limit);
   },
+
+  incrementCashWin(userId) { stmts.incrementCashWin.run(userId); },
+  incrementCashLoss(userId) { stmts.incrementCashLoss.run(userId); },
 };
 
 module.exports = userRepo;
