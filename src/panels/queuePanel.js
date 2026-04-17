@@ -106,11 +106,6 @@ function buildQueuePanel(lang = 'en') {
       .setCustomId('ranked_queue_leave')
       .setLabel('Leave Queue')
       .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId('ranked_queue_refresh')
-      .setLabel('Refresh')
-      .setEmoji('🔄')
-      .setStyle(ButtonStyle.Secondary),
   );
 
   // No language dropdown on the queue panel — it updates frequently
@@ -175,11 +170,6 @@ async function postQueuePanel(client, lang = 'en') {
 async function handleQueueButton(interaction) {
   const id = interaction.customId;
   const discordId = interaction.user.id;
-
-  // ── Refresh ──────────────────────────────────────────────────
-  if (id === 'ranked_queue_refresh') {
-    return interaction.update(buildQueuePanel());
-  }
 
   // ── Join ─────────────────────────────────────────────────────
   if (id === 'ranked_queue_join') {
