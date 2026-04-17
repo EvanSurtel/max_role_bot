@@ -113,7 +113,10 @@ function buildQueuePanel(lang = 'en') {
       .setStyle(ButtonStyle.Secondary),
   );
 
-  return { embeds: [embed], components: [actionRow, ...buildLanguageDropdownRow(lang)] };
+  // No language dropdown on the queue panel — it updates frequently
+  // as players join/leave, and the content is universal enough
+  // (player names + XP numbers) that translation isn't needed.
+  return { embeds: [embed], components: [actionRow] };
 }
 
 // ═══════════════════════════════════════════════════════════════════
