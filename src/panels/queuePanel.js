@@ -77,17 +77,8 @@ function buildQueuePanel(lang = 'en') {
   if (count === 0) {
     playerList = '_No players in queue._';
   } else {
-    const { USDC_PER_UNIT } = require('../config/constants');
     playerList = players
-      .map((p, i) => {
-        const user = userRepo.findByDiscordId(p.discordId);
-        const flag = user?.country_flag || '';
-        const name = user?.server_username || user?.cod_ign || 'Player';
-        const xp = (user?.xp_points ?? p.xp ?? 0).toLocaleString();
-        const earnings = Number(user?.total_earnings_usdc || 0) / USDC_PER_UNIT;
-        const earningsStr = earnings > 0 ? ` | $${earnings.toFixed(2)}` : '';
-        return `${i + 1}. ${flag} **${name}** — ${xp} XP${earningsStr}`;
-      })
+      .map((p, i) => `${i + 1}. <@${p.discordId}>`)
       .join('\n');
   }
 
