@@ -12,6 +12,55 @@ const QUEUE_CONFIG = require('../config/queueConfig');
 const userRepo = require('../database/repositories/userRepo');
 const onboarding = require('../interactions/onboarding');
 
+// Track which thresholds have been pinged this fill cycle (7/10, 8/10, 9/10).
+// Reset when the queue empties (match created) or times out.
+const _lastPingedAt = {};
+
+// 1-hour queue timeout — if the queue doesn't fill in 60 minutes,
+// remove all waiting players and reset. Prevents players from being
+// stuck in a queue that will never fill (late night, low population).
+const QUEUE_TIMEOUT_MS = 60 * 60 * 1000;
+let _queueTimeoutTimer = null;
+
+function _startQueueTimeout(client) {
+  _clearQueueTimeout();
+  _queueTimeoutTimer = setTimeout(async () => {
+    const size = queueService.getQueueSize();
+    if (size === 0) return;
+
+    console.log(`[QueuePanel] Queue timeout — removing ${size} player(s) after 1 hour`);
+
+    // Clear the queue
+    const players = queueService.getQueuePlayers();
+    for (const p of players) {
+      queueService.leaveQueue(p.discordId);
+    }
+
+    // Reset ping thresholds
+    for (const k of Object.keys(_lastPingedAt)) delete _lastPingedAt[k];
+
+    // Notify in the queue channel
+    const channelId = process.env.RANKED_QUEUE_CHANNEL_ID;
+    const ch = client?.channels?.cache?.get(channelId);
+    if (ch) {
+      ch.send({
+        content: 'Queue has been cleared — not enough players joined within 1 hour. Join again when ready!',
+        allowedMentions: { parse: [] },
+      }).catch(() => {});
+    }
+
+    // Refresh the panel
+    await _refreshPanelInChannel(client);
+  }, QUEUE_TIMEOUT_MS);
+}
+
+function _clearQueueTimeout() {
+  if (_queueTimeoutTimer) {
+    clearTimeout(_queueTimeoutTimer);
+    _queueTimeoutTimer = null;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Panel builder
 // ═══════════════════════════════════════════════════════════════════
@@ -174,11 +223,40 @@ async function handleQueueButton(interaction) {
     const xp = user.xp_points || 0;
     const newSize = queueService.joinQueue(discordId, xp);
 
+    // Start the 1-hour timeout on first join. Resets if someone
+    // else joins later (timer restarts). Clears when queue fills.
+    if (newSize === 1) {
+      _startQueueTimeout(interaction.client);
+    }
+
     // Update the panel in-place so everyone sees the new list
     await interaction.update(buildQueuePanel());
 
+    // Auto-ping when queue is almost full (7/10, 8/10, 9/10).
+    // Only ping ONCE per threshold per fill cycle — the state
+    // resets when the queue empties (match created or timeout).
+    const PING_THRESHOLDS = [7, 8, 9];
+    if (PING_THRESHOLDS.includes(newSize) && newSize < QUEUE_CONFIG.TOTAL_PLAYERS) {
+      if (!_lastPingedAt[newSize]) {
+        _lastPingedAt[newSize] = true;
+        const channelId = process.env.RANKED_QUEUE_CHANNEL_ID;
+        const ch = interaction.client.channels.cache.get(channelId);
+        if (ch) {
+          const remaining = QUEUE_CONFIG.TOTAL_PLAYERS - newSize;
+          ch.send({
+            content: `**${newSize}/${QUEUE_CONFIG.TOTAL_PLAYERS}** in queue — ${remaining} more needed! 🎮`,
+            allowedMentions: { parse: [] },
+          }).catch(() => {});
+        }
+      }
+    }
+
     // Check if queue is full
     if (newSize >= QUEUE_CONFIG.TOTAL_PLAYERS) {
+      // Clear timeout + ping state for the next fill cycle
+      _clearQueueTimeout();
+      for (const k of Object.keys(_lastPingedAt)) delete _lastPingedAt[k];
+
       try {
         const guild = interaction.guild || interaction.client.guilds.cache.get(process.env.GUILD_ID);
         if (guild) {
@@ -206,6 +284,13 @@ async function handleQueueButton(interaction) {
     }
 
     queueService.leaveQueue(discordId);
+
+    // If queue is now empty, clear the timeout + ping state
+    if (queueService.getQueueSize() === 0) {
+      _clearQueueTimeout();
+      for (const k of Object.keys(_lastPingedAt)) delete _lastPingedAt[k];
+    }
+
     return interaction.update(buildQueuePanel());
   }
 }
