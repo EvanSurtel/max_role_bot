@@ -148,7 +148,7 @@ async function handleConfirmedAccept(interaction) {
 
   // Check if acceptor is busy
   const { isPlayerBusy } = require('../utils/playerStatus');
-  const busy = isPlayerBusy(user.id);
+  const busy = isPlayerBusy(user.id, discordId);
   if (busy.busy) {
     return interaction.reply({ content: busy.reason, ephemeral: true });
   }

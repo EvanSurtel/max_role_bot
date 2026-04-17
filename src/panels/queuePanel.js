@@ -150,11 +150,22 @@ async function handleQueueButton(interaction) {
       });
     }
 
-    // Check if in an active match
+    // Check if in an active queue match
     const activeMatchId = queueService.isInActiveMatch(discordId);
     if (activeMatchId) {
       return interaction.reply({
         content: `You are already in an active queue match (#${activeMatchId}). Finish that match first.`,
+        ephemeral: true,
+        _autoDeleteMs: 10_000,
+      });
+    }
+
+    // Check if in a wager/XP match (cross-system check)
+    const { isPlayerBusy } = require('../utils/playerStatus');
+    const busy = isPlayerBusy(user.id, discordId);
+    if (busy.busy) {
+      return interaction.reply({
+        content: busy.reason,
         ephemeral: true,
         _autoDeleteMs: 10_000,
       });

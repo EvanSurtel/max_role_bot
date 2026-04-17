@@ -75,6 +75,11 @@ async function handleQueueInteraction(interaction) {
     return await _handleDqSelectButton(interaction);
   }
 
+  // ── Cancel match button (staff only) ───────────────────────
+  if (id.startsWith('queue_cancel_')) {
+    return await _handleCancelButton(interaction);
+  }
+
   console.warn(`[QueueService] Unhandled queue interaction: ${id}`);
   if (!interaction.replied && !interaction.deferred) {
     await interaction.deferUpdate().catch(() => {});
@@ -569,6 +574,48 @@ async function _handleDqSelectButton(interaction) {
     content: `DQ'd <@${targetDiscordId}> with -${QUEUE_CONFIG.DQ_PENALTY} XP penalty.`,
     components: [],
   });
+}
+
+// ── Cancel Match (staff only) ────────────────────────────────
+async function _handleCancelButton(interaction) {
+  if (!_isStaffMember(interaction.member)) {
+    return interaction.reply({ content: 'Only staff can cancel queue matches.', ephemeral: true });
+  }
+
+  const matchId = parseInt(interaction.customId.replace('queue_cancel_', ''), 10);
+  const match = getMatch(matchId);
+  if (!match) {
+    return interaction.reply({ content: 'Match not found or already ended.', ephemeral: true });
+  }
+  if (match.phase === 'RESOLVED' || match.phase === 'CANCELLED') {
+    return interaction.reply({ content: 'This match has already ended.', ephemeral: true });
+  }
+
+  // Cancel the match
+  const { cancelMatch } = require('./matchLifecycle');
+  await cancelMatch(interaction.client, match, `Cancelled by staff (<@${interaction.user.id}>)`);
+
+  // Notify in the match channel
+  try {
+    const tc = interaction.client.channels.cache.get(match.textChannelId);
+    if (tc) {
+      await tc.send({
+        embeds: [new EmbedBuilder()
+          .setTitle('Match Cancelled')
+          .setColor(0xe74c3c)
+          .setDescription(`This match has been cancelled by <@${interaction.user.id}>.\n\nNo XP changes. Channels will be cleaned up shortly.`)
+          .setTimestamp()
+        ],
+      });
+    }
+  } catch { /* best effort */ }
+
+  // Disable buttons on the match message
+  try {
+    await interaction.update({ components: [] });
+  } catch {
+    await interaction.reply({ content: 'Match cancelled.', ephemeral: true });
+  }
 }
 
 module.exports = {

@@ -83,6 +83,10 @@ async function startPlayPhase(match) {
       .setCustomId(`queue_dq_${match.id}`)
       .setLabel('DQ Player (-300 XP)')
       .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`queue_cancel_${match.id}`)
+      .setLabel('Cancel Match')
+      .setStyle(ButtonStyle.Danger),
   );
 
   match._matchMsg = await textChannel.send({ embeds: [embed], components: [reportRow, adminRow] });

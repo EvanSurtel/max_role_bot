@@ -1,18 +1,40 @@
-// Check if a player is busy (in active challenge/match).
+// Check if a player is busy (in active challenge/match/queue).
+//
+// Cross-checks BOTH the DB-backed wager/XP system AND the in-memory
+// queue system so a player can never be in two things at once.
 const db = require('../database/db');
 
 /**
- * Check if a user is currently busy (in an active challenge or match).
+ * Check if a user is currently busy (in an active challenge, match, or queue).
  * A player is "busy" if they are:
  * - In a challenge with status: pending_teammates, open, accepted, in_progress
  * - In a match with status: active or voting WHERE their captain hasn't voted yet
+ * - In the ranked queue (waiting for a match to form)
+ * - In an active queue match (any phase before RESOLVED/CANCELLED)
  *
- * Once their captain has voted, they are FREE to join other things.
+ * Once their captain has voted (wager/XP match) or their queue match has
+ * resolved, they are FREE to join other things.
  *
  * @param {number} userId - Internal user ID
+ * @param {string} [discordId] - Discord ID (needed for queue check — pass if available)
  * @returns {{ busy: boolean, reason: string|null }}
  */
-function isPlayerBusy(userId) {
+function isPlayerBusy(userId, discordId) {
+  // Queue system check (in-memory) — must come first because queue
+  // state is not in the DB. Requires discordId since the queue is
+  // keyed by Discord ID, not internal user ID.
+  if (discordId) {
+    try {
+      const { isInQueue, isInActiveMatch } = require('../queue/state');
+      if (isInQueue(discordId)) {
+        return { busy: true, reason: 'You are currently in the ranked queue. Leave the queue first.' };
+      }
+      const queueMatchId = isInActiveMatch(discordId);
+      if (queueMatchId) {
+        return { busy: true, reason: `You are in an active queue match (#${queueMatchId}). Finish that match first.` };
+      }
+    } catch { /* queue module not loaded yet — skip */ }
+  }
   // Check if in a forming challenge (pending_teammates, open, accepted)
   const formingChallenge = db.prepare(`
     SELECT c.id, c.status, c.type, c.display_number FROM challenges c
