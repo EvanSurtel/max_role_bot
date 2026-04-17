@@ -667,15 +667,25 @@ async function handleAdminConfirmNoWinner(interaction) {
   });
 
   try {
-    // For cash matches: refund all escrow funds back to players
+    // For cash matches: refund ALL funds — both on-chain escrow
+    // deposits AND DB-level balance_held amounts. Both paths are
+    // idempotent: cancelOnChainMatch pre-logs refunds; refundAll
+    // computes net holds from the transaction log and only releases
+    // positive nets. Calling both handles every state the match
+    // could be in:
+    //   - Deposits happened → cancelOnChainMatch sends USDC back,
+    //     refundAll sees net=0 (already refunded), does nothing
+    //   - Deposits never happened (bot crashed mid-flow) →
+    //     cancelOnChainMatch succeeds vacuously (nothing to refund
+    //     on-chain), refundAll releases the DB balance_held amounts
+    //     that were never sent to escrow
     if (challenge && challenge.type === 'cash_match' && Number(challenge.total_pot_usdc) > 0) {
       const challengePlayerRepo2 = require('../database/repositories/challengePlayerRepo');
       const allPlayers = challengePlayerRepo2.findByChallengeId(match.challenge_id);
 
-      // Cancel the match on-chain via the smart contract.
-      // The contract refunds all players' USDC from escrow back to
-      // their individual wallets in a single transaction.
       const escrowManager = require('../base/escrowManager');
+
+      // 1. On-chain cancel (refunds any deposited USDC from contract)
       try {
         await escrowManager.cancelOnChainMatch(
           matchId,
@@ -691,6 +701,14 @@ async function handleAdminConfirmNoWinner(interaction) {
           challengeId: match.challenge_id,
           memo: `🚨 On-chain cancel FAILED for match #${matchId} (no winner). Error: ${err.message}`,
         });
+      }
+
+      // 2. DB-level hold release (catches any remaining balance_held
+      //    that never made it to on-chain escrow)
+      try {
+        escrowManager.refundAll(match.challenge_id);
+      } catch (refundErr) {
+        console.error(`[MatchResult] DB refundAll failed for match #${matchId}:`, refundErr.message);
       }
     }
 

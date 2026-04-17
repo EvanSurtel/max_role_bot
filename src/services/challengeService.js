@@ -254,14 +254,31 @@ async function cancelChallenge(challengeId) {
     return;
   }
 
+  // Atomic status transition: only cancel from a pre-match state.
+  // This prevents a race where cancelChallenge (from a teammate
+  // timeout timer) runs at the same time as startMatch (from the
+  // last teammate accepting). Without this, the cancel could refund
+  // DB holds while startMatch is pulling the same funds into escrow.
+  const CANCELLABLE = [
+    CHALLENGE_STATUS.PENDING_TEAMMATES,
+    CHALLENGE_STATUS.OPEN,
+    CHALLENGE_STATUS.ACCEPTED,
+  ];
+  if (!CANCELLABLE.includes(challenge.status)) {
+    console.log(`[ChallengeService] Challenge #${challengeId} is ${challenge.status} — not cancellable, skipping`);
+    return;
+  }
+  const claimed = challengeRepo.atomicStatusTransition(challengeId, challenge.status, CHALLENGE_STATUS.CANCELLED);
+  if (!claimed) {
+    console.log(`[ChallengeService] Challenge #${challengeId} status changed before cancel could claim it — skipping`);
+    return;
+  }
+
   // Refund all held funds
   escrowManager.refundAll(challengeId);
 
   // Cancel any pending expiry timer for this challenge
   timerService.cancelTimersByReference('challenge_expiry', challengeId);
-
-  // Update status to cancelled
-  challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.CANCELLED);
 
   // Clear any teammate accept timers for this challenge
   for (const [key, timer] of teammateTimers.entries()) {

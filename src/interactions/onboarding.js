@@ -197,6 +197,13 @@ async function handleButton(interaction) {
  * Reads 3 fields (Display Name, COD IGN, COD UID) — region and country
  * were already collected via dropdowns and stored in global._pendingRegistrations.
  */
+// Concurrency limiter on wallet generation. CDP API has rate limits;
+// too many simultaneous getOrCreateAccount + getOrCreateSmartAccount
+// calls can cause partial registrations (user row with TOS but no
+// wallet). Cap at 3 concurrent registrations.
+const MAX_CONCURRENT_REGISTRATIONS = 3;
+let _activeRegistrations = 0;
+
 async function handleRegistrationModal(interaction) {
   const discordId = interaction.user.id;
   const lang = langFor(interaction);
@@ -279,10 +286,29 @@ async function handleRegistrationModal(interaction) {
       WHERE id = ?
     `).run(displayName, codIgn, codUid, regionLabel, country, countryCode, region, depositRegion, user.id);
 
-    // Generate Base wallet
+    // Generate Base wallet (concurrency-limited to avoid CDP API overload)
     let wallet = walletRepo.findByUserId(user.id);
     if (!wallet) {
-      const { address, accountRef, smartAccountRef } = await walletManager.generateWallet(user.id);
+      if (_activeRegistrations >= MAX_CONCURRENT_REGISTRATIONS) {
+        return interaction.editReply({
+          content: 'Server is processing several registrations at once. Please try again in 30 seconds.',
+          embeds: [], components: [],
+        });
+      }
+      _activeRegistrations++;
+      let walletData;
+      try {
+        walletData = await walletManager.generateWallet(user.id);
+      } catch (walletErr) {
+        _activeRegistrations--;
+        console.error(`[Onboarding] Wallet generation failed for user ${user.id}:`, walletErr.message);
+        return interaction.editReply({
+          content: 'Wallet creation failed. Please try clicking Accept TOS again in a moment.',
+          embeds: [], components: [],
+        });
+      }
+      _activeRegistrations--;
+      const { address, accountRef, smartAccountRef } = walletData;
       wallet = walletRepo.create({
         userId: user.id,
         address,
