@@ -588,6 +588,13 @@ async function _handleDqSelectButton(interaction) {
         });
       }
     }
+    // Log to admin feed
+    const { postTransaction: ptxDq } = require('../utils/transactionFeed');
+    ptxDq({
+      type: 'queue_dq',
+      discordId: targetDiscordId,
+      memo: `Queue Match #${match.id} DQ: <@${targetDiscordId}> — -${QUEUE_CONFIG.DQ_PENALTY} XP by <@${interaction.user.id}>`,
+    });
   } catch (err) {
     console.error(`[QueueService] Failed to apply DQ penalty to ${targetDiscordId}:`, err.message);
   }

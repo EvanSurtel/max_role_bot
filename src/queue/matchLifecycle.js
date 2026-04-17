@@ -97,6 +97,13 @@ async function createMatch(client, guild) {
     }
   }, QUEUE_CONFIG.VOICE_JOIN_TIMEOUT);
 
+  // Log to admin feed
+  const { postTransaction } = require('../utils/transactionFeed');
+  postTransaction({
+    type: 'queue_match_created',
+    memo: `Queue Match #${match.id} created | 5v5 HP Bo3\nPlayers: ${allDiscordIds.map(id => `<@${id}>`).join(', ')}`,
+  });
+
   console.log(`[QueueService] Queue match #${match.id} created with ${allDiscordIds.length} players`);
   return match;
 }
@@ -136,6 +143,7 @@ async function handleNoShows(client, match) {
   }
 
   // ── Penalize no-shows ────────────────────────────────────────
+  const { postTransaction: ptxNoShow } = require('../utils/transactionFeed');
   for (const discordId of noShows) {
     try {
       const user = userRepo.findByDiscordId(discordId);
@@ -148,6 +156,13 @@ async function handleNoShows(client, match) {
             console.error(`[QueueService] NeatQueue penalty sync failed for ${discordId}:`, err.message);
           });
         }
+
+        ptxNoShow({
+          type: 'queue_no_show',
+          username: user.server_username,
+          discordId,
+          memo: `Queue Match #${match.id} no-show: <@${discordId}> — -${QUEUE_CONFIG.NO_SHOW_PENALTY} XP`,
+        });
       }
     } catch (err) {
       console.error(`[QueueService] Failed to penalize no-show ${discordId}:`, err.message);
@@ -371,6 +386,15 @@ async function resolveMatch(client, match, winningTeam) {
     });
   }, 5 * 60 * 1000);
 
+  // Log to admin feed
+  const { postTransaction: ptx } = require('../utils/transactionFeed');
+  const winnerMentions = [...match.players.values()].filter(p => p.team === winningTeam).map(p => `<@${p.discordId}>`).join(', ');
+  const loserMentions = [...match.players.values()].filter(p => p.team !== winningTeam && p.team).map(p => `<@${p.discordId}>`).join(', ');
+  ptx({
+    type: 'queue_match_resolved',
+    memo: `Queue Match #${match.id} | Team ${winningTeam} wins\nWinners: ${winnerMentions} (+${QUEUE_CONFIG.WIN_XP} XP)\nLosers: ${loserMentions} (-${QUEUE_CONFIG.LOSS_XP} XP)`,
+  });
+
   console.log(`[QueueService] Match #${match.id} resolved. Team ${winningTeam} wins.`);
 }
 
@@ -385,6 +409,13 @@ async function cancelMatch(client, match, reason) {
   if (match.phase === 'RESOLVED' || match.phase === 'CANCELLED') return;
   match.phase = 'CANCELLED';
   if (match.timer) { clearTimeout(match.timer); match.timer = null; }
+
+  // Log to admin feed
+  const { postTransaction } = require('../utils/transactionFeed');
+  postTransaction({
+    type: 'queue_match_cancelled',
+    memo: `Queue Match #${match.id} cancelled: ${reason}`,
+  });
 
   console.log(`[QueueService] Match #${match.id} cancelled: ${reason}`);
 

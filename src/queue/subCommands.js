@@ -57,6 +57,13 @@ function subPlayerOut(matchId, discordId, replacementDiscordId, subType) {
   match.players.set(replacementDiscordId, replacement);
   match.players.delete(discordId);
 
+  // Log to admin feed
+  const { postTransaction } = require('../utils/transactionFeed');
+  postTransaction({
+    type: 'queue_sub',
+    memo: `Queue Match #${match.id} sub: <@${discordId}> out (-${QUEUE_CONFIG.NO_SHOW_PENALTY} XP) → <@${replacementDiscordId}> in (${subType})`,
+  });
+
   console.log(`[QueueService] Subbed ${discordId} out for ${replacementDiscordId} (${subType}) in match #${match.id}`);
   return { success: true };
 }
