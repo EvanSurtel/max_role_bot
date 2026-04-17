@@ -15,6 +15,7 @@ const wagerStatsPanel = require('../panels/wagerStatsPanel');
 const seasonPanel = require('../panels/seasonPanel');
 const escrowPanel = require('../panels/escrowPanel');
 const queuePanel = require('../panels/queuePanel');
+const queueService = require('../services/queueService');
 const { isWalletChannel } = require('../utils/ephemeralReply');
 
 // Per-(user, channel) "current live ephemeral session" tracking. When
@@ -352,6 +353,10 @@ module.exports = {
         if (id === 'ranked_queue_join' || id === 'ranked_queue_leave' || id === 'ranked_queue_refresh') {
           return await queuePanel.handleQueueButton(interaction);
         }
+        // Queue match phase buttons (captain pick, role select, report, sub, DQ, etc.)
+        if (id.startsWith('queue_')) {
+          return await queueService.handleQueueInteraction(interaction);
+        }
         // Queue stats navigation/refresh buttons
         if (id.startsWith('qs_prev_') || id.startsWith('qs_next_') || id.startsWith('qs_first_') || id.startsWith('qs_last_') || id.startsWith('qs_refresh_')) {
           return await queueStatsPanel.handleQueueStatsNav(interaction);
@@ -419,6 +424,10 @@ module.exports = {
       // String select menus (leaderboard dropdowns + welcome master language picker + wallet language picker)
       if (interaction.isStringSelectMenu()) {
         const id = interaction.customId;
+        // Queue captain vote select menu
+        if (id.startsWith('queue_captain_vote_')) {
+          return await queueService.handleQueueInteraction(interaction);
+        }
         if (id.startsWith('xplb_') || id.startsWith('earnlb_')) {
           return await leaderboardPanel.handleLeaderboardSelect(interaction);
         }
