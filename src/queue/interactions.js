@@ -47,8 +47,8 @@ async function handleQueueInteraction(interaction) {
     return await _handleOperatorButton(interaction);
   }
 
-  // ── Report result button ────────────────────────────────────
-  if (id.startsWith('queue_report_')) {
+  // ── Report result button (initial + confirm + nevermind) ────
+  if (id.startsWith('queue_report_') || id === 'queue_report_nevermind') {
     return await _handleReportButton(interaction);
   }
 
@@ -75,8 +75,8 @@ async function handleQueueInteraction(interaction) {
     return await _handleDqSelectButton(interaction);
   }
 
-  // ── Cancel match button (staff only) ───────────────────────
-  if (id.startsWith('queue_cancel_')) {
+  // ── Cancel match button (initial + confirm + nevermind) ─────
+  if (id.startsWith('queue_cancel_') || id === 'queue_cancel_nevermind') {
     return await _handleCancelButton(interaction);
   }
 
@@ -227,15 +227,53 @@ async function _handleOperatorButton(interaction) {
 
 // ── Report Result Button handler ──────────────────────────────
 async function _handleReportButton(interaction) {
-  // customId: queue_report_{matchId}_{winningTeam}
-  const parts = interaction.customId.split('_');
-  const matchId = parseInt(parts[2], 10);
-  const winningTeam = parseInt(parts[3], 10);
+  const id = interaction.customId;
+
+  // "Nevermind" button on the confirmation ephemeral
+  if (id === 'queue_report_nevermind') {
+    return interaction.update({ content: 'Report cancelled.', components: [] });
+  }
+
+  // Confirmation step: queue_report_{matchId}_{team} → show confirm
+  if (!id.startsWith('queue_report_confirm_')) {
+    const parts = id.split('_');
+    const matchId = parseInt(parts[2], 10);
+    const winningTeam = parseInt(parts[3], 10);
+    const match = getMatch(matchId);
+    if (!match) return interaction.reply({ content: 'Match not found.', ephemeral: true });
+
+    const captainId = interaction.user.id;
+    const isCap = captainId === match.captains?.team1 || captainId === match.captains?.team2;
+    if (!isCap) return interaction.reply({ content: 'Only captains can report results.', ephemeral: true });
+
+    const confirmRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`queue_report_confirm_${matchId}_${winningTeam}`)
+        .setLabel(`Yes, Team ${winningTeam} Won`)
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('queue_report_nevermind')
+        .setLabel('Cancel')
+        .setStyle(ButtonStyle.Secondary),
+    );
+    return interaction.reply({
+      content: `Are you sure you want to report **Team ${winningTeam}** as the winner?`,
+      components: [confirmRow],
+      ephemeral: true,
+    });
+  }
+
+  // Confirmed: queue_report_confirm_{matchId}_{winningTeam}
+  const parts = id.split('_');
+  const matchId = parseInt(parts[3], 10);
+  const winningTeam = parseInt(parts[4], 10);
   const captainId = interaction.user.id;
+
+  await interaction.update({ content: `Reporting Team ${winningTeam} as the winner...`, components: [] });
 
   const result = recordVote(matchId, captainId, winningTeam);
   if (!result.success) {
-    return interaction.reply({ content: result.error, ephemeral: true, _autoDeleteMs: 10_000 });
+    return interaction.followUp({ content: result.error, ephemeral: true, _autoDeleteMs: 10_000 });
   }
 
   const match = getMatch(matchId);
@@ -576,26 +614,58 @@ async function _handleDqSelectButton(interaction) {
   });
 }
 
-// ── Cancel Match (staff only) ────────────────────────────────
+// ── Cancel Match (staff only, with confirmation) ────────────
 async function _handleCancelButton(interaction) {
   if (!_isStaffMember(interaction.member)) {
     return interaction.reply({ content: 'Only staff can cancel queue matches.', ephemeral: true });
   }
 
-  const matchId = parseInt(interaction.customId.replace('queue_cancel_', ''), 10);
-  const match = getMatch(matchId);
-  if (!match) {
-    return interaction.reply({ content: 'Match not found or already ended.', ephemeral: true });
-  }
-  if (match.phase === 'RESOLVED' || match.phase === 'CANCELLED') {
-    return interaction.reply({ content: 'This match has already ended.', ephemeral: true });
+  const id = interaction.customId;
+
+  // "Nevermind" button on the confirmation
+  if (id === 'queue_cancel_nevermind') {
+    return interaction.update({ content: 'Cancel aborted.', components: [] });
   }
 
-  // Cancel the match
+  // Confirmation step: queue_cancel_{matchId} → show confirm
+  if (!id.startsWith('queue_cancel_confirm_')) {
+    const matchId = parseInt(id.replace('queue_cancel_', ''), 10);
+    const match = getMatch(matchId);
+    if (!match) return interaction.reply({ content: 'Match not found or already ended.', ephemeral: true });
+    if (match.phase === 'RESOLVED' || match.phase === 'CANCELLED') {
+      return interaction.reply({ content: 'This match has already ended.', ephemeral: true });
+    }
+
+    const confirmRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`queue_cancel_confirm_${matchId}`)
+        .setLabel('Yes, Cancel This Match')
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId('queue_cancel_nevermind')
+        .setLabel('No, Go Back')
+        .setStyle(ButtonStyle.Secondary),
+    );
+    return interaction.reply({
+      content: `⚠️ Are you sure you want to cancel **Queue Match #${matchId}**? No XP changes will be applied.`,
+      components: [confirmRow],
+      ephemeral: true,
+    });
+  }
+
+  // Confirmed: queue_cancel_confirm_{matchId}
+  const matchId = parseInt(id.replace('queue_cancel_confirm_', ''), 10);
+  const match = getMatch(matchId);
+  if (!match) return interaction.update({ content: 'Match already ended.', components: [] });
+  if (match.phase === 'RESOLVED' || match.phase === 'CANCELLED') {
+    return interaction.update({ content: 'This match has already ended.', components: [] });
+  }
+
+  await interaction.update({ content: 'Cancelling match...', components: [] });
+
   const { cancelMatch } = require('./matchLifecycle');
   await cancelMatch(interaction.client, match, `Cancelled by staff (<@${interaction.user.id}>)`);
 
-  // Notify in the match channel
   try {
     const tc = interaction.client.channels.cache.get(match.textChannelId);
     if (tc) {
@@ -611,10 +681,8 @@ async function _handleCancelButton(interaction) {
   } catch { /* best effort */ }
 
   // Disable buttons on the match message
-  try {
-    await interaction.update({ components: [] });
-  } catch {
-    await interaction.reply({ content: 'Match cancelled.', ephemeral: true });
+  if (match._matchMsg) {
+    try { await match._matchMsg.edit({ components: [] }); } catch { /* */ }
   }
 }
 
