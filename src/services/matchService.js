@@ -378,14 +378,36 @@ async function startMatch(client, challengeId) {
     } catch (err) {
       console.error(`[MatchService] ESCROW FAILURE for match #${match.id}:`, err.message);
 
+      // If ANY deposits landed on-chain before the failure, we must
+      // cancel the on-chain match to refund those players' USDC back
+      // from the escrow contract. Without this, partial deposits are
+      // trapped in the contract with no recovery path.
+      try {
+        const playersWithHolds = allPlayers.filter(p => p.funds_held);
+        await escrowManager.cancelOnChainMatch(
+          match.id,
+          challengeId,
+          playersWithHolds,
+          challenge.entry_amount_usdc,
+        );
+        console.log(`[MatchService] On-chain cancel succeeded for match #${match.id} — partial deposits refunded`);
+      } catch (cancelErr) {
+        // cancelOnChainMatch may fail if createMatch never landed
+        // on-chain (nothing to cancel). Log it but continue with
+        // DB refund — the worst case is an orphaned on-chain match
+        // with some deposits, which admins can recover manually via
+        // emergency-cancel-match.js.
+        console.error(`[MatchService] On-chain cancel also failed for match #${match.id}: ${cancelErr.message}. If deposits landed on-chain, use scripts/emergency-cancel-match.js to recover.`);
+      }
+
       // Revert: refund all DB-held funds back to available
       try {
         escrowManager.refundAll(challengeId);
       } catch (refundErr) {
-        console.error(`[MatchService] Refund after escrow failure also failed:`, refundErr.message);
+        console.error(`[MatchService] DB refund after escrow failure also failed:`, refundErr.message);
       }
 
-      // Revert: set challenge back to OPEN so it can be re-accepted
+      // Revert: set challenge to CANCELLED
       challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.CANCELLED);
 
       // Clean up the match channels we just created
@@ -398,7 +420,7 @@ async function startMatch(client, challengeId) {
       postTransaction({
         type: 'balance_mismatch',
         challengeId,
-        memo: `🚨 Escrow transfer FAILED for match #${match.id}. Challenge cancelled + funds refunded. Error: ${err.message}`,
+        memo: `🚨 Escrow transfer FAILED for match #${match.id}. On-chain cancel attempted + DB funds refunded. Error: ${err.message}`,
       });
 
       throw new Error(`Escrow transfer failed — match #${match.id} cancelled`);

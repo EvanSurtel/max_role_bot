@@ -588,36 +588,65 @@ async function _executeUsdcWithdraw(interaction, user, amountUsdc, address, lang
 
   try {
     const freshWallet = walletRepo.findByUserId(user.id);
-    const freshAvailable = Number(freshWallet.balance_available);
-    if (amountSmallest > freshAvailable) {
+    const freshAvailable = BigInt(freshWallet.balance_available);
+    const amountBig = BigInt(amountSmallest);
+    if (amountBig > freshAvailable) {
       walletRepo.releaseLock(user.id);
-      const availableFormatted = (freshAvailable / USDC_PER_UNIT).toFixed(2);
+      const availableFormatted = (Number(freshAvailable) / USDC_PER_UNIT).toFixed(2);
       return interaction.editReply({ content: t('common.insufficient_balance', lang, { available: availableFormatted }) });
     }
 
-    const { signature } = await transactionService.transferUsdc(
-      freshWallet.address,
-      address,
-      amountSmallest.toString(),
-      { ownerRef: freshWallet.account_ref, smartRef: freshWallet.smart_account_ref },
-    );
+    // Pre-log the withdrawal intent BEFORE sending on-chain. If the
+    // bot crashes after the tx lands but before the DB debit, the
+    // pending_onchain row tells the reconciliation service what
+    // happened — prevents the user from spending the same USDC
+    // again in a match (their DB balance would still show the old
+    // amount, but the pending row is the audit trail).
+    const pendingRow = transactionRepo.create({
+      type: TRANSACTION_TYPE.WITHDRAWAL,
+      userId: user.id,
+      amountUsdc: amountSmallest.toString(),
+      txHash: null,
+      fromAddress: freshWallet.address,
+      toAddress: address,
+      status: 'pending_onchain',
+      memo: `Withdrawal of $${amountUsdc} USDC — tx pending`,
+    });
 
-    const newAvailable = (freshAvailable - amountSmallest).toString();
+    // Debit DB BEFORE the on-chain transfer. This is safer than
+    // debiting after: if the tx fails, we re-credit (no double-
+    // spend window). If the tx succeeds but the bot dies before
+    // re-crediting on failure, the user loses the amount from their
+    // DB balance — but the on-chain tx also failed, so the funds
+    // are still in their wallet on-chain. The deposit poller will
+    // eventually re-credit the delta.
+    const newAvailable = (freshAvailable - amountBig).toString();
     walletRepo.updateBalance(user.id, {
       balanceAvailable: newAvailable,
       balanceHeld: freshWallet.balance_held,
     });
 
-    transactionRepo.create({
-      type: TRANSACTION_TYPE.WITHDRAWAL,
-      userId: user.id,
-      amountUsdc: amountSmallest.toString(),
-      txHash: signature,
-      fromAddress: freshWallet.address,
-      toAddress: address,
-      status: 'completed',
-      memo: `Withdrawal of $${amountUsdc} USDC`,
-    });
+    let signature;
+    try {
+      const result = await transactionService.transferUsdc(
+        freshWallet.address,
+        address,
+        amountSmallest.toString(),
+        { ownerRef: freshWallet.account_ref, smartRef: freshWallet.smart_account_ref },
+      );
+      signature = result.signature;
+    } catch (txErr) {
+      // On-chain transfer failed. Re-credit the DB balance we just
+      // debited so the user's available balance is restored.
+      try {
+        walletRepo.creditAvailable(user.id, amountSmallest.toString());
+      } catch { /* best-effort — deposit poller catches it if this fails */ }
+      transactionRepo.updateStatusAndHash(pendingRow.id, 'failed', null, `Withdrawal failed: ${txErr.message}`);
+      throw txErr;
+    }
+
+    // On-chain succeeded — finalize the pre-logged row.
+    transactionRepo.updateStatusAndHash(pendingRow.id, 'completed', signature, `Withdrawal of $${amountUsdc} USDC`);
 
     const { postTransaction } = require('../utils/transactionFeed');
     postTransaction({ type: 'withdrawal', username: user.server_username, discordId: user.discord_id, amount: `$${amountUsdc.toFixed(2)}`, currency: 'USDC', fromAddress: freshWallet.address, toAddress: address, signature, memo: `Withdrawal of $${amountUsdc.toFixed(2)} USDC` });
