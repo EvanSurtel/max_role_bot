@@ -427,7 +427,7 @@ async function pauseNeatQueue() {
   await fetch('https://api.neatqueue.com/api/v2/queue/pause', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ channel_id: parseInt(channelId) }),
+    body: JSON.stringify({ channel_id: channelId }),
   });
   console.log('[NeatQueue] Queue paused');
 }
@@ -443,7 +443,7 @@ async function resumeNeatQueue() {
   await fetch('https://api.neatqueue.com/api/v2/queue/resume', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ channel_id: parseInt(channelId) }),
+    body: JSON.stringify({ channel_id: channelId }),
   });
   console.log('[NeatQueue] Queue resumed');
 }
