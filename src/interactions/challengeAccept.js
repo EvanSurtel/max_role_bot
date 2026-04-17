@@ -162,6 +162,21 @@ async function handleConfirmedAccept(interaction) {
     return interaction.reply({ content: guard.message, ephemeral: true, _autoDeleteMs: 60_000 });
   }
 
+  // Self-play protection: reject if the acceptor's COD UID matches
+  // any player already in the challenge (team 1). Prevents XP farming
+  // via two Discord accounts linked to the same CODM account.
+  const team1Players = challengePlayerRepo.findByChallengeAndTeam(challengeId, 1);
+  for (const p of team1Players) {
+    const team1User = userRepo.findById(p.user_id);
+    if (team1User && team1User.cod_uid && team1User.cod_uid === user.cod_uid) {
+      return interaction.reply({
+        content: 'You cannot accept a challenge where your COD Mobile account is already on the other team.',
+        ephemeral: true,
+        _autoDeleteMs: 60_000,
+      });
+    }
+  }
+
   const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const entryUsdc = challenge.entry_amount_usdc;
 
@@ -180,6 +195,8 @@ async function handleConfirmedAccept(interaction) {
       if (isCashMatch && Number(entryUsdc) > 0) {
         const entryAmount = (Number(entryUsdc) / 1_000_000).toFixed(2);
         if (!escrowManager.canAfford(user.id, entryUsdc)) {
+          // Revert the status claim so the challenge returns to OPEN
+          challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.OPEN);
           return interaction.editReply({
             content: t('challenge_accept.insufficient_accept', lang, { amount: entryAmount }),
           });
@@ -187,6 +204,8 @@ async function handleConfirmedAccept(interaction) {
 
         const held = escrowManager.holdFunds(user.id, entryUsdc, challengeId);
         if (!held) {
+          // Revert the status claim so the challenge returns to OPEN
+          challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.OPEN);
           return interaction.editReply({
             content: t('challenge_create.failed_hold_funds', lang),
           });

@@ -523,7 +523,16 @@ async function handleWithdrawModal(interaction) {
     return interaction.reply({ content: t('common.amount_must_be_positive', lang), ephemeral: true });
   }
 
-  const amountSmallest = Math.floor(amountUsdc * USDC_PER_UNIT);
+  const minWithdraw = Number(process.env.MIN_WITHDRAWAL_USDC || 1);
+  if (amountUsdc < minWithdraw) {
+    return interaction.reply({
+      content: `Minimum withdrawal is $${minWithdraw.toFixed(2)} USDC.`,
+      ephemeral: true,
+      _autoDeleteMs: 60_000,
+    });
+  }
+
+  const amountSmallest = Math.round(amountUsdc * USDC_PER_UNIT);
   const availableSmallest = Number(wallet.balance_available);
 
   if (amountSmallest > availableSmallest) {
