@@ -134,18 +134,39 @@ function _isStaffMember(member) {
 function findClosestXpReplacement(targetXp) {
   if (waitingQueue.length === 0) return null;
 
-  let bestIdx = 0;
-  let bestDiff = Math.abs(waitingQueue[0].xp - targetXp);
+  // Filter out anyone who became busy in another system (wager/XP
+  // match) since they joined the queue. This shouldn't happen if
+  // the join checks are working, but belt-and-suspenders.
+  const { isInActiveMatch } = require('./state');
+  const userRepo = require('../database/repositories/userRepo');
+  const eligible = [];
+  for (let i = 0; i < waitingQueue.length; i++) {
+    const entry = waitingQueue[i];
+    if (isInActiveMatch(entry.discordId)) continue; // in another queue match
+    const user = userRepo.findByDiscordId(entry.discordId);
+    if (user) {
+      const { isPlayerBusy } = require('../utils/playerStatus');
+      const busy = isPlayerBusy(user.id, entry.discordId);
+      if (busy.busy) continue; // in a wager/XP match
+    }
+    eligible.push({ index: i, ...entry });
+  }
 
-  for (let i = 1; i < waitingQueue.length; i++) {
-    const diff = Math.abs(waitingQueue[i].xp - targetXp);
+  if (eligible.length === 0) return null;
+
+  let best = eligible[0];
+  let bestDiff = Math.abs(best.xp - targetXp);
+
+  for (let i = 1; i < eligible.length; i++) {
+    const diff = Math.abs(eligible[i].xp - targetXp);
     if (diff < bestDiff) {
       bestDiff = diff;
-      bestIdx = i;
+      best = eligible[i];
     }
   }
 
-  return waitingQueue.splice(bestIdx, 1)[0];
+  // Remove from waitingQueue by original index
+  return waitingQueue.splice(best.index, 1)[0];
 }
 
 module.exports = {

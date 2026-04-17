@@ -592,6 +592,55 @@ async function _handleDqSelectButton(interaction) {
     console.error(`[QueueService] Failed to apply DQ penalty to ${targetDiscordId}:`, err.message);
   }
 
+  // Remove the player from the match and attempt replacement from
+  // the waiting queue. Without this, a DQ'd player stays in the
+  // match data structure — they'd appear as a pickable player in
+  // captain pick and count as a team member in role select, leaving
+  // their team effectively down a player (e.g. 4v5).
+  const playerTeam = player.team;
+  match.players.delete(targetDiscordId);
+  if (playerTeam === 1) {
+    const idx = match.team1.indexOf(targetDiscordId);
+    if (idx !== -1) match.team1.splice(idx, 1);
+  } else if (playerTeam === 2) {
+    const idx = match.team2.indexOf(targetDiscordId);
+    if (idx !== -1) match.team2.splice(idx, 1);
+  }
+
+  // If the DQ'd player was a captain, pick the highest-XP remaining
+  // teammate as the new captain.
+  if (match.captains?.team1 === targetDiscordId) {
+    const t1Players = [...match.players.values()].filter(p => p.team === 1).sort((a, b) => b.xp - a.xp);
+    match.captains.team1 = t1Players[0]?.discordId || null;
+    if (t1Players[0]) t1Players[0].isCaptain = true;
+  }
+  if (match.captains?.team2 === targetDiscordId) {
+    const t2Players = [...match.players.values()].filter(p => p.team === 2).sort((a, b) => b.xp - a.xp);
+    match.captains.team2 = t2Players[0]?.discordId || null;
+    if (t2Players[0]) t2Players[0].isCaptain = true;
+  }
+
+  // Try to find a replacement from the waiting queue
+  let replacementMsg = '';
+  const replacement = findClosestXpReplacement(player.xp);
+  if (replacement) {
+    const { _newPlayer } = require('./state');
+    const repPlayer = _newPlayer(replacement.discordId, replacement.xp);
+    repPlayer.team = playerTeam; // put on same team (or unassigned if no team yet)
+    match.players.set(replacement.discordId, repPlayer);
+    if (playerTeam === 1) match.team1.push(replacement.discordId);
+    else if (playerTeam === 2) match.team2.push(replacement.discordId);
+    replacementMsg = `\nReplaced by <@${replacement.discordId}> (${replacement.xp} XP) from the queue.`;
+  } else {
+    replacementMsg = '\nNo replacement available in the queue.';
+    // If we're in early phases and down to <10 players with no replacement, cancel
+    if (match.players.size < QUEUE_CONFIG.TOTAL_PLAYERS && ['WAITING_VOICE', 'CAPTAIN_VOTE', 'CAPTAIN_PICK'].includes(match.phase)) {
+      const { cancelMatch } = require('./matchLifecycle');
+      await cancelMatch(interaction.client, match, `DQ left match with fewer than ${QUEUE_CONFIG.TOTAL_PLAYERS} players and no replacement available`);
+      replacementMsg += ' **Match cancelled due to insufficient players.**';
+    }
+  }
+
   const _client = setClient();
   const textChannel = _client?.channels?.cache?.get(match.textChannelId);
   if (textChannel) {
@@ -603,13 +652,14 @@ async function _handleDqSelectButton(interaction) {
           .setDescription([
             `<@${targetDiscordId}> has been **disqualified** by <@${interaction.user.id}>.`,
             `Penalty: **-${QUEUE_CONFIG.DQ_PENALTY} XP**`,
+            replacementMsg,
           ].join('\n')),
       ],
     });
   }
 
   return interaction.update({
-    content: `DQ'd <@${targetDiscordId}> with -${QUEUE_CONFIG.DQ_PENALTY} XP penalty.`,
+    content: `DQ'd <@${targetDiscordId}> with -${QUEUE_CONFIG.DQ_PENALTY} XP penalty.${replacementMsg}`,
     components: [],
   });
 }

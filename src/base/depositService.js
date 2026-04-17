@@ -135,6 +135,17 @@ async function checkDeposits() {
 
     for (const wallet of wallets) {
       try {
+        // Skip wallets with an active lock — a withdrawal or other
+        // balance-mutating operation is in progress. If we read the
+        // on-chain balance now, it might reflect pre-withdrawal state
+        // while the DB was already debited (debit-before-send pattern).
+        // Crediting the delta as a "deposit" would phantom-credit the
+        // user. Safer to skip and catch it on the next poll cycle.
+        if (wallet.locked_at) {
+          const lockAge = Date.now() - new Date(wallet.locked_at).getTime();
+          if (lockAge < 120_000) continue; // skip if lock is < 2 min old
+        }
+
         // Query Base for on-chain USDC balance
         const onChainBalance = BigInt(
           await walletManager.getUsdcBalance(wallet.address),
