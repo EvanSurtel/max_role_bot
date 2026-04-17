@@ -8,8 +8,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title WagerEscrow
- * @notice Match escrow for USDC wagers on Base. Ported from the Anchor
- *         (Solana) contract at programs/wager-escrow/src/lib.rs.
+ * @notice Match escrow for USDC wagers on Base.
  *
  * Architecture:
  *   - Each user has their own wallet. The bot signs on their behalf.
@@ -21,6 +20,12 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  *   - resolveMatch: bot (owner) distributes the pot to winners.
  *   - cancelMatch: bot (owner) refunds all locked USDC to players.
  *
+ * Safety:
+ *   - totalActiveEscrow tracks the sum of all USDC locked in
+ *     unresolved/uncancelled matches. emergencyWithdraw can ONLY
+ *     withdraw funds NOT allocated to active matches — it cannot
+ *     drain player money from in-progress games.
+ *
  * Every state change emits an event with the matchId so the full
  * history is queryable on BaseScan.
  */
@@ -28,6 +33,12 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable usdc;
+
+    /// @notice Running total of USDC locked in active (non-resolved,
+    ///         non-cancelled) matches. Incremented on deposit, decremented
+    ///         on resolve/cancel. emergencyWithdraw is capped at
+    ///         contractBalance - totalActiveEscrow.
+    uint256 public totalActiveEscrow;
 
     struct Match {
         uint256 entryAmount;     // USDC per player (6 decimals)
@@ -50,6 +61,7 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
     event Deposited(uint256 indexed matchId, address indexed player, uint256 amount);
     event MatchResolved(uint256 indexed matchId, address[] winners, uint256[] amounts);
     event MatchCancelled(uint256 indexed matchId, address[] players, uint256[] refunds);
+    event EmergencyWithdraw(address indexed to, uint256 amount);
 
     // ─── Constructor ────────────────────────────────────────────
 
@@ -115,11 +127,11 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
         uint256 amount = m.entryAmount;
 
         // Pull USDC from the player's wallet into this contract.
-        // Requires prior ERC-20 approve() from the player's wallet.
         usdc.safeTransferFrom(player, address(this), amount);
 
         m.depositsCount += 1;
         m.totalDeposited += amount;
+        totalActiveEscrow += amount;
         hasDeposited[matchId][player] = true;
 
         emit Deposited(matchId, player, amount);
@@ -129,7 +141,9 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
 
     /**
      * @notice Distribute the pot to winners. Only callable by owner.
-     *         Total payouts must not exceed totalDeposited.
+     *         Total payouts must not exceed totalDeposited for this match.
+     *         Decrements totalActiveEscrow by the match's totalDeposited
+     *         (not just the payout — any remainder is now unallocated).
      * @param matchId  The match to resolve.
      * @param winners  Array of winner wallet addresses.
      * @param amounts  Array of USDC amounts (same length as winners).
@@ -153,6 +167,11 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
         require(totalPayout <= m.totalDeposited, "Payout exceeds escrow");
 
         m.resolved = true;
+
+        // Release the ENTIRE match deposit from active escrow tracking,
+        // not just the payout. Any difference (totalDeposited - totalPayout)
+        // becomes unallocated and withdrawable via emergencyWithdraw.
+        totalActiveEscrow -= m.totalDeposited;
 
         for (uint256 i = 0; i < winners.length; i++) {
             if (amounts[i] > 0) {
@@ -190,6 +209,9 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
 
         m.cancelled = true;
 
+        // Release the ENTIRE match deposit from active escrow tracking.
+        totalActiveEscrow -= m.totalDeposited;
+
         for (uint256 i = 0; i < players.length; i++) {
             if (refunds[i] > 0) {
                 usdc.safeTransfer(players[i], refunds[i]);
@@ -202,9 +224,14 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
     // ─── Emergency Withdraw ────────────────────────────────────
 
     /**
-     * @notice Emergency withdraw any USDC stuck in the contract.
-     *         Only callable by owner. Use this if a match gets stuck
-     *         (never resolved or cancelled) and USDC is stranded.
+     * @notice Emergency withdraw USDC that is NOT locked in active matches.
+     *         Only callable by owner. Cannot touch funds belonging to
+     *         unresolved/uncancelled matches — those are tracked by
+     *         totalActiveEscrow and excluded from the withdrawable amount.
+     *
+     *         Use this if USDC accumulates from resolved matches where
+     *         totalPayout < totalDeposited (rounding dust, fee remnants),
+     *         or if someone accidentally sends USDC directly to this contract.
      * @param to     Address to send the USDC to.
      * @param amount Amount of USDC to withdraw.
      */
@@ -214,12 +241,16 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
     ) external onlyOwner nonReentrant {
         require(to != address(0), "Cannot send to zero address");
         require(amount > 0, "Amount must be > 0");
-        require(amount <= usdc.balanceOf(address(this)), "Exceeds contract balance");
+
+        uint256 contractBalance = usdc.balanceOf(address(this));
+        uint256 withdrawable = contractBalance > totalActiveEscrow
+            ? contractBalance - totalActiveEscrow
+            : 0;
+        require(amount <= withdrawable, "Cannot withdraw active match funds");
+
         usdc.safeTransfer(to, amount);
         emit EmergencyWithdraw(to, amount);
     }
-
-    event EmergencyWithdraw(address indexed to, uint256 amount);
 
     // ─── View Helpers ───────────────────────────────────────────
 
@@ -229,5 +260,14 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
 
     function getContractUsdcBalance() external view returns (uint256) {
         return usdc.balanceOf(address(this));
+    }
+
+    /// @notice Returns the amount of USDC that can be withdrawn via
+    ///         emergencyWithdraw (contract balance minus active escrow).
+    function getWithdrawableBalance() external view returns (uint256) {
+        uint256 contractBalance = usdc.balanceOf(address(this));
+        return contractBalance > totalActiveEscrow
+            ? contractBalance - totalActiveEscrow
+            : 0;
     }
 }
