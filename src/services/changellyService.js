@@ -1,3 +1,4 @@
+// Changelly Fiat API — RSA-SHA256 signed requests for on/off-ramp orders.
 const crypto = require('crypto');
 
 const DEFAULT_API_URL = 'https://fiat-api.changelly.com/v1';

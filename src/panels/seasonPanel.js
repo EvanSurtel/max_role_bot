@@ -1,3 +1,4 @@
+// Admin season management — pause/resume matches, end season, change season name.
 const {
   EmbedBuilder,
   ActionRowBuilder,

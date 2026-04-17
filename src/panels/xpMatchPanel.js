@@ -1,3 +1,4 @@
+// XP match lobby panel — Create XP Match button.
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { t } = require('../locales/i18n');
 const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');

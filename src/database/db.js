@@ -1,3 +1,5 @@
+// SQLite connection + migration runner. WAL mode, auto-applies migrations
+// from migrations/ on first require.
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');

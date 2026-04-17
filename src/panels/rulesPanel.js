@@ -1,3 +1,4 @@
+// Server rules panel — game settings, banned weapons, no-show rules, cash/XP match rules.
 const { EmbedBuilder } = require('discord.js');
 const { getLocale } = require('../locales');
 const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');

@@ -1,3 +1,4 @@
+// Welcome channel — TOS display + Accept/Decline buttons + language picker.
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { t } = require('../locales/i18n');
 const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');

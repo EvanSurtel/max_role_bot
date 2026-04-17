@@ -1,3 +1,4 @@
+// Random map pool selection for match series.
 const { MAP_POOLS, MODE_ROTATIONS } = require('../config/constants');
 
 /**

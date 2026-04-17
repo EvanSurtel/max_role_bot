@@ -1,3 +1,4 @@
+// Wallet table CRUD + atomic balance operations (hold, release, credit).
 const db = require('../db');
 
 const stmts = {

@@ -1,3 +1,4 @@
+// Cash Match Stats leaderboard — earnings, wagered, cash W/L, local DB queries.
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const { t } = require('../locales/i18n');
 const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');

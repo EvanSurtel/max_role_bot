@@ -1,3 +1,4 @@
+// Discord embed builders — challenge board, match result, wallet, onboarding.
 const { EmbedBuilder } = require('discord.js');
 const { GAME_MODES, CHALLENGE_TYPE, USDC_PER_UNIT } = require('../config/constants');
 const { t } = require('../locales/i18n');

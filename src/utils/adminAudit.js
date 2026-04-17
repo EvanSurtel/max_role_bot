@@ -1,3 +1,4 @@
+// Admin action audit log (dispute resolution, XP adjustments).
 const db = require('../database/db');
 
 const insertStmt = db.prepare(`

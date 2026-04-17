@@ -1,3 +1,4 @@
+// Bot ready event — currently unused (startup logic is in index.js).
 module.exports = {
   name: 'ready',
   once: true,

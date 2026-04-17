@@ -1,3 +1,4 @@
+// Admin escrow panel — contract balance, user count, admin withdraw ETH/USDC.
 const {
   EmbedBuilder,
   ActionRowBuilder,

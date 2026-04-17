@@ -1,3 +1,5 @@
+// Wallet management — deposit info, withdraw (USDC/ETH), cash out, balance
+// refresh, transaction history.
 const {
   ActionRowBuilder,
   ButtonBuilder,

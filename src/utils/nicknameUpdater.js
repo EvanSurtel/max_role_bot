@@ -1,3 +1,4 @@
+// Discord nickname sync — [Flag] Name [XP] [$Earnings] format.
 const userRepo = require('../database/repositories/userRepo');
 const { USDC_PER_UNIT } = require('../config/constants');
 

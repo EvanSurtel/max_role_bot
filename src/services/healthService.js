@@ -1,3 +1,4 @@
+// Periodic health checks + daily admin summary.
 const { TIMERS } = require('../config/constants');
 const db = require('../database/db');
 

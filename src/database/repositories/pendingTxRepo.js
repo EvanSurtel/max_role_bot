@@ -1,3 +1,4 @@
+// Pending on-chain transaction tracking.
 const db = require('../db');
 
 const stmts = {

@@ -1,3 +1,4 @@
+// Main wager lobby panel — Create Cash Match, Create XP Match, Wallet, Leaderboard buttons.
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { t } = require('../locales/i18n');
 const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');

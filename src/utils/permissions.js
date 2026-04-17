@@ -1,3 +1,4 @@
+// Discord channel permission overwrite templates.
 const { PermissionFlagsBits } = require('discord.js');
 
 /**

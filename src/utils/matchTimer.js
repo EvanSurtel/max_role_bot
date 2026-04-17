@@ -1,3 +1,4 @@
+// Match duration estimation and auto-dispute timing.
 const { MODE_ROTATIONS, MAP_DURATION_MINUTES, MATCH_TIMERS } = require('../config/constants');
 
 /**

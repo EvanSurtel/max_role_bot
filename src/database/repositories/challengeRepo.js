@@ -1,3 +1,4 @@
+// Challenge table CRUD + atomic status transitions.
 const db = require('../db');
 
 const stmts = {

@@ -1,3 +1,4 @@
+// Teammate accept/decline responses via DM or private channel.
 const challengeRepo = require('../database/repositories/challengeRepo');
 const challengePlayerRepo = require('../database/repositories/challengePlayerRepo');
 const userRepo = require('../database/repositories/userRepo');

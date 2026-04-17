@@ -1,3 +1,4 @@
+// Discord channel creation helpers with permission overwrites.
 const { ChannelType } = require('discord.js');
 const { privateTextOverwrites, privateVoiceOverwrites } = require('../utils/permissions');
 

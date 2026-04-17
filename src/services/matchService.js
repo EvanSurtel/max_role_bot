@@ -1,3 +1,4 @@
+// Match lifecycle — channel creation, escrow transfer, XP/stats award, resolution, cleanup.
 const { ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const matchRepo = require('../database/repositories/matchRepo');
 const challengeRepo = require('../database/repositories/challengeRepo');

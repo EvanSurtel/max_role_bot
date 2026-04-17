@@ -1,3 +1,4 @@
+// User table CRUD + stats (XP, wins, losses, earnings, language, cash match stats).
 const db = require('../db');
 
 // Starting XP for a brand-new user. This MUST match STARTING_XP in

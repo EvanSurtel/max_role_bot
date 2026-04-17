@@ -1,3 +1,4 @@
+// Periodic on-chain vs DB balance reconciliation (every 5 min).
 const walletRepo = require('../database/repositories/walletRepo');
 const walletManager = require('../base/walletManager');
 

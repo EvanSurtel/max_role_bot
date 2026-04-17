@@ -1,3 +1,4 @@
+// Check if a player is busy (in active challenge/match).
 const db = require('../database/db');
 
 /**

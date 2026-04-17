@@ -1,3 +1,4 @@
+// TOS acceptance + registration flow (region, country, COD UID, wallet creation).
 const {
   EmbedBuilder,
   ActionRowBuilder,

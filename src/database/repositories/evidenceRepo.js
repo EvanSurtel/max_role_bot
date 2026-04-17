@@ -1,3 +1,4 @@
+// Dispute evidence attachments storage.
 const db = require('../db');
 
 const stmts = {

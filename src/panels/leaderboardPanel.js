@@ -1,3 +1,4 @@
+// XP + earnings leaderboards with region/season filters and admin XP adjust.
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const userRepo = require('../database/repositories/userRepo');
 const { USDC_PER_UNIT } = require('../config/constants');

@@ -1,3 +1,4 @@
+// DB-backed persistent timers — survives bot restarts.
 const db = require('../database/db');
 
 // In-memory map of active timeouts: timerId -> setTimeout handle

@@ -1,3 +1,4 @@
+// Challenge display number assignment.
 /**
  * Get the proper display label for a challenge.
  * Returns "Cash Match #3" or "XP Match #5" with type-specific numbering.

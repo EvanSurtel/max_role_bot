@@ -1,3 +1,4 @@
+// How It Works guide panel — 5 step walkthrough posted to HOW_IT_WORKS_CHANNEL_ID.
 const { EmbedBuilder } = require('discord.js');
 const { getLocale } = require('../locales');
 const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');

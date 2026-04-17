@@ -1,3 +1,4 @@
+// Match result reporting, captain voting, dispute handling, admin resolution.
 const {
   ActionRowBuilder,
   ButtonBuilder,

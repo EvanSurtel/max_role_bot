@@ -1,3 +1,5 @@
+// Multi-step cash match / XP match creation flow
+// (type -> size -> teammates -> mode -> series -> amount).
 const {
   ActionRowBuilder,
   ButtonBuilder,

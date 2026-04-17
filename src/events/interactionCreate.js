@@ -1,3 +1,5 @@
+// Master interaction router — dispatches buttons, modals, selects to handlers.
+// Ephemeral session management.
 const challengeCreate = require('../interactions/challengeCreate');
 const challengeAccept = require('../interactions/challengeAccept');
 const challengeCancel = require('../interactions/challengeCancel');

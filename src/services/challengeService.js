@@ -1,3 +1,4 @@
+// Challenge lifecycle — teammate notification, board posting, cancellation.
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const challengeRepo = require('../database/repositories/challengeRepo');
 const challengePlayerRepo = require('../database/repositories/challengePlayerRepo');

@@ -1,3 +1,4 @@
+// Challenge acceptance flow (1v1 instant accept, team games with teammate selection).
 const { ActionRowBuilder, UserSelectMenuBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const challengeRepo = require('../database/repositories/challengeRepo');
 const challengePlayerRepo = require('../database/repositories/challengePlayerRepo');

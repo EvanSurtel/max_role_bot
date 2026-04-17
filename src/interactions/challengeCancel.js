@@ -1,3 +1,4 @@
+// Challenge cancellation by creator (refunds held funds).
 const challengeRepo = require('../database/repositories/challengeRepo');
 const userRepo = require('../database/repositories/userRepo');
 const challengeService = require('../services/challengeService');

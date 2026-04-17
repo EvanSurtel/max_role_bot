@@ -143,16 +143,19 @@ async function finalizeCaptainVote(match) {
     }
   }
 
-  // Sort by votes DESC, then XP DESC, then random
+  // Sort by votes DESC, then XP DESC, then stable random tiebreak.
+  // Assign a random tiebreak value ONCE per entry before sorting —
+  // Math.random() inside a comparator violates the sort contract
+  // (transitivity) and produces biased results with TimSort.
   const sorted = [...tally.entries()]
     .map(([discordId, votes]) => {
       const player = match.players.get(discordId);
-      return { discordId, votes, xp: player?.xp || 0 };
+      return { discordId, votes, xp: player?.xp || 0, tiebreak: Math.random() };
     })
     .sort((a, b) => {
       if (b.votes !== a.votes) return b.votes - a.votes;
       if (b.xp !== a.xp) return b.xp - a.xp;
-      return Math.random() - 0.5;
+      return a.tiebreak - b.tiebreak;
     });
 
   const captain1Id = sorted[0].discordId;

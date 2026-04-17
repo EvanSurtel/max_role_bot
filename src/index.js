@@ -1,3 +1,4 @@
+// Entry point — Discord client setup, DB init, service startup, panel posting.
 require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const fs = require('fs');

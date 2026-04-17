@@ -1,3 +1,4 @@
+// Transaction log CRUD + pending inflow queries for deposit reconciliation.
 const db = require('../db');
 
 const stmts = {

@@ -1,3 +1,5 @@
+// Timer event handlers — challenge expiry, teammate timeout, dispute hold
+// release, match inactivity.
 const timerService = require('./timerService');
 const challengeService = require('./challengeService');
 const challengeRepo = require('../database/repositories/challengeRepo');

@@ -1,3 +1,4 @@
+// Challenge player records — team assignment, status, funds_held tracking.
 const db = require('../db');
 
 const stmts = {

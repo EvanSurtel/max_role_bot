@@ -1,3 +1,4 @@
+// Dispute creation from the lobby panel.
 const {
   ActionRowBuilder,
   ButtonBuilder,

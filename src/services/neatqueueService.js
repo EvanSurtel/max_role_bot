@@ -1,3 +1,4 @@
+// NeatQueue API client — push XP/wins/losses, fetch leaderboard.
 const API_BASE = 'https://api.neatqueue.com';
 
 function getToken() {

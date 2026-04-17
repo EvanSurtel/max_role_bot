@@ -1,3 +1,4 @@
+// ELO-based XP reward calculation for matches.
 const { XP_MATCH, XP_WAGER, USDC_PER_UNIT } = require('../config/constants');
 
 /**
