@@ -35,25 +35,37 @@ function getExplorerUrl() {
     : 'https://basescan.org';
 }
 
-/** @type {ethers.JsonRpcProvider | null} */
+/** @type {ethers.JsonRpcProvider | ethers.FallbackProvider | null} */
 let provider = null;
 
 function getProvider() {
   if (!provider) {
-    const endpoint = process.env.BASE_RPC_URL || getDefaultRpcUrl();
     const chainId = getChainId();
-    provider = new ethers.JsonRpcProvider(endpoint, {
-      name: getChainName(),
-      chainId,
-    });
+    const network = { name: getChainName(), chainId };
+    const primaryUrl = process.env.BASE_RPC_URL;
+    const fallbackUrl = process.env.BASE_RPC_URL_FALLBACK;
 
-    if (getNetwork() === 'sepolia') {
-      console.log(`[Base] 🧪 TESTNET (Base Sepolia, chain ${chainId}). RPC: ${endpoint}`);
+    const netLabel = getNetwork() === 'sepolia'
+      ? `🧪 TESTNET (Base Sepolia, chain ${chainId})`
+      : `🔴 MAINNET (chain ${chainId})`;
+
+    if (primaryUrl && fallbackUrl) {
+      // Both URLs available — use FallbackProvider for automatic failover
+      const primaryProvider = new ethers.JsonRpcProvider(primaryUrl, network);
+      const fallbackProvider = new ethers.JsonRpcProvider(fallbackUrl, network);
+      provider = new ethers.FallbackProvider([
+        { provider: primaryProvider, priority: 1, stallTimeout: 2000, weight: 2 },
+        { provider: fallbackProvider, priority: 2, stallTimeout: 3000, weight: 1 },
+      ], network, { quorum: 1 });
+      console.log(`[Base] ${netLabel}. RPC: FallbackProvider (primary + fallback)`);
     } else {
-      console.log(`[Base] 🔴 MAINNET (chain ${chainId}). RPC: ${endpoint}`);
+      // Single provider mode
+      const endpoint = primaryUrl || getDefaultRpcUrl();
+      provider = new ethers.JsonRpcProvider(endpoint, network);
+      console.log(`[Base] ${netLabel}. RPC: ${endpoint}`);
     }
 
-    if (!process.env.BASE_RPC_URL) {
+    if (!primaryUrl) {
       console.warn('[Base] Using public RPC — set BASE_RPC_URL for production.');
     }
   }

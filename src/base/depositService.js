@@ -16,6 +16,8 @@ const walletManager = require('./walletManager');
 const db = require('../database/db');
 const { USDC_PER_UNIT, TRANSACTION_TYPE, TIMERS } = require('../config/constants');
 
+const MIN_DEPOSIT_UNITS = 10_000; // $0.01 USDC — ignore dust below this
+
 let pollInterval = null;
 let botClient = null;
 let pollInProgress = false;
@@ -144,6 +146,10 @@ async function checkDeposits() {
         const snapshotAvail = BigInt(wallet.balance_available);
         const snapshotHeld = BigInt(wallet.balance_held);
         if (onChainBalance <= snapshotAvail + snapshotHeld) continue;
+
+        // Skip dust deposits — anything below $0.01 USDC is ignored
+        const snapshotDelta = onChainBalance - (snapshotAvail + snapshotHeld);
+        if (snapshotDelta < BigInt(MIN_DEPOSIT_UNITS)) continue;
 
         // Atomic credit with fresh DB read. Returns the delta that
         // was applied (already += to balance_available).
