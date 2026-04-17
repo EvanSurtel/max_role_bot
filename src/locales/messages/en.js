@@ -511,6 +511,17 @@ module.exports = {
     admin_only: 'Admin only.',
   },
 
+  // Queue Stats panel — NeatQueue leaderboard view
+  queue_stats: {
+    title: 'Rank $ {stat} Leaderboard',
+    select_stat: 'Select Stat',
+    no_data: 'No players on this leaderboard yet.',
+    unavailable_title: 'Queue Stats Unavailable',
+    unavailable_desc: 'Queue stats are temporarily unavailable. NeatQueue\'s API may be down.\nTry again in a few minutes.',
+    footer_page: 'Page {page}/{totalPages}',
+    footer_source: 'Source: NeatQueue',
+  },
+
   // Dedicated language channel panel — explains the master language switch
   language_panel: {
     title: '🌐 Language',

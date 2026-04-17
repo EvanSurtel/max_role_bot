@@ -153,4 +153,39 @@ async function getChannelLeaderboard() {
   return neatqueueFetch(`/api/v1/leaderboard/${guildId}/${channelId}`);
 }
 
-module.exports = { addPoints, setPoints, addWin, addLoss, getPlayerStats, getChannelLeaderboard, isConfigured };
+/**
+ * Get paginated leaderboard from NeatQueue's v2 API with selectable fields.
+ *
+ * @param {object} options
+ * @param {number} [options.page=1]         - 1-based page number
+ * @param {number} [options.pageSize=10]    - entries per page
+ * @param {string} [options.includeFields]  - comma-separated list of fields to include
+ * @returns {object|null} API response or null on error
+ */
+async function getLeaderboardV2({ page = 1, pageSize = 10, includeFields } = {}) {
+  if (!isConfigured()) return null;
+  const guildId = getGuildId();
+  const channelId = getChannelId();
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  if (includeFields) params.set('include_fields', includeFields);
+  return neatqueueFetch(`/api/v2/leaderboard/${guildId}/${channelId}?${params.toString()}`);
+}
+
+/**
+ * Get detailed player stats including game history.
+ *
+ * @param {string} discordUserId - Discord user ID
+ * @returns {object|null} Player stats with game history or null on error
+ */
+async function getPlayerStatsDetailed(discordUserId) {
+  if (!isConfigured()) return null;
+  const guildId = getGuildId();
+  return neatqueueFetch(`/api/v1/playerstats/${guildId}/${discordUserId}?include_games=true`);
+}
+
+module.exports = {
+  addPoints, setPoints, addWin, addLoss,
+  getPlayerStats, getPlayerStatsDetailed,
+  getChannelLeaderboard, getLeaderboardV2,
+  isConfigured,
+};

@@ -159,6 +159,7 @@ async function refreshSharedPanels(client, lang) {
     const { postSeasonPanel } = require('../panels/seasonPanel');
     const { postEscrowPanel } = require('../panels/escrowPanel');
     const { postAllLeaderboardPanels } = require('../panels/leaderboardPanel');
+    const { postQueueStatsPanel } = require('../panels/queueStatsPanel');
 
     // Run these in parallel since they target different channels.
     await Promise.all([
@@ -168,6 +169,7 @@ async function refreshSharedPanels(client, lang) {
       postSeasonPanel(client, lang).catch(e => console.error('[LangRefresh] season:', e.message)),
       postEscrowPanel(client, lang).catch(e => console.error('[LangRefresh] escrow:', e.message)),
       postAllLeaderboardPanels(client, lang).catch(e => console.error('[LangRefresh] leaderboards:', e.message)),
+      postQueueStatsPanel(client, lang).catch(e => console.error('[LangRefresh] queueStats:', e.message)),
     ]);
   } catch (err) {
     console.error('[LangRefresh] Failed to refresh multi-message panels:', err.message);

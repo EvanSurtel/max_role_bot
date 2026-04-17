@@ -10,6 +10,7 @@ const perMessageLanguage = require('../interactions/perMessageLanguage');
 const adminWalletViewer = require('../interactions/adminWalletViewer');
 const walletPanel = require('../panels/walletPanel');
 const leaderboardPanel = require('../panels/leaderboardPanel');
+const queueStatsPanel = require('../panels/queueStatsPanel');
 const seasonPanel = require('../panels/seasonPanel');
 const escrowPanel = require('../panels/escrowPanel');
 const { isWalletChannel } = require('../utils/ephemeralReply');
@@ -345,6 +346,10 @@ module.exports = {
         if (id.startsWith('season_')) {
           return await seasonPanel.handleSeasonButton(interaction);
         }
+        // Queue stats navigation/refresh buttons
+        if (id.startsWith('qs_prev_') || id.startsWith('qs_next_') || id.startsWith('qs_first_') || id.startsWith('qs_last_') || id.startsWith('qs_refresh_')) {
+          return await queueStatsPanel.handleQueueStatsNav(interaction);
+        }
         // Leaderboard admin buttons
         if (id.startsWith('lb_admin_')) {
           return await leaderboardPanel.handleLeaderboardButton(interaction);
@@ -406,6 +411,10 @@ module.exports = {
         const id = interaction.customId;
         if (id.startsWith('xplb_') || id.startsWith('earnlb_')) {
           return await leaderboardPanel.handleLeaderboardSelect(interaction);
+        }
+        // Queue stats stat type dropdown
+        if (id === 'qs_stat') {
+          return await queueStatsPanel.handleQueueStatsSelect(interaction);
         }
         // Inline language dropdown placed directly on shared panels.
         // The legacy welcome_lang_master / language_panel_select /
