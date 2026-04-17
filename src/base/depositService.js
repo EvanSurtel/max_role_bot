@@ -160,7 +160,7 @@ async function checkDeposits() {
         // where the on-chain tx landed but the DB credit failed. In
         // that case the escrowManager left a pending_onchain row we
         // can reconcile to instead of double-logging.
-        const pendingInflows = transactionRepo.findPendingInflowsForUser(wallet.user_id, 1800);
+        const pendingInflows = transactionRepo.findPendingInflowsForUser(wallet.user_id, 5400);
         const reconciled = _reconcilePendingInflows(delta, pendingInflows);
 
         const usdcFmt = (Number(delta) / USDC_PER_UNIT).toFixed(2);
@@ -238,7 +238,7 @@ async function checkDeposits() {
           toAddress: wallet.address,
           memo: reconciled.partiallyReconciled
             ? `Deposit (residual after reconciliation): $${residualUsdc} USDC`
-            : `Deposit: $${residualUsdc} USDC — external source (no matching pending inflow in last 30 min)`,
+            : `Deposit: $${residualUsdc} USDC — external source (no matching pending inflow in last 90 min)`,
         });
 
         console.log(

@@ -48,7 +48,7 @@ const transactionRepo = {
    * with previously-logged intent instead of mis-tagging it as a new
    * deposit.
    */
-  findPendingInflowsForUser(userId, lookbackSec = 1800) {
+  findPendingInflowsForUser(userId, lookbackSec = 5400) {
     return stmts.findPendingInflowsForUser.all(userId, `-${Number(lookbackSec)} seconds`);
   },
 

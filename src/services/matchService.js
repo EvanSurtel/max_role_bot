@@ -65,12 +65,29 @@ async function postResultToChannels(client, resultEmbed, components, isCashMatch
 }
 
 /**
+ * Create the match DB record (without Discord channels). Returns the
+ * match row with an auto-generated `id` that can be used as the on-chain
+ * match identifier. Discord channels are created later by
+ * `createMatchChannels()` once the escrow transfer succeeds.
+ *
+ * @param {object} challenge - The challenge DB record.
+ * @returns {object} The created match record (with match.id).
+ */
+function createMatchRecord(challenge) {
+  return matchRepo.create({
+    challengeId: challenge.id,
+    categoryId: null,
+  });
+}
+
+/**
  * Create match channels (team voice, team text, shared, voting) for a matched challenge.
  * @param {import('discord.js').Client} client - The Discord client.
  * @param {object} challenge - The challenge DB record.
- * @returns {Promise<object>} The created match record.
+ * @param {number} matchId - The match ID (already created via createMatchRecord).
+ * @returns {Promise<object>} The match record (re-fetched after channel IDs are set).
  */
-async function createMatchChannels(client, challenge) {
+async function createMatchChannels(client, challenge, matchId) {
   // Get the guild — try from the challenge board channel first, then fallback to first guild
   let guild;
   if (challenge.challenge_channel_id) {
@@ -196,11 +213,11 @@ async function createMatchChannels(client, challenge) {
     reason: 'Match voting channel',
   });
 
-  // Create match record in DB
-  const match = matchRepo.create({
-    challengeId: challenge.id,
-    categoryId: category.id,
-  });
+  // Update match record with category ID
+  matchRepo.updateCategoryId(matchId, category.id);
+
+  // Fetch the match record so callers get the full row
+  const match = matchRepo.findById(matchId);
 
   // Store all channel IDs
   matchRepo.setChannels(match.id, {
@@ -360,10 +377,13 @@ async function startMatch(client, challengeId) {
     throw new Error(`Cannot start match: ${pendingPlayers.length} player(s) have not accepted`);
   }
 
-  // Create match channels FIRST (so we have the match ID for the contract)
-  const match = await createMatchChannels(client, challenge);
+  // Step 1: Create DB match record (no Discord channels yet) to get a
+  // match ID for the on-chain escrow call.
+  const match = createMatchRecord(challenge);
 
-  // Transfer all held funds to escrow via smart contract (cash match challenges only)
+  // Step 2: Transfer held funds to escrow via smart contract (cash match only).
+  // This happens BEFORE creating Discord channels so that if the escrow
+  // transfer fails, no orphaned channels need cleanup.
   if (challenge.type === CHALLENGE_TYPE.CASH_MATCH && Number(challenge.entry_amount_usdc) > 0) {
     try {
       // Call the smart contract: create match on-chain + pull USDC from each player.
@@ -407,25 +427,27 @@ async function startMatch(client, challengeId) {
         console.error(`[MatchService] DB refund after escrow failure also failed:`, refundErr.message);
       }
 
-      // Revert: set challenge to CANCELLED
+      // Revert: set challenge to CANCELLED and mark match row as cancelled.
+      // No Discord channels were created, so no channel cleanup needed.
       challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.CANCELLED);
-
-      // Clean up the match channels we just created
-      try {
-        await cleanupChannels(client, match.id);
-      } catch { /* best effort */ }
+      matchRepo.updateStatus(match.id, MATCH_STATUS.CANCELLED);
 
       // Alert admins
       const { postTransaction } = require('../utils/transactionFeed');
       postTransaction({
         type: 'balance_mismatch',
         challengeId,
-        memo: `🚨 Escrow transfer FAILED for match #${match.id}. On-chain cancel attempted + DB funds refunded. Error: ${err.message}`,
+        memo: `🚨 Escrow transfer FAILED for match #${match.id}. On-chain cancel attempted + DB funds refunded. No channels created. Error: ${err.message}`,
       });
 
       throw new Error(`Escrow transfer failed — match #${match.id} cancelled`);
     }
   }
+
+  // Step 3: Escrow succeeded (or XP match with no escrow). Now create
+  // the Discord channels. If this fails, the on-chain funds are safe
+  // and an admin can resolve manually.
+  await createMatchChannels(client, challenge, match.id);
 
   // Update challenge status to in_progress (createMatchChannels already does this, but be explicit)
   challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.IN_PROGRESS);
@@ -973,4 +995,4 @@ function startNoShowReminders(client, match, playerDiscordIds) {
   }, 10 * 60 * 1000);
 }
 
-module.exports = { createMatchChannels, startMatch, resolveMatch, cleanupChannels, postResultToChannels };
+module.exports = { createMatchRecord, createMatchChannels, startMatch, resolveMatch, cleanupChannels, postResultToChannels };

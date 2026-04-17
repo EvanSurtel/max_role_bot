@@ -290,11 +290,39 @@ async function handleRegistrationModal(interaction) {
         smartAccountRef,
       });
 
+      let escrowApprovalFailed = false;
       try {
         const { approveEscrowForUser } = require('../base/escrowManager');
         await approveEscrowForUser(user.id);
       } catch (err) {
+        escrowApprovalFailed = true;
         console.warn(`[Onboarding] Escrow approval failed for user ${user.id}:`, err.message);
+
+        // Alert admins so they can monitor
+        const approvalAlertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
+        if (approvalAlertChannelId) {
+          try {
+            const alertCh = interaction.client.channels.cache.get(approvalAlertChannelId);
+            if (alertCh) {
+              const approvalAlertEmbed = new EmbedBuilder()
+                .setTitle('Escrow Approval Failed During Onboarding')
+                .setColor(0xe74c3c)
+                .setDescription([
+                  `<@${discordId}> registered successfully but USDC escrow approval failed.`,
+                  '',
+                  `**User ID:** ${user.id}`,
+                  `**Wallet:** \`${wallet.address}\``,
+                  `**Error:** ${err.message}`,
+                  '',
+                  'The approval will be retried automatically at first match entry (`depositToEscrow` checks allowance).',
+                ].join('\n'))
+                .setTimestamp();
+              await alertCh.send({ embeds: [approvalAlertEmbed] });
+            }
+          } catch (alertErr) {
+            console.error('[Onboarding] Failed to send escrow approval alert:', alertErr.message);
+          }
+        }
       }
     }
 
@@ -370,6 +398,18 @@ async function handleRegistrationModal(interaction) {
       ].join('\n'));
 
     await interaction.editReply({ embeds: [completeEmbed], components: [], content: '' });
+
+    // Warn user if escrow approval failed (non-blocking — approval retried at first match)
+    if (escrowApprovalFailed) {
+      try {
+        await interaction.followUp({
+          content: 'Your wallet was created but the USDC approval step had an issue. This will be retried automatically when you enter your first match. If you see errors when creating a match, try again.',
+          ephemeral: true,
+        });
+      } catch (followUpErr) {
+        console.warn('[Onboarding] Failed to send escrow approval warning to user:', followUpErr.message);
+      }
+    }
 
     // Admin notification
     const alertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;

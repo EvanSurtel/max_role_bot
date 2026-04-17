@@ -36,6 +36,7 @@ const stmts = {
     UPDATE matches SET winning_team = ?, resolved_at = datetime('now') WHERE id = ?
   `),
   updateStatus: db.prepare('UPDATE matches SET status = ? WHERE id = ?'),
+  updateCategoryId: db.prepare('UPDATE matches SET category_id = ? WHERE id = ?'),
 };
 
 const matchRepo = {
@@ -79,6 +80,10 @@ const matchRepo = {
 
   updateStatus(id, status) {
     return stmts.updateStatus.run(status, id);
+  },
+
+  updateCategoryId(id, categoryId) {
+    return stmts.updateCategoryId.run(categoryId, id);
   },
 
   /**

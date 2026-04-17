@@ -203,6 +203,7 @@ const MATCH_STATUS = {
   VOTING: 'voting',
   COMPLETED: 'completed',
   DISPUTED: 'disputed',
+  CANCELLED: 'cancelled',
 };
 
 // Challenge types
