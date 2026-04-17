@@ -15,7 +15,7 @@ const wagerStatsPanel = require('../panels/wagerStatsPanel');
 const seasonPanel = require('../panels/seasonPanel');
 const escrowPanel = require('../panels/escrowPanel');
 const queuePanel = require('../panels/queuePanel');
-const queueService = require('../services/queueService');
+const queueService = require('../queue');
 const { isWalletChannel } = require('../utils/ephemeralReply');
 
 // Per-(user, channel) "current live ephemeral session" tracking. When

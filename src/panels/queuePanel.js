@@ -7,7 +7,7 @@
 
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
-const queueService = require('../services/queueService');
+const queueService = require('../queue');
 const QUEUE_CONFIG = require('../config/queueConfig');
 const userRepo = require('../database/repositories/userRepo');
 const onboarding = require('../interactions/onboarding');
