@@ -203,8 +203,23 @@ async function postTransaction({ type, username, discordId, amount, currency, fr
   }
 }
 
+// Types that route to the XP/Queue transactions channel instead of
+// the main cash transactions channel. Keeps cash match financials
+// separate from XP/queue activity so neither channel gets overcrowded.
+const XP_CHANNEL_TYPES = new Set([
+  'queue_match_created', 'queue_no_show', 'queue_match_resolved',
+  'queue_match_cancelled', 'queue_sub', 'queue_dq', 'queue_match',
+  'xp_awarded',
+]);
+
 async function _postToFeedChannel({ type, username, discordId, amount, currency, fromAddress, toAddress, signature, memo, challengeId }) {
-  const channelId = process.env.TRANSACTIONS_CHANNEL_ID;
+  // Route to the right channel: XP/queue events go to XP_TRANSACTIONS_CHANNEL_ID,
+  // everything else (cash match deposits, withdrawals, escrow, balance mismatches)
+  // goes to TRANSACTIONS_CHANNEL_ID. Falls back to TRANSACTIONS if XP channel not set.
+  const isXpType = XP_CHANNEL_TYPES.has(type);
+  const channelId = isXpType
+    ? (process.env.XP_TRANSACTIONS_CHANNEL_ID || process.env.TRANSACTIONS_CHANNEL_ID)
+    : process.env.TRANSACTIONS_CHANNEL_ID;
   if (!channelId) {
     console.warn('[TxFeed] TRANSACTIONS_CHANNEL_ID not set — skipping channel post');
     return;
