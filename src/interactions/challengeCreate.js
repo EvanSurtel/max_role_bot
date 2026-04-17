@@ -783,7 +783,7 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
       return sendFlowReply(interaction, t('common.onboarding_required', lang));
     }
 
-    const entryUsdc = Math.floor(amountUsdc * USDC_PER_UNIT);
+    const entryUsdc = Math.round(amountUsdc * USDC_PER_UNIT);
     const matchPrizeUsdc = entryUsdc * flow.teamSize * 2;
 
     const expiresAt = new Date(Date.now() + TIMERS.CHALLENGE_EXPIRY).toISOString();

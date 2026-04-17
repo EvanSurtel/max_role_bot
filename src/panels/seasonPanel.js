@@ -45,7 +45,19 @@ function setMatchesPaused(paused) {
 function getActiveMatchCount() {
   const db = require('../database/db');
   const row = db.prepare("SELECT COUNT(*) as c FROM matches WHERE status IN ('active', 'voting', 'disputed')").get();
-  return row?.c || 0;
+  let count = row?.c || 0;
+
+  // Also count in-memory queue matches (not in DB).
+  // Without this, admin could end season while a queue match is
+  // running, resetting XP mid-game.
+  try {
+    const { getActiveMatchCount: getQueueMatchCount } = require('../queue/state');
+    if (typeof getQueueMatchCount === 'function') {
+      count += getQueueMatchCount();
+    }
+  } catch { /* queue module not loaded */ }
+
+  return count;
 }
 
 /**

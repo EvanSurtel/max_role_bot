@@ -187,6 +187,13 @@ module.exports = {
   // Match lookup
   getMatch,
   getMatchByChannel,
+  getActiveMatchCount: () => {
+    let count = 0;
+    for (const match of activeMatches.values()) {
+      if (match.phase !== 'RESOLVED' && match.phase !== 'CANCELLED') count++;
+    }
+    return count;
+  },
 
   // Client & ID
   setClient,

@@ -260,11 +260,13 @@ async function handleRegistrationModal(interaction) {
       user = userRepo.create(discordId);
     }
 
-    if (user.accepted_tos === 1) {
+    // Allow re-entry if TOS was accepted but wallet creation failed
+    // previously (user is stuck with accepted_tos=1 but no wallet).
+    // Only block if they're FULLY registered (TOS + wallet).
+    const existingWallet = walletRepo.findByUserId(user.id);
+    if (user.accepted_tos === 1 && existingWallet) {
       return interaction.editReply({ content: t('onboarding.already_registered', lang), components: [] });
     }
-
-    userRepo.acceptTos(user.id);
 
     // Determine deposit region
     const GROUP_A_REGIONS = new Set(['na', 'eu']);
@@ -316,6 +318,12 @@ async function handleRegistrationModal(interaction) {
         accountRef,
         smartAccountRef,
       });
+
+      // NOW accept TOS — after wallet is confirmed created. If we
+      // accepted TOS before wallet generation and wallet failed,
+      // the user would be stuck (accepted_tos=1 but no wallet,
+      // and the "already registered" guard would block re-entry).
+      userRepo.acceptTos(user.id);
 
       let escrowApprovalFailed = false;
       try {

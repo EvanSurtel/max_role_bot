@@ -147,6 +147,16 @@ const typeColors = {
   season_resumed: 0x2ecc71,
   season_ended: 0xe67e22,
   user_registered: 0x3498db,
+  eth_withdrawal: 0xe74c3c,
+  reconciled_inflow: 0x3498db,
+  dispute_hold_credit: 0xf39c12,
+  queue_match_created: 0x3498db,
+  queue_no_show: 0xe74c3c,
+  queue_match_resolved: 0x2ecc71,
+  queue_match_cancelled: 0x95a5a6,
+  queue_sub: 0xf39c12,
+  queue_dq: 0xe74c3c,
+  queue_match: 0x3498db,
 };
 
 const typeIcons = {
@@ -178,6 +188,16 @@ const typeIcons = {
   season_resumed: '▶️',
   season_ended: '🏁',
   user_registered: '👤',
+  eth_withdrawal: '📤',
+  reconciled_inflow: '🔄',
+  dispute_hold_credit: '⏳',
+  queue_match_created: '🎮',
+  queue_no_show: '👻',
+  queue_match_resolved: '🏆',
+  queue_match_cancelled: '❌',
+  queue_sub: '🔁',
+  queue_dq: '🚫',
+  queue_match: '🎮',
 };
 
 /**
@@ -216,7 +236,17 @@ async function _postToFeedChannel({ type, username, discordId, amount, currency,
   // Route to the right channel: XP/queue events go to XP_TRANSACTIONS_CHANNEL_ID,
   // everything else (cash match deposits, withdrawals, escrow, balance mismatches)
   // goes to TRANSACTIONS_CHANNEL_ID. Falls back to TRANSACTIONS if XP channel not set.
-  const isXpType = XP_CHANNEL_TYPES.has(type);
+  //
+  // For match_resolved/match_started types, check if the challenge is
+  // an XP match (not cash) by looking up the challenge type in the DB.
+  let isXpType = XP_CHANNEL_TYPES.has(type);
+  if (!isXpType && challengeId && (type === 'match_resolved' || type === 'match_started')) {
+    try {
+      const db = require('../database/db');
+      const ch = db.prepare('SELECT type FROM challenges WHERE id = ?').get(challengeId);
+      if (ch && ch.type === 'xp') isXpType = true;
+    } catch { /* fall through to cash channel */ }
+  }
   const channelId = isXpType
     ? (process.env.XP_TRANSACTIONS_CHANNEL_ID || process.env.TRANSACTIONS_CHANNEL_ID)
     : process.env.TRANSACTIONS_CHANNEL_ID;
