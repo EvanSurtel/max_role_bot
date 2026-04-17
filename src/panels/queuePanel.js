@@ -16,6 +16,9 @@ const onboarding = require('../interactions/onboarding');
 // Reset when the queue empties (match created) or times out.
 const _lastPingedAt = {};
 
+// Shows "Player Joined Queue!" / "Player Left Queue!" at the top of the embed.
+let _lastAction = '';
+
 // 1-hour queue timeout — if the queue doesn't fill in 60 minutes,
 // remove all waiting players and reset. Prevents players from being
 // stuck in a queue that will never fill (late night, low population).
@@ -73,26 +76,20 @@ function buildQueuePanel(lang = 'en') {
   const count = players.length;
 
   // Build player list lines
-  let playerList = '';
-  if (count === 0) {
-    playerList = '_No players in queue._';
-  } else {
-    playerList = players
-      .map((p, i) => `${i + 1}. <@${p.discordId}>`)
-      .join('\n');
-  }
+  const playerList = count > 0
+    ? players.map(p => `<@${p.discordId}>`).join(', ')
+    : '';
 
   const embed = new EmbedBuilder()
     .setTitle('5v5 Ranked Queue')
-    .setColor(0x3498db)
+    .setColor(0xf1c40f)
     .setDescription([
-      'Click **Join Queue** to enter. When 10 players are ready, the match begins.',
+      _lastAction || '',
       '',
-      `**Players in Queue: ${count}/${QUEUE_CONFIG.TOTAL_PLAYERS}**`,
-      '',
+      `**Queue ${count}/${QUEUE_CONFIG.TOTAL_PLAYERS}**`,
       playerList,
-    ].join('\n'))
-    .setFooter({ text: 'Hardpoint | Bo3 | 5v5' });
+    ].filter(Boolean).join('\n'))
+    .setTimestamp();
 
   const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -212,6 +209,7 @@ async function handleQueueButton(interaction) {
 
     const xp = user.xp_points || 0;
     const newSize = queueService.joinQueue(discordId, xp);
+    _lastAction = `**Player Joined Queue!**\n<@${discordId}>`;
 
     // Start the 1-hour timeout on first join. Resets if someone
     // else joins later (timer restarts). Clears when queue fills.
@@ -274,6 +272,7 @@ async function handleQueueButton(interaction) {
     }
 
     queueService.leaveQueue(discordId);
+    _lastAction = `**Player Left Queue!**\n<@${discordId}>`;
 
     // If queue is now empty, clear the timeout + ping state
     if (queueService.getQueueSize() === 0) {
