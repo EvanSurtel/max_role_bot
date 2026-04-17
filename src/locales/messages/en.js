@@ -633,4 +633,14 @@ module.exports = {
     evidence_header: '**Evidence & Discussion ({count} messages):**',
     no_evidence: '*No evidence was posted for Match #{matchId}.*',
   },
+
+  // Wager Stats panel — local DB leaderboard view
+  wager_stats: {
+    title: 'Rank $ {stat} Leaderboard',
+    select_stat: 'Select stat type',
+    no_data: 'No player data available yet.',
+    footer_page: 'Page {page}/{total}',
+    footer_source: 'Rank $ Wager Stats',
+    season_label: 'Season: {season}',
+  },
 };

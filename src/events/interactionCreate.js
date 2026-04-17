@@ -11,6 +11,7 @@ const adminWalletViewer = require('../interactions/adminWalletViewer');
 const walletPanel = require('../panels/walletPanel');
 const leaderboardPanel = require('../panels/leaderboardPanel');
 const queueStatsPanel = require('../panels/queueStatsPanel');
+const wagerStatsPanel = require('../panels/wagerStatsPanel');
 const seasonPanel = require('../panels/seasonPanel');
 const escrowPanel = require('../panels/escrowPanel');
 const { isWalletChannel } = require('../utils/ephemeralReply');
@@ -350,6 +351,10 @@ module.exports = {
         if (id.startsWith('qs_prev_') || id.startsWith('qs_next_') || id.startsWith('qs_first_') || id.startsWith('qs_last_') || id.startsWith('qs_refresh_')) {
           return await queueStatsPanel.handleQueueStatsNav(interaction);
         }
+        // Wager stats navigation/refresh buttons
+        if (id.startsWith('ws_prev_') || id.startsWith('ws_next_') || id.startsWith('ws_first_') || id.startsWith('ws_last_') || id.startsWith('ws_refresh_')) {
+          return await wagerStatsPanel.handleWagerStatsNav(interaction);
+        }
         // Leaderboard admin buttons
         if (id.startsWith('lb_admin_')) {
           return await leaderboardPanel.handleLeaderboardButton(interaction);
@@ -415,6 +420,10 @@ module.exports = {
         // Queue stats stat type dropdown
         if (id === 'qs_stat') {
           return await queueStatsPanel.handleQueueStatsSelect(interaction);
+        }
+        // Wager stats stat type dropdown
+        if (id === 'ws_stat') {
+          return await wagerStatsPanel.handleWagerStatsSelect(interaction);
         }
         // Inline language dropdown placed directly on shared panels.
         // The legacy welcome_lang_master / language_panel_select /
