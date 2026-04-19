@@ -8,7 +8,7 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 const QUEUE_CONFIG = require('../config/queueConfig');
 const userRepo = require('../database/repositories/userRepo');
 const { setClient, getMatch, waitingQueue } = require('./state');
-const { _isStaffMember, findClosestXpReplacement, _cleanupMatchChannels } = require('./helpers');
+const { _isStaffMember, findClosestXpReplacement } = require('./helpers');
 const { recordCaptainVote, finalizeCaptainVote } = require('./captainVote');
 const { recordCaptainPick, _advancePick } = require('./captainPick');
 const { recordRoleChoice, recordOperatorChoice, _postRoleSelectMessage, _checkAllRolesComplete } = require('./roleSelect');
@@ -718,10 +718,10 @@ async function _handleCancelButton(interaction) {
 
   await interaction.update({ content: 'Cancelling match...', components: [] });
 
-  const { cancelMatch } = require('./matchLifecycle');
-  // skipCleanupSchedule — we manage our own 15s cleanup window below
-  // so players have a chance to click "Rejoin Queue" before the
-  // channels are torn down.
+  const { cancelMatch, _postCancelWithRejoinWindow } = require('./matchLifecycle');
+  // skipCleanupSchedule — _postCancelWithRejoinWindow manages its own
+  // 15s cleanup window, so the default 60s cancelMatch cleanup must
+  // not also fire.
   await cancelMatch(
     interaction.client,
     match,
@@ -729,62 +729,21 @@ async function _handleCancelButton(interaction) {
     { skipCleanupSchedule: true },
   );
 
-  // Disable buttons on the match message
+  // Disable the Report / Sub / DQ / Cancel buttons on the match embed
+  // so players can't trigger new actions on a cancelled match. Specific
+  // to staff-cancel — auto-cancel (no-show) fires before the match
+  // message exists.
   if (match._matchMsg) {
     try { await match._matchMsg.edit({ components: [] }); } catch { /* */ }
   }
 
-  // Post cancel embed with Rejoin Queue button (15s window)
-  const REJOIN_WINDOW_MS = 15_000;
-  const playerMentions = [...match.players.keys()].map(id => `<@${id}>`).join(', ') || '—';
-
-  const rejoinRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`queue_rejoin_${match.id}`)
-      .setLabel('Rejoin Queue')
-      .setStyle(ButtonStyle.Success),
-  );
-
-  const cancelEmbed = new EmbedBuilder()
-    .setTitle('Match Cancelled')
-    .setColor(0xe74c3c)
-    .setDescription([
+  await _postCancelWithRejoinWindow(interaction.client, match, {
+    headerLines: [
       `This match has been cancelled by <@${interaction.user.id}>.`,
       `**No XP changes.**`,
-      '',
-      `**Players:** ${playerMentions}`,
-      '',
-      `Want another match? Click **Rejoin Queue** within **${REJOIN_WINDOW_MS / 1000}s**. If you don't, you are **not** auto-re-queued.`,
-      `Channels will be deleted when the window closes.`,
-    ].join('\n'))
-    .setTimestamp();
-
-  let cancelMsg = null;
-  try {
-    const tc = interaction.client.channels.cache.get(match.textChannelId);
-    if (tc) {
-      cancelMsg = await tc.send({
-        content: playerMentions,
-        embeds: [cancelEmbed],
-        components: [rejoinRow],
-        allowedMentions: { users: [...match.players.keys()] },
-      });
-    }
-  } catch (err) {
-    console.error(`[QueueService] Failed to post staff-cancel rejoin embed for match #${match.id}:`, err.message);
-  }
-
-  // 15s window → disable button and run cleanup
-  setTimeout(async () => {
-    try {
-      if (cancelMsg) {
-        await cancelMsg.edit({ components: [] }).catch(() => {});
-      }
-    } catch { /* best effort */ }
-    _cleanupMatchChannels(interaction.client, match).catch(err => {
-      console.error(`[QueueService] Cleanup failed for cancelled match #${match.id}:`, err.message);
-    });
-  }, REJOIN_WINDOW_MS);
+    ],
+    eligibleDiscordIds: [...match.players.keys()],
+  });
 }
 
 // ── Rejoin Queue button (shown after staff cancel, 15s window) ─

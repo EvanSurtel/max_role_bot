@@ -4,7 +4,7 @@
 // voting phase after voice join. Called by playPhase.js and interactions.js
 // when a match result is confirmed.
 
-const { ChannelType, EmbedBuilder } = require('discord.js');
+const { ChannelType, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const QUEUE_CONFIG = require('../config/queueConfig');
 const userRepo = require('../database/repositories/userRepo');
 const { getCurrentSeason } = require('../panels/leaderboardPanel');
@@ -239,32 +239,27 @@ async function handleNoShows(client, match) {
       }
     }, 60_000);
   } else {
-    // Not enough replacements — cancel match. Players are NOT auto-re-queued
-    // because an unaware player dropped back into queue can get pulled
-    // into the next match and eat another -300 XP no-show. Manual rejoin
-    // via the queue panel only.
-    const showedMentions = showed.map(id => `<@${id}>`).join(', ') || '—';
-    const partialRepMentions = replacements.map(r => `<@${r.discordId}>`).join(', ');
-    const stranded = [showedMentions, partialRepMentions].filter(s => s && s !== '—').join(', ') || '—';
-    const rankedQueueChannelId = process.env.RANKED_QUEUE_CHANNEL_ID;
-    const queueChannelMention = rankedQueueChannelId ? `<#${rankedQueueChannelId}>` : 'the ranked queue channel';
+    // Not enough replacements — flip the match to CANCELLED but keep the
+    // channels open for a short rejoin window. Players are NOT auto-re-
+    // queued: an unaware player dropped back in could get pulled into the
+    // next match and eat another -300 XP no-show. They must click
+    // Rejoin Queue in this window, or join from the queue panel.
+    await cancelMatch(client, match, 'Not enough replacement players', { skipCleanupSchedule: true });
 
-    const embed = new EmbedBuilder()
-      .setTitle('Match Cancelled — Not Enough Players')
-      .setColor(0xe74c3c)
-      .setDescription([
+    // Showed-up players AND partial replacements (yanked from the waiting
+    // queue but left stranded) both get the rejoin option — none of them
+    // did anything wrong.
+    const eligible = [...showed, ...replacements.map(r => r.discordId)];
+
+    await _postCancelWithRejoinWindow(client, match, {
+      title: 'Match Cancelled — Not Enough Players',
+      headerLines: [
         `**No-shows** (-${QUEUE_CONFIG.NO_SHOW_PENALTY} XP): ${noShowMentions}`,
         '',
         `Not enough players in queue to replace them.`,
-        '',
-        `**${stranded}** — you were **not** automatically re-queued. Head to ${queueChannelMention} and hit **Join Queue** if you want to play again.`,
-        '',
-        `This channel will be deleted in 1 minute.`,
-      ].join('\n'));
-
-    await textChannel.send({ embeds: [embed] });
-
-    await cancelMatch(client, match, 'Not enough replacement players');
+      ],
+      eligibleDiscordIds: eligible,
+    });
   }
 }
 
@@ -399,9 +394,84 @@ async function cancelMatch(client, match, reason, options = {}) {
   }, 60_000);
 }
 
+/**
+ * Post a "Match Cancelled" embed with a Rejoin Queue button in the match's
+ * text channel, then schedule channel cleanup after the rejoin window
+ * closes. Shared by both the auto-cancel (no-show) and staff-cancel
+ * paths so their UX stays consistent.
+ *
+ * Caller is responsible for having already flipped the match into the
+ * CANCELLED phase (via cancelMatch with skipCleanupSchedule: true).
+ *
+ * @param {import('discord.js').Client} client
+ * @param {object} match
+ * @param {object} opts
+ * @param {string} [opts.title='Match Cancelled']
+ * @param {number} [opts.color=0xe74c3c]
+ * @param {string[]} opts.headerLines — lines that go at the top of the embed description (context-specific wording)
+ * @param {string[]} opts.eligibleDiscordIds — players to ping + offer the rejoin button to
+ * @param {number} [opts.windowMs=15_000] — how long the rejoin button stays live before cleanup
+ * @returns {Promise<void>}
+ */
+async function _postCancelWithRejoinWindow(client, match, {
+  title = 'Match Cancelled',
+  color = 0xe74c3c,
+  headerLines = [],
+  eligibleDiscordIds,
+  windowMs = 15_000,
+}) {
+  const playerMentions = eligibleDiscordIds.map(id => `<@${id}>`).join(', ') || '—';
+
+  const rejoinRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`queue_rejoin_${match.id}`)
+      .setLabel('Rejoin Queue')
+      .setStyle(ButtonStyle.Success),
+  );
+
+  const embed = new EmbedBuilder()
+    .setTitle(title)
+    .setColor(color)
+    .setDescription([
+      ...headerLines,
+      '',
+      `**Eligible to rejoin:** ${playerMentions}`,
+      '',
+      `Click **Rejoin Queue** within **${windowMs / 1000}s** to play again. If you don't, you are **not** auto-re-queued.`,
+      `Channels will be deleted when the window closes.`,
+    ].join('\n'))
+    .setTimestamp();
+
+  let cancelMsg = null;
+  try {
+    const tc = client.channels.cache.get(match.textChannelId);
+    if (tc) {
+      cancelMsg = await tc.send({
+        content: playerMentions,
+        embeds: [embed],
+        components: [rejoinRow],
+        allowedMentions: { users: eligibleDiscordIds },
+      });
+    }
+  } catch (err) {
+    console.error(`[QueueService] Failed to post cancel/rejoin embed for match #${match.id}:`, err.message);
+  }
+
+  // Window expiry → strip the button, tear down channels
+  setTimeout(async () => {
+    if (cancelMsg) {
+      cancelMsg.edit({ components: [] }).catch(() => {});
+    }
+    _cleanupMatchChannels(client, match).catch(err => {
+      console.error(`[QueueService] Cleanup failed for cancelled match #${match.id}:`, err.message);
+    });
+  }, windowMs);
+}
+
 module.exports = {
   createMatch,
   handleNoShows,
   resolveMatch,
   cancelMatch,
+  _postCancelWithRejoinWindow,
 };
