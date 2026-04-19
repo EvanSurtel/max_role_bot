@@ -50,7 +50,24 @@ async function handleDeposit(interaction, user, wallet, lang) {
       });
     }
 
-    const onrampUrl = `https://pay.coinbase.com/buy/select-asset?sessionToken=${encodeURIComponent(sessionToken)}&presetFiatAmount=50&defaultPaymentMethod=CARD`;
+    // Build the hosted-widget URL. Match Coinbase's reference demo —
+    // `partnerUserId`, `defaultAsset`, `defaultNetwork`, and `fiatCurrency`
+    // are what prompt the widget to show the guest-checkout flow
+    // (US/UK/Canada) instead of defaulting to the sign-in page.
+    const country = (user.country_code || '').toUpperCase();
+    const fiatCurrency = country === 'CA' ? 'CAD' : country === 'GB' ? 'GBP' : country === 'AU' ? 'AUD'
+      : (country === 'US' || !country) ? 'USD'
+      : 'USD'; // EU users get USD (EUR not yet supported by Onramp fiat preset)
+    const params = new URLSearchParams({
+      sessionToken,
+      defaultAsset: 'USDC',
+      defaultNetwork: 'base',
+      defaultPaymentMethod: 'CARD',
+      presetFiatAmount: '50',
+      fiatCurrency,
+      partnerUserId: address.slice(0, 49),
+    });
+    const onrampUrl = `https://pay.coinbase.com/buy/select-asset?${params.toString()}`;
 
     const openButton = new ActionRowBuilder().addComponents(
       new ButtonBuilder()

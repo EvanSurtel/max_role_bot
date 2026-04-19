@@ -46,7 +46,13 @@ async function handleCashOut(interaction, user, wallet, lang) {
       });
     }
 
-    const offrampUrl = `https://pay.coinbase.com/sell/select-asset?sessionToken=${encodeURIComponent(sessionToken)}`;
+    const params = new URLSearchParams({
+      sessionToken,
+      defaultAsset: 'USDC',
+      defaultNetwork: 'base',
+      partnerUserId: address.slice(0, 49),
+    });
+    const offrampUrl = `https://pay.coinbase.com/v3/sell/input?${params.toString()}`;
 
     const openButton = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setURL(offrampUrl).setLabel('Cash Out USDC').setStyle(ButtonStyle.Link),
