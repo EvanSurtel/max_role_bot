@@ -164,7 +164,7 @@ async function handleRankCommand(message) {
   const lang = langFor({ user: message.author, member: message.member, locale: message.guild?.preferredLocale });
 
   // Show "bot is typing" so the user sees something is happening
-  // while we round-trip to NeatQueue.
+  // while the rank card renders.
   try { await message.channel.sendTyping(); } catch { /* ignore */ }
 
   const result = await buildRankCard(target, lang);

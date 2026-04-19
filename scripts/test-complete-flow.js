@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Complete bot flow test — everything from wallet creation to dispute resolution.
-// Tests Smart Accounts, escrow, XP, NeatQueue, deposits, withdrawals, disputes.
+// Tests Smart Accounts, escrow, XP, deposits, withdrawals, disputes.
 
 require('dotenv').config();
 const { ethers } = require('ethers');
@@ -195,31 +195,9 @@ async function main() {
   } catch (e) { fail('Rank tiers', e.message); }
 
   // ═══════════════════════════════════════════════════════════
-  // SECTION 6: NEATQUEUE
+  // SECTION 6: DATABASE
   // ═══════════════════════════════════════════════════════════
-  console.log('\n── SECTION 6: NEATQUEUE ──');
-
-  try {
-    const nq = require('../src/services/neatqueueService');
-    if (nq.isConfigured()) {
-      // Test the leaderboard endpoint
-      const token = process.env.NEATQUEUE_API_TOKEN;
-      const channelId = process.env.NEATQUEUE_CHANNEL_ID;
-      const guildId = process.env.GUILD_ID;
-      const res = await fetch(`https://api.neatqueue.com/api/v1/leaderboard/${guildId}/${channelId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (res.ok) pass(`NeatQueue API connected (status ${res.status})`);
-      else fail('NeatQueue API', `Status ${res.status}`);
-    } else {
-      skip('NeatQueue', 'Not configured');
-    }
-  } catch (e) { fail('NeatQueue', e.message); }
-
-  // ═══════════════════════════════════════════════════════════
-  // SECTION 7: DATABASE
-  // ═══════════════════════════════════════════════════════════
-  console.log('\n── SECTION 7: DATABASE ──');
+  console.log('\n── SECTION 6: DATABASE ──');
 
   try {
     const db = require('../src/database/db');
@@ -321,7 +299,7 @@ async function main() {
 
   // Verify URL generation for each group
   const testAddr = '0x1234567890123456789012345678901234567890';
-  const cdpAppId = process.env.CDP_API_KEY || process.env.CDP_API_KEY_ID || 'test';
+  const cdpAppId = process.env.CDP_PROJECT_ID || process.env.CDP_API_KEY_ID || 'test';
 
   // Group A: Coinbase Onramp
   const onrampUrl = `https://pay.coinbase.com/buy/select-asset?appId=${cdpAppId}&addresses={"${testAddr}":["base"]}&assets=["USDC"]`;

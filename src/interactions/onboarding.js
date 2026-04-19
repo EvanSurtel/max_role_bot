@@ -12,7 +12,6 @@ const userRepo = require('../database/repositories/userRepo');
 const walletRepo = require('../database/repositories/walletRepo');
 const walletManager = require('../base/walletManager');
 const channelService = require('../services/channelService');
-const neatqueueService = require('../services/neatqueueService');
 const { t, langFor } = require('../locales/i18n');
 
 // Map server/region input to leaderboard region
@@ -251,7 +250,7 @@ async function handleRegistrationModal(interaction) {
     });
   }
 
-  // --- Full registration (wallet, roles, NeatQueue, nickname, etc.) ---
+  // --- Full registration (wallet, roles, nickname, etc.) ---
   await interaction.deferReply({ ephemeral: true });
 
   try {
@@ -379,20 +378,6 @@ async function handleRegistrationModal(interaction) {
       await member.setNickname(`${displayName} ${country} [500]`);
     } catch (err) {
       console.warn(`[Onboarding] Could not set nickname:`, err.message);
-    }
-
-    // NeatQueue sync
-    if (neatqueueService.isConfigured()) {
-      try {
-        await syncIgnToNeatQueue(discordId, codIgn);
-      } catch (err) {
-        console.error(`[Onboarding] NeatQueue IGN sync failed:`, err.message);
-      }
-      try {
-        await neatqueueService.setPoints(discordId, 500);
-      } catch (err) {
-        console.error(`[Onboarding] NeatQueue starting-points seed failed:`, err.message);
-      }
     }
 
     // Rank role
@@ -589,41 +574,6 @@ async function handleCountrySelect(interaction) {
   );
 
   return interaction.showModal(modal);
-}
-
-/**
- * Sync IGN to NeatQueue via their API.
- */
-async function syncIgnToNeatQueue(discordUserId, ign) {
-  const token = process.env.NEATQUEUE_API_TOKEN;
-  if (!token) return;
-
-  const channelId = process.env.NEATQUEUE_CHANNEL_ID;
-  if (!channelId) return;
-
-  // IMPORTANT: channel_id and user_id stay as STRINGS. Discord snowflakes
-  // are 64-bit IDs that overflow JS Number precision (> 2^53), so parseInt
-  // silently corrupts the last few digits of 18–19 digit IDs. Serialize as
-  // strings so the full ID survives the round-trip to NeatQueue.
-  const res = await fetch('https://api.neatqueue.com/api/v2/ign', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      channel_id: channelId,
-      user_id: String(discordUserId),
-      ign: ign,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    console.error(`[NeatQueue] IGN sync failed (${res.status}): ${body}`);
-  } else {
-    console.log(`[NeatQueue] IGN synced for ${discordUserId}: ${ign}`);
-  }
 }
 
 /**

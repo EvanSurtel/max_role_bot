@@ -9,7 +9,6 @@ const {
   TextInputStyle,
 } = require('discord.js');
 const { getCurrentSeason, setCurrentSeason } = require('./leaderboardPanel');
-const neatqueueService = require('../services/neatqueueService');
 const { logAdminAction } = require('../utils/adminAudit');
 const { t, langFor } = require('../locales/i18n');
 
@@ -183,15 +182,6 @@ async function handleSeasonButton(interaction) {
     setMatchesPaused(true);
     logAdminAction(interaction.user.id, 'pause_matches', 'system', 0, { season: getCurrentSeason() });
 
-    // Try to pause NeatQueue
-    if (neatqueueService.isConfigured()) {
-      try {
-        await pauseNeatQueue();
-      } catch (err) {
-        console.warn('[Season] Failed to pause NeatQueue:', err.message);
-      }
-    }
-
     const { postTransaction } = require('../utils/transactionFeed');
     postTransaction({
       type: 'season_paused',
@@ -211,15 +201,6 @@ async function handleSeasonButton(interaction) {
   if (id === 'season_resume') {
     setMatchesPaused(false);
     logAdminAction(interaction.user.id, 'resume_matches', 'system', 0, { season: getCurrentSeason() });
-
-    // Try to resume NeatQueue
-    if (neatqueueService.isConfigured()) {
-      try {
-        await resumeNeatQueue();
-      } catch (err) {
-        console.warn('[Season] Failed to resume NeatQueue:', err.message);
-      }
-    }
 
     const { postTransaction } = require('../utils/transactionFeed');
     postTransaction({
@@ -329,45 +310,12 @@ async function handleSeasonModal(interaction) {
     // 4. Resume matches for the new season
     setMatchesPaused(false);
 
-    // 5. Reset NeatQueue stats and resume
-    if (neatqueueService.isConfigured()) {
-      try {
-        await resetNeatQueue();
-        console.log('[Season] NeatQueue stats reset');
-      } catch (err) {
-        console.warn('[Season] Failed to reset NeatQueue:', err.message);
-      }
-
-      // Set every user to exactly STARTING_XP on NeatQueue.
-      // setPoints (not addPoints) — if resetNeatQueue above failed
-      // or partially succeeded, addPoints would have stacked on top
-      // of the old value. setPoints reads the current number and
-      // adds the delta needed to hit the target, so the end state
-      // is always exactly STARTING_XP regardless of what happened.
-      try {
-        const allUsers = db.prepare('SELECT discord_id FROM users WHERE accepted_tos = 1').all();
-        for (const u of allUsers) {
-          await neatqueueService.setPoints(u.discord_id, STARTING_XP).catch(() => {});
-        }
-        console.log(`[Season] Set ${allUsers.length} users to exactly ${STARTING_XP} starting XP in NeatQueue`);
-      } catch (err) {
-        console.warn('[Season] Failed to set NeatQueue starting points:', err.message);
-      }
-
-      try {
-        await resumeNeatQueue();
-      } catch (err) {
-        console.warn('[Season] Failed to resume NeatQueue:', err.message);
-      }
-    }
-
     await interaction.editReply({
       content: [
         t('season_panel.season_ended_complete', lang),
         '',
         t('season_panel.season_ended_old', lang, { old: oldSeason }),
         t('season_panel.season_ended_new', lang, { new: newSeason }),
-        t('season_panel.season_ended_neatqueue', lang),
         '',
         t('season_panel.season_ended_active', lang),
       ].join('\n'),
@@ -399,65 +347,6 @@ async function handleSeasonModal(interaction) {
     console.error('[Season] Error ending season:', err);
     await interaction.editReply({ content: t('season_panel.failed_end', lang) });
   }
-}
-
-/**
- * Reset all NeatQueue stats (points, wins, losses, MMR) for the queue.
- */
-async function resetNeatQueue() {
-  const token = process.env.NEATQUEUE_API_TOKEN;
-  const channelId = process.env.NEATQUEUE_CHANNEL_ID;
-  const guildId = process.env.GUILD_ID;
-  if (!token || !channelId) return;
-
-  // Snowflake IDs stay as STRINGS — parseInt corrupts 18-19 digit
-  // Discord IDs past Number.MAX_SAFE_INTEGER (same bug we fixed in
-  // neatqueueService and onboarding.syncIgnToNeatQueue). Before this
-  // fix the reset call went to a bogus channel_id and silently did
-  // nothing, which caused the subsequent addPoints(500) loop to
-  // stack on top of the old values instead of resetting to 500.
-  const res = await fetch('https://api.neatqueue.com/api/v2/managestats/reset/all', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ server_id: guildId, channel_id: channelId }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    console.error(`[NeatQueue] Reset failed (${res.status}): ${body}`);
-  }
-}
-
-/**
- * Try to pause NeatQueue via API.
- */
-async function pauseNeatQueue() {
-  const token = process.env.NEATQUEUE_API_TOKEN;
-  const channelId = process.env.NEATQUEUE_CHANNEL_ID;
-  if (!token || !channelId) return;
-
-  await fetch('https://api.neatqueue.com/api/v2/queue/pause', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ channel_id: channelId }),
-  });
-  console.log('[NeatQueue] Queue paused');
-}
-
-/**
- * Try to resume NeatQueue via API.
- */
-async function resumeNeatQueue() {
-  const token = process.env.NEATQUEUE_API_TOKEN;
-  const channelId = process.env.NEATQUEUE_CHANNEL_ID;
-  if (!token || !channelId) return;
-
-  await fetch('https://api.neatqueue.com/api/v2/queue/resume', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ channel_id: channelId }),
-  });
-  console.log('[NeatQueue] Queue resumed');
 }
 
 module.exports = { isMatchesPaused, buildSeasonPanel, postSeasonPanel, handleSeasonButton, handleSeasonModal };

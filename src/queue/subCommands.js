@@ -4,7 +4,6 @@
 // factory. Used by interactions.js when staff triggers a sub via buttons.
 
 const userRepo = require('../database/repositories/userRepo');
-const neatqueueService = require('../services/neatqueueService');
 const QUEUE_CONFIG = require('../config/queueConfig');
 const { getMatch, _newPlayer } = require('./state');
 
@@ -46,7 +45,6 @@ function subPlayerOut(matchId, discordId, replacementDiscordId, subType) {
   if (subbedUser) {
     try {
       userRepo.addXp(subbedUser.id, -QUEUE_CONFIG.NO_SHOW_PENALTY);
-      neatqueueService.addPoints(discordId, -QUEUE_CONFIG.NO_SHOW_PENALTY).catch(() => {});
       console.log(`[QueueService] Applied -${QUEUE_CONFIG.NO_SHOW_PENALTY} XP penalty to subbed-out player ${discordId}`);
     } catch (err) {
       console.error(`[QueueService] Failed to apply sub-out penalty to ${discordId}:`, err.message);

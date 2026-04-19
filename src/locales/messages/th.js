@@ -185,7 +185,7 @@ module.exports = {
     title: 'XP Matches',
     description: 'แข่งขันเพื่อ **XP** กับผู้เล่นคนอื่น ไม่มีเงินเกี่ยวข้อง\n\nXP ได้ตามความแข็งแกร่งของคู่แข่ง — เอาชนะทีมที่แข็งแกร่งกว่าเพื่อ XP มากขึ้น',
     btn_create_xp: 'สร้าง XP Match',
-    footer: 'XP ซิงค์กับ NeatQueue',
+    footer: 'XP ซิงค์กับ queue',
   },
 
   challenge_create: {
@@ -381,12 +381,11 @@ module.exports = {
     modal_title: 'จบ Season และเริ่มใหม่',
     modal_label: 'กำลังจบ: {old} ชื่อ season ใหม่:',
     modal_placeholder: 'เช่น 2026-S2',
-    pause_msg: '**หยุดแมตช์ชั่วคราวแล้ว** ไม่สามารถสร้าง cash match, XP match หรือคิว NeatQueue ใหม่ได้ แมตช์ที่มีอยู่จะดำเนินต่อไปจนจบ',
-    resume_msg: '**เริ่มแมตช์ต่อแล้ว** Cash match, XP match และคิว NeatQueue กลับมาเปิดใช้งานอีกครั้ง',
+    pause_msg: '**หยุดแมตช์ชั่วคราวแล้ว** ไม่สามารถสร้าง cash match, XP match หรือคิว queue ใหม่ได้ แมตช์ที่มีอยู่จะดำเนินต่อไปจนจบ',
+    resume_msg: '**เริ่มแมตช์ต่อแล้ว** Cash match, XP match และคิว queue กลับมาเปิดใช้งานอีกครั้ง',
     season_ended_complete: '**เปลี่ยน Season เรียบร้อยแล้ว!**',
     season_ended_old: '**{old}** จบแล้ว ข้อมูล season ทั้งหมดถูกเก็บไว้ในประวัติ',
     season_ended_new: '**{new}** เริ่มแล้ว ผู้เล่นทุกคนถูกรีเซ็ตเป็น 500 XP, 0W-0L',
-    season_ended_neatqueue: 'สถิติ NeatQueue ถูกรีเซ็ตและใช้คะแนนเริ่มต้นแล้ว',
     season_ended_active: 'การสร้างแมตช์เปิดใช้งานแล้ว โชคดีทุกคน!',
     cannot_end: 'ไม่สามารถจบ season ได้ — ยังมี {n} แมตช์กำลังเล่นอยู่ กรุณารอให้จบก่อน',
     failed_end: 'จบ season ไม่สำเร็จ กรุณาตรวจสอบ log',

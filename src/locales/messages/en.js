@@ -243,7 +243,7 @@ module.exports = {
     title: 'XP Matches',
     description: 'Compete for **XP** against other players. No money involved.\n\nXP is earned based on opponent strength — beat stronger teams for more XP.',
     btn_create_xp: 'Create XP Match',
-    footer: 'XP synced with NeatQueue',
+    footer: 'XP synced with queue stats',
   },
 
   challenge_create: {
@@ -439,12 +439,11 @@ module.exports = {
     modal_title: 'End Season & Start New',
     modal_label: 'Ending: {old}. New season name:',
     modal_placeholder: 'e.g. 2026-S2',
-    pause_msg: '**Matches paused.** No new cash matches, XP matches, or NeatQueue queues can be created. Existing matches will continue until finished.',
-    resume_msg: '**Matches resumed.** Cash matches, XP matches, and NeatQueue queues are active again.',
+    pause_msg: '**Matches paused.** No new cash matches, XP matches, or queue matches can be created. Existing matches will continue until finished.',
+    resume_msg: '**Matches resumed.** Cash matches, XP matches, and queue matches are active again.',
     season_ended_complete: '**Season transition complete!**',
     season_ended_old: '**{old}** has ended. All season data preserved in history.',
     season_ended_new: '**{new}** has started. All players reset to 500 XP, 0W-0L.',
-    season_ended_neatqueue: 'NeatQueue stats reset and starting points applied.',
     season_ended_active: 'Match creation is now active. Good luck everyone!',
     cannot_end: 'Cannot end season — {n} match(es) still active. Wait for them to finish.',
     failed_end: 'Failed to end season. Check logs.',
@@ -511,7 +510,7 @@ module.exports = {
     admin_only: 'Admin only.',
   },
 
-  // Queue Stats panel — NeatQueue leaderboard view
+  // Queue Stats panel — queue leaderboard view
   queue_stats: {
     title: 'Rank $ {stat} Leaderboard',
     select_stat: 'Select Stat',

@@ -185,7 +185,7 @@ module.exports = {
     title: 'XP Match',
     description: 'Bertanding untuk **XP** lawan pemain lain. Tanpa uang.\n\nXP didapat berdasarkan kekuatan lawan — kalahkan tim yang lebih kuat untuk dapat XP lebih banyak.',
     btn_create_xp: 'Buat XP Match',
-    footer: 'XP sinkron dengan NeatQueue',
+    footer: 'XP sinkron dengan queue',
   },
 
   challenge_create: {
@@ -381,12 +381,11 @@ module.exports = {
     modal_title: 'Akhiri Season & Mulai Baru',
     modal_label: 'Mengakhiri: {old}. Nama season baru:',
     modal_placeholder: 'mis. 2026-S2',
-    pause_msg: '**Match dijeda.** Tidak ada cash match, XP match, atau queue NeatQueue baru yang bisa dibuat. Match yang sedang berjalan akan berlanjut sampai selesai.',
-    resume_msg: '**Match dilanjutkan.** Cash match, XP match, dan queue NeatQueue aktif kembali.',
+    pause_msg: '**Match dijeda.** Tidak ada cash match, XP match, atau queue queue baru yang bisa dibuat. Match yang sedang berjalan akan berlanjut sampai selesai.',
+    resume_msg: '**Match dilanjutkan.** Cash match, XP match, dan queue queue aktif kembali.',
     season_ended_complete: '**Transisi season selesai!**',
     season_ended_old: '**{old}** sudah berakhir. Semua data season disimpan di riwayat.',
     season_ended_new: '**{new}** sudah dimulai. Semua pemain direset ke 500 XP, 0W-0L.',
-    season_ended_neatqueue: 'Stats NeatQueue direset dan poin awal diterapkan.',
     season_ended_active: 'Pembuatan match sekarang aktif. Semoga beruntung semuanya!',
     cannot_end: 'Tidak bisa mengakhiri season — {n} match masih aktif. Tunggu sampai selesai.',
     failed_end: 'Gagal mengakhiri season. Cek log.',

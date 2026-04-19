@@ -185,7 +185,7 @@ module.exports = {
     title: 'Trận XP',
     description: 'Thi đấu để giành **XP** với người chơi khác. Không có tiền liên quan.\n\nXP được tính dựa trên sức mạnh đối thủ — đánh bại các đội mạnh hơn để có nhiều XP hơn.',
     btn_create_xp: 'Tạo Trận XP',
-    footer: 'XP đồng bộ với NeatQueue',
+    footer: 'XP đồng bộ với queue',
   },
 
   challenge_create: {
@@ -381,12 +381,11 @@ module.exports = {
     modal_title: 'Kết Thúc Season & Bắt Đầu Mới',
     modal_label: 'Kết thúc: {old}. Tên season mới:',
     modal_placeholder: 'ví dụ: 2026-S2',
-    pause_msg: '**Đã tạm dừng tạo trận.** Không thể tạo cash match, XP match, hoặc queue NeatQueue mới. Các trận đang diễn ra sẽ tiếp tục cho đến khi kết thúc.',
-    resume_msg: '**Đã tiếp tục tạo trận.** Cash match, XP match, và queue NeatQueue đã hoạt động trở lại.',
+    pause_msg: '**Đã tạm dừng tạo trận.** Không thể tạo cash match, XP match, hoặc queue queue mới. Các trận đang diễn ra sẽ tiếp tục cho đến khi kết thúc.',
+    resume_msg: '**Đã tiếp tục tạo trận.** Cash match, XP match, và queue queue đã hoạt động trở lại.',
     season_ended_complete: '**Chuyển season hoàn tất!**',
     season_ended_old: '**{old}** đã kết thúc. Toàn bộ dữ liệu season được lưu vào lịch sử.',
     season_ended_new: '**{new}** đã bắt đầu. Tất cả người chơi được reset về 500 XP, 0W-0L.',
-    season_ended_neatqueue: 'Stats NeatQueue đã được reset và điểm khởi đầu đã được áp dụng.',
     season_ended_active: 'Việc tạo trận hiện đã hoạt động. Chúc mọi người may mắn!',
     cannot_end: 'Không thể kết thúc season — vẫn còn {n} trận đang diễn ra. Vui lòng đợi cho đến khi kết thúc.',
     failed_end: 'Kết thúc season thất bại. Hãy kiểm tra log.',

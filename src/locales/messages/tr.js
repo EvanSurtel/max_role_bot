@@ -186,7 +186,7 @@ module.exports = {
     title: 'XP Maçları',
     description: 'Diğer oyunculara karşı **XP** için yarış. Para işin içinde değil.\n\nXP rakip gücüne göre kazanılır — daha güçlü takımları yenerek daha fazla XP kazan.',
     btn_create_xp: 'XP Maçı Oluştur',
-    footer: 'XP NeatQueue ile senkronize',
+    footer: 'XP queue ile senkronize',
   },
 
   challenge_create: {
@@ -382,12 +382,11 @@ module.exports = {
     modal_title: 'Sezonu Bitir ve Yenisini Başlat',
     modal_label: 'Biten: {old}. Yeni sezon adı:',
     modal_placeholder: 'örn. 2026-S2',
-    pause_msg: '**Maçlar duraklatıldı.** Yeni bahis, XP maçı veya NeatQueue sırası oluşturulamaz. Mevcut maçlar bitene kadar devam edecek.',
-    resume_msg: '**Maçlar devam ediyor.** Bahisler, XP maçları ve NeatQueue sıraları tekrar aktif.',
+    pause_msg: '**Maçlar duraklatıldı.** Yeni bahis, XP maçı veya queue sırası oluşturulamaz. Mevcut maçlar bitene kadar devam edecek.',
+    resume_msg: '**Maçlar devam ediyor.** Bahisler, XP maçları ve queue sıraları tekrar aktif.',
     season_ended_complete: '**Sezon geçişi tamamlandı!**',
     season_ended_old: '**{old}** sona erdi. Tüm sezon verileri geçmişte saklandı.',
     season_ended_new: '**{new}** başladı. Tüm oyuncular 500 XP, 0W-0L olarak sıfırlandı.',
-    season_ended_neatqueue: 'NeatQueue istatistikleri sıfırlandı ve başlangıç puanları uygulandı.',
     season_ended_active: 'Maç oluşturma artık aktif. Herkese bol şans!',
     cannot_end: 'Sezon bitirilemez — {n} maç hâlâ aktif. Bitmelerini bekle.',
     failed_end: 'Sezon bitirilemedi. Logları kontrol et.',

@@ -186,7 +186,7 @@ module.exports = {
     title: 'Match XP',
     description: 'Compete per **XP** contro altri giocatori. Senza soldi.\n\nGli XP si guadagnano in base alla forza dell\'avversario — batti squadre più forti per più XP.',
     btn_create_xp: 'Crea Match XP',
-    footer: 'XP sincronizzati con NeatQueue',
+    footer: 'XP sincronizzati con queue',
   },
 
   challenge_create: {
@@ -382,12 +382,11 @@ module.exports = {
     modal_title: 'Termina Stagione e Inizia Nuova',
     modal_label: 'Terminando: {old}. Nome nuova stagione:',
     modal_placeholder: 'es. 2026-S2',
-    pause_msg: '**Match in pausa.** Non è possibile creare nuove partite con soldi, match XP o code NeatQueue. I match esistenti continueranno fino al termine.',
-    resume_msg: '**Match ripresi.** Scommesse, match XP e code NeatQueue sono di nuovo attivi.',
+    pause_msg: '**Match in pausa.** Non è possibile creare nuove partite con soldi, match XP o code queue. I match esistenti continueranno fino al termine.',
+    resume_msg: '**Match ripresi.** Scommesse, match XP e code queue sono di nuovo attivi.',
     season_ended_complete: '**Transizione di stagione completata!**',
     season_ended_old: '**{old}** è terminata. Tutti i dati della stagione sono conservati nello storico.',
     season_ended_new: '**{new}** è iniziata. Tutti i giocatori sono stati resettati a 500 XP, 0W-0L.',
-    season_ended_neatqueue: 'Statistiche NeatQueue resettate e punti iniziali applicati.',
     season_ended_active: 'La creazione dei match è ora attiva. Buona fortuna a tutti!',
     cannot_end: 'Impossibile terminare la stagione — {n} match ancora attivi. Aspetta che finiscano.',
     failed_end: 'Impossibile terminare la stagione. Controlla i log.',

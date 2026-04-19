@@ -54,7 +54,7 @@ async function main() {
   // ─── Test 1: Coinbase Onramp URL ────────────────────────
   console.log('\n[1] Coinbase Onramp URL generation...');
   const testAddress = '0xd53cD88a294C222a22AFcc07d171714135e0C966';
-  const cdpAppId = process.env.CDP_API_KEY || process.env.CDP_API_KEY_ID || 'test';
+  const cdpAppId = process.env.CDP_PROJECT_ID || process.env.CDP_API_KEY_ID || 'test';
   const onrampUrl = `https://pay.coinbase.com/buy/select-asset?appId=${cdpAppId}&addresses={"${testAddress}":["base"]}&assets=["USDC"]&presetFiatAmount=50&defaultPaymentMethod=CARD`;
   console.log(`  URL: ${onrampUrl.slice(0, 80)}...`);
   console.log(`  Contains address: ${onrampUrl.includes(testAddress) ? '✅' : '❌'}`);

@@ -185,7 +185,7 @@ module.exports = {
     title: 'XP-Matches',
     description: 'Kämpfe um **XP** gegen andere Spieler. Kein Geld im Spiel.\n\nXP wird basierend auf der Stärke des Gegners verdient — schlag stärkere Teams für mehr XP.',
     btn_create_xp: 'XP-Match Erstellen',
-    footer: 'XP synchronisiert mit NeatQueue',
+    footer: 'XP synchronisiert mit queue',
   },
 
   challenge_create: {
@@ -381,12 +381,11 @@ module.exports = {
     modal_title: 'Saison Beenden und Neue Starten',
     modal_label: 'Beende: {old}. Name der neuen Saison:',
     modal_placeholder: 'z.B. 2026-S2',
-    pause_msg: '**Matches pausiert.** Es können keine neuen Cash Matches, XP-Matches oder NeatQueue-Warteschlangen erstellt werden. Bestehende Matches laufen bis zum Ende weiter.',
-    resume_msg: '**Matches fortgesetzt.** Cash Matches, XP-Matches und NeatQueue-Warteschlangen sind wieder aktiv.',
+    pause_msg: '**Matches pausiert.** Es können keine neuen Cash Matches, XP-Matches oder queue-Warteschlangen erstellt werden. Bestehende Matches laufen bis zum Ende weiter.',
+    resume_msg: '**Matches fortgesetzt.** Cash Matches, XP-Matches und queue-Warteschlangen sind wieder aktiv.',
     season_ended_complete: '**Saisonwechsel abgeschlossen!**',
     season_ended_old: '**{old}** ist beendet. Alle Saisondaten bleiben im Verlauf erhalten.',
     season_ended_new: '**{new}** hat begonnen. Alle Spieler zurückgesetzt auf 500 XP, 0W-0L.',
-    season_ended_neatqueue: 'NeatQueue-Statistiken zurückgesetzt und Startpunkte angewendet.',
     season_ended_active: 'Match-Erstellung ist jetzt aktiv. Viel Glück euch allen!',
     cannot_end: 'Saison kann nicht beendet werden — {n} Match(es) noch aktiv. Warte, bis sie beendet sind.',
     failed_end: 'Saison konnte nicht beendet werden. Überprüfe die Logs.',

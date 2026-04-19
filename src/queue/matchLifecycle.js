@@ -7,12 +7,11 @@
 const { ChannelType, EmbedBuilder } = require('discord.js');
 const QUEUE_CONFIG = require('../config/queueConfig');
 const userRepo = require('../database/repositories/userRepo');
-const neatqueueService = require('../services/neatqueueService');
 const { getCurrentSeason } = require('../panels/leaderboardPanel');
 const {
   waitingQueue, activeMatches,
   _newQueueMatch, _newPlayer,
-  nextMatchId, isInQueue,
+  nextMatchId,
 } = require('./state');
 const { _queueChannelOverwrites, _cleanupMatchChannels, findClosestXpReplacement } = require('./helpers');
 
@@ -150,13 +149,6 @@ async function handleNoShows(client, match) {
       if (user) {
         userRepo.addXp(user.id, -QUEUE_CONFIG.NO_SHOW_PENALTY);
 
-        // Sync penalty to NeatQueue
-        if (neatqueueService.isConfigured()) {
-          neatqueueService.addPoints(discordId, -QUEUE_CONFIG.NO_SHOW_PENALTY).catch(err => {
-            console.error(`[QueueService] NeatQueue penalty sync failed for ${discordId}:`, err.message);
-          });
-        }
-
         ptxNoShow({
           type: 'queue_no_show',
           username: user.server_username,
@@ -247,35 +239,30 @@ async function handleNoShows(client, match) {
       }
     }, 60_000);
   } else {
-    // Not enough replacements — cancel match, re-queue showed players
+    // Not enough replacements — cancel match. Players are NOT auto-re-queued
+    // because an unaware player dropped back into queue can get pulled
+    // into the next match and eat another -300 XP no-show. Manual rejoin
+    // via the queue panel only.
+    const showedMentions = showed.map(id => `<@${id}>`).join(', ') || '—';
+    const partialRepMentions = replacements.map(r => `<@${r.discordId}>`).join(', ');
+    const stranded = [showedMentions, partialRepMentions].filter(s => s && s !== '—').join(', ') || '—';
+    const rankedQueueChannelId = process.env.RANKED_QUEUE_CHANNEL_ID;
+    const queueChannelMention = rankedQueueChannelId ? `<#${rankedQueueChannelId}>` : 'the ranked queue channel';
+
     const embed = new EmbedBuilder()
       .setTitle('Match Cancelled — Not Enough Players')
       .setColor(0xe74c3c)
       .setDescription([
-        `**No-shows** (${QUEUE_CONFIG.NO_SHOW_PENALTY} XP penalty): ${noShowMentions}`,
+        `**No-shows** (-${QUEUE_CONFIG.NO_SHOW_PENALTY} XP): ${noShowMentions}`,
         '',
         `Not enough players in queue to replace them.`,
-        `Players who showed up have been re-added to the queue.`,
+        '',
+        `**${stranded}** — you were **not** automatically re-queued. Head to ${queueChannelMention} and hit **Join Queue** if you want to play again.`,
         '',
         `This channel will be deleted in 1 minute.`,
       ].join('\n'));
 
     await textChannel.send({ embeds: [embed] });
-
-    // Re-queue players who showed up
-    for (const discordId of showed) {
-      const player = match.players.get(discordId);
-      if (player && !isInQueue(discordId)) {
-        waitingQueue.push({ discordId, joinedAt: Date.now(), xp: player.xp });
-      }
-    }
-
-    // Re-queue any replacements that were found (partial)
-    for (const rep of replacements) {
-      if (!isInQueue(rep.discordId)) {
-        waitingQueue.push({ discordId: rep.discordId, joinedAt: Date.now(), xp: rep.xp });
-      }
-    }
 
     await cancelMatch(client, match, 'Not enough replacement players');
   }
@@ -311,16 +298,6 @@ async function resolveMatch(client, match, winningTeam) {
       userRepo.addXp(user.id, QUEUE_CONFIG.WIN_XP);
       userRepo.addWin(user.id);
       insertXpHistory.run(user.id, match.id, 'queue', QUEUE_CONFIG.WIN_XP, season);
-
-      // Sync to NeatQueue
-      if (neatqueueService.isConfigured()) {
-        neatqueueService.addPoints(discordId, QUEUE_CONFIG.WIN_XP).catch(err => {
-          console.error(`[QueueService] NeatQueue points failed for winner ${discordId}:`, err.message);
-        });
-        neatqueueService.addWin(discordId).catch(err => {
-          console.error(`[QueueService] NeatQueue win failed for ${discordId}:`, err.message);
-        });
-      }
     } catch (err) {
       console.error(`[QueueService] Failed to award win XP to ${discordId}:`, err.message);
     }
@@ -337,20 +314,9 @@ async function resolveMatch(client, match, winningTeam) {
       if (player.subType !== 'mid_series') {
         userRepo.addXp(user.id, -QUEUE_CONFIG.LOSS_XP);
         insertXpHistory.run(user.id, match.id, 'queue', -QUEUE_CONFIG.LOSS_XP, season);
-
-        if (neatqueueService.isConfigured()) {
-          neatqueueService.addPoints(discordId, -QUEUE_CONFIG.LOSS_XP).catch(err => {
-            console.error(`[QueueService] NeatQueue loss points failed for ${discordId}:`, err.message);
-          });
-        }
       }
 
       userRepo.addLoss(user.id);
-      if (neatqueueService.isConfigured()) {
-        neatqueueService.addLoss(discordId).catch(err => {
-          console.error(`[QueueService] NeatQueue loss failed for ${discordId}:`, err.message);
-        });
-      }
     } catch (err) {
       console.error(`[QueueService] Failed to apply loss for ${discordId}:`, err.message);
     }
@@ -403,9 +369,13 @@ async function resolveMatch(client, match, winningTeam) {
  * @param {import('discord.js').Client} client — Discord client.
  * @param {object} match — The QueueMatch object.
  * @param {string} reason — Why the match was cancelled.
+ * @param {{ skipCleanupSchedule?: boolean }} [options] — If skipCleanupSchedule
+ *   is true, the caller is responsible for calling _cleanupMatchChannels later.
+ *   Used by the staff-cancel path so it can run its own 15s rejoin window
+ *   before tearing the channels down.
  * @returns {Promise<void>}
  */
-async function cancelMatch(client, match, reason) {
+async function cancelMatch(client, match, reason, options = {}) {
   if (match.phase === 'RESOLVED' || match.phase === 'CANCELLED') return;
   match.phase = 'CANCELLED';
   if (match.timer) { clearTimeout(match.timer); match.timer = null; }
@@ -418,6 +388,8 @@ async function cancelMatch(client, match, reason) {
   });
 
   console.log(`[QueueService] Match #${match.id} cancelled: ${reason}`);
+
+  if (options.skipCleanupSchedule) return;
 
   // Schedule cleanup (1 min for cancelled matches)
   setTimeout(() => {

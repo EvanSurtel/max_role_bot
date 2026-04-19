@@ -185,7 +185,7 @@ module.exports = {
     title: 'XP Matches',
     description: 'Makipag-compete para sa **XP** laban sa ibang players. Walang pera na involved.\n\nNakukuha ang XP base sa lakas ng kalaban — talunin ang mas malalakas na teams para sa mas maraming XP.',
     btn_create_xp: 'Create XP Match',
-    footer: 'Naka-sync ang XP sa NeatQueue',
+    footer: 'Naka-sync ang XP sa queue',
   },
 
   challenge_create: {
@@ -381,12 +381,11 @@ module.exports = {
     modal_title: 'Tapusin ang Season at Magsimula ng Bago',
     modal_label: 'Tinatapos: {old}. Pangalan ng bagong season:',
     modal_placeholder: 'hal. 2026-S2',
-    pause_msg: '**Naka-pause ang mga match.** Hindi pwedeng gumawa ng bagong cash matches, XP matches, o NeatQueue queues. Ituloy ang mga existing na match hanggang matapos.',
-    resume_msg: '**Naituloy na ang mga match.** Active na ulit ang cash matches, XP matches, at NeatQueue queues.',
+    pause_msg: '**Naka-pause ang mga match.** Hindi pwedeng gumawa ng bagong cash matches, XP matches, o queue matches. Ituloy ang mga existing na match hanggang matapos.',
+    resume_msg: '**Naituloy na ang mga match.** Active na ulit ang cash matches, XP matches, at queue matches.',
     season_ended_complete: '**Tapos na ang season transition!**',
     season_ended_old: 'Natapos na ang **{old}**. Lahat ng season data ay nakatago sa history.',
     season_ended_new: 'Nagsimula na ang **{new}**. Ni-reset ang lahat ng players sa 500 XP, 0W-0L.',
-    season_ended_neatqueue: 'Ni-reset ang NeatQueue stats at ina-apply na ang starting points.',
     season_ended_active: 'Active na ulit ang paggawa ng match. Good luck sa lahat!',
     cannot_end: 'Hindi pwedeng tapusin ang season — may {n} match(es) pa na active. Hintayin muna silang matapos.',
     failed_end: 'Nabigong tapusin ang season. Tingnan ang logs.',

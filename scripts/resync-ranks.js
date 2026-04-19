@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One-shot rank role resync. Pulls every TOS-accepted user from the
-// DB, looks up their current NeatQueue XP, picks the right tier from
-// RANK_TIERS in constants.js, and grants/strips Discord roles to match.
+// DB, picks the right tier from RANK_TIERS in constants.js based on
+// their local xp_points, and grants/strips Discord roles to match.
 //
 // Run after changing rank tier thresholds (constants.js → RANK_TIERS)
 // so existing members move to their new correct tier without waiting

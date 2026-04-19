@@ -185,7 +185,7 @@ module.exports = {
     title: 'XP 매치',
     description: '다른 플레이어와 **XP**를 두고 경쟁하세요. 돈은 관여 안 해요.\n\nXP는 상대 강도에 따라 획득 — 더 강한 팀을 이기면 더 많은 XP를 얻어요.',
     btn_create_xp: 'XP 매치 만들기',
-    footer: 'XP는 NeatQueue와 동기화',
+    footer: 'XP는 queue와 동기화',
   },
 
   challenge_create: {
@@ -381,12 +381,11 @@ module.exports = {
     modal_title: '시즌 종료 후 새 시즌 시작',
     modal_label: '종료: {old}. 새 시즌 이름:',
     modal_placeholder: '예: 2026-S2',
-    pause_msg: '**매치가 일시 중지되었어요.** 새 베팅, XP 매치 또는 NeatQueue 큐를 생성할 수 없어요. 기존 매치는 완료될 때까지 계속 진행돼요.',
-    resume_msg: '**매치가 재개되었어요.** 베팅, XP 매치 및 NeatQueue 큐가 다시 활성화되었어요.',
+    pause_msg: '**매치가 일시 중지되었어요.** 새 베팅, XP 매치 또는 queue 큐를 생성할 수 없어요. 기존 매치는 완료될 때까지 계속 진행돼요.',
+    resume_msg: '**매치가 재개되었어요.** 베팅, XP 매치 및 queue 큐가 다시 활성화되었어요.',
     season_ended_complete: '**시즌 전환이 완료되었어요!**',
     season_ended_old: '**{old}**이(가) 종료되었어요. 모든 시즌 데이터는 기록에 보존돼요.',
     season_ended_new: '**{new}**이(가) 시작되었어요. 모든 플레이어가 500 XP, 0W-0L로 초기화되었어요.',
-    season_ended_neatqueue: 'NeatQueue 통계가 초기화되고 시작 포인트가 적용되었어요.',
     season_ended_active: '매치 생성이 이제 활성화되었어요. 모두 행운을 빌어요!',
     cannot_end: '시즌을 종료할 수 없어요 — 아직 {n}개의 매치가 진행 중이에요. 종료될 때까지 기다려주세요.',
     failed_end: '시즌 종료에 실패했어요. 로그를 확인하세요.',

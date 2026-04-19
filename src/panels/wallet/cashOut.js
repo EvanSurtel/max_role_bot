@@ -23,8 +23,8 @@ async function handleCashOut(interaction, user, wallet, lang) {
   const depositRegion = user.deposit_region || 'GROUP_B';
   const address = wallet.address;
 
-  if (depositRegion === 'GROUP_A' && process.env.CDP_API_KEY) {
-    const cdpAppId = process.env.CDP_API_KEY;
+  if (depositRegion === 'GROUP_A' && process.env.CDP_PROJECT_ID) {
+    const cdpAppId = process.env.CDP_PROJECT_ID;
     const offrampUrl = `https://pay.coinbase.com/sell/select-asset?appId=${cdpAppId}&addresses={"${address}":["base"]}&assets=["USDC"]`;
 
     const openButton = new ActionRowBuilder().addComponents(

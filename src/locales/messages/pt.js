@@ -185,7 +185,7 @@ module.exports = {
     title: 'Partidas XP',
     description: 'Compita por **XP** contra outros jogadores. Sem dinheiro envolvido.\n\nA XP é ganha com base na força do oponente — vença times mais fortes pra ganhar mais XP.',
     btn_create_xp: 'Criar Partida XP',
-    footer: 'XP sincronizada com o NeatQueue',
+    footer: 'XP sincronizada com o queue',
   },
 
   challenge_create: {
@@ -381,12 +381,11 @@ module.exports = {
     modal_title: 'Encerrar Temporada e Iniciar Nova',
     modal_label: 'Encerrando: {old}. Nome da nova temporada:',
     modal_placeholder: 'ex: 2026-S2',
-    pause_msg: '**Partidas pausadas.** Nenhuma partida com dinheiro nova, partida XP ou fila do NeatQueue pode ser criada. As partidas existentes vão continuar até terminarem.',
-    resume_msg: '**Partidas retomadas.** Partidas com dinheiro, partidas XP e filas do NeatQueue estão ativas de novo.',
+    pause_msg: '**Partidas pausadas.** Nenhuma partida com dinheiro nova, partida XP ou fila do queue pode ser criada. As partidas existentes vão continuar até terminarem.',
+    resume_msg: '**Partidas retomadas.** Partidas com dinheiro, partidas XP e filas do queue estão ativas de novo.',
     season_ended_complete: '**Transição de temporada concluída!**',
     season_ended_old: '**{old}** foi encerrada. Todos os dados da temporada ficaram preservados no histórico.',
     season_ended_new: '**{new}** começou. Todos os jogadores foram resetados para 500 XP, 0W-0L.',
-    season_ended_neatqueue: 'Estatísticas do NeatQueue resetadas e pontos iniciais aplicados.',
     season_ended_active: 'A criação de partidas está ativa agora. Boa sorte pra todo mundo!',
     cannot_end: 'Não dá pra encerrar a temporada — {n} partida(s) ainda ativa(s). Aguarde elas terminarem.',
     failed_end: 'Falha ao encerrar a temporada. Confira os logs.',

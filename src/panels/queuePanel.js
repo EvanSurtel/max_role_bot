@@ -314,4 +314,13 @@ async function _refreshPanelInChannel(client) {
   }
 }
 
-module.exports = { buildQueuePanel, postQueuePanel, handleQueueButton };
+module.exports = {
+  buildQueuePanel,
+  postQueuePanel,
+  handleQueueButton,
+  // Lightweight panel refresher (fetch limit 10, edit in place).
+  // Used by external flows (e.g. the staff-cancel Rejoin Queue button)
+  // to sync the shared panel without the 50-message scan that
+  // postQueuePanel does on first-run.
+  refreshQueuePanel: _refreshPanelInChannel,
+};

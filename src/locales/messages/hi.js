@@ -185,7 +185,7 @@ module.exports = {
     title: 'XP Matches',
     description: 'दूसरे players के खिलाफ **XP** के लिए compete करो। कोई पैसा नहीं।\n\nXP opponent की strength के आधार पर मिलता है — मज़बूत teams को हराओ ज़्यादा XP के लिए।',
     btn_create_xp: 'XP Match बनाओ',
-    footer: 'XP NeatQueue के साथ synced',
+    footer: 'XP queue के साथ synced',
   },
 
   challenge_create: {
@@ -381,12 +381,11 @@ module.exports = {
     modal_title: 'Season समाप्त करें और नया शुरू करें',
     modal_label: 'समाप्त हो रहा है: {old}। नए season का नाम:',
     modal_placeholder: 'जैसे 2026-S2',
-    pause_msg: '**Matches रोके गए।** कोई नए cash matches, XP matches, या NeatQueue queues नहीं बनाए जा सकते। मौजूदा matches खत्म होने तक जारी रहेंगे।',
-    resume_msg: '**Matches पुनः शुरू।** Cash matches, XP matches, और NeatQueue queues फिर से active हैं।',
+    pause_msg: '**Matches रोके गए।** कोई नए cash matches, XP matches, या queue matches नहीं बनाए जा सकते। मौजूदा matches खत्म होने तक जारी रहेंगे।',
+    resume_msg: '**Matches पुनः शुरू।** Cash matches, XP matches, और queue matches फिर से active हैं।',
     season_ended_complete: '**Season transition पूरा!**',
     season_ended_old: '**{old}** समाप्त हो गया। सभी season data history में सुरक्षित है।',
     season_ended_new: '**{new}** शुरू हो गया। सभी players 500 XP, 0W-0L पर reset हो गए।',
-    season_ended_neatqueue: 'NeatQueue stats reset कर दी गईं और starting points लागू कर दिए गए।',
     season_ended_active: 'Match creation अब active है। सभी को शुभकामनाएं!',
     cannot_end: 'Season समाप्त नहीं किया जा सकता — {n} match(es) अभी भी active हैं। इनके खत्म होने का wait करें।',
     failed_end: 'Season समाप्त करने में विफल। Logs check करें।',

@@ -185,7 +185,7 @@ module.exports = {
     title: 'XP 比赛',
     description: '与其他玩家争夺 **XP**。不涉及金钱。\n\nXP 根据对手强度获得 — 击败更强的队伍获得更多 XP。',
     btn_create_xp: '创建 XP 比赛',
-    footer: 'XP 与 NeatQueue 同步',
+    footer: 'XP 与 queue 同步',
   },
 
   challenge_create: {
@@ -381,12 +381,11 @@ module.exports = {
     modal_title: '结束赛季并开始新赛季',
     modal_label: '正在结束: {old}。新赛季名称:',
     modal_placeholder: '例如 2026-S2',
-    pause_msg: '**比赛已暂停。** 无法创建新的投注、XP 比赛或 NeatQueue 队列。现有比赛将继续进行直到完成。',
-    resume_msg: '**比赛已恢复。** 投注、XP 比赛和 NeatQueue 队列已重新激活。',
+    pause_msg: '**比赛已暂停。** 无法创建新的投注、XP 比赛或 queue 队列。现有比赛将继续进行直到完成。',
+    resume_msg: '**比赛已恢复。** 投注、XP 比赛和 queue 队列已重新激活。',
     season_ended_complete: '**赛季过渡已完成!**',
     season_ended_old: '**{old}** 已结束。所有赛季数据已保存在历史记录中。',
     season_ended_new: '**{new}** 已开始。所有玩家已重置为 500 XP, 0W-0L。',
-    season_ended_neatqueue: 'NeatQueue 统计数据已重置并应用起始积分。',
     season_ended_active: '比赛创建现已激活。祝大家好运!',
     cannot_end: '无法结束赛季 — 仍有 {n} 场比赛在进行中。请等待它们结束。',
     failed_end: '结束赛季失败。请检查日志。',

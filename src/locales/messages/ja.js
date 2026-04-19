@@ -185,7 +185,7 @@ module.exports = {
     title: 'XPマッチ',
     description: '他のプレイヤーと **XP** を競う。お金は関係なし。\n\nXPは相手の強さに基づいて獲得 — より強いチームに勝つほど多くのXPを獲得。',
     btn_create_xp: 'XPマッチ作成',
-    footer: 'XPはNeatQueueと同期',
+    footer: 'XPはqueueと同期',
   },
 
   challenge_create: {
@@ -381,12 +381,11 @@ module.exports = {
     modal_title: 'シーズンを終了して新規開始',
     modal_label: '終了: {old}。新しいシーズン名:',
     modal_placeholder: '例: 2026-S2',
-    pause_msg: '**マッチを一時停止しました。** 新しいベット、XPマッチ、NeatQueueキューは作成できません。既存のマッチは終了まで続行されます。',
-    resume_msg: '**マッチを再開しました。** ベット、XPマッチ、NeatQueueキューが再びアクティブになりました。',
+    pause_msg: '**マッチを一時停止しました。** 新しいベット、XPマッチ、queueキューは作成できません。既存のマッチは終了まで続行されます。',
+    resume_msg: '**マッチを再開しました。** ベット、XPマッチ、queueキューが再びアクティブになりました。',
     season_ended_complete: '**シーズン移行が完了しました！**',
     season_ended_old: '**{old}** が終了しました。すべてのシーズンデータは履歴に保存されています。',
     season_ended_new: '**{new}** が始まりました。全プレイヤーは 500 XP, 0W-0L にリセットされました。',
-    season_ended_neatqueue: 'NeatQueueの統計がリセットされ、開始ポイントが適用されました。',
     season_ended_active: 'マッチ作成がアクティブになりました。皆さんの健闘を祈ります！',
     cannot_end: 'シーズンを終了できません — まだ {n} 件のマッチがアクティブです。終了をお待ちください。',
     failed_end: 'シーズン終了に失敗しました。ログを確認してください。',

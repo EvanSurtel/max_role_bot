@@ -386,7 +386,6 @@ async function handleAdminModal(interaction) {
 
   const { logAdminAction } = require('../utils/adminAudit');
   const db = require('../database/db');
-  const neatqueueService = require('../services/neatqueueService');
 
   if (id === 'lb_admin_xp_modal') {
     const targetId = interaction.fields.getTextInputValue('target_user_id').trim();
@@ -397,7 +396,6 @@ async function handleAdminModal(interaction) {
     if (!user) return interaction.reply({ content: t('leaderboard_panel.user_not_found_msg', lang, { id: targetId }), ephemeral: true });
     userRepo.addXp(user.id, xpAmount);
     db.prepare('INSERT INTO xp_history (user_id, match_id, match_type, xp_amount, season) VALUES (?, NULL, ?, ?, ?)').run(user.id, 'admin_adjust', xpAmount, getCurrentSeason());
-    if (neatqueueService.isConfigured()) neatqueueService.addPoints(targetId, xpAmount).catch(() => {});
     logAdminAction(interaction.user.id, 'adjust_xp', 'user', user.id, { xpAmount, reason });
 
     // Re-sync the user's rank role — they may have crossed a tier

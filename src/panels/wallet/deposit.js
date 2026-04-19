@@ -23,8 +23,8 @@ async function handleDeposit(interaction, user, wallet, lang) {
   const depositRegion = user.deposit_region || 'GROUP_B';
   const address = wallet.address;
 
-  if (depositRegion === 'GROUP_A' && process.env.CDP_API_KEY) {
-    const cdpAppId = process.env.CDP_API_KEY;
+  if (depositRegion === 'GROUP_A' && process.env.CDP_PROJECT_ID) {
+    const cdpAppId = process.env.CDP_PROJECT_ID;
     const onrampUrl = `https://pay.coinbase.com/buy/select-asset?appId=${cdpAppId}&addresses={"${address}":["base"]}&assets=["USDC"]&presetFiatAmount=50&defaultPaymentMethod=CARD`;
 
     const openButton = new ActionRowBuilder().addComponents(

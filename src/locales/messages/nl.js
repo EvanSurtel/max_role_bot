@@ -186,7 +186,7 @@ module.exports = {
     title: 'XP Matches',
     description: 'Strijd om **XP** tegen andere spelers. Geen geld betrokken.\n\nXP wordt verdiend op basis van tegenstander sterkte — versla sterkere teams voor meer XP.',
     btn_create_xp: 'Maak XP Match',
-    footer: 'XP gesynchroniseerd met NeatQueue',
+    footer: 'XP gesynchroniseerd met queue',
   },
 
   challenge_create: {
@@ -382,12 +382,11 @@ module.exports = {
     modal_title: 'Beëindig Seizoen & Start Nieuw',
     modal_label: 'Beëindigen: {old}. Nieuwe seizoensnaam:',
     modal_placeholder: 'bv. 2026-S2',
-    pause_msg: '**Matches gepauzeerd.** Er kunnen geen nieuwe cash matches, XP matches, of NeatQueue queues worden aangemaakt. Lopende matches gaan door tot ze klaar zijn.',
-    resume_msg: '**Matches hervat.** Cash matches, XP matches, en NeatQueue queues zijn weer actief.',
+    pause_msg: '**Matches gepauzeerd.** Er kunnen geen nieuwe cash matches, XP matches, of queue matches worden aangemaakt. Lopende matches gaan door tot ze klaar zijn.',
+    resume_msg: '**Matches hervat.** Cash matches, XP matches, en queue matches zijn weer actief.',
     season_ended_complete: '**Seizoenswisseling voltooid!**',
     season_ended_old: '**{old}** is beëindigd. Alle seizoensdata is bewaard in de geschiedenis.',
     season_ended_new: '**{new}** is begonnen. Alle spelers zijn gereset naar 500 XP, 0W-0L.',
-    season_ended_neatqueue: 'NeatQueue stats gereset en startpunten toegepast.',
     season_ended_active: 'Match creatie is nu actief. Succes allemaal!',
     cannot_end: 'Kan seizoen niet beëindigen — {n} match(es) nog actief. Wacht tot ze klaar zijn.',
     failed_end: 'Beëindigen van seizoen is mislukt. Check de logs.',

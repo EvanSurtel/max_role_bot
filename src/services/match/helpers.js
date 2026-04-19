@@ -62,8 +62,7 @@ async function postResultToChannels(client, resultEmbed, components, isCashMatch
 }
 
 /**
- * Award XP, stats, and earnings to winners and losers. Also syncs to
- * NeatQueue and logs to xp_history.
+ * Award XP, stats, and earnings to winners and losers. Logs to xp_history.
  *
  * @param {object} params
  * @param {number} params.matchId
@@ -77,7 +76,6 @@ function awardStats({ matchId, challenge, winningPlayers, losingPlayers, isCashM
   const userRepo = require('../../database/repositories/userRepo');
   const { calculateXpMatchRewards, calculateWagerXpRewards } = require('../../utils/xpCalculator');
   const { getCurrentSeason } = require('../../panels/leaderboardPanel');
-  const neatqueueService = require('../neatqueueService');
   const db = require('../../database/db');
 
   let winXp, loseXp;
@@ -127,18 +125,6 @@ function awardStats({ matchId, challenge, winningPlayers, losingPlayers, isCashM
     } catch (err) {
       console.error(`[MatchService] Failed to update stats for winner ${player.user_id}:`, err.message);
     }
-
-    if (neatqueueService.isConfigured()) {
-      const winUser = userRepo.findById(player.user_id);
-      if (winUser) {
-        neatqueueService.addPoints(winUser.discord_id, winXp).catch(err => {
-          console.error(`[MatchService] NeatQueue points failed for winner ${winUser.discord_id}:`, err.message);
-        });
-        neatqueueService.addWin(winUser.discord_id).catch(err => {
-          console.error(`[MatchService] NeatQueue win failed for ${winUser.discord_id}:`, err.message);
-        });
-      }
-    }
   }
 
   for (const player of losingPlayers) {
@@ -154,20 +140,6 @@ function awardStats({ matchId, challenge, winningPlayers, losingPlayers, isCashM
       }
     } catch (err) {
       console.error(`[MatchService] Failed to update stats for loser ${player.user_id}:`, err.message);
-    }
-
-    if (neatqueueService.isConfigured()) {
-      const loseUser = userRepo.findById(player.user_id);
-      if (loseUser) {
-        if (loseXp > 0) {
-          neatqueueService.addPoints(loseUser.discord_id, -loseXp).catch(err => {
-            console.error(`[MatchService] NeatQueue points failed for loser ${loseUser.discord_id}:`, err.message);
-          });
-        }
-        neatqueueService.addLoss(loseUser.discord_id).catch(err => {
-          console.error(`[MatchService] NeatQueue loss failed for ${loseUser.discord_id}:`, err.message);
-        });
-      }
     }
   }
 

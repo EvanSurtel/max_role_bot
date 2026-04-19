@@ -7,9 +7,8 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const QUEUE_CONFIG = require('../config/queueConfig');
 const userRepo = require('../database/repositories/userRepo');
-const neatqueueService = require('../services/neatqueueService');
 const { setClient, getMatch, waitingQueue } = require('./state');
-const { _isStaffMember, findClosestXpReplacement } = require('./helpers');
+const { _isStaffMember, findClosestXpReplacement, _cleanupMatchChannels } = require('./helpers');
 const { recordCaptainVote, finalizeCaptainVote } = require('./captainVote');
 const { recordCaptainPick, _advancePick } = require('./captainPick');
 const { recordRoleChoice, recordOperatorChoice, _postRoleSelectMessage, _checkAllRolesComplete } = require('./roleSelect');
@@ -78,6 +77,11 @@ async function handleQueueInteraction(interaction) {
   // ── Cancel match button (initial + confirm + nevermind) ─────
   if (id.startsWith('queue_cancel_') || id === 'queue_cancel_nevermind') {
     return await _handleCancelButton(interaction);
+  }
+
+  // ── Rejoin queue after staff cancel ─────────────────────────
+  if (id.startsWith('queue_rejoin_')) {
+    return await _handleRejoinButton(interaction);
   }
 
   console.warn(`[QueueService] Unhandled queue interaction: ${id}`);
@@ -581,12 +585,6 @@ async function _handleDqSelectButton(interaction) {
     const user = userRepo.findByDiscordId(targetDiscordId);
     if (user) {
       userRepo.addXp(user.id, -QUEUE_CONFIG.DQ_PENALTY);
-
-      if (neatqueueService.isConfigured()) {
-        neatqueueService.addPoints(targetDiscordId, -QUEUE_CONFIG.DQ_PENALTY).catch(err => {
-          console.error(`[QueueService] NeatQueue DQ penalty sync failed for ${targetDiscordId}:`, err.message);
-        });
-      }
     }
     // Log to admin feed
     const { postTransaction: ptxDq } = require('../utils/transactionFeed');
@@ -721,25 +719,159 @@ async function _handleCancelButton(interaction) {
   await interaction.update({ content: 'Cancelling match...', components: [] });
 
   const { cancelMatch } = require('./matchLifecycle');
-  await cancelMatch(interaction.client, match, `Cancelled by staff (<@${interaction.user.id}>)`);
-
-  try {
-    const tc = interaction.client.channels.cache.get(match.textChannelId);
-    if (tc) {
-      await tc.send({
-        embeds: [new EmbedBuilder()
-          .setTitle('Match Cancelled')
-          .setColor(0xe74c3c)
-          .setDescription(`This match has been cancelled by <@${interaction.user.id}>.\n\nNo XP changes. Channels will be cleaned up shortly.`)
-          .setTimestamp()
-        ],
-      });
-    }
-  } catch { /* best effort */ }
+  // skipCleanupSchedule — we manage our own 15s cleanup window below
+  // so players have a chance to click "Rejoin Queue" before the
+  // channels are torn down.
+  await cancelMatch(
+    interaction.client,
+    match,
+    `Cancelled by staff (<@${interaction.user.id}>)`,
+    { skipCleanupSchedule: true },
+  );
 
   // Disable buttons on the match message
   if (match._matchMsg) {
     try { await match._matchMsg.edit({ components: [] }); } catch { /* */ }
+  }
+
+  // Post cancel embed with Rejoin Queue button (15s window)
+  const REJOIN_WINDOW_MS = 15_000;
+  const playerMentions = [...match.players.keys()].map(id => `<@${id}>`).join(', ') || '—';
+
+  const rejoinRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`queue_rejoin_${match.id}`)
+      .setLabel('Rejoin Queue')
+      .setStyle(ButtonStyle.Success),
+  );
+
+  const cancelEmbed = new EmbedBuilder()
+    .setTitle('Match Cancelled')
+    .setColor(0xe74c3c)
+    .setDescription([
+      `This match has been cancelled by <@${interaction.user.id}>.`,
+      `**No XP changes.**`,
+      '',
+      `**Players:** ${playerMentions}`,
+      '',
+      `Want another match? Click **Rejoin Queue** within **${REJOIN_WINDOW_MS / 1000}s**. If you don't, you are **not** auto-re-queued.`,
+      `Channels will be deleted when the window closes.`,
+    ].join('\n'))
+    .setTimestamp();
+
+  let cancelMsg = null;
+  try {
+    const tc = interaction.client.channels.cache.get(match.textChannelId);
+    if (tc) {
+      cancelMsg = await tc.send({
+        content: playerMentions,
+        embeds: [cancelEmbed],
+        components: [rejoinRow],
+        allowedMentions: { users: [...match.players.keys()] },
+      });
+    }
+  } catch (err) {
+    console.error(`[QueueService] Failed to post staff-cancel rejoin embed for match #${match.id}:`, err.message);
+  }
+
+  // 15s window → disable button and run cleanup
+  setTimeout(async () => {
+    try {
+      if (cancelMsg) {
+        await cancelMsg.edit({ components: [] }).catch(() => {});
+      }
+    } catch { /* best effort */ }
+    _cleanupMatchChannels(interaction.client, match).catch(err => {
+      console.error(`[QueueService] Cleanup failed for cancelled match #${match.id}:`, err.message);
+    });
+  }, REJOIN_WINDOW_MS);
+}
+
+// ── Rejoin Queue button (shown after staff cancel, 15s window) ─
+async function _handleRejoinButton(interaction) {
+  const discordId = interaction.user.id;
+
+  // A stale (>3s) or already-acked interaction would throw on reply.
+  // Log and swallow so we never abort the queue-side side effects just
+  // because the user's ack failed.
+  const safeReply = (payload) =>
+    interaction.reply(payload).catch(err => {
+      console.error('[QueueService] Rejoin: interaction.reply failed:', err.message);
+    });
+
+  const user = userRepo.findByDiscordId(discordId);
+  if (!user || !user.accepted_tos) {
+    return safeReply({
+      content: 'You need to register first. Head to the welcome channel and accept the Terms of Service.',
+      ephemeral: true,
+      _autoDeleteMs: 15_000,
+    });
+  }
+
+  const queueService = require('./index');
+
+  if (queueService.isInQueue(discordId)) {
+    return safeReply({
+      content: 'You are already in the queue.',
+      ephemeral: true,
+      _autoDeleteMs: 10_000,
+    });
+  }
+
+  const activeMatchId = queueService.isInActiveMatch(discordId);
+  if (activeMatchId) {
+    return safeReply({
+      content: `You are already in an active queue match (#${activeMatchId}).`,
+      ephemeral: true,
+      _autoDeleteMs: 10_000,
+    });
+  }
+
+  const { isPlayerBusy } = require('../utils/playerStatus');
+  const busy = isPlayerBusy(user.id, discordId);
+  if (busy.busy) {
+    return safeReply({
+      content: busy.reason,
+      ephemeral: true,
+      _autoDeleteMs: 10_000,
+    });
+  }
+
+  const xp = user.xp_points || 0;
+  const newSize = queueService.joinQueue(discordId, xp);
+
+  await safeReply({
+    content: `Re-joined queue. (${newSize}/${QUEUE_CONFIG.TOTAL_PLAYERS})`,
+    ephemeral: true,
+    _autoDeleteMs: 10_000,
+  });
+
+  // Auto-create match if this rejoin fills the queue. The second size
+  // check guards against a TOCTOU race: two near-simultaneous rejoins
+  // can both observe newSize >= TOTAL_PLAYERS after their respective
+  // joins (queue of 9 → two clicks yield sizes 10 and 11). Without the
+  // re-check, both would call createMatch and the second would splice
+  // a short roster off an empty queue.
+  if (newSize >= QUEUE_CONFIG.TOTAL_PLAYERS && queueService.getQueueSize() >= QUEUE_CONFIG.TOTAL_PLAYERS) {
+    try {
+      const guild = interaction.guild || interaction.client.guilds.cache.get(process.env.GUILD_ID);
+      if (guild) {
+        const { createMatch } = require('./matchLifecycle');
+        await createMatch(interaction.client, guild);
+      }
+    } catch (err) {
+      console.error('[QueueService] Rejoin: auto-create match failed:', err.message);
+    }
+  }
+
+  // Single panel refresh at the end. Uses the lightweight helper
+  // (fetch limit 10, one edit) so even 10 simultaneous clicks stay
+  // well under Discord's per-channel edit rate limits.
+  try {
+    const { refreshQueuePanel } = require('../panels/queuePanel');
+    await refreshQueuePanel(interaction.client);
+  } catch (err) {
+    console.error('[QueueService] Rejoin: panel refresh failed:', err.message);
   }
 }
 

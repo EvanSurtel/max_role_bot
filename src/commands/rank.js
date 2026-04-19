@@ -7,14 +7,12 @@
 // (see rank-context.js) — both paths produce the exact same embed
 // via buildRankCard().
 //
-// XP source of truth: NeatQueue's channel leaderboard. Falls back
-// to local users.xp_points if NeatQueue is unreachable. Crowned is
-// position-based (top N on the NeatQueue leaderboard).
+// XP source of truth: local users.xp_points. Crowned is position-based
+// (top N by xp_points among Obsidian-tier players in the local DB).
 
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { RANK_TIERS } = require('../config/constants');
 const userRepo = require('../database/repositories/userRepo');
-const neatqueueService = require('../services/neatqueueService');
 const { getLocale } = require('../locales');
 const { langFor } = require('../locales/i18n');
 const { renderRankCard } = require('../utils/rankCardRenderer');
@@ -32,25 +30,6 @@ function _tierForXp(xp) {
 
 function _positionBasedTier() {
   return RANK_TIERS.find(t => t.topN) || null;
-}
-
-function _normalizeLeaderboard(raw) {
-  if (!raw) return [];
-  const arr = Array.isArray(raw)
-    ? raw
-    : (raw.leaderboard || raw.data || raw.players || raw.entries || []);
-  if (!Array.isArray(arr)) return [];
-  const normalized = arr.map(entry => {
-    const userId = String(
-      entry.user_id || entry.userId || entry.id || entry.discord_id || entry.discordId || ''
-    );
-    const points = Number(
-      entry.points ?? entry.score ?? entry.stats?.points ?? entry.xp ?? 0
-    );
-    return { userId, points };
-  }).filter(e => e.userId);
-  normalized.sort((a, b) => b.points - a.points);
-  return normalized;
 }
 
 /**
@@ -73,32 +52,25 @@ async function buildRankCard(targetUser, lang = 'en') {
     };
   }
 
-  // Fetch authoritative XP from NeatQueue
-  let points = null;
-  let position = null;
-  try {
-    if (neatqueueService.isConfigured()) {
-      const raw = await neatqueueService.getChannelLeaderboard();
-      const lb = _normalizeLeaderboard(raw);
-      const idx = lb.findIndex(e => e.userId === String(targetUser.id));
-      if (idx !== -1) {
-        points = lb[idx].points;
-        position = idx + 1;
-      }
-    }
-  } catch (err) {
-    console.warn('[RankCmd] NeatQueue lookup failed, falling back to local:', err.message);
-  }
+  const points = user.xp_points || 0;
 
-  if (points === null) {
-    points = user.xp_points || 0;
-  }
-
-  // Decide the tier — Crowned overrides base tier when in top N
+  // Position = rank among accepted-TOS users by xp_points (1-based).
+  // Only computed when relevant — we only need it to decide Crowned.
   const crowned = _positionBasedTier();
+  let position = null;
   let tier = _tierForXp(points);
-  if (crowned && position !== null && position <= (crowned.topN || 10)) {
-    tier = crowned;
+  if (crowned) {
+    const obsidianMinXp = RANK_TIERS.find(t => t.key === 'obsidian')?.minXp || 4500;
+    if (points >= obsidianMinXp) {
+      const db = require('../database/db');
+      try {
+        const ahead = db.prepare(
+          'SELECT COUNT(*) as c FROM users WHERE accepted_tos = 1 AND xp_points > ?'
+        ).get(points)?.c || 0;
+        position = ahead + 1;
+        if (position <= (crowned.topN || 10)) tier = crowned;
+      } catch { /* fall through with no position */ }
+    }
   }
 
   const tierLocaleEntry = tRanks[tier.key] || {};
