@@ -6,6 +6,7 @@ const {
 } = require('discord.js');
 const { t } = require('../../locales/i18n');
 const changelly = require('../../services/changellyService');
+const onramp = require('../../services/coinbaseOnrampService');
 
 /**
  * Show region-specific deposit instructions.
@@ -23,9 +24,33 @@ async function handleDeposit(interaction, user, wallet, lang) {
   const depositRegion = user.deposit_region || 'GROUP_B';
   const address = wallet.address;
 
-  if (depositRegion === 'GROUP_A' && process.env.CDP_PROJECT_ID) {
-    const cdpAppId = process.env.CDP_PROJECT_ID;
-    const onrampUrl = `https://pay.coinbase.com/buy/select-asset?appId=${cdpAppId}&addresses={"${address}":["base"]}&assets=["USDC"]&presetFiatAmount=50&defaultPaymentMethod=CARD`;
+  if (depositRegion === 'GROUP_A' && onramp.isConfigured()) {
+    await interaction.deferReply({ ephemeral: true });
+
+    let sessionToken;
+    try {
+      sessionToken = await onramp.createSessionToken({
+        walletAddress: address,
+        assets: ['USDC'],
+        blockchains: ['base'],
+      });
+    } catch (err) {
+      console.error('[Wallet] Failed to mint Onramp session token:', err.message);
+      return interaction.editReply({
+        content: [
+          '**\u{1F4B3} Deposit USDC**',
+          '',
+          `Your deposit address (Base network):`,
+          `\`\`\`\n${address}\n\`\`\``,
+          '',
+          'We could not generate a payment link right now. You can still deposit by buying USDC on any exchange (Binance, Bybit, Coinbase, etc.) and sending it to your address above.',
+          '',
+          '\u26A0\uFE0F Make sure to send USDC on the **Base** network. Sending on the wrong network will result in permanent loss of funds.',
+        ].join('\n'),
+      });
+    }
+
+    const onrampUrl = `https://pay.coinbase.com/buy/select-asset?sessionToken=${encodeURIComponent(sessionToken)}&presetFiatAmount=50&defaultPaymentMethod=CARD`;
 
     const openButton = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -34,7 +59,7 @@ async function handleDeposit(interaction, user, wallet, lang) {
         .setStyle(ButtonStyle.Link),
     );
 
-    return interaction.reply({
+    return interaction.editReply({
       content: [
         '**\u{1F4B3} Deposit USDC**',
         '',
@@ -50,7 +75,6 @@ async function handleDeposit(interaction, user, wallet, lang) {
         '\u26A0\uFE0F Make sure to send USDC on the **Base** network. Sending on the wrong network will result in permanent loss of funds.',
       ].join('\n'),
       components: [openButton],
-      ephemeral: true,
     });
   }
 

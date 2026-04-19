@@ -7,6 +7,7 @@ const {
 const walletRepo = require('../../database/repositories/walletRepo');
 const { USDC_PER_UNIT } = require('../../config/constants');
 const changelly = require('../../services/changellyService');
+const onramp = require('../../services/coinbaseOnrampService');
 
 /**
  * Show cash-out (fiat offramp) instructions based on deposit region.
@@ -23,15 +24,35 @@ async function handleCashOut(interaction, user, wallet, lang) {
   const depositRegion = user.deposit_region || 'GROUP_B';
   const address = wallet.address;
 
-  if (depositRegion === 'GROUP_A' && process.env.CDP_PROJECT_ID) {
-    const cdpAppId = process.env.CDP_PROJECT_ID;
-    const offrampUrl = `https://pay.coinbase.com/sell/select-asset?appId=${cdpAppId}&addresses={"${address}":["base"]}&assets=["USDC"]`;
+  if (depositRegion === 'GROUP_A' && onramp.isConfigured()) {
+    await interaction.deferReply({ ephemeral: true });
+
+    let sessionToken;
+    try {
+      sessionToken = await onramp.createSessionToken({
+        walletAddress: address,
+        assets: ['USDC'],
+        blockchains: ['base'],
+      });
+    } catch (err) {
+      console.error('[Wallet] Failed to mint Offramp session token:', err.message);
+      return interaction.editReply({
+        content: [
+          '**\u{1F4B8} Cash Out**',
+          '',
+          'We could not generate a cash-out link right now.',
+          'Use **Send** to withdraw USDC to an exchange (Binance, Coinbase, etc.) on the Base network, then sell there.',
+        ].join('\n'),
+      });
+    }
+
+    const offrampUrl = `https://pay.coinbase.com/sell/select-asset?sessionToken=${encodeURIComponent(sessionToken)}`;
 
     const openButton = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setURL(offrampUrl).setLabel('Cash Out USDC').setStyle(ButtonStyle.Link),
     );
 
-    return interaction.reply({
+    return interaction.editReply({
       content: [
         '**\u{1F4B8} Cash Out**',
         '',
@@ -41,7 +62,6 @@ async function handleCashOut(interaction, user, wallet, lang) {
         '4. Cash arrives in your account within minutes',
       ].join('\n'),
       components: [openButton],
-      ephemeral: true,
     });
   }
 
