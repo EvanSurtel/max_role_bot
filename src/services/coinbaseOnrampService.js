@@ -61,7 +61,7 @@ async function createOneClickBuySession({
   destinationNetwork = 'base',
   paymentAmount,
   paymentCurrency,
-  paymentMethod = 'CARD',
+  paymentMethod,     // optional — omitting lets Coinbase surface guest-compatible methods (e.g. Apple Pay) instead of pinning to one
   country,
   subdivision,
   partnerUserRef,
@@ -78,10 +78,10 @@ async function createOneClickBuySession({
     destinationNetwork,
     paymentAmount: String(paymentAmount),
     paymentCurrency,
-    paymentMethod,
     country,
     partnerUserRef,
   };
+  if (paymentMethod) body.paymentMethod = paymentMethod;
   if (subdivision) body.subdivision = subdivision;
 
   const res = await fetch(`https://${SESSIONS_HOST}${SESSIONS_PATH}`, {

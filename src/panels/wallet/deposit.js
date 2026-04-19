@@ -53,7 +53,10 @@ async function handleDeposit(interaction, user, wallet, lang) {
         destinationNetwork: 'base',
         paymentAmount: '50',
         paymentCurrency,
-        paymentMethod: 'CARD',
+        // Intentionally omitting paymentMethod — letting Coinbase pick
+        // the best available (including guest-eligible Apple Pay) for
+        // the viewer. Pinning to CARD forces the Coinbase-account card
+        // flow, which disqualifies the guest path.
         country: country || 'US',
         partnerUserRef: String(user.discord_id).slice(0, 49),
       });
