@@ -141,7 +141,7 @@ async function _request(method, path, body = null) {
  * @param {string} options.countryCode  - ISO 3166-1 alpha-2 country code
  * @returns {Promise<{orderId: string, redirectUrl: string, providerCode: string}|null>}
  */
-async function createOrder({ userId, walletAddress, amountUsd, countryCode }) {
+async function createOrder({ userId, walletAddress, amountUsd, countryCode, stateCode }) {
   const offers = await getOffers(amountUsd, countryCode);
   const offerList = Array.isArray(offers) ? offers : (offers?.data || offers?.offers || []);
   if (!offerList || offerList.length === 0) {
@@ -149,15 +149,19 @@ async function createOrder({ userId, walletAddress, amountUsd, countryCode }) {
     return null;
   }
 
-  // Pick the first offer with a resolvable providerCode. Providers
-  // occasionally appear in offers without a code (partially supported);
-  // skip those rather than failing the /orders call downstream.
-  const offer = offerList.find(o => (o.providerCode || o.provider?.code || o.provider_code));
-  const providerCode = offer && (offer.providerCode || offer.provider?.code || offer.provider_code);
-  if (!providerCode) {
-    console.error(`[Changelly] Offers returned but none had a providerCode: ${JSON.stringify(offerList).slice(0, 300)}`);
+  // Changelly's /offers response is a union of success and error offers —
+  // same shape otherwise, but error offers carry `errorType`+`errorMessage`
+  // and NO rate/fee. Picking one and passing its providerCode straight to
+  // /orders is how the "could not generate payment link" path fires. Filter
+  // to success offers only before picking.
+  const successOffers = offerList.filter(o => !o.errorType && (o.providerCode || o.provider?.code || o.provider_code));
+  if (successOffers.length === 0) {
+    const errs = offerList.filter(o => o.errorType).map(o => `${o.providerCode}:${o.errorType}`).join(', ');
+    console.error(`[Changelly] No usable offers for ${amountUsd} USD → USDC in ${countryCode}. Provider errors: ${errs || 'none'}`);
     return null;
   }
+  const offer = successOffers[0];
+  const providerCode = offer.providerCode || offer.provider?.code || offer.provider_code;
 
   const webhookHost = process.env.WEBHOOK_HOST || '';
 
@@ -172,6 +176,13 @@ async function createOrder({ userId, walletAddress, amountUsd, countryCode }) {
     walletAddress,
     paymentMethod: 'card',
   };
+
+  // `state` is required by Changelly when country=US (the
+  // ChangellyErrorType.State enum exists specifically for offers
+  // rejected due to missing state). Omitting it for non-US countries.
+  if (countryCode === 'US' && stateCode) {
+    body.state = stateCode;
+  }
 
   if (webhookHost) {
     body.returnSuccessUrl = `${webhookHost}/deposit-success`;
@@ -239,7 +250,7 @@ async function getAvailableCountries() {
  * @param {string} options.countryCode  - ISO 3166-1 alpha-2 country code
  * @returns {Promise<{orderId: string, redirectUrl: string}|null>}
  */
-async function createSellOrder({ userId, walletAddress, amountUsdc, countryCode }) {
+async function createSellOrder({ userId, walletAddress, amountUsdc, countryCode, stateCode }) {
   // Off-ramp uses the same /offers → /orders flow as on-ramp, just with
   // currencyFrom/To flipped. providerCode is still required.
   const offers = await _request('GET', `/offers?${new URLSearchParams({
@@ -254,12 +265,15 @@ async function createSellOrder({ userId, walletAddress, amountUsdc, countryCode 
     console.error(`[Changelly] No sell offers available for ${amountUsdc} USDC → USD in ${countryCode}`);
     return null;
   }
-  const offer = offerList.find(o => (o.providerCode || o.provider?.code || o.provider_code));
-  const providerCode = offer && (offer.providerCode || offer.provider?.code || offer.provider_code);
-  if (!providerCode) {
-    console.error(`[Changelly] Sell offers returned but none had a providerCode`);
+
+  const successOffers = offerList.filter(o => !o.errorType && (o.providerCode || o.provider?.code || o.provider_code));
+  if (successOffers.length === 0) {
+    const errs = offerList.filter(o => o.errorType).map(o => `${o.providerCode}:${o.errorType}`).join(', ');
+    console.error(`[Changelly] No usable sell offers in ${countryCode}. Provider errors: ${errs || 'none'}`);
     return null;
   }
+  const offer = successOffers[0];
+  const providerCode = offer.providerCode || offer.provider?.code || offer.provider_code;
 
   const webhookHost = process.env.WEBHOOK_HOST || '';
 
@@ -275,6 +289,10 @@ async function createSellOrder({ userId, walletAddress, amountUsdc, countryCode 
     paymentMethod: 'card',
     metadata: { blockchain: 'base' },
   };
+
+  if (countryCode === 'US' && stateCode) {
+    body.state = stateCode;
+  }
 
   if (webhookHost) {
     body.returnSuccessUrl = `${webhookHost}/cashout-success`;

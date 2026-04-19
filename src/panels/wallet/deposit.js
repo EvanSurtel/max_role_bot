@@ -119,6 +119,7 @@ async function handleDeposit(interaction, user, wallet, lang) {
         walletAddress: address,
         amountUsd: 50,
         countryCode: country || 'US',
+        stateCode: user.state_code || null, // pass-through for US users; null otherwise
       });
 
       if (order?.redirectUrl) {
