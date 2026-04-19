@@ -8,34 +8,59 @@ const { t } = require('../../locales/i18n');
 const changelly = require('../../services/changellyService');
 const onramp = require('../../services/coinbaseOnrampService');
 
+// ISO 3166-1 alpha-2 → Onramp fiat currency. Coinbase's Onramp supports
+// USD / CAD / GBP / EUR / AUD presets; anything else falls back to USD.
+const FIAT_BY_COUNTRY = {
+  CA: 'CAD', GB: 'GBP', AU: 'AUD',
+  AT: 'EUR', BE: 'EUR', CY: 'EUR', DE: 'EUR', EE: 'EUR', ES: 'EUR', FI: 'EUR',
+  FR: 'EUR', GR: 'EUR', IE: 'EUR', IT: 'EUR', LT: 'EUR', LU: 'EUR', LV: 'EUR',
+  MT: 'EUR', NL: 'EUR', PT: 'EUR', SI: 'EUR', SK: 'EUR',
+};
+
 /**
  * Show region-specific deposit instructions.
  *
- * Group A (US/UK/EU/etc.) gets a Coinbase Onramp link (0% fee).
- * Group B (everywhere else) gets a Changelly fiat on-ramp (~4-5% fee).
- * Falls back to generic manual instructions if no provider is configured.
+ * Group A (US / UK / Canada / EU / etc.) — Coinbase Onramp one-click-buy:
+ *   Calls POST /platform/v2/onramp/sessions to get a URL that, for users
+ *   without an active Coinbase session, lands DIRECTLY on guest checkout
+ *   (Apple Pay / debit card). No sign-in page.
  *
- * @param {import('discord.js').ButtonInteraction} interaction
- * @param {object} user - DB user row.
- * @param {object} wallet - DB wallet row.
- * @param {string} lang - Locale code.
+ * Group B (everywhere else) — Changelly fiat on-ramp:
+ *   First pulls /offers to find an available provider (moonpay, banxa,
+ *   transak, wert), then creates the order with that providerCode. The
+ *   order's redirectUrl goes straight to the provider's hosted page —
+ *   no Changelly account required.
+ *
+ * Manual fallback if either generator fails.
  */
 async function handleDeposit(interaction, user, wallet, lang) {
   const depositRegion = user.deposit_region || 'GROUP_B';
   const address = wallet.address;
+  const country = (user.country_code || '').toUpperCase();
 
+  // ─── Group A: Coinbase one-click buy ────────────────────────
   if (depositRegion === 'GROUP_A' && onramp.isConfigured()) {
     await interaction.deferReply({ ephemeral: true });
 
-    let sessionToken;
+    const paymentCurrency = FIAT_BY_COUNTRY[country] || 'USD';
+
+    let onrampUrl;
+    let quote = null;
     try {
-      sessionToken = await onramp.createSessionToken({
+      const session = await onramp.createOneClickBuySession({
         walletAddress: address,
-        assets: ['USDC'],
-        blockchains: ['base'],
+        purchaseCurrency: 'USDC',
+        destinationNetwork: 'base',
+        paymentAmount: '50',
+        paymentCurrency,
+        paymentMethod: 'CARD',
+        country: country || 'US',
+        partnerUserRef: String(user.discord_id).slice(0, 49),
       });
+      onrampUrl = session.onrampUrl;
+      quote = session.quote;
     } catch (err) {
-      console.error('[Wallet] Failed to mint Onramp session token:', err.message);
+      console.error('[Wallet] Failed to create one-click Onramp session:', err.message);
       return interaction.editReply({
         content: [
           '**\u{1F4B3} Deposit USDC**',
@@ -50,31 +75,16 @@ async function handleDeposit(interaction, user, wallet, lang) {
       });
     }
 
-    // Build the hosted-widget URL. Match Coinbase's reference demo —
-    // `partnerUserId`, `defaultAsset`, `defaultNetwork`, and `fiatCurrency`
-    // are what prompt the widget to show the guest-checkout flow
-    // (US/UK/Canada) instead of defaulting to the sign-in page.
-    const country = (user.country_code || '').toUpperCase();
-    const fiatCurrency = country === 'CA' ? 'CAD' : country === 'GB' ? 'GBP' : country === 'AU' ? 'AUD'
-      : (country === 'US' || !country) ? 'USD'
-      : 'USD'; // EU users get USD (EUR not yet supported by Onramp fiat preset)
-    const params = new URLSearchParams({
-      sessionToken,
-      defaultAsset: 'USDC',
-      defaultNetwork: 'base',
-      defaultPaymentMethod: 'CARD',
-      presetFiatAmount: '50',
-      fiatCurrency,
-      partnerUserId: address.slice(0, 49),
-    });
-    const onrampUrl = `https://pay.coinbase.com/buy/select-asset?${params.toString()}`;
-
     const openButton = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setURL(onrampUrl)
         .setLabel('Buy USDC')
         .setStyle(ButtonStyle.Link),
     );
+
+    const quoteLine = quote?.paymentTotal
+      ? `(Preview: **${quote.paymentTotal} ${quote.paymentCurrency}** → **${quote.purchaseAmount} USDC**)`
+      : '';
 
     return interaction.editReply({
       content: [
@@ -84,30 +94,31 @@ async function handleDeposit(interaction, user, wallet, lang) {
         `\`\`\`\n${address}\n\`\`\``,
         '',
         '**Steps:**',
-        '1. Click the button below \u2014 it opens Coinbase',
-        '2. Enter the amount you want (minimum $5)',
-        '3. Pay with card, Apple Pay, Google Pay, or bank transfer',
-        '4. USDC arrives in your wallet within a few minutes \u2014 **0% fee**',
+        '1. Click the button below \u2014 no Coinbase account needed',
+        '2. Pay with **Apple Pay** or **debit card**',
+        '3. USDC arrives in your wallet within a few minutes \u2014 **0% fee**',
+        quoteLine ? '' : null,
+        quoteLine || null,
         '',
         '\u26A0\uFE0F Make sure to send USDC on the **Base** network. Sending on the wrong network will result in permanent loss of funds.',
-      ].join('\n'),
+      ].filter(line => line !== null).join('\n'),
       components: [openButton],
     });
   }
 
-  // Group B (or no CDP key) -- Changelly fiat on-ramp
+  // ─── Group B: Changelly ─────────────────────────────────────
   if (changelly.isConfigured()) {
-    try {
-      await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
 
+    try {
       const order = await changelly.createOrder({
         userId: interaction.user.id,
         walletAddress: address,
         amountUsd: 50,
-        countryCode: user.country_code || 'US',
+        countryCode: country || 'US',
       });
 
-      if (order && order.redirectUrl) {
+      if (order?.redirectUrl) {
         const buyButton = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setURL(order.redirectUrl)
@@ -123,12 +134,11 @@ async function handleDeposit(interaction, user, wallet, lang) {
             `\`\`\`\n${address}\n\`\`\``,
             '',
             '**Steps:**',
-            '1. Click the button below \u2014 it opens the payment page',
-            '2. Enter the amount you want (minimum ~$5)',
-            '3. Pay with your card',
-            '4. USDC arrives in your wallet within a few minutes',
+            '1. Click the button below \u2014 no account needed',
+            '2. Pay with your card on the payment page',
+            '3. USDC arrives in your wallet within a few minutes',
             '',
-            '\u{1F4B8} Fee: ~4-5% from the payment provider.',
+            '\u{1F4B8} Fee: ~4\u20135% from the payment provider.',
             '',
             '\u26A0\uFE0F Make sure to send USDC on the **Base** network. Sending on the wrong network will result in permanent loss of funds.',
           ].join('\n'),
@@ -136,10 +146,9 @@ async function handleDeposit(interaction, user, wallet, lang) {
         });
       }
     } catch (err) {
-      console.error('[Wallet] Changelly order creation failed:', err);
+      console.error('[Wallet] Changelly order creation failed:', err.message);
     }
 
-    // Changelly order failed -- show fallback with manual instructions
     return interaction.editReply({
       content: [
         '**\u{1F4B3} Deposit USDC**',
@@ -154,7 +163,7 @@ async function handleDeposit(interaction, user, wallet, lang) {
     });
   }
 
-  // Changelly not configured -- fallback manual instructions
+  // ─── No provider configured — manual only ───────────────────
   return interaction.reply({
     content: [
       '**\u{1F4B3} Deposit USDC**',

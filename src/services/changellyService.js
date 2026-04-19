@@ -126,21 +126,45 @@ async function _request(method, path, body = null) {
 
 /**
  * Create a fiat-to-crypto order and return the redirect URL.
+ *
+ * Changelly's /orders endpoint requires `providerCode` (moonpay, banxa,
+ * transak, or wert) — it won't pick one for you. We call /offers first
+ * to see which providers are currently available for this country +
+ * currency pair and use the first one (Changelly returns offers ranked
+ * by best rate). The resulting redirect URL goes straight to that
+ * provider's hosted page; the user doesn't sign into Changelly.
+ *
  * @param {Object} options
  * @param {string} options.userId       - Discord user ID
  * @param {string} options.walletAddress - Base wallet address to receive USDC
  * @param {number|string} options.amountUsd - Amount in USD
  * @param {string} options.countryCode  - ISO 3166-1 alpha-2 country code
- * @returns {Promise<{orderId: string, redirectUrl: string}|null>}
+ * @returns {Promise<{orderId: string, redirectUrl: string, providerCode: string}|null>}
  */
 async function createOrder({ userId, walletAddress, amountUsd, countryCode }) {
-  // Build webhook URL from server's public IP and port
-  const webhookPort = process.env.WEBHOOK_PORT || '3001';
-  const webhookHost = process.env.WEBHOOK_HOST || ''; // e.g., http://40.233.115.208:3001
+  const offers = await getOffers(amountUsd, countryCode);
+  const offerList = Array.isArray(offers) ? offers : (offers?.data || offers?.offers || []);
+  if (!offerList || offerList.length === 0) {
+    console.error(`[Changelly] No offers available for ${amountUsd} USD → USDC in ${countryCode}`);
+    return null;
+  }
+
+  // Pick the first offer with a resolvable providerCode. Providers
+  // occasionally appear in offers without a code (partially supported);
+  // skip those rather than failing the /orders call downstream.
+  const offer = offerList.find(o => (o.providerCode || o.provider?.code || o.provider_code));
+  const providerCode = offer && (offer.providerCode || offer.provider?.code || offer.provider_code);
+  if (!providerCode) {
+    console.error(`[Changelly] Offers returned but none had a providerCode: ${JSON.stringify(offerList).slice(0, 300)}`);
+    return null;
+  }
+
+  const webhookHost = process.env.WEBHOOK_HOST || '';
 
   const body = {
     externalOrderId: `rank-${userId}-${Date.now()}`,
     externalUserId: userId,
+    providerCode,
     currencyFrom: 'USD',
     currencyTo: 'USDC',
     amountFrom: String(amountUsd),
@@ -149,19 +173,20 @@ async function createOrder({ userId, walletAddress, amountUsd, countryCode }) {
     paymentMethod: 'card',
   };
 
-  // Add webhook URL if configured
   if (webhookHost) {
-    body.callbackUrl = `${webhookHost}/api/changelly/webhook`;
+    body.returnSuccessUrl = `${webhookHost}/deposit-success`;
+    body.returnFailedUrl = `${webhookHost}/deposit-failed`;
   }
 
   const data = await _request('POST', '/orders', body);
   if (!data) return null;
 
-  console.log(`[Changelly] Order created for user ${userId}: orderId=${data.orderId || data.id || 'unknown'}`);
+  console.log(`[Changelly] Order created for user ${userId} via ${providerCode}: orderId=${data.orderId || data.id || 'unknown'}`);
 
   return {
     orderId: data.orderId || data.id,
     redirectUrl: data.redirectUrl || data.paymentUrl || data.redirect_url,
+    providerCode,
   };
 }
 
@@ -215,11 +240,33 @@ async function getAvailableCountries() {
  * @returns {Promise<{orderId: string, redirectUrl: string}|null>}
  */
 async function createSellOrder({ userId, walletAddress, amountUsdc, countryCode }) {
+  // Off-ramp uses the same /offers → /orders flow as on-ramp, just with
+  // currencyFrom/To flipped. providerCode is still required.
+  const offers = await _request('GET', `/offers?${new URLSearchParams({
+    currencyFrom: 'USDC',
+    currencyTo: 'USD',
+    amountFrom: String(amountUsdc),
+    country: countryCode,
+    paymentMethod: 'card',
+  }).toString()}`);
+  const offerList = Array.isArray(offers) ? offers : (offers?.data || offers?.offers || []);
+  if (!offerList || offerList.length === 0) {
+    console.error(`[Changelly] No sell offers available for ${amountUsdc} USDC → USD in ${countryCode}`);
+    return null;
+  }
+  const offer = offerList.find(o => (o.providerCode || o.provider?.code || o.provider_code));
+  const providerCode = offer && (offer.providerCode || offer.provider?.code || offer.provider_code);
+  if (!providerCode) {
+    console.error(`[Changelly] Sell offers returned but none had a providerCode`);
+    return null;
+  }
+
   const webhookHost = process.env.WEBHOOK_HOST || '';
 
   const body = {
     externalOrderId: `rank-sell-${userId}-${Date.now()}`,
     externalUserId: userId,
+    providerCode,
     currencyFrom: 'USDC',
     currencyTo: 'USD',
     amountFrom: String(amountUsdc),
@@ -230,17 +277,19 @@ async function createSellOrder({ userId, walletAddress, amountUsdc, countryCode 
   };
 
   if (webhookHost) {
-    body.callbackUrl = `${webhookHost}/api/changelly/webhook`;
+    body.returnSuccessUrl = `${webhookHost}/cashout-success`;
+    body.returnFailedUrl = `${webhookHost}/cashout-failed`;
   }
 
   const data = await _request('POST', '/orders', body);
   if (!data) return null;
 
-  console.log(`[Changelly] Sell order created for user ${userId}: orderId=${data.orderId || data.id || 'unknown'}`);
+  console.log(`[Changelly] Sell order created for user ${userId} via ${providerCode}: orderId=${data.orderId || data.id || 'unknown'}`);
 
   return {
     orderId: data.orderId || data.id,
     redirectUrl: data.redirectUrl || data.paymentUrl || data.redirect_url,
+    providerCode,
   };
 }
 
