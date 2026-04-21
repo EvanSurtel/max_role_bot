@@ -19,14 +19,16 @@ function startWebhookServer(client) {
   }
 
   app = express();
-  app.use(express.json());
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
   // ─── Changelly Fiat On-Ramp Webhook ─────────────────────────
-  app.post('/api/changelly/webhook', async (req, res) => {
+  // Changelly verifies via RSA signature over the JSON body, which
+  // express.json() parses after we've grabbed what we need via the
+  // `x-callback-signature` header path below. Json parser is fine here.
+  app.post('/api/changelly/webhook', express.json(), async (req, res) => {
     res.status(200).json({ ok: true });
 
     try {
@@ -192,115 +194,122 @@ function startWebhookServer(client) {
   });
 
   // ─── Coinbase CDP Onramp / Offramp Webhook ─────────────────────
-  // Coinbase posts transaction.updated events here when an Onramp
-  // session completes or fails. We use it to increment the CDP trial
-  // counter so the payment router auto-falls-back to Wert once the
-  // 25-transaction trial cap is exhausted.
   //
-  // Docs: https://docs.cdp.coinbase.com/onramp/additional-resources/webhooks
-  // Signature verification is via HMAC with CDP_WEBHOOK_SECRET.
-  app.post('/api/coinbase/webhook', async (req, res) => {
-    res.status(200).json({ ok: true });
+  // Coinbase delivers webhooks via Hook0. Per their docs
+  // (https://docs.cdp.coinbase.com/data/webhooks/verify-signatures):
+  //
+  //   - Header:     x-hook0-signature
+  //   - Format:     t=<unix_ts>,h=<space-separated-header-names>,v1=<hmac_hex>
+  //   - Algorithm:  HMAC-SHA256 over
+  //                   `${timestamp}.${headerNames}.${headerValues}.${rawBody}`
+  //   - Body:       RAW bytes (we must not json-parse before verifying)
+  //   - Window:     5-minute replay tolerance on the `t=` timestamp
+  //
+  // We verify the signature first, then JSON-parse the raw buffer. The
+  // secret comes from the webhook subscription response when the
+  // subscription was created in the CDP Portal (stored as CDP_WEBHOOK_SECRET).
+  //
+  // Event types we care about (dot-separated service.resource.verb):
+  //   - onramp.transaction.success   → increment trial counter
+  //   - onramp.transaction.failed    → log only
+  //   - offramp.transaction.*        → forwarded to offramp handler
+  //
+  // Status enum (from @coinbase/cdp-sdk OpenAPI schemas):
+  //   ONRAMP_ORDER_STATUS_PENDING_AUTH|PENDING_PAYMENT|PROCESSING|COMPLETED|FAILED
+  app.post('/api/coinbase/webhook',
+    express.raw({ type: '*/*' }),
+    async (req, res) => {
+      res.status(200).json({ ok: true });
 
-    try {
-      // Signature verification — only runs if CDP_WEBHOOK_SECRET is
-      // set. On mainnet without a secret we refuse to increment the
-      // counter (otherwise anyone could POST to this endpoint and
-      // accelerate trial burn).
-      const secret = process.env.CDP_WEBHOOK_SECRET;
-      // Coinbase's webhook signature header isn't publicly documented
-      // for CDP Onramp specifically. Their Commerce product uses
-      // `x-cc-webhook-signature`; we also accept the generic variants
-      // in case CDP's is different. First matching header wins.
-      const signature =
-        req.headers['x-cc-webhook-signature'] ||
-        req.headers['x-cdp-webhook-signature'] ||
-        req.headers['x-webhook-signature'] ||
-        req.headers['coinbase-signature'] ||
-        req.headers['x-signature'];
-      if (secret) {
-        try {
-          const crypto = require('crypto');
-          const body = JSON.stringify(req.body);
-          const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
-          // Constant-time compare to avoid timing-based signature oracle.
-          let verified = false;
-          if (signature) {
-            const a = Buffer.from(String(signature));
-            const b = Buffer.from(expected);
-            verified = a.length === b.length && crypto.timingSafeEqual(a, b);
-          }
-          if (!verified) {
-            console.warn('[CDP] Webhook signature mismatch — ignoring (tried x-cc-webhook-signature, x-cdp-webhook-signature, x-webhook-signature, coinbase-signature, x-signature)');
+      try {
+        const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '');
+        const rawBodyStr = rawBody.toString('utf8');
+
+        const secret = process.env.CDP_WEBHOOK_SECRET;
+        const signatureHeader = req.headers['x-hook0-signature'];
+
+        // Signature verification
+        if (secret) {
+          const verifyResult = _verifyHook0Signature(rawBodyStr, signatureHeader, secret, req.headers);
+          if (!verifyResult.ok) {
+            console.warn(`[CDP] Webhook signature rejected: ${verifyResult.reason}`);
             return;
           }
-        } catch (verifyErr) {
-          console.warn('[CDP] Webhook signature verification error:', verifyErr.message);
-          return;
-        }
-      } else {
-        const isMainnet = (process.env.BASE_NETWORK || 'mainnet').toLowerCase() !== 'sepolia';
-        if (isMainnet) {
-          console.error('[CDP] CDP_WEBHOOK_SECRET not set on mainnet — rejecting webhook to prevent trial-counter tampering.');
-          return;
-        }
-      }
-
-      const payload = req.body;
-      const eventType = payload?.eventType || payload?.event_type || payload?.type;
-      const status = payload?.data?.status || payload?.status;
-      const eventId = payload?.eventId || payload?.event_id || payload?.id || payload?.data?.transactionId;
-      const orderId = payload?.data?.transactionId || payload?.transactionId || payload?.orderId;
-
-      console.log(`[CDP] Webhook received: event=${eventType} status=${status} id=${eventId}`);
-
-      // Idempotency — dedupe on (provider, eventId). If we've already
-      // recorded this event, skip the counter increment.
-      if (eventId) {
-        try {
-          const paymentEventRepo = require('../database/repositories/paymentEventRepo');
-          const inserted = paymentEventRepo.record({
-            provider: 'coinbase',
-            eventId: String(eventId),
-            eventType,
-            orderId: orderId ? String(orderId) : null,
-            status,
-            payload,
-          });
-          if (!inserted) {
-            console.log(`[CDP] Duplicate event ${eventId} — skipping.`);
+        } else {
+          const isMainnet = (process.env.BASE_NETWORK || 'mainnet').toLowerCase() !== 'sepolia';
+          if (isMainnet) {
+            console.error('[CDP] CDP_WEBHOOK_SECRET not set on mainnet — rejecting webhook.');
             return;
           }
-        } catch (dedupeErr) {
-          console.warn('[CDP] Dedupe check failed, processing anyway:', dedupeErr.message);
         }
+
+        // Parse JSON after signature verification. Payload is FLAT per
+        // Coinbase docs (not { data: {...} } wrapped).
+        let payload;
+        try { payload = JSON.parse(rawBodyStr); } catch {
+          console.warn('[CDP] Webhook body was not JSON — ignoring');
+          return;
+        }
+
+        const eventType = payload?.eventType || payload?.event_type || payload?.type;
+        const status = payload?.status;
+        // Per SDK schema, orderId is the canonical id on OnrampOrder.
+        // Fall back to transactionId for older event shapes.
+        const eventId = payload?.orderId || payload?.eventId || payload?.transactionId || payload?.id;
+        const orderId = payload?.orderId || payload?.transactionId;
+        const partnerUserRef = payload?.partnerUserRef;
+        const purchaseAmount = payload?.purchaseAmount;
+
+        console.log(`[CDP] Webhook: event=${eventType} status=${status} order=${orderId} partnerUserRef=${partnerUserRef}`);
+
+        // Idempotency — dedupe on (provider, eventId). Coinbase retries
+        // on 5xx, so the same event can arrive multiple times.
+        if (eventId) {
+          try {
+            const paymentEventRepo = require('../database/repositories/paymentEventRepo');
+            const inserted = paymentEventRepo.record({
+              provider: 'coinbase',
+              eventId: `${eventId}:${status || eventType}`,
+              eventType,
+              orderId: orderId ? String(orderId) : null,
+              status,
+              payload,
+            });
+            if (!inserted) {
+              console.log(`[CDP] Duplicate event ${eventId} — skipping.`);
+              return;
+            }
+          } catch (dedupeErr) {
+            console.warn('[CDP] Dedupe check failed, processing anyway:', dedupeErr.message);
+          }
+        }
+
+        // Increment trial counter on confirmed onramp completions.
+        // Accept both event-type signals (.success) and status signals
+        // (ONRAMP_ORDER_STATUS_COMPLETED) — Coinbase docs aren't
+        // 100% explicit on which fires, so either qualifies.
+        const isOnrampCompleted =
+          eventType === 'onramp.transaction.success' ||
+          (eventType === 'onramp.transaction.updated' && status === 'ONRAMP_ORDER_STATUS_COMPLETED') ||
+          status === 'ONRAMP_ORDER_STATUS_COMPLETED';
+
+        if (isOnrampCompleted) {
+          const cdpTrial = require('./cdpTrialService');
+          const newCount = cdpTrial.incrementTrialCounter();
+          console.log(`[CDP] Trial counter → ${newCount}/${cdpTrial.getStatus().max} (orderId=${orderId} user=${partnerUserRef} amount=${purchaseAmount})`);
+
+          try {
+            const { postTransaction } = require('../utils/transactionFeed');
+            postTransaction({
+              type: 'cdp_onramp_completed',
+              memo: `CDP Onramp completed — ${purchaseAmount} USDC to ${partnerUserRef}. Trial counter ${newCount}/${cdpTrial.getStatus().max}`,
+            });
+          } catch { /* best effort */ }
+        }
+      } catch (err) {
+        console.error('[CDP] Webhook handler error:', err.message);
       }
-
-      // Increment trial counter ONLY on confirmed onramp completions.
-      // Offramp events don't count separately (Coinbase's trial cap is
-      // shared, but we're not offering CDP offramp on Day 1).
-      const isOnrampCompleted =
-        (eventType === 'onramp.transaction.updated' && status === 'ONRAMP_ORDER_STATUS_COMPLETED') ||
-        (status === 'ONRAMP_ORDER_STATUS_COMPLETED');
-
-      if (isOnrampCompleted) {
-        const cdpTrial = require('./cdpTrialService');
-        const newCount = cdpTrial.incrementTrialCounter();
-        console.log(`[CDP] Trial counter incremented → ${newCount}/${cdpTrial.getStatus().max}`);
-
-        // Best-effort transaction feed log
-        try {
-          const { postTransaction } = require('../utils/transactionFeed');
-          postTransaction({
-            type: 'cdp_onramp_completed',
-            memo: `CDP Onramp completed — trial counter now ${newCount}/${cdpTrial.getStatus().max}`,
-          });
-        } catch { /* best effort */ }
-      }
-    } catch (err) {
-      console.error('[CDP] Webhook handler error:', err.message);
-    }
-  });
+    });
 
   app.use((req, res) => {
     res.status(404).send('not found');
@@ -318,6 +327,62 @@ function stopWebhookServer() {
     app = null;
     discordClient = null;
   }
+}
+
+/**
+ * Verify a Hook0 webhook signature.
+ *
+ * Header format: `t=<unix_ts>,h=<space-separated-header-names>,v1=<hmac_hex>`
+ * Signed payload: `${timestamp}.${headerNames}.${headerValues}.${rawBody}`
+ * Algorithm: HMAC-SHA256
+ * Window: 5-minute max age on the timestamp (replay protection)
+ *
+ * Returns { ok: boolean, reason: string }.
+ */
+function _verifyHook0Signature(rawBody, signatureHeader, secret, reqHeaders, maxAgeSeconds = 5 * 60) {
+  if (!signatureHeader) return { ok: false, reason: 'missing x-hook0-signature header' };
+
+  const parts = String(signatureHeader).split(',');
+  const get = (prefix) => {
+    const el = parts.find(p => p.startsWith(prefix));
+    return el ? el.slice(prefix.length) : null;
+  };
+
+  const timestamp = get('t=');
+  const headerNames = get('h=');
+  const providedSig = get('v1=');
+  if (!timestamp || headerNames == null || !providedSig) {
+    return { ok: false, reason: 'signature header missing t=, h=, or v1= component' };
+  }
+
+  // Replay guard
+  const ageSeconds = Math.floor(Date.now() / 1000) - parseInt(timestamp, 10);
+  if (!Number.isFinite(ageSeconds) || ageSeconds > maxAgeSeconds || ageSeconds < -maxAgeSeconds) {
+    return { ok: false, reason: `timestamp out of ±${maxAgeSeconds}s window (age=${ageSeconds}s)` };
+  }
+
+  // Build the header-values portion. The `h=` list is space-separated
+  // header names (possibly empty string if no extra headers are
+  // included). Values are concatenated with '.' separators; missing
+  // headers contribute an empty string.
+  const names = headerNames ? headerNames.split(' ') : [];
+  const values = names.map(name => String(reqHeaders[name.toLowerCase()] ?? '')).join('.');
+
+  const signedPayload = `${timestamp}.${headerNames}.${values}.${rawBody}`;
+
+  const crypto = require('crypto');
+  const expected = crypto.createHmac('sha256', secret).update(signedPayload).digest('hex');
+
+  let verified = false;
+  try {
+    const a = Buffer.from(expected, 'hex');
+    const b = Buffer.from(providedSig, 'hex');
+    verified = a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch (err) {
+    return { ok: false, reason: `compare failed: ${err.message}` };
+  }
+
+  return verified ? { ok: true, reason: 'ok' } : { ok: false, reason: 'hmac mismatch' };
 }
 
 module.exports = { startWebhookServer, stopWebhookServer };

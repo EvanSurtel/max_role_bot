@@ -302,6 +302,11 @@ module.exports = {
           return await disputeCreate.handleCreateDispute(interaction);
         }
         // "View My Wallet" button on the public wallet panel
+        if (id === 'coinbase_review_demo') {
+          const { handleCoinbaseReviewDemoButton } = require('../panels/coinbaseReviewDemoPanel');
+          return await handleCoinbaseReviewDemoButton(interaction);
+        }
+
         if (id === 'wallet_view_open') {
           return await walletPanel.handleWalletViewOpen(interaction);
         }
@@ -407,6 +412,8 @@ module.exports = {
         if (id === 'wallet_deposit_amount_modal' || id === 'wallet_cashout_amount_modal') {
           return await walletPanel.handleWalletAmountModal(interaction);
         }
+
+        // (no modal for coinbase demo — button only)
         // Admin escrow withdraw modals (SOL + USDC)
         if (id === 'escrow_withdraw_sol_modal' || id === 'escrow_withdraw_usdc_modal') {
           return await escrowPanel.handleEscrowModal(interaction);

@@ -144,6 +144,9 @@ client.once('ready', async () => {
     const { postQueuePanel } = require('./panels/queuePanel');
     await postQueuePanel(client, displayLang);
 
+    const { postCoinbaseReviewDemoPanel } = require('./panels/coinbaseReviewDemoPanel');
+    await postCoinbaseReviewDemoPanel(client, displayLang);
+
     // (Dedicated language channel was removed — every shared panel has
     // an inline language dropdown now, so a separate channel was redundant.)
 
