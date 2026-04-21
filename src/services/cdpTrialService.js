@@ -35,6 +35,26 @@ function _setCounter(value) {
   }
 }
 
+/**
+ * Atomic increment — a single SQL statement so two concurrent webhooks
+ * can't both read the same base value and each add 1 (losing an
+ * increment). Returns the new count.
+ */
+function _incrementAtomic() {
+  try {
+    db.prepare(`
+      INSERT INTO bot_settings (key, value) VALUES ('cdp_trial_counter', '1')
+      ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + 1
+    `).run();
+  } catch {
+    // Fall back for older SQLite (<3.24 — unlikely but defensive)
+    db.prepare('CREATE TABLE IF NOT EXISTS bot_settings (key TEXT PRIMARY KEY, value TEXT)').run();
+    const before = _getCounter();
+    _setCounter(before + 1);
+  }
+  return _getCounter();
+}
+
 function getMax() {
   return parseInt(process.env.CDP_TRIAL_MAX_TRANSACTIONS || '25', 10);
 }
@@ -62,16 +82,35 @@ function canUseOfframp() {
 
 /**
  * Increment the trial counter. Call this from the Coinbase webhook on
- * order-completed. Returns the new count.
+ * order-completed. Atomic at the SQL layer so concurrent webhooks can't
+ * race. Returns the new count.
  */
 function incrementTrialCounter() {
-  const current = _getCounter();
-  const next = current + 1;
-  _setCounter(next);
+  const next = _incrementAtomic();
   if (next >= getMax()) {
     console.warn(`[CDP] Trial counter hit max (${next}/${getMax()}). All further traffic falls back to Wert.`);
   }
   return next;
+}
+
+/**
+ * Force-exhaust the counter by setting it to max. Use when Coinbase's
+ * API returns an error that indicates the trial cap was hit early
+ * (undocumented shared limits, 403/429, "tier exceeded" messages) —
+ * stops further CDP attempts for this project until counter is reset.
+ */
+function forceExhaust() {
+  _setCounter(getMax());
+  console.error('[CDP] Trial force-exhausted (API error indicated cap hit). Routing all traffic to Wert until reset.');
+}
+
+/**
+ * Admin reset — zero the counter. Run via scripts/reset-cdp-trial.js
+ * after Coinbase approves the full-access upgrade.
+ */
+function reset() {
+  _setCounter(0);
+  console.log('[CDP] Trial counter reset to 0.');
 }
 
 function getStatus() {
@@ -87,4 +126,4 @@ function getStatus() {
   };
 }
 
-module.exports = { canUseOnramp, canUseOfframp, incrementTrialCounter, getStatus };
+module.exports = { canUseOnramp, canUseOfframp, incrementTrialCounter, forceExhaust, reset, getStatus };

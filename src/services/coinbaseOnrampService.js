@@ -24,8 +24,41 @@ const SESSIONS_PATH = '/platform/v2/onramp/sessions';
 const LEGACY_HOST = 'api.developer.coinbase.com';
 const LEGACY_TOKEN_PATH = '/onramp/v1/token';
 
+/**
+ * Thrown when Coinbase returns a response that signals the trial cap
+ * was hit (403/429, or a body mentioning limit/tier/quota/trial/
+ * exceeded). Callers should catch this and silently fall back to a
+ * different provider (Wert) instead of showing a hard error — the
+ * trial counter is also force-exhausted as a side effect so the
+ * payment router stops offering CDP for subsequent requests.
+ */
+class TrialExhaustedError extends Error {
+  constructor(detail) {
+    super(detail ? `CDP trial limit reached: ${detail}` : 'CDP trial limit reached');
+    this.name = 'TrialExhaustedError';
+  }
+}
+
 function isConfigured() {
   return Boolean(process.env.CDP_API_KEY_ID) && Boolean(process.env.CDP_API_KEY_SECRET);
+}
+
+/**
+ * Is this HTTP response from Coinbase's Onramp API likely a trial-cap
+ * signal? Coinbase doesn't expose a single error code for this; they
+ * return 403 or 429 with messages like "Project tier exceeded" or
+ * "monthly limit reached". We match heuristically.
+ */
+function _looksLikeTrialCap(status, bodyText) {
+  if (status === 403 || status === 429) return true;
+  const msg = String(bodyText || '').toLowerCase();
+  return (
+    msg.includes('limit') ||
+    msg.includes('tier') ||
+    msg.includes('quota') ||
+    msg.includes('trial') ||
+    msg.includes('exceeded')
+  );
 }
 
 async function _signJwt({ host, path }) {
@@ -95,6 +128,12 @@ async function createOneClickBuySession({
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
+    if (_looksLikeTrialCap(res.status, errText)) {
+      // Force-exhaust the local counter so the router stops handing
+      // out CDP options until an admin resets it.
+      try { require('./cdpTrialService').forceExhaust(); } catch { /* circular-safe */ }
+      throw new TrialExhaustedError(`${res.status} ${errText}`.slice(0, 200));
+    }
     throw new Error(`Onramp session request failed: ${res.status} ${errText}`);
   }
 
@@ -147,4 +186,4 @@ async function createSessionToken({ walletAddress, assets = ['USDC'], blockchain
   return data.token;
 }
 
-module.exports = { createOneClickBuySession, createSessionToken, isConfigured };
+module.exports = { createOneClickBuySession, createSessionToken, isConfigured, TrialExhaustedError };

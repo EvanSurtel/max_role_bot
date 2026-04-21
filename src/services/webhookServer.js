@@ -183,8 +183,32 @@ function startWebhookServer(client) {
       const payload = req.body;
       const eventType = payload?.eventType || payload?.event_type || payload?.type;
       const status = payload?.data?.status || payload?.status;
+      const eventId = payload?.eventId || payload?.event_id || payload?.id || payload?.data?.transactionId;
+      const orderId = payload?.data?.transactionId || payload?.transactionId || payload?.orderId;
 
-      console.log(`[CDP] Webhook received: event=${eventType} status=${status}`);
+      console.log(`[CDP] Webhook received: event=${eventType} status=${status} id=${eventId}`);
+
+      // Idempotency — dedupe on (provider, eventId). If we've already
+      // recorded this event, skip the counter increment.
+      if (eventId) {
+        try {
+          const paymentEventRepo = require('../database/repositories/paymentEventRepo');
+          const inserted = paymentEventRepo.record({
+            provider: 'coinbase',
+            eventId: String(eventId),
+            eventType,
+            orderId: orderId ? String(orderId) : null,
+            status,
+            payload,
+          });
+          if (!inserted) {
+            console.log(`[CDP] Duplicate event ${eventId} — skipping.`);
+            return;
+          }
+        } catch (dedupeErr) {
+          console.warn('[CDP] Dedupe check failed, processing anyway:', dedupeErr.message);
+        }
+      }
 
       // Increment trial counter ONLY on confirmed onramp completions.
       // Offramp events don't count separately (Coinbase's trial cap is

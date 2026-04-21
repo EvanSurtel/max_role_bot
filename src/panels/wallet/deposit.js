@@ -132,6 +132,17 @@ async function _handleCdp(interaction, user, wallet, country) {
     onrampUrl = session.onrampUrl;
     quote = session.quote;
   } catch (err) {
+    // Trial-cap error — silently fall back to Wert so the user gets
+    // a working path instead of a dead-end. forceExhaust already fired
+    // inside coinbaseOnrampService, so subsequent pickers won't offer
+    // CDP again until the counter resets.
+    if (err instanceof onramp.TrialExhaustedError) {
+      console.warn(`[Wallet] CDP trial exhausted for ${user.discord_id}; silently falling back to Wert.`);
+      return _handleChangelly(interaction, user, wallet, country, 'wert', {
+        alreadyDeferred: true,
+        fallbackFromCdp: true,
+      });
+    }
     console.error('[Wallet] Coinbase Onramp session failed:', err.message);
     return interaction.editReply({
       content: [
@@ -168,15 +179,24 @@ async function _handleCdp(interaction, user, wallet, country) {
 }
 
 // ─── Wert / Transak via Changelly ───────────────────────────────
-async function _handleChangelly(interaction, user, wallet, country, preferredProviderCode) {
+async function _handleChangelly(interaction, user, wallet, country, preferredProviderCode, opts = {}) {
   if (!changelly.isConfigured()) {
+    if (opts.alreadyDeferred) {
+      return interaction.editReply({
+        content: 'Changelly is not configured. Please deposit USDC directly to your Base address.',
+      });
+    }
     return interaction.reply({
       content: 'Changelly is not configured. Please pick a different payment method.',
       ephemeral: true,
     });
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  // When we're called from the CDP fallback path, deferReply was
+  // already invoked by _handleCdp — calling it again would throw.
+  if (!opts.alreadyDeferred) {
+    await interaction.deferReply({ ephemeral: true });
+  }
 
   try {
     const order = await changelly.createOrder({
@@ -199,15 +219,19 @@ async function _handleChangelly(interaction, user, wallet, country, preferredPro
       const actualProvider = order.providerCode || preferredProviderCode;
       const providerLabel = actualProvider.charAt(0).toUpperCase() + actualProvider.slice(1);
 
+      const headerTag = opts.fallbackFromCdp
+        ? '**\u{1F4B3} Deposit USDC — ' + providerLabel + '** (Apple Pay / card via Coinbase is temporarily unavailable — here\'s the next-best option)'
+        : `**\u{1F4B3} Deposit USDC — ${providerLabel}**`;
+
       return interaction.editReply({
         content: [
-          `**\u{1F4B3} Deposit USDC — ${providerLabel}**`,
+          headerTag,
           '',
           '1. Click **Buy USDC** below — goes straight to the payment page',
           '2. Pay with your card',
           '3. USDC arrives in your wallet within a few minutes',
           '',
-          actualProvider !== preferredProviderCode
+          (!opts.fallbackFromCdp && actualProvider !== preferredProviderCode)
             ? `(${preferredProviderCode} wasn't available for your region — routed to ${actualProvider} instead.)`
             : null,
         ].filter(l => l !== null).join('\n'),
