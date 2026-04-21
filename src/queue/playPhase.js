@@ -5,7 +5,7 @@
 
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const QUEUE_CONFIG = require('../config/queueConfig');
-const { setClient, getMatch } = require('./state');
+const { setClient, getMatch, save: saveMatch } = require('./state');
 const { pickMaps } = require('../utils/mapPicker');
 
 /**
@@ -25,6 +25,7 @@ async function startPlayPhase(match) {
 
   // Pick maps — always HP Bo3
   match.maps = pickMaps(QUEUE_CONFIG.GAME_MODE, QUEUE_CONFIG.SERIES_LENGTH);
+  saveMatch(match);
 
   // Build team roster lines
   function teamRoster(teamNum) {
@@ -132,6 +133,8 @@ function recordVote(matchId, captainDiscordId, winningTeam) {
 
   if (isCap1) match.captain1Vote = winningTeam;
   else match.captain2Vote = winningTeam;
+
+  saveMatch(match);
 
   const allVoted = match.captain1Vote !== null && match.captain2Vote !== null;
   const agreed = allVoted && match.captain1Vote === match.captain2Vote;

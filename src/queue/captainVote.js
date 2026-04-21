@@ -6,7 +6,7 @@
 const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const QUEUE_CONFIG = require('../config/queueConfig');
 const userRepo = require('../database/repositories/userRepo');
-const { setClient, getMatch } = require('./state');
+const { setClient, getMatch, save: saveMatch } = require('./state');
 
 /**
  * Begin captain voting. Each player votes for 2 players they want as captain.
@@ -18,6 +18,7 @@ const { setClient, getMatch } = require('./state');
 async function startCaptainVote(match, client) {
   match.phase = 'CAPTAIN_VOTE';
   if (match.timer) { clearTimeout(match.timer); match.timer = null; }
+  saveMatch(match);
   if (client) setClient(client);
   const _client = setClient();
   console.log(`[QueueService] Match #${match.id} entering CAPTAIN_VOTE phase`);
@@ -95,6 +96,7 @@ function recordCaptainVote(matchId, voterId, votedForIds) {
   }
 
   match.captainVotes.set(voterId, votedForIds);
+  saveMatch(match);
 
   // Check if all players have voted
   const allVoted = match.captainVotes.size >= match.players.size;
@@ -171,6 +173,7 @@ async function finalizeCaptainVote(match) {
   cap2Player.isCaptain = true;
   match.team1 = [captain1Id];
   match.team2 = [captain2Id];
+  saveMatch(match);
 
   // Post result
   if (textChannel) {

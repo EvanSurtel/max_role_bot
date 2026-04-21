@@ -1,8 +1,11 @@
 // In-memory queue state and player/match factories.
 //
-// All state is transient (resets on bot restart). This is the single source
-// of truth for the waiting queue and active matches. Every other file in
-// src/queue/ imports state from here — never the reverse.
+// The WAITING QUEUE itself is still transient (lightweight, no money
+// at stake for queued-but-not-matched players). Active QUEUE MATCHES,
+// however, are persisted to the `queue_matches` table — see
+// src/database/repositories/queueMatchRepo. On bot startup, the
+// recovery function below loads active rows and rehydrates the
+// activeMatches Map so in-progress lobbies survive restarts.
 
 const QUEUE_CONFIG = require('../config/queueConfig');
 
@@ -167,6 +170,77 @@ function nextMatchId() {
   return _matchIdCounter;
 }
 
+/**
+ * Startup recovery. Loads active queue_matches rows and rehydrates
+ * the in-memory activeMatches Map so in-progress lobbies survive a
+ * bot restart. Also seeds _matchIdCounter to MAX(id) so new matches
+ * never collide with persisted ones.
+ *
+ * Called from src/index.js after Discord client is ready. Must be
+ * called BEFORE any queue interactions are accepted.
+ */
+function recoverFromDb() {
+  try {
+    const queueMatchRepo = require('../database/repositories/queueMatchRepo');
+    const maxId = queueMatchRepo.findMaxId();
+    if (maxId > _matchIdCounter) _matchIdCounter = maxId;
+
+    const rows = queueMatchRepo.findActive();
+    if (rows.length === 0) {
+      console.log('[QueueRecovery] No active queue matches to recover');
+      return { recovered: 0, skipped: 0 };
+    }
+
+    let recovered = 0;
+    let skipped = 0;
+    for (const match of rows) {
+      if (!match.categoryId) {
+        // No Discord channels ever attached — skip, mark cancelled.
+        queueMatchRepo.markCancelled(match.id);
+        skipped++;
+        continue;
+      }
+      activeMatches.set(match.categoryId, match);
+      recovered++;
+    }
+    console.log(`[QueueRecovery] Recovered ${recovered} active queue match(es), skipped ${skipped} without category`);
+    return { recovered, skipped };
+  } catch (err) {
+    console.error('[QueueRecovery] Failed to recover from DB:', err.message);
+    return { recovered: 0, skipped: 0, error: err.message };
+  }
+}
+
+/**
+ * Convenience: persist a match's current state. Delegates to
+ * queueMatchRepo.save — provided here so queue phase files can do
+ * `state.save(match)` without importing the repo directly.
+ */
+function save(match) {
+  try {
+    const queueMatchRepo = require('../database/repositories/queueMatchRepo');
+    queueMatchRepo.save(match);
+  } catch (err) {
+    console.error(`[QueueState] save failed for match #${match?.id}:`, err.message);
+  }
+}
+
+function markResolved(matchId) {
+  try {
+    require('../database/repositories/queueMatchRepo').markResolved(matchId);
+  } catch (err) {
+    console.error(`[QueueState] markResolved failed for #${matchId}:`, err.message);
+  }
+}
+
+function markCancelled(matchId) {
+  try {
+    require('../database/repositories/queueMatchRepo').markCancelled(matchId);
+  } catch (err) {
+    console.error(`[QueueState] markCancelled failed for #${matchId}:`, err.message);
+  }
+}
+
 module.exports = {
   // Raw state (import for direct mutation where needed)
   waitingQueue,
@@ -198,4 +272,10 @@ module.exports = {
   // Client & ID
   setClient,
   nextMatchId,
+
+  // Persistence
+  save,
+  markResolved,
+  markCancelled,
+  recoverFromDb,
 };

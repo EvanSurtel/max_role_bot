@@ -71,6 +71,18 @@ client.once('ready', async () => {
     const pendingWithdrawSweeper = require('./services/pendingWithdrawSweeper');
     pendingWithdrawSweeper.startSweeper();
 
+    // Queue state recovery. Rehydrates in-memory activeMatches from
+    // the queue_matches table so in-progress lobbies survive a
+    // restart. Must run BEFORE any queue interactions are processed.
+    // Seeds _matchIdCounter to MAX(id) so new matches don't collide.
+    try {
+      const queueState = require('./queue/state');
+      queueState.setClient(client);
+      queueState.recoverFromDb();
+    } catch (err) {
+      console.error('[Boot] Queue recovery failed:', err.message);
+    }
+
     // Start escrow health monitoring
     const healthService = require('./services/healthService');
     healthService.startHealthChecks(client);

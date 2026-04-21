@@ -5,7 +5,7 @@
 
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const QUEUE_CONFIG = require('../config/queueConfig');
-const { setClient, getMatch } = require('./state');
+const { setClient, getMatch, save: saveMatch } = require('./state');
 
 /**
  * Begin role selection. Each team gets a message with weapon role + operator buttons.
@@ -27,6 +27,7 @@ async function startRoleSelect(match) {
   match.team2Roles = new Map();
   match.team1Operators = new Map();
   match.team2Operators = new Map();
+  saveMatch(match);
 
   // Post a message for each team
   for (const teamNum of [1, 2]) {
@@ -227,6 +228,7 @@ function recordRoleChoice(matchId, discordId, role) {
   player.weaponRoles.push(role);
   teamRoles.set(role, currentCount + 1);
 
+  saveMatch(match);
   return { success: true };
 }
 
@@ -265,6 +267,7 @@ function recordOperatorChoice(matchId, discordId, operator) {
   player.operator = operator;
   teamOps.set(operator, discordId);
 
+  saveMatch(match);
   return { success: true };
 }
 

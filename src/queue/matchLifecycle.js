@@ -12,6 +12,9 @@ const {
   waitingQueue, activeMatches,
   _newQueueMatch, _newPlayer,
   nextMatchId,
+  save: saveMatch,
+  markResolved: markMatchResolved,
+  markCancelled: markMatchCancelled,
 } = require('./state');
 const { _queueChannelOverwrites, _cleanupMatchChannels, findClosestXpReplacement } = require('./helpers');
 
@@ -64,8 +67,10 @@ async function createMatch(client, guild) {
   });
   match.voiceChannelId = voiceChannel.id;
 
-  // Store match
+  // Store match (in-memory Map + persist initial row so a restart
+  // during channel creation can still clean up).
   activeMatches.set(category.id, match);
+  saveMatch(match);
 
   // ── Ping players ─────────────────────────────────────────────
   const mentions = allDiscordIds.map(id => `<@${id}>`).join(' ');
@@ -274,6 +279,7 @@ async function resolveMatch(client, match, winningTeam) {
   if (match.phase === 'RESOLVED' || match.phase === 'CANCELLED') return;
   match.phase = 'RESOLVED';
   if (match.timer) { clearTimeout(match.timer); match.timer = null; }
+  markMatchResolved(match.id);
 
   const db = require('../database/db');
   const insertXpHistory = db.prepare(
@@ -384,6 +390,7 @@ async function cancelMatch(client, match, reason, options = {}) {
   if (match.phase === 'RESOLVED' || match.phase === 'CANCELLED') return;
   match.phase = 'CANCELLED';
   if (match.timer) { clearTimeout(match.timer); match.timer = null; }
+  markMatchCancelled(match.id);
 
   // Log to admin feed
   const { postTransaction } = require('../utils/transactionFeed');

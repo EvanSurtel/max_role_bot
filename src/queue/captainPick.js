@@ -6,7 +6,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const QUEUE_CONFIG = require('../config/queueConfig');
 const userRepo = require('../database/repositories/userRepo');
-const { setClient, getMatch } = require('./state');
+const { setClient, getMatch, save: saveMatch } = require('./state');
 
 /**
  * Begin pick phase. Random first pick; captains alternate (snake draft).
@@ -33,6 +33,7 @@ async function startCaptainPick(match) {
   ];
   match._pickIndex = 0;
   match.currentPicker = match.pickOrder[0];
+  saveMatch(match);
 
   await _postPickMessage(match);
 }
@@ -161,6 +162,7 @@ function recordCaptainPick(matchId, captainId, pickedPlayerId) {
   // clobbering it to null here is safe.
   match.currentPicker = null;
 
+  saveMatch(match);
   return { success: true };
 }
 
@@ -188,6 +190,7 @@ async function _advancePick(match) {
 
   // Advance to next captain in the pick order
   match.currentPicker = match.pickOrder[match._pickIndex];
+  saveMatch(match);
   await _postPickMessage(match);
 }
 
