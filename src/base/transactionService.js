@@ -50,29 +50,31 @@ async function _sendUserOp(smartAccount, calls) {
   const cdp = getCdpClient();
   const network = getCdpNetwork();
 
-  // The paymaster URL is what makes user ops gasless. Without it, the
-  // bundler asks the sender Smart Account to pay for gas — and user
-  // SAs (and escrow-owner-smart) never hold ETH by design. Error
-  // looks like "sender balance and deposit together is 0 but must
-  // be at least ... to pay for this operation" when this is omitted.
+  // Paymaster handling:
+  //   - On network === "base" (mainnet) with no paymasterUrl, the CDP
+  //     SDK auto-fetches your project's default Base Node RPC URL
+  //     and uses it as the paymaster (see the SDK's sendUserOperation.js
+  //     lines 57-63 and accounts/evm/getBaseNodeRpcUrl.ts). That means
+  //     gasless works out of the box as long as CDP_API_KEY_ID /
+  //     CDP_API_KEY_SECRET are valid and the project has Paymaster
+  //     enabled on the dashboard with the target contracts allowlisted.
+  //   - On base-sepolia the SDK does NOT auto-resolve a paymaster, so
+  //     PAYMASTER_RPC_URL must be set explicitly for testnet runs.
+  //   - PAYMASTER_RPC_URL override always wins if set, for either net.
   //
-  // PAYMASTER_RPC_URL format (from CDP dashboard, per project):
-  //   https://api.developer.coinbase.com/rpc/v1/<network>/<paymaster_key>
-  // Fail loudly at the first UserOp if it's missing, rather than
-  // silently draining the sender on a random future approve.
-  const paymasterUrl = process.env.PAYMASTER_RPC_URL;
-  if (!paymasterUrl) {
-    const err = new Error('PAYMASTER_RPC_URL not set — every UserOp would require ETH in the sender Smart Account. Configure the CDP Paymaster URL in your env.');
-    err.stage = 'pre_submit';
-    throw err;
-  }
+  // Error "sender balance and deposit together is 0 but must be at
+  // least N to pay for this operation" means the Paymaster did NOT
+  // sponsor — either the auto-fetch silently failed (returns undefined
+  // on caught errors), or the project's Paymaster isn't enabled, or
+  // the specific contract/function isn't on the allowlist.
+  const paymasterUrl = process.env.PAYMASTER_RPC_URL || undefined;
 
   let result;
   try {
     result = await cdp.evm.prepareAndSendUserOperation({
       smartAccount,
       network,
-      paymasterUrl,
+      ...(paymasterUrl ? { paymasterUrl } : {}),
       calls: calls.map(c => ({
         to: c.to,
         value: c.value ?? 0n,
@@ -81,6 +83,22 @@ async function _sendUserOp(smartAccount, calls) {
     });
   } catch (err) {
     err.stage = 'pre_submit';
+    // Annotate so upstream logs/alerts can distinguish gasless
+    // sponsorship failure from other pre-submit errors. The CDP
+    // bundler uses this exact precheck message; match it to flag.
+    if (typeof err.message === 'string' && err.message.includes('sender balance and deposit together is 0')) {
+      err.paymasterFailed = true;
+      console.error(
+        '[Base] UserOp gasless sponsorship failed. ' +
+        `network=${network} explicitPaymasterUrl=${paymasterUrl ? 'set' : 'auto'} ` +
+        'sender=' + smartAccount.address + '. ' +
+        'Verify: (a) CDP project has Paymaster enabled for this network, ' +
+        '(b) allowlist includes the target contract + function, ' +
+        '(c) CDP_API_KEY_ID/CDP_API_KEY_SECRET are valid (the SDK needs ' +
+        'them to auto-resolve the Base Node RPC URL when PAYMASTER_RPC_URL ' +
+        'is unset on mainnet).'
+      );
+    }
     throw err;
   }
 

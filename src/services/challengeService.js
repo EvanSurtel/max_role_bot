@@ -86,38 +86,62 @@ async function notifyTeammates(guild, challenge) {
         color: isCashMatch ? 0xf1c40f : 0x3498db,
       };
 
-      // ── Try DM first ────────────────────────────────────────────
+      // ── DM only — no private-channel fallback ────────────────────
+      // Policy: teammate invites are DM-only. If the teammate has DMs
+      // disabled for this server, they auto-decline — the creator
+      // gets told, and the challenge is cancelled (or has to be
+      // retried with a different teammate, or dropped to 1v1).
+      //
+      // Rationale: private invite channels balloon the server's
+      // channel count (Discord cap 500/guild) and clutter the
+      // category list. Users are expected to have DMs enabled for
+      // the bot; we announce this at onboarding / in the rules panel.
       let dmUser = null;
-      let fallbackChannel = null;
       try {
         dmUser = await guild.client.users.fetch(discordId);
         await dmUser.send({ embeds: [embedPayload], components: [row] });
         console.log(`[ChallengeService] DM'd teammate ${discordId} for challenge ${challenge.id}`);
       } catch (dmErr) {
-        // DMs disabled / blocked / unreachable — fall back to a
-        // private server channel. This keeps channel creation rare
-        // rather than the default.
-        console.log(`[ChallengeService] DM failed for ${discordId} (${dmErr.message}) — falling back to private channel`);
-        dmUser = null;
+        console.log(`[ChallengeService] DM failed for ${discordId} (${dmErr.message}) — auto-declining teammate`);
 
-        let username = discordId;
+        // Auto-decline this teammate. No channel fallback.
+        challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.DECLINED);
+
+        // Tell the creator in the admin feed + DM (best effort). The
+        // feed post is durable and visible to staff; the DM is a
+        // convenience for the creator.
         try {
-          const discordMember = await guild.members.fetch(discordId);
-          username = discordMember.user.username;
-        } catch { /* fall back to discord ID */ }
+          const { postTransaction } = require('../utils/transactionFeed');
+          const targetMember = await guild.members.fetch(discordId).catch(() => null);
+          const targetName = targetMember?.user?.username || discordId;
+          const creatorUser = userRepo.findById(challenge.creator_user_id);
+          postTransaction({
+            type: 'challenge_cancelled',
+            challengeId: challenge.id,
+            discordId: creatorUser?.discord_id,
+            memo: `Teammate @${targetName} (${discordId}) has DMs disabled for this server and can't be invited. Challenge #${challenge.display_number || challenge.id} auto-cancelled. They need to enable "Allow direct messages from server members" in Discord to play anything but 1v1.`,
+          });
+          if (creatorUser) {
+            try {
+              const creatorDiscord = await guild.client.users.fetch(creatorUser.discord_id);
+              await creatorDiscord.send({
+                content: [
+                  `Your challenge was cancelled — teammate **${targetName}** has direct messages disabled.`,
+                  '',
+                  `Ask them to enable **User Settings → Privacy & Safety → Allow direct messages from server members** for this server. They need DMs on to receive team invites.`,
+                  '',
+                  'If they can\'t enable DMs, you can still create **1v1** challenges with them (those don\'t require teammate invites).',
+                ].join('\n'),
+              });
+            } catch { /* creator may also have DMs off */ }
+          }
+        } catch { /* best effort — never block cancel on notify */ }
 
-        fallbackChannel = await channelService.createPrivateChannel(
-          guild,
-          `invite-${username}`,
-          [discordId],
-        );
-        challengePlayerRepo.setNotificationChannel(player.id, fallbackChannel.id);
-
-        await fallbackChannel.send({
-          content: `<@${discordId}>`,
-          embeds: [embedPayload],
-          components: [row],
-        });
+        // Cancel the whole challenge (refund, clean up any other
+        // teammates that already accepted). Pass client so cancel
+        // can also delete any leftover channels from older flows.
+        await cancelChallenge(challenge.id, guild.client);
+        return;
       }
 
       // ── Timeout timer — treat no response as decline ────────────
@@ -132,26 +156,12 @@ async function notifyTeammates(guild, challenge) {
           challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.DECLINED);
           console.log(`[ChallengeService] Teammate ${player.user_id} timed out for challenge ${challenge.id}`);
 
-          const timeoutText = t('notify_team.timeout_msg', lang);
-
-          if (fallbackChannel) {
-            try { await fallbackChannel.send(timeoutText); } catch { /* channel gone */ }
-          } else if (dmUser) {
+          if (dmUser) {
+            const timeoutText = t('notify_team.timeout_msg', lang);
             try { await dmUser.send(timeoutText); } catch { /* DM now blocked */ }
           }
 
-          // Pass guild.client so cancelChallenge can delete invite
-          // channels for any OTHER pending teammates that also had
-          // fallback channels created — we can't clean those up here
-          // from the timeout scope.
           await cancelChallenge(challenge.id, guild.client);
-
-          // Only the fallback channel can/should be deleted. DMs persist.
-          if (fallbackChannel) {
-            setTimeout(async () => {
-              try { await channelService.deleteChannel(fallbackChannel); } catch { /* gone */ }
-            }, 5000);
-          }
         } catch (err) {
           console.error(`[ChallengeService] Error handling teammate timeout:`, err);
         }
