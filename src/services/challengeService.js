@@ -319,8 +319,22 @@ async function cancelChallenge(challengeId) {
  * @param {object} challenge - The challenge DB record.
  */
 async function handleAllTeammatesAccepted(client, challenge) {
-  // Update challenge status to open
-  challengeRepo.updateStatus(challenge.id, CHALLENGE_STATUS.OPEN);
+  // Atomic claim — two teammate accepts landing in the same tick can
+  // both see pendingCount === 0 (there's an `await interaction.reply`
+  // between the status write and the count read in teammateResponse),
+  // and both call this function. Without the claim below, postToBoard
+  // runs twice and the challenge appears on the board as a duplicate.
+  // atomicStatusTransition uses BEGIN IMMEDIATE so only the first
+  // caller wins PENDING_TEAMMATES -> OPEN.
+  const claimed = challengeRepo.atomicStatusTransition(
+    challenge.id,
+    CHALLENGE_STATUS.PENDING_TEAMMATES,
+    CHALLENGE_STATUS.OPEN,
+  );
+  if (!claimed) {
+    console.log(`[ChallengeService] handleAllTeammatesAccepted race lost for #${challenge.id} \u2014 another caller already posted to the board`);
+    return;
+  }
 
   // Refresh the challenge record so postToBoard sees the updated status
   const updatedChallenge = challengeRepo.findById(challenge.id);

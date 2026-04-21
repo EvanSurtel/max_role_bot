@@ -37,10 +37,48 @@ async function startMatch(client, challengeId) {
     throw new Error(`Challenge ${challengeId} not found`);
   }
 
+  // Atomic claim for the TEAM game path only. The teammateResponse
+  // accept handler has an `await interaction.reply` between the
+  // `updateStatus(ACCEPTED)` and the `countPendingByChallenge` read,
+  // so two concurrent final-teammate accepts can both reach startMatch
+  // with challenge.status === ACCEPTED. Without the claim below, both
+  // would createMatchRecord (two match rows for one challenge) and
+  // both would transferToEscrow (two on-chain createMatch +
+  // depositToEscrow cycles, funds double-locked, escrow stuck).
+  //
+  // The 1v1 path goes OPEN -> IN_PROGRESS inside challengeAccept.js
+  // via its own atomic claim, so by the time startMatch runs, status
+  // is already IN_PROGRESS and only one caller exists — no extra
+  // claim needed here for that path.
+  if (challenge.status === CHALLENGE_STATUS.ACCEPTED) {
+    const claimed = challengeRepo.atomicStatusTransition(
+      challengeId,
+      CHALLENGE_STATUS.ACCEPTED,
+      CHALLENGE_STATUS.IN_PROGRESS,
+    );
+    if (!claimed) {
+      const fresh = challengeRepo.findById(challengeId);
+      console.warn(`[MatchService] startMatch race lost for challenge #${challengeId} (status=${fresh?.status || 'unknown'}) \u2014 skipping duplicate match creation`);
+      return null;
+    }
+  } else if (challenge.status !== CHALLENGE_STATUS.IN_PROGRESS) {
+    // Anything other than ACCEPTED (team path) or IN_PROGRESS (1v1
+    // path already claimed) is a caller bug — don't start a match on
+    // a cancelled / completed / pending challenge.
+    console.warn(`[MatchService] startMatch called on challenge #${challengeId} with unexpected status=${challenge.status} \u2014 aborting`);
+    return null;
+  }
+
   // Verify all players have accepted
   const allPlayers = challengePlayerRepo.findByChallengeId(challengeId);
   const pendingPlayers = allPlayers.filter(p => p.status !== 'accepted');
   if (pendingPlayers.length > 0) {
+    // Revert the team-path claim so another caller can pick it up.
+    // For the 1v1 path the status was already IN_PROGRESS before we
+    // got here, so revert goes OPEN (the original). But 1v1 always
+    // has exactly 2 players both set ACCEPTED before startMatch is
+    // called, so this branch only fires on team games that claimed.
+    challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.ACCEPTED);
     throw new Error(`Cannot start match: ${pendingPlayers.length} player(s) have not accepted`);
   }
 
@@ -95,7 +133,7 @@ async function startMatch(client, challengeId) {
   // Step 3: Create Discord channels.
   await createMatchChannels(client, challenge, match.id);
 
-  challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.IN_PROGRESS);
+  // challenge.status is already IN_PROGRESS (set by atomic claim above).
   matchRepo.updateStatus(match.id, MATCH_STATUS.ACTIVE);
 
   // Start inactivity timer
