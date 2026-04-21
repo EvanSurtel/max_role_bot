@@ -41,6 +41,12 @@ async function handleWalletSubButton(interaction) {
     return handleDeposit(interaction, user, wallet, lang);
   }
 
+  // Deposit per-provider buttons (shown on the picker from wallet_deposit)
+  if (id.startsWith('wallet_deposit_')) {
+    const { handleDepositProvider } = require('./deposit');
+    return handleDepositProvider(interaction, user, wallet, lang);
+  }
+
   if (id === 'wallet_withdraw_menu') {
     const { handleWithdrawMenu } = require('./withdrawMenu');
     return handleWithdrawMenu(interaction, lang);
@@ -49,6 +55,12 @@ async function handleWalletSubButton(interaction) {
   if (id === 'wallet_cashout') {
     const { handleCashOut } = require('./cashOut');
     return handleCashOut(interaction, user, wallet, lang);
+  }
+
+  // Cash-out per-provider buttons (shown on the picker from wallet_cashout)
+  if (id.startsWith('wallet_cashout_')) {
+    const { handleCashOutProvider } = require('./cashOut');
+    return handleCashOutProvider(interaction, user, wallet, lang);
   }
 
   if (id === 'wallet_copy_address') {

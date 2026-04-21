@@ -130,18 +130,21 @@ async function _request(method, path, body = null) {
  * Changelly's /orders endpoint requires `providerCode` (moonpay, banxa,
  * transak, or wert) — it won't pick one for you. We call /offers first
  * to see which providers are currently available for this country +
- * currency pair and use the first one (Changelly returns offers ranked
- * by best rate). The resulting redirect URL goes straight to that
- * provider's hosted page; the user doesn't sign into Changelly.
+ * currency pair. If `preferredProviderCode` is passed, we pick that
+ * provider's offer specifically; otherwise we fall back to the first
+ * success offer (best rate). The resulting redirect URL goes straight
+ * to the provider's hosted page; the user doesn't sign into Changelly.
  *
  * @param {Object} options
  * @param {string} options.userId       - Discord user ID
  * @param {string} options.walletAddress - Base wallet address to receive USDC
  * @param {number|string} options.amountUsd - Amount in USD
  * @param {string} options.countryCode  - ISO 3166-1 alpha-2 country code
+ * @param {string} [options.stateCode]  - ISO 3166-2 US state code (required if country=US)
+ * @param {string} [options.preferredProviderCode] - Pin to a specific provider (wert|transak|moonpay|banxa)
  * @returns {Promise<{orderId: string, redirectUrl: string, providerCode: string}|null>}
  */
-async function createOrder({ userId, walletAddress, amountUsd, countryCode, stateCode }) {
+async function createOrder({ userId, walletAddress, amountUsd, countryCode, stateCode, preferredProviderCode }) {
   const offers = await getOffers(amountUsd, countryCode);
   const offerList = Array.isArray(offers) ? offers : (offers?.data || offers?.offers || []);
   if (!offerList || offerList.length === 0) {
@@ -149,19 +152,29 @@ async function createOrder({ userId, walletAddress, amountUsd, countryCode, stat
     return null;
   }
 
-  // Changelly's /offers response is a union of success and error offers —
-  // same shape otherwise, but error offers carry `errorType`+`errorMessage`
-  // and NO rate/fee. Picking one and passing its providerCode straight to
-  // /orders is how the "could not generate payment link" path fires. Filter
-  // to success offers only before picking.
+  // Filter to success offers only — error offers carry errorType + no
+  // rate/fee. Picking one and passing its providerCode to /orders is how
+  // the "could not generate payment link" path fires.
   const successOffers = offerList.filter(o => !o.errorType && (o.providerCode || o.provider?.code || o.provider_code));
   if (successOffers.length === 0) {
     const errs = offerList.filter(o => o.errorType).map(o => `${o.providerCode}:${o.errorType}`).join(', ');
     console.error(`[Changelly] No usable offers for ${amountUsd} USD → USDC in ${countryCode}. Provider errors: ${errs || 'none'}`);
     return null;
   }
-  const offer = successOffers[0];
-  const providerCode = offer.providerCode || offer.provider?.code || offer.provider_code;
+
+  // If caller pinned a provider, try it first. If unavailable in this
+  // country / amount combo, fall through to first success offer so the
+  // user gets *some* working path rather than a hard fail.
+  const _codeOf = o => (o.providerCode || o.provider?.code || o.provider_code);
+  let offer;
+  if (preferredProviderCode) {
+    offer = successOffers.find(o => _codeOf(o) === preferredProviderCode);
+    if (!offer) {
+      console.warn(`[Changelly] Preferred provider ${preferredProviderCode} not available for ${countryCode}; falling back to first success offer.`);
+    }
+  }
+  if (!offer) offer = successOffers[0];
+  const providerCode = _codeOf(offer);
 
   const webhookHost = process.env.WEBHOOK_HOST || '';
 
@@ -250,7 +263,7 @@ async function getAvailableCountries() {
  * @param {string} options.countryCode  - ISO 3166-1 alpha-2 country code
  * @returns {Promise<{orderId: string, redirectUrl: string}|null>}
  */
-async function createSellOrder({ userId, walletAddress, amountUsdc, countryCode, stateCode }) {
+async function createSellOrder({ userId, walletAddress, amountUsdc, countryCode, stateCode, preferredProviderCode }) {
   // Off-ramp uses the same /offers → /orders flow as on-ramp, just with
   // currencyFrom/To flipped. providerCode is still required.
   const offers = await _request('GET', `/offers?${new URLSearchParams({
@@ -272,8 +285,16 @@ async function createSellOrder({ userId, walletAddress, amountUsdc, countryCode,
     console.error(`[Changelly] No usable sell offers in ${countryCode}. Provider errors: ${errs || 'none'}`);
     return null;
   }
-  const offer = successOffers[0];
-  const providerCode = offer.providerCode || offer.provider?.code || offer.provider_code;
+  const _codeOf = o => (o.providerCode || o.provider?.code || o.provider_code);
+  let offer;
+  if (preferredProviderCode) {
+    offer = successOffers.find(o => _codeOf(o) === preferredProviderCode);
+    if (!offer) {
+      console.warn(`[Changelly] Preferred sell provider ${preferredProviderCode} not available in ${countryCode}; falling back to first success offer.`);
+    }
+  }
+  if (!offer) offer = successOffers[0];
+  const providerCode = _codeOf(offer);
 
   const webhookHost = process.env.WEBHOOK_HOST || '';
 

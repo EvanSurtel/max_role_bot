@@ -141,6 +141,77 @@ function startWebhookServer(client) {
     }
   });
 
+  // ─── Coinbase CDP Onramp / Offramp Webhook ─────────────────────
+  // Coinbase posts transaction.updated events here when an Onramp
+  // session completes or fails. We use it to increment the CDP trial
+  // counter so the payment router auto-falls-back to Wert once the
+  // 25-transaction trial cap is exhausted.
+  //
+  // Docs: https://docs.cdp.coinbase.com/onramp/additional-resources/webhooks
+  // Signature verification is via HMAC with CDP_WEBHOOK_SECRET.
+  app.post('/api/coinbase/webhook', async (req, res) => {
+    res.status(200).json({ ok: true });
+
+    try {
+      // Signature verification — only runs if CDP_WEBHOOK_SECRET is
+      // set. On mainnet without a secret we refuse to increment the
+      // counter (otherwise anyone could POST to this endpoint and
+      // accelerate trial burn).
+      const secret = process.env.CDP_WEBHOOK_SECRET;
+      const signature = req.headers['x-cc-webhook-signature'] || req.headers['x-webhook-signature'];
+      if (secret) {
+        try {
+          const crypto = require('crypto');
+          const body = JSON.stringify(req.body);
+          const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
+          if (!signature || signature !== expected) {
+            console.warn('[CDP] Webhook signature mismatch — ignoring');
+            return;
+          }
+        } catch (verifyErr) {
+          console.warn('[CDP] Webhook signature verification error:', verifyErr.message);
+          return;
+        }
+      } else {
+        const isMainnet = (process.env.BASE_NETWORK || 'mainnet').toLowerCase() !== 'sepolia';
+        if (isMainnet) {
+          console.error('[CDP] CDP_WEBHOOK_SECRET not set on mainnet — rejecting webhook to prevent trial-counter tampering.');
+          return;
+        }
+      }
+
+      const payload = req.body;
+      const eventType = payload?.eventType || payload?.event_type || payload?.type;
+      const status = payload?.data?.status || payload?.status;
+
+      console.log(`[CDP] Webhook received: event=${eventType} status=${status}`);
+
+      // Increment trial counter ONLY on confirmed onramp completions.
+      // Offramp events don't count separately (Coinbase's trial cap is
+      // shared, but we're not offering CDP offramp on Day 1).
+      const isOnrampCompleted =
+        (eventType === 'onramp.transaction.updated' && status === 'ONRAMP_ORDER_STATUS_COMPLETED') ||
+        (status === 'ONRAMP_ORDER_STATUS_COMPLETED');
+
+      if (isOnrampCompleted) {
+        const cdpTrial = require('./cdpTrialService');
+        const newCount = cdpTrial.incrementTrialCounter();
+        console.log(`[CDP] Trial counter incremented → ${newCount}/${cdpTrial.getStatus().max}`);
+
+        // Best-effort transaction feed log
+        try {
+          const { postTransaction } = require('../utils/transactionFeed');
+          postTransaction({
+            type: 'cdp_onramp_completed',
+            memo: `CDP Onramp completed — trial counter now ${newCount}/${cdpTrial.getStatus().max}`,
+          });
+        } catch { /* best effort */ }
+      }
+    } catch (err) {
+      console.error('[CDP] Webhook handler error:', err.message);
+    }
+  });
+
   app.use((req, res) => {
     res.status(404).send('not found');
   });
