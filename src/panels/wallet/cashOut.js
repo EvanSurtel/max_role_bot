@@ -128,9 +128,23 @@ async function handleCashOutProvider(interaction, user, wallet, lang) {
 
   const rest = id.slice('wallet_cashout_'.length);
   const [providerKey, amountStr] = rest.split('__');
-  const amountUsdc = Number(amountStr) || 0;
-  if (amountUsdc <= 0) {
-    return interaction.reply({ content: 'Invalid cash-out amount.', ephemeral: true });
+  const amountUsdc = Number(amountStr);
+
+  // Re-validate against current balance. The customId is user-
+  // controllable (modified Discord client) so we can't trust the
+  // amount that comes out of it.
+  const availableUsdc = Number(wallet.balance_available) / USDC_PER_UNIT;
+  if (!Number.isFinite(amountUsdc) || amountUsdc < MIN_CASHOUT_USDC) {
+    return interaction.reply({
+      content: `Invalid amount. Must be at least $${MIN_CASHOUT_USDC} USDC.`,
+      ephemeral: true,
+    });
+  }
+  if (amountUsdc > availableUsdc) {
+    return interaction.reply({
+      content: `You only have $${availableUsdc.toFixed(2)} USDC available; can't cash out $${amountUsdc.toFixed(2)}.`,
+      ephemeral: true,
+    });
   }
 
   if (providerKey === 'cdp_offramp') {

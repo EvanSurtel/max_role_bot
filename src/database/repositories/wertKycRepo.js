@@ -22,15 +22,22 @@ function getLifetimeUsd(userId) {
 }
 
 /**
- * Add an amount (USD) to the user's Wert lifetime total. Idempotency
- * is the caller's responsibility — this is meant to be invoked from
- * the Changelly webhook handler after the payment_events dedupe check.
+ * Add an amount (USD) to the user's Wert lifetime total. Atomic via a
+ * single SQL UPDATE — two concurrent webhooks can't both read the same
+ * base value and lose an increment. Idempotency is still the caller's
+ * responsibility (enforced via the payment_events UNIQUE index).
  */
 function addLifetime(userId, amountUsd) {
-  const current = getLifetimeUsd(userId);
-  const next = current + (parseFloat(amountUsd) || 0);
-  db.prepare('UPDATE users SET wert_lifetime_usd = ? WHERE id = ?').run(String(next), userId);
-  return next;
+  const delta = parseFloat(amountUsd) || 0;
+  if (delta === 0) return getLifetimeUsd(userId);
+  db.prepare(`
+    UPDATE users
+    SET wert_lifetime_usd = CAST(
+      CAST(COALESCE(wert_lifetime_usd, '0') AS REAL) + ? AS TEXT
+    )
+    WHERE id = ?
+  `).run(delta, userId);
+  return getLifetimeUsd(userId);
 }
 
 function getRemainingCap(userId) {

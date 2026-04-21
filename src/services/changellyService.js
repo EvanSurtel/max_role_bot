@@ -179,7 +179,11 @@ async function createOrder({ userId, walletAddress, amountUsd, countryCode, stat
   const webhookHost = process.env.WEBHOOK_HOST || '';
 
   const body = {
-    externalOrderId: `rank-${userId}-${Date.now()}`,
+    // Millisecond + random suffix so two clicks in the same millisecond
+    // still mint distinct order ids (Changelly treats externalOrderId
+    // as unique; a collision would either create a duplicate order or
+    // 409 the second request).
+    externalOrderId: `rank-${userId}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
     externalUserId: userId,
     providerCode,
     currencyFrom: 'USD',
@@ -299,7 +303,7 @@ async function createSellOrder({ userId, walletAddress, amountUsdc, countryCode,
   const webhookHost = process.env.WEBHOOK_HOST || '';
 
   const body = {
-    externalOrderId: `rank-sell-${userId}-${Date.now()}`,
+    externalOrderId: `rank-sell-${userId}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
     externalUserId: userId,
     providerCode,
     currencyFrom: 'USDC',

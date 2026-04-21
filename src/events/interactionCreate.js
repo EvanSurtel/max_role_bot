@@ -409,7 +409,7 @@ module.exports = {
         if (id === 'wallet_withdraw_sol_max_modal') {
           return await walletPanel.handleWithdrawSolMaxModal(interaction);
         }
-        if (id === 'wallet_deposit_amount_modal' || id === 'wallet_cashout_amount_modal') {
+        if (id === 'wallet_deposit_amount_modal' || id === 'wallet_cashout_amount_modal' || id === 'wallet_deposit_state_modal') {
           return await walletPanel.handleWalletAmountModal(interaction);
         }
 

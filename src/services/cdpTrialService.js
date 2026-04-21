@@ -56,16 +56,32 @@ function _incrementAtomic() {
 }
 
 function getMax() {
-  return parseInt(process.env.CDP_TRIAL_MAX_TRANSACTIONS || '25', 10);
+  const raw = process.env.CDP_TRIAL_MAX_TRANSACTIONS;
+  if (!raw) return 25;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 0) {
+    console.error(`[CDP] CDP_TRIAL_MAX_TRANSACTIONS invalid: "${raw}". Using default 25.`);
+    return 25;
+  }
+  return n;
 }
 
 /**
  * Per-transaction USD cap in trial mode. Coinbase limits trial
  * projects to $5 per tx × 25 total. When full access is granted, bump
  * CDP_TRIAL_MAX_AMOUNT_USD to a high value (or remove to use default).
+ * Validates the env value — negative or non-numeric silently break the
+ * router ("amountUsd <= perTxMax" always false ⇒ CDP hidden forever).
  */
 function getMaxPerTxUsd() {
-  return parseFloat(process.env.CDP_TRIAL_MAX_AMOUNT_USD || '5') || 5;
+  const raw = process.env.CDP_TRIAL_MAX_AMOUNT_USD;
+  if (!raw) return 5;
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n) || n <= 0) {
+    console.error(`[CDP] CDP_TRIAL_MAX_AMOUNT_USD invalid: "${raw}". Using default 5.`);
+    return 5;
+  }
+  return n;
 }
 
 /**

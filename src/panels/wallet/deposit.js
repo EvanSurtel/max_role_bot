@@ -137,7 +137,17 @@ async function handleDepositProvider(interaction, user, wallet, lang) {
 
   const rest = id.slice('wallet_deposit_'.length);
   const [providerKey, amountStr] = rest.split('__');
-  const amountUsd = Number(amountStr) || DEFAULT_PRESET_USD;
+  const amountUsd = Number(amountStr);
+
+  // Re-validate — the customId is user-controllable (they can edit it
+  // in a modified Discord client). Modal validation at input time
+  // isn't enough; the handler is the trust boundary.
+  if (!Number.isFinite(amountUsd) || amountUsd < MIN_DEPOSIT_USD || amountUsd > MAX_DEPOSIT_USD) {
+    return interaction.reply({
+      content: `Invalid amount. Enter a USD amount between $${MIN_DEPOSIT_USD} and $${MAX_DEPOSIT_USD}.`,
+      ephemeral: true,
+    });
+  }
 
   if (providerKey === 'cdp_onramp') {
     return _handleCdp(interaction, user, wallet, country, amountUsd);
@@ -194,7 +204,18 @@ async function _handleCdp(interaction, user, wallet, country, amountUsd) {
     // inside coinbaseOnrampService so future pickers won't offer CDP
     // until the counter resets.
     if (err instanceof onramp.TrialExhaustedError) {
-      console.warn(`[Wallet] CDP trial exhausted for ${user.discord_id}; silently falling back to Wert.`);
+      console.warn(`[Wallet] CDP trial exhausted for ${user.discord_id} @ $${amountUsd}; silently falling back to Wert.`);
+      // Ops visibility — logged to the cash-tx feed so admins can see
+      // how often the silent fallback fires without leaking it to the
+      // user.
+      try {
+        const { postTransaction } = require('../../utils/transactionFeed');
+        postTransaction({
+          type: 'cdp_fallback_to_wert',
+          discordId: String(user.discord_id),
+          memo: `CDP trial exhausted mid-request ($${amountUsd}) — silently routed to Wert`,
+        });
+      } catch { /* best effort */ }
       return _handleChangelly(interaction, user, wallet, country, 'wert', amountUsd, {
         alreadyDeferred: true,
         fallbackFromCdp: true,
@@ -237,6 +258,43 @@ async function _handleCdp(interaction, user, wallet, country, amountUsd) {
 
 // ─── Wert / Transak via Changelly ───────────────────────────────
 async function _handleChangelly(interaction, user, wallet, country, preferredProviderCode, amountUsd, opts = {}) {
+  // Changelly requires state for US; existing users who onboarded
+  // before the state_code migration have NULL. Prompt them to enter
+  // it in-line rather than letting the /orders call silently fail.
+  if (country === 'US' && !user.state_code) {
+    const { ModalBuilder: MB, TextInputBuilder: TI, TextInputStyle: TIS, ActionRowBuilder: AR } = require('discord.js');
+    const modal = new MB()
+      .setCustomId('wallet_deposit_state_modal')
+      .setTitle('US State Required');
+    const input = new TI()
+      .setCustomId('deposit_state_code')
+      .setLabel('Your US state (2-letter code, e.g. NY, CA, TX)')
+      .setStyle(TIS.Short)
+      .setRequired(true)
+      .setMinLength(2)
+      .setMaxLength(2);
+    modal.addComponents(new AR().addComponents(input));
+    return interaction.showModal(modal);
+  }
+
+  // Wert LKYC cap guard — stop rapid-fire deposits from exceeding
+  // $1000 lifetime before their webhooks land. Sums the in-flight
+  // (paymentEventRepo credited rows), plus any new amount now, and
+  // refuses if it would blow through.
+  if (preferredProviderCode === 'wert') {
+    try {
+      const wertKyc = require('../../database/repositories/wertKycRepo');
+      const projected = wertKyc.getLifetimeUsd(user.id) + amountUsd;
+      if (projected > wertKyc.LKYC_CAP_USD) {
+        const msg = `This $${amountUsd} Wert deposit would push your lifetime Wert total past the $${wertKyc.LKYC_CAP_USD} no-ID cap (you're at $${wertKyc.getLifetimeUsd(user.id).toFixed(2)}). Please pick **Transak** instead — it needs ID once but has no lifetime cap.`;
+        if (opts.alreadyDeferred) {
+          return interaction.editReply({ content: msg });
+        }
+        return interaction.reply({ content: msg, ephemeral: true });
+      }
+    } catch { /* best effort — don't block the deposit if the check itself fails */ }
+  }
+
   if (!changelly.isConfigured()) {
     if (opts.alreadyDeferred) {
       return interaction.editReply({

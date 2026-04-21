@@ -107,6 +107,24 @@ async function postCoinbaseReviewDemoPanel(client, lang = 'en') {
 async function handleCoinbaseReviewDemoButton(interaction) {
   await interaction.deferReply({ ephemeral: true });
 
+  // Role gate — only Coinbase reviewers (or configured reviewer role)
+  // and bot admins can click this button. Without this guard, any
+  // server member with channel access could click 25 times and burn
+  // the production trial counter.
+  const reviewerRoleId = process.env.CDP_REVIEWER_ROLE_ID;
+  const adminRoleId = process.env.ADMIN_ROLE_ID;
+  const ownerRoleId = process.env.OWNER_ROLE_ID;
+  const memberRoles = interaction.member?.roles?.cache;
+  const isAuthorized =
+    (reviewerRoleId && memberRoles?.has(reviewerRoleId)) ||
+    (adminRoleId && memberRoles?.has(adminRoleId)) ||
+    (ownerRoleId && memberRoles?.has(ownerRoleId));
+  if (!isAuthorized) {
+    return interaction.editReply({
+      content: 'This demo is reserved for the Coinbase review team. Contact an admin if you need access.',
+    });
+  }
+
   const demoWallet = process.env.DEMO_WALLET_ADDRESS;
   if (!demoWallet || !/^0x[0-9a-fA-F]{40}$/.test(demoWallet)) {
     return interaction.editReply({

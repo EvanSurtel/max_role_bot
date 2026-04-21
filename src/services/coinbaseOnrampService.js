@@ -103,6 +103,24 @@ async function createOneClickBuySession({
     throw new Error('CDP_API_KEY_ID and CDP_API_KEY_SECRET must be set');
   }
 
+  // Close the TOCTOU window between picker render and session mint —
+  // if the counter flipped to exhausted while the user was deciding,
+  // bail now so deposit.js takes the silent Wert fallback instead of
+  // handing out a session Coinbase will reject.
+  try {
+    const cdpTrial = require('./cdpTrialService');
+    if (!cdpTrial.canUseOnramp()) {
+      throw new TrialExhaustedError('trial cap reached between picker render and session mint');
+    }
+  } catch (e) {
+    if (e instanceof TrialExhaustedError) throw e;
+    // cdpTrial unavailable — fall through, let Coinbase enforce.
+  }
+
+  if (partnerUserRef && String(partnerUserRef).length > 49) {
+    console.warn(`[CDP] partnerUserRef length ${String(partnerUserRef).length} > 49; truncating. Value: ${String(partnerUserRef).slice(0, 49)}`);
+  }
+
   const jwt = await _signJwt({ host: SESSIONS_HOST, path: SESSIONS_PATH });
 
   const body = {

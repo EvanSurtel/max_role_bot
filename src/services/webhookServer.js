@@ -114,19 +114,38 @@ function startWebhookServer(client) {
       // Wert LKYC lifetime tracking — increment on completed Wert buy.
       // Only counts *completed* on-ramp purchases; refunds/expired/etc.
       // are not counted.
+      //
+      // Idempotent per orderId: even if Changelly sends multiple
+      // completed-status events for the same order (e.g. order flips
+      // processing → completed → processing → completed), we only
+      // credit the lifetime once. Enforced via a dedicated
+      // `wert-credit:<orderId>` row in payment_events (UNIQUE, so the
+      // second insert returns null and we skip).
       if ((status === 'completed' || status === 'finished') &&
           providerCode === 'wert' &&
           (type === 'buy' || currencyFrom)) {
         try {
           const userRepo = require('../database/repositories/userRepo');
           const wertKyc = require('../database/repositories/wertKycRepo');
+          const paymentEventRepo = require('../database/repositories/paymentEventRepo');
           const dbUser = userRepo.findByDiscordId(String(externalUserId));
           if (dbUser) {
-            // amountFrom is the fiat the user paid (USD). Fallback to amountTo if missing.
             const usd = parseFloat(amountFrom ?? amountTo ?? '0') || 0;
             if (usd > 0) {
-              const newTotal = wertKyc.addLifetime(dbUser.id, usd);
-              console.log(`[Changelly] Wert lifetime for user ${dbUser.id}: +$${usd} → $${newTotal.toFixed(2)}`);
+              const creditRecord = paymentEventRepo.record({
+                provider: 'changelly',
+                eventId: `wert-credit:${externalOrderId}`,
+                eventType: 'wert_lifetime_credit',
+                orderId: String(externalOrderId),
+                status: 'credited',
+                payload: { amountUsd: usd, discordId: externalUserId },
+              });
+              if (creditRecord) {
+                const newTotal = wertKyc.addLifetime(dbUser.id, usd);
+                console.log(`[Changelly] Wert lifetime for user ${dbUser.id}: +$${usd} → $${newTotal.toFixed(2)}`);
+              } else {
+                console.log(`[Changelly] Wert lifetime already credited for order ${externalOrderId} — skipping duplicate.`);
+              }
             }
           }
         } catch (err) {
@@ -246,8 +265,18 @@ function startWebhookServer(client) {
         // Parse JSON after signature verification. Payload is FLAT per
         // Coinbase docs (not { data: {...} } wrapped).
         let payload;
-        try { payload = JSON.parse(rawBodyStr); } catch {
-          console.warn('[CDP] Webhook body was not JSON — ignoring');
+        try { payload = JSON.parse(rawBodyStr); } catch (parseErr) {
+          console.warn(`[CDP] Webhook body was not JSON: ${parseErr.message}`);
+          try {
+            const paymentEventRepo = require('../database/repositories/paymentEventRepo');
+            paymentEventRepo.record({
+              provider: 'coinbase',
+              eventId: `parse-error:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`,
+              eventType: 'parse_error',
+              status: 'malformed_json',
+              payload: { raw: rawBodyStr.slice(0, 1000), error: parseErr.message },
+            });
+          } catch { /* best effort */ }
           return;
         }
 
@@ -353,6 +382,22 @@ function _verifyHook0Signature(rawBody, signatureHeader, secret, reqHeaders, max
   const providedSig = get('v1=');
   if (!timestamp || headerNames == null || !providedSig) {
     return { ok: false, reason: 'signature header missing t=, h=, or v1= component' };
+  }
+  // Signature encoding is hex per Coinbase's reference code. Reject
+  // non-hex v1= up front to keep crypto.timingSafeEqual off malformed
+  // input, and reject non-numeric timestamps so the replay window
+  // calc below can't become NaN.
+  if (!/^[0-9a-fA-F]+$/.test(providedSig)) {
+    return { ok: false, reason: 'v1= signature is not hex' };
+  }
+  if (!/^[0-9]+$/.test(timestamp)) {
+    return { ok: false, reason: 't= timestamp is not numeric' };
+  }
+  // An empty h= list reduces the signed payload to just
+  // "timestamp..rawBody" — we never rely on it. Require at least one
+  // header name so the signature binds to some non-body context.
+  if (!headerNames || !headerNames.trim()) {
+    return { ok: false, reason: 'h= header list is empty (refuse to verify body-only signatures)' };
   }
 
   // Replay guard

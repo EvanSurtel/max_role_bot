@@ -125,6 +125,26 @@ async function handleWalletAmountModal(interaction) {
 
   if (id === 'wallet_deposit_amount_modal') return handleDepositAmountModal(interaction, user, wallet, lang);
   if (id === 'wallet_cashout_amount_modal') return handleCashOutAmountModal(interaction, user, wallet, lang);
+  if (id === 'wallet_deposit_state_modal') {
+    // Backfill state_code for pre-migration US users, then nudge them
+    // back to the deposit flow.
+    const US_STATES = new Set([
+      'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
+      'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+      'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
+      'VA','WA','WV','WI','WY','DC','PR','VI','GU','AS','MP',
+    ]);
+    const raw = interaction.fields.getTextInputValue('deposit_state_code').trim().toUpperCase().slice(0, 2);
+    if (!US_STATES.has(raw)) {
+      return interaction.reply({ content: `\`${raw}\` isn't a valid US state code.`, ephemeral: true });
+    }
+    const db = require('../../database/db');
+    db.prepare('UPDATE users SET state_code = ? WHERE id = ?').run(raw, user.id);
+    return interaction.reply({
+      content: `State saved: **${raw}**. Click **Deposit USDC** again to continue.`,
+      ephemeral: true,
+    });
+  }
 }
 
 module.exports = {

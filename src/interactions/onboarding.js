@@ -220,11 +220,28 @@ async function handleRegistrationModal(interaction) {
   const displayName = interaction.fields.getTextInputValue('reg_display_name').trim();
   const codIgn = interaction.fields.getTextInputValue('reg_cod_ign').trim();
   const codUid = interaction.fields.getTextInputValue('reg_cod_uid').trim();
-  // state_code only present on the US-variant modal
+  // state_code only present on the US-variant modal. Validated against
+  // the ISO 3166-2 list so we don't pass "XX" through to Changelly and
+  // get a generic "couldn't generate link" rejection.
+  const US_STATES = new Set([
+    'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
+    'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+    'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
+    'VA','WA','WV','WI','WY','DC','PR','VI','GU','AS','MP',
+  ]);
   let stateCode = null;
   try {
     const raw = interaction.fields.getTextInputValue('reg_state_code');
-    if (raw) stateCode = raw.trim().toUpperCase().slice(0, 2);
+    if (raw) {
+      const candidate = raw.trim().toUpperCase().slice(0, 2);
+      if (!US_STATES.has(candidate)) {
+        return interaction.reply({
+          content: `\`${candidate}\` isn't a valid US state code. Please restart onboarding and enter a 2-letter code like NY, CA, TX.`,
+          ephemeral: true,
+        });
+      }
+      stateCode = candidate;
+    }
   } catch { /* field not present on non-US modal */ }
 
   // Validate CODM UID:
