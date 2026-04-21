@@ -68,23 +68,25 @@ function getOnrampOptions({ country, amountUsd, userId }) {
 
   // CDP guest checkout — only where Coinbase actually routes to guest
   // flow today (US as of 2026-04-21), and only while the trial counter
-  // has room left. Trial mode also caps each transaction at $5 — if
-  // the user requested more, we hide CDP entirely rather than
-  // silently clamping the amount (cleaner UX: the button doesn't
-  // appear for $50 requests, so the user isn't confused when the
-  // widget shows only $5 available).
+  // has room left. Trial mode caps each transaction at $5 — if the
+  // user requested more, we hide CDP entirely rather than silently
+  // clamping.
+  //
+  // Fee messaging during trial: Coinbase waives their card fee on
+  // trial-sized transactions, so we show "no fees" for ≤$5 deposits.
+  // Post-approval, CDP_ZERO_FEE_USDC flips the copy to 0% globally.
   if (CDP_GUEST_ONRAMP_COUNTRIES.has(c) && cdpTrial.canUseOnramp()) {
     const perTxMax = cdpTrial.getMaxPerTxUsd();
     const fitsInTrialCap = amountUsd == null || amountUsd <= perTxMax;
     if (fitsInTrialCap) {
-      const capNote = perTxMax < 100 ? ` (capped at $${perTxMax}/tx during trial)` : '';
+      const zeroFee = process.env.CDP_ZERO_FEE_USDC === 'true' || perTxMax <= 5;
       options.push({
         provider: 'cdp_onramp',
         label: 'Apple Pay / Debit Card',
-        description: process.env.CDP_ZERO_FEE_USDC === 'true'
-          ? `Fastest. 0% fee. No Coinbase account needed${capNote}.`
-          : `Fastest. ~2.5% fee. No Coinbase account needed${capNote}.`,
-        feePctEstimate: process.env.CDP_ZERO_FEE_USDC === 'true' ? 0 : 0.025,
+        description: zeroFee
+          ? `**No fees** on deposits up to $${perTxMax}. No Coinbase account needed. Powered by Coinbase.`
+          : 'Fastest. ~2.5% Coinbase card fee. No Coinbase account needed.',
+        feePctEstimate: zeroFee ? 0 : 0.025,
         kycRequired: 'none',
         primary: true,
       });
@@ -109,6 +111,11 @@ function getOnrampOptions({ country, amountUsd, userId }) {
           wertDesc = `Heads up: this deposit exceeds your remaining $${remaining.toFixed(0)} Wert no-ID limit — Wert may ask for ID. Consider the Transak option instead.`;
         }
       }
+      // Default Wert description includes fee + attribution ("paid to
+      // Wert") unless we've already swapped it for a KYC-cap warning.
+      if (wertDesc === 'No ID upload needed under $1,000 lifetime. 4% + $1 fee. Powered by Wert.') {
+        wertDesc = 'No ID upload needed under $1,000 lifetime. Fee: 4% (min $1) — paid to Wert, not Rank $.';
+      }
       options.push({
         provider: 'wert',
         label: 'Pay with Card (Wert)',
@@ -125,10 +132,10 @@ function getOnrampOptions({ country, amountUsd, userId }) {
   // Wert-replacement once the user is over the LKYC cap.
   options.push({
     provider: 'transak',
-    label: c === 'GB' ? 'Pay with Card (Transak)' : 'Pay with Card (Transak — ID required, lower fees)',
+    label: c === 'GB' ? 'Pay with Card (Transak)' : 'Pay with Card (Transak — ID required)',
     description: c === 'GB'
-      ? 'ID verification required. 3.29% + $0.99 card fee, 0.49% + £1 Faster Payments.'
-      : 'ID verification required, cheaper than Wert. 3.29% + $0.99 card fee.',
+      ? 'ID verification required. Fee: 3.29% + $0.99 card / 0.49% + £1 Faster Payments — paid to Transak, not Rank $.'
+      : 'ID verification required. Fee: 3.29% + $0.99 — paid to Transak, not Rank $.',
     feePctEstimate: 0.0329,
     kycRequired: 'full',
     primary: options.length === 0,  // primary if neither CDP nor Wert claimed it
@@ -167,7 +174,7 @@ function getOfframpOptions({ country, amountUsdc }) {
   options.push({
     provider: 'transak',
     label: 'Cash out to bank (Transak)',
-    description: 'ID verification required once. ~1–2% fee depending on local payout rail.',
+    description: 'ID verification required once. Fee: ~1–2% depending on local payout rail — paid to Transak, not Rank $.',
     feePctEstimate: 0.015,
     kycRequired: 'full',
     primary: options.length === 0,
@@ -179,7 +186,7 @@ function getOfframpOptions({ country, amountUsdc }) {
   options.push({
     provider: 'bitrefill',
     label: 'Spend on Gift Cards (no ID)',
-    description: 'Amazon, Steam, Apple, Uber, and 1,000+ brands. 0–3% effective fee.',
+    description: 'Amazon, Steam, Apple, Uber, 1,000+ brands. Effective fee 0–3% depending on brand — the gift-card markup is Bitrefill\'s, not Rank $.',
     feePctEstimate: 0.015,
     kycRequired: 'none',
     primary: false,

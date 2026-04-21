@@ -110,6 +110,8 @@ async function handleCashOutAmountModal(interaction, user, wallet, lang) {
       '',
       '**Pick a cash-out method:**',
       ...descLines,
+      '',
+      '_Rank $ does not charge any cash-out fee. All fees shown go to the cash-out provider (Coinbase / Transak / Bitrefill), not to us._',
     ].join('\n'),
     components: [new ActionRowBuilder().addComponents(buttons)],
     ephemeral: true,

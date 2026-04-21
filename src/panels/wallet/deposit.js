@@ -117,6 +117,8 @@ async function handleDepositAmountModal(interaction, user, wallet, lang) {
       '**Pick a payment method:**',
       ...descLines,
       '',
+      '_Rank $ does not charge any deposit fee. All fees shown go to the payment provider (Coinbase / Wert / Transak), not to us._',
+      '',
       '\u26A0\uFE0F Always send USDC on the **Base** network. Any other network will result in permanent loss of funds.',
     ].join('\n'),
     components: [new ActionRowBuilder().addComponents(buttons)],
@@ -272,13 +274,13 @@ async function _handleChangelly(interaction, user, wallet, country, preferredPro
       const actualProvider = order.providerCode || preferredProviderCode;
       const providerLabel = actualProvider.charAt(0).toUpperCase() + actualProvider.slice(1);
 
-      const headerTag = opts.fallbackFromCdp
-        ? `**\u{1F4B3} Deposit $${amountUsd} USDC — ${providerLabel}** (Apple Pay / card via Coinbase is temporarily unavailable — here's the next-best option)`
-        : `**\u{1F4B3} Deposit $${amountUsd} USDC — ${providerLabel}**`;
-
+      // Silent CDP → Wert fallback: user sees the Wert result exactly
+      // as if they had picked Wert in the first place. No "Apple Pay
+      // unavailable" breadcrumb — the CDP trial cap is an operational
+      // detail, not a user concern.
       return interaction.editReply({
         content: [
-          headerTag,
+          `**\u{1F4B3} Deposit $${amountUsd} USDC — ${providerLabel}**`,
           '',
           '1. Click **Buy USDC** below — goes straight to the payment page',
           '2. Pay with your card',
