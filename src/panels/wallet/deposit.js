@@ -161,6 +161,16 @@ async function _handleCdp(interaction, user, wallet, country, amountUsd) {
 
   await interaction.deferReply({ ephemeral: true });
 
+  // Defensive: if the picker still somehow offered CDP for an amount
+  // above the trial per-tx cap (shouldn't happen — router hides CDP
+  // for amounts > cap), clamp here too so we don't 4xx Coinbase.
+  const cdpTrial = require('../../services/cdpTrialService');
+  const perTxMax = cdpTrial.getMaxPerTxUsd();
+  if (amountUsd > perTxMax) {
+    console.warn(`[Wallet] CDP request $${amountUsd} over per-tx cap $${perTxMax}; clamping.`);
+    amountUsd = perTxMax;
+  }
+
   const paymentCurrency = FIAT_BY_COUNTRY[country] || 'USD';
 
   let onrampUrl;

@@ -60,6 +60,15 @@ function getMax() {
 }
 
 /**
+ * Per-transaction USD cap in trial mode. Coinbase limits trial
+ * projects to $5 per tx × 25 total. When full access is granted, bump
+ * CDP_TRIAL_MAX_AMOUNT_USD to a high value (or remove to use default).
+ */
+function getMaxPerTxUsd() {
+  return parseFloat(process.env.CDP_TRIAL_MAX_AMOUNT_USD || '5') || 5;
+}
+
+/**
  * Can we mint another CDP Onramp session right now?
  * False if the onramp feature flag is off, or the trial counter has
  * reached the configured max.
@@ -121,9 +130,19 @@ function getStatus() {
     max,
     remaining: Math.max(0, max - count),
     exhausted: count >= max,
+    maxPerTxUsd: getMaxPerTxUsd(),
     onrampEnabled: process.env.CDP_ONRAMP_ENABLED === 'true',
     offrampEnabled: process.env.CDP_OFFRAMP_ENABLED === 'true',
   };
 }
 
-module.exports = { canUseOnramp, canUseOfframp, incrementTrialCounter, forceExhaust, reset, getStatus };
+module.exports = {
+  canUseOnramp,
+  canUseOfframp,
+  incrementTrialCounter,
+  forceExhaust,
+  reset,
+  getStatus,
+  getMax,
+  getMaxPerTxUsd,
+};

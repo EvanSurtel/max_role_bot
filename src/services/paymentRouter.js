@@ -67,19 +67,28 @@ function getOnrampOptions({ country, amountUsd, userId }) {
   const options = [];
 
   // CDP guest checkout — only where Coinbase actually routes to guest
-  // flow today (US on 2026-04-21), and only while the trial counter
-  // has room left.
+  // flow today (US as of 2026-04-21), and only while the trial counter
+  // has room left. Trial mode also caps each transaction at $5 — if
+  // the user requested more, we hide CDP entirely rather than
+  // silently clamping the amount (cleaner UX: the button doesn't
+  // appear for $50 requests, so the user isn't confused when the
+  // widget shows only $5 available).
   if (CDP_GUEST_ONRAMP_COUNTRIES.has(c) && cdpTrial.canUseOnramp()) {
-    options.push({
-      provider: 'cdp_onramp',
-      label: 'Apple Pay / Debit Card',
-      description: process.env.CDP_ZERO_FEE_USDC === 'true'
-        ? 'Fastest option. 0% fee. No Coinbase account needed. Powered by Coinbase.'
-        : 'Fastest option. ~2.5% fee. No Coinbase account needed. Powered by Coinbase.',
-      feePctEstimate: process.env.CDP_ZERO_FEE_USDC === 'true' ? 0 : 0.025,
-      kycRequired: 'none',
-      primary: true,
-    });
+    const perTxMax = cdpTrial.getMaxPerTxUsd();
+    const fitsInTrialCap = amountUsd == null || amountUsd <= perTxMax;
+    if (fitsInTrialCap) {
+      const capNote = perTxMax < 100 ? ` (capped at $${perTxMax}/tx during trial)` : '';
+      options.push({
+        provider: 'cdp_onramp',
+        label: 'Apple Pay / Debit Card',
+        description: process.env.CDP_ZERO_FEE_USDC === 'true'
+          ? `Fastest. 0% fee. No Coinbase account needed${capNote}.`
+          : `Fastest. ~2.5% fee. No Coinbase account needed${capNote}.`,
+        feePctEstimate: process.env.CDP_ZERO_FEE_USDC === 'true' ? 0 : 0.025,
+        kycRequired: 'none',
+        primary: true,
+      });
+    }
   }
 
   // Wert — card payments with LKYC (typed-only up to $1,000 lifetime).
