@@ -391,6 +391,18 @@ async function _handleAdminResolveButton(interaction) {
     try { await match._matchMsg.edit({ components: [] }); } catch { /* */ }
   }
 
+  // Audit the admin action — matches the pattern used for wager-match
+  // dispute resolutions (src/interactions/matchResult/adminResolve.js).
+  // Without this, rogue staff could resolve queue disputes without a trace.
+  const { logAdminAction } = require('../utils/adminAudit');
+  logAdminAction(interaction.user.id, 'resolve_queue_dispute', 'match', matchId, {
+    winningTeam,
+    captain1: match.captains?.team1,
+    captain2: match.captains?.team2,
+    captain1Vote: match.captain1Vote,
+    captain2Vote: match.captain2Vote,
+  });
+
   await resolveMatch(_client, match, winningTeam);
 }
 

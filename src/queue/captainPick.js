@@ -150,6 +150,17 @@ function recordCaptainPick(matchId, captainId, pickedPlayerId) {
   if (player.team === 1) match.team1.push(pickedPlayerId);
   else match.team2.push(pickedPlayerId);
 
+  // Clear currentPicker BEFORE returning so a second spam-click from the
+  // same captain (on a different player) fails the `currentPicker !==
+  // captainId` guard above. Without this, the captain can double-pick
+  // in the ~50-200 ms window between this function returning and
+  // _advancePick running (the button handler does a textChannel.send +
+  // deferUpdate after recordCaptainPick — both yield the event loop
+  // before _advancePick updates currentPicker to the next captain).
+  // _advancePick overwrites match.currentPicker unconditionally, so
+  // clobbering it to null here is safe.
+  match.currentPicker = null;
+
   return { success: true };
 }
 
