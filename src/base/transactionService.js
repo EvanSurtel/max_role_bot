@@ -50,11 +50,29 @@ async function _sendUserOp(smartAccount, calls) {
   const cdp = getCdpClient();
   const network = getCdpNetwork();
 
+  // The paymaster URL is what makes user ops gasless. Without it, the
+  // bundler asks the sender Smart Account to pay for gas — and user
+  // SAs (and escrow-owner-smart) never hold ETH by design. Error
+  // looks like "sender balance and deposit together is 0 but must
+  // be at least ... to pay for this operation" when this is omitted.
+  //
+  // PAYMASTER_RPC_URL format (from CDP dashboard, per project):
+  //   https://api.developer.coinbase.com/rpc/v1/<network>/<paymaster_key>
+  // Fail loudly at the first UserOp if it's missing, rather than
+  // silently draining the sender on a random future approve.
+  const paymasterUrl = process.env.PAYMASTER_RPC_URL;
+  if (!paymasterUrl) {
+    const err = new Error('PAYMASTER_RPC_URL not set — every UserOp would require ETH in the sender Smart Account. Configure the CDP Paymaster URL in your env.');
+    err.stage = 'pre_submit';
+    throw err;
+  }
+
   let result;
   try {
     result = await cdp.evm.prepareAndSendUserOperation({
       smartAccount,
       network,
+      paymasterUrl,
       calls: calls.map(c => ({
         to: c.to,
         value: c.value ?? 0n,
