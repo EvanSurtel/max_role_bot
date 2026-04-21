@@ -112,16 +112,35 @@ function awardStats({ matchId, challenge, winningPlayers, losingPlayers, isCashM
     'INSERT INTO xp_history (user_id, match_id, match_type, xp_amount, season) VALUES (?, ?, ?, ?, ?)'
   );
 
+  // Per-player atomic wrap so a mid-loop failure (constraint violation,
+  // disk full, etc.) can't leave a player with e.g. XP awarded but no
+  // win recorded + no xp_history row — which would desync the
+  // xp_points column from the leaderboard (which reads xp_history).
+  const awardWinnerTx = db.transaction((userId) => {
+    userRepo.addXp(userId, winXp);
+    userRepo.addWin(userId);
+    insertXpHistory.run(userId, matchId, challenge.type, winXp, getCurrentSeason());
+    if (isCashMatch) {
+      userRepo.addEarnings(userId, perPlayerEarnings);
+      userRepo.addEntered(userId, challenge.entry_amount_usdc);
+      userRepo.incrementCashWin(userId);
+    }
+  });
+  const awardLoserTx = db.transaction((userId) => {
+    if (loseXp > 0) {
+      userRepo.addXp(userId, -loseXp);
+      insertXpHistory.run(userId, matchId, challenge.type, -loseXp, getCurrentSeason());
+    }
+    userRepo.addLoss(userId);
+    if (isCashMatch) {
+      userRepo.addEntered(userId, challenge.entry_amount_usdc);
+      userRepo.incrementCashLoss(userId);
+    }
+  });
+
   for (const player of winningPlayers) {
     try {
-      userRepo.addXp(player.user_id, winXp);
-      userRepo.addWin(player.user_id);
-      insertXpHistory.run(player.user_id, matchId, challenge.type, winXp, getCurrentSeason());
-      if (isCashMatch) {
-        userRepo.addEarnings(player.user_id, perPlayerEarnings);
-        userRepo.addEntered(player.user_id, challenge.entry_amount_usdc);
-        userRepo.incrementCashWin(player.user_id);
-      }
+      awardWinnerTx(player.user_id);
     } catch (err) {
       console.error(`[MatchService] Failed to update stats for winner ${player.user_id}:`, err.message);
     }
@@ -129,15 +148,7 @@ function awardStats({ matchId, challenge, winningPlayers, losingPlayers, isCashM
 
   for (const player of losingPlayers) {
     try {
-      if (loseXp > 0) {
-        userRepo.addXp(player.user_id, -loseXp);
-        insertXpHistory.run(player.user_id, matchId, challenge.type, -loseXp, getCurrentSeason());
-      }
-      userRepo.addLoss(player.user_id);
-      if (isCashMatch) {
-        userRepo.addEntered(player.user_id, challenge.entry_amount_usdc);
-        userRepo.incrementCashLoss(player.user_id);
-      }
+      awardLoserTx(player.user_id);
     } catch (err) {
       console.error(`[MatchService] Failed to update stats for loser ${player.user_id}:`, err.message);
     }

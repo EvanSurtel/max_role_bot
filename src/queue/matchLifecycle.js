@@ -283,16 +283,33 @@ async function resolveMatch(client, match, winningTeam) {
   const losingTeam = winningTeam === 1 ? 2 : 1;
   const season = getCurrentSeason();
 
+  // Per-user atomicity: wrap (addXp, addWin/Loss, insertXpHistory) in
+  // one DB transaction so a mid-write failure (disk full, constraint
+  // violation, etc.) can't leave a player with XP awarded but no
+  // win/loss stat or no xp_history row. Without this, the leaderboard
+  // (reads xp_history) and the player's xp_points column could drift
+  // out of sync — the player sees their rank move but the season
+  // standings don't reflect the match.
+  const awardWinTx = db.transaction((userId) => {
+    userRepo.addXp(userId, QUEUE_CONFIG.WIN_XP);
+    userRepo.addWin(userId);
+    insertXpHistory.run(userId, match.id, 'queue', QUEUE_CONFIG.WIN_XP, season);
+  });
+  const awardLossTx = db.transaction((userId, penalize) => {
+    if (penalize) {
+      userRepo.addXp(userId, -QUEUE_CONFIG.LOSS_XP);
+      insertXpHistory.run(userId, match.id, 'queue', -QUEUE_CONFIG.LOSS_XP, season);
+    }
+    userRepo.addLoss(userId);
+  });
+
   // Winners: +WIN_XP, addWin
   for (const [discordId, player] of match.players) {
     if (player.team !== winningTeam) continue;
     try {
       const user = userRepo.findByDiscordId(discordId);
       if (!user) continue;
-
-      userRepo.addXp(user.id, QUEUE_CONFIG.WIN_XP);
-      userRepo.addWin(user.id);
-      insertXpHistory.run(user.id, match.id, 'queue', QUEUE_CONFIG.WIN_XP, season);
+      awardWinTx(user.id);
     } catch (err) {
       console.error(`[QueueService] Failed to award win XP to ${discordId}:`, err.message);
     }
@@ -304,14 +321,7 @@ async function resolveMatch(client, match, winningTeam) {
     try {
       const user = userRepo.findByDiscordId(discordId);
       if (!user) continue;
-
-      // Mid-series subs don't get penalized
-      if (player.subType !== 'mid_series') {
-        userRepo.addXp(user.id, -QUEUE_CONFIG.LOSS_XP);
-        insertXpHistory.run(user.id, match.id, 'queue', -QUEUE_CONFIG.LOSS_XP, season);
-      }
-
-      userRepo.addLoss(user.id);
+      awardLossTx(user.id, player.subType !== 'mid_series');
     } catch (err) {
       console.error(`[QueueService] Failed to apply loss for ${discordId}:`, err.message);
     }
