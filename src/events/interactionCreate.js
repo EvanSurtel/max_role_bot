@@ -404,6 +404,9 @@ module.exports = {
         if (id === 'wallet_withdraw_sol_max_modal') {
           return await walletPanel.handleWithdrawSolMaxModal(interaction);
         }
+        if (id === 'wallet_deposit_amount_modal' || id === 'wallet_cashout_amount_modal') {
+          return await walletPanel.handleWalletAmountModal(interaction);
+        }
         // Admin escrow withdraw modals (SOL + USDC)
         if (id === 'escrow_withdraw_sol_modal' || id === 'escrow_withdraw_usdc_modal') {
           return await escrowPanel.handleEscrowModal(interaction);

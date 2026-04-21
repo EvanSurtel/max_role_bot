@@ -220,6 +220,12 @@ async function handleRegistrationModal(interaction) {
   const displayName = interaction.fields.getTextInputValue('reg_display_name').trim();
   const codIgn = interaction.fields.getTextInputValue('reg_cod_ign').trim();
   const codUid = interaction.fields.getTextInputValue('reg_cod_uid').trim();
+  // state_code only present on the US-variant modal
+  let stateCode = null;
+  try {
+    const raw = interaction.fields.getTextInputValue('reg_state_code');
+    if (raw) stateCode = raw.trim().toUpperCase().slice(0, 2);
+  } catch { /* field not present on non-US modal */ }
 
   // Validate CODM UID:
   // - Must be numeric
@@ -284,9 +290,9 @@ async function handleRegistrationModal(interaction) {
     const countryCode = FLAG_TO_ISO[country] || '';
 
     db.prepare(`
-      UPDATE users SET server_username = ?, cod_ign = ?, cod_uid = ?, cod_server = ?, country_flag = ?, country_code = ?, region = ?, deposit_region = ?, tos_accepted_at = datetime('now')
+      UPDATE users SET server_username = ?, cod_ign = ?, cod_uid = ?, cod_server = ?, country_flag = ?, country_code = ?, state_code = ?, region = ?, deposit_region = ?, tos_accepted_at = datetime('now')
       WHERE id = ?
-    `).run(displayName, codIgn, codUid, regionLabel, country, countryCode, region, depositRegion, user.id);
+    `).run(displayName, codIgn, codUid, regionLabel, country, countryCode, stateCode, region, depositRegion, user.id);
 
     // Generate Base wallet (concurrency-limited to avoid CDP API overload)
     let wallet = walletRepo.findByUserId(user.id);
@@ -537,7 +543,11 @@ async function handleCountrySelect(interaction) {
   // Auto-expire after 5 minutes
   setTimeout(() => global._pendingRegistrations.delete(discordId), 5 * 60 * 1000);
 
-  // Open 3-field registration modal
+  // Open registration modal. US users get a 4th field for their
+  // ISO-3166-2 state code (required by Changelly + CDP when
+  // country=US). Everyone else gets the standard 3 fields.
+  const isUs = country === '🇺🇸';
+
   const modal = new ModalBuilder()
     .setCustomId('registration_modal')
     .setTitle('Register for Rank $');
@@ -567,11 +577,25 @@ async function handleCountrySelect(interaction) {
     .setMinLength(13)
     .setMaxLength(19);
 
-  modal.addComponents(
+  const rows = [
     new ActionRowBuilder().addComponents(displayNameInput),
     new ActionRowBuilder().addComponents(codIgnInput),
     new ActionRowBuilder().addComponents(codUidInput),
-  );
+  ];
+
+  if (isUs) {
+    const stateInput = new TextInputBuilder()
+      .setCustomId('reg_state_code')
+      .setLabel('US State (2-letter code, e.g. NY, CA, TX)')
+      .setPlaceholder('NY')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMinLength(2)
+      .setMaxLength(2);
+    rows.push(new ActionRowBuilder().addComponents(stateInput));
+  }
+
+  modal.addComponents(...rows);
 
   return interaction.showModal(modal);
 }

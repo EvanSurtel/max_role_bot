@@ -8,6 +8,8 @@ const { t, langFor } = require('../../locales/i18n');
 const { handleWalletViewOpen } = require('./viewOpen');
 const { handleWithdrawModal, handleWithdrawConfirmButton } = require('./withdraw');
 const { handleWithdrawSolModal, handleWithdrawSolMaxModal } = require('./withdrawEth');
+const { handleDepositAmountModal } = require('./deposit');
+const { handleCashOutAmountModal } = require('./cashOut');
 
 /**
  * Handle wallet sub-buttons on the ephemeral wallet view (copy address,
@@ -109,9 +111,26 @@ async function handleWalletSubButton(interaction) {
   }
 }
 
+/**
+ * Route payment amount-modal submits (deposit + cash-out). Called from
+ * the interactionCreate modal dispatcher when customId matches.
+ */
+async function handleWalletAmountModal(interaction) {
+  const id = interaction.customId;
+  const user = userRepo.findByDiscordId(interaction.user.id);
+  if (!user) return interaction.reply({ content: 'User not found.', ephemeral: true });
+  const wallet = walletRepo.findByUserId(user.id);
+  if (!wallet) return interaction.reply({ content: 'Wallet not found.', ephemeral: true });
+  const lang = langFor(interaction);
+
+  if (id === 'wallet_deposit_amount_modal') return handleDepositAmountModal(interaction, user, wallet, lang);
+  if (id === 'wallet_cashout_amount_modal') return handleCashOutAmountModal(interaction, user, wallet, lang);
+}
+
 module.exports = {
   handleWalletViewOpen,
   handleWalletSubButton,
+  handleWalletAmountModal,
   handleWithdrawModal,
   handleWithdrawSolModal,
   handleWithdrawSolMaxModal,

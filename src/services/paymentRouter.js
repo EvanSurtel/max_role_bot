@@ -29,6 +29,7 @@
 //     CDP Offramp is feature-flagged off until Coinbase approves it.
 
 const cdpTrial = require('./cdpTrialService');
+const wertKyc = require('../database/repositories/wertKycRepo');
 
 // Countries where CDP Onramp guest checkout is actually live. Per
 // Rishabh Jain (CDP team) on 2026-04-21, this is US-only today despite
@@ -56,9 +57,12 @@ const WERT_UNSUPPORTED = new Set(['GB']);
  * @param {Object} args
  * @param {string} args.country - ISO 3166-1 alpha-2 (US, CA, GB, DE, ...)
  * @param {number} args.amountUsd
+ * @param {number} [args.userId] - Internal user id; if provided, the
+ *                                  Wert option's label/description
+ *                                  reflect the user's lifetime LKYC cap.
  * @returns {ProviderOption[]}
  */
-function getOnrampOptions({ country, amountUsd }) {
+function getOnrampOptions({ country, amountUsd, userId }) {
   const c = (country || '').toUpperCase();
   const options = [];
 
@@ -79,20 +83,37 @@ function getOnrampOptions({ country, amountUsd }) {
   }
 
   // Wert — card payments with LKYC (typed-only up to $1,000 lifetime).
-  // Available everywhere EXCEPT UK.
+  // Available everywhere EXCEPT UK. Once the user has crossed the cap,
+  // we suppress Wert entirely and let Transak take the slot — otherwise
+  // the user would hit Wert's own KYC gate mid-flow after clicking our
+  // "no ID needed" button.
   if (!WERT_UNSUPPORTED.has(c)) {
-    options.push({
-      provider: 'wert',
-      label: 'Pay with Card (Wert)',
-      description: 'No ID upload needed under $1,000 lifetime. 4% + $1 fee. Powered by Wert.',
-      feePctEstimate: 0.04,
-      kycRequired: 'lkyc',
-      primary: options.length === 0,  // primary if CDP didn't claim it
-    });
+    const wertBlocked = userId != null && wertKyc.isOverCap(userId);
+    if (!wertBlocked) {
+      let wertDesc = 'No ID upload needed under $1,000 lifetime. 4% + $1 fee. Powered by Wert.';
+      if (userId != null) {
+        const remaining = wertKyc.getRemainingCap(userId);
+        if (wertKyc.shouldWarn(userId)) {
+          wertDesc = `No ID upload needed (you have about $${remaining.toFixed(0)} left before Wert asks for ID). 4% + $1 fee.`;
+        }
+        if (amountUsd != null && remaining > 0 && amountUsd > remaining) {
+          wertDesc = `Heads up: this deposit exceeds your remaining $${remaining.toFixed(0)} Wert no-ID limit — Wert may ask for ID. Consider the Transak option instead.`;
+        }
+      }
+      options.push({
+        provider: 'wert',
+        label: 'Pay with Card (Wert)',
+        description: wertDesc,
+        feePctEstimate: 0.04,
+        kycRequired: 'lkyc',
+        primary: options.length === 0,
+      });
+    }
   }
 
   // Transak — global card / bank with full document KYC. Primary in UK
-  // (where Wert is unavailable), secondary elsewhere.
+  // (where Wert is unavailable), secondary elsewhere. Also becomes the
+  // Wert-replacement once the user is over the LKYC cap.
   options.push({
     provider: 'transak',
     label: c === 'GB' ? 'Pay with Card (Transak)' : 'Pay with Card (Transak — ID required, lower fees)',

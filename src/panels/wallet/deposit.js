@@ -1,23 +1,28 @@
-// Deposit info display — multi-provider picker.
+// Deposit flow:
 //
-// The initial click on "Deposit USDC" in the wallet ephemeral shows the
-// user ONE button per provider available for their country (via the
-// paymentRouter). The user picks which provider they want; that click
-// routes to a per-provider handler that actually mints the URL.
+//   Click "Deposit USDC"   → opens amount modal
+//   Submit amount modal    → shows provider picker with amount in the
+//                            button customIds (wallet_deposit_<provider>_<amount>)
+//   Click provider button  → mints the URL for that provider at that amount
 //
 // Provider choices come from src/services/paymentRouter.js so the
-// country → provider matrix and the CDP trial counter live in one place.
+// country → provider matrix, CDP trial counter, and Wert lifetime KYC
+// state all live in one place.
 
 const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } = require('discord.js');
-const { t } = require('../../locales/i18n');
 const changelly = require('../../services/changellyService');
 const onramp = require('../../services/coinbaseOnrampService');
 const paymentRouter = require('../../services/paymentRouter');
 
+const MIN_DEPOSIT_USD = 5;
+const MAX_DEPOSIT_USD = 1000;
 const DEFAULT_PRESET_USD = 50;
 
 // ISO 3166-1 alpha-2 → Onramp fiat currency. Coinbase's Onramp supports
@@ -32,14 +37,47 @@ const FIAT_BY_COUNTRY = {
 const STYLE_BY_INDEX = [ButtonStyle.Success, ButtonStyle.Primary, ButtonStyle.Secondary, ButtonStyle.Secondary];
 
 /**
- * Initial "Deposit USDC" click — show picker with one button per
- * available provider.
+ * Step 1 — user clicks "Deposit USDC". Open a modal asking for the
+ * USD amount they want to deposit.
  */
 async function handleDeposit(interaction, user, wallet, lang) {
+  const modal = new ModalBuilder()
+    .setCustomId('wallet_deposit_amount_modal')
+    .setTitle('Deposit USDC');
+
+  const amountInput = new TextInputBuilder()
+    .setCustomId('deposit_amount_usd')
+    .setLabel(`How much USD? (min $${MIN_DEPOSIT_USD}, max $${MAX_DEPOSIT_USD})`)
+    .setPlaceholder(`e.g. ${DEFAULT_PRESET_USD}`)
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMinLength(1)
+    .setMaxLength(6);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
+
+  return interaction.showModal(modal);
+}
+
+/**
+ * Step 2 — amount modal submitted. Validate the amount and show the
+ * provider picker with amount encoded in each button customId.
+ */
+async function handleDepositAmountModal(interaction, user, wallet, lang) {
+  const raw = interaction.fields.getTextInputValue('deposit_amount_usd').trim();
+  const amount = Number(raw.replace(/[^0-9.]/g, ''));
+  if (!Number.isFinite(amount) || amount < MIN_DEPOSIT_USD || amount > MAX_DEPOSIT_USD) {
+    return interaction.reply({
+      content: `Invalid amount. Enter a USD number between $${MIN_DEPOSIT_USD} and $${MAX_DEPOSIT_USD}.`,
+      ephemeral: true,
+    });
+  }
+  const amountUsd = Math.round(amount * 100) / 100; // 2-decimal round
+
   const country = (user.country_code || '').toUpperCase();
   const address = wallet.address;
 
-  const options = paymentRouter.getOnrampOptions({ country, amountUsd: DEFAULT_PRESET_USD });
+  const options = paymentRouter.getOnrampOptions({ country, amountUsd, userId: user.id });
 
   if (options.length === 0) {
     return interaction.reply({
@@ -51,15 +89,18 @@ async function handleDeposit(interaction, user, wallet, lang) {
         '',
         'No card-payment providers are available for your region right now. You can still deposit by buying USDC on any exchange (Binance, Bybit, Coinbase, etc.) and sending it to your address above.',
         '',
-        '\u26A0\uFE0F Make sure to send USDC on the **Base** network. Sending on the wrong network will result in permanent loss of funds.',
+        '\u26A0\uFE0F Make sure to send USDC on the **Base** network.',
       ].join('\n'),
       ephemeral: true,
     });
   }
 
+  // Encode amount in button customId so the per-provider handler can
+  // read it without needing separate state storage.
+  const amountStr = String(amountUsd);
   const buttons = options.slice(0, 5).map((opt, idx) =>
     new ButtonBuilder()
-      .setCustomId(`wallet_deposit_${opt.provider}`)
+      .setCustomId(`wallet_deposit_${opt.provider}__${amountStr}`)
       .setLabel(opt.label)
       .setStyle(opt.primary ? ButtonStyle.Success : STYLE_BY_INDEX[idx] || ButtonStyle.Secondary),
   );
@@ -68,7 +109,7 @@ async function handleDeposit(interaction, user, wallet, lang) {
 
   return interaction.reply({
     content: [
-      '**\u{1F4B3} Deposit USDC**',
+      `**\u{1F4B3} Deposit $${amountUsd.toFixed(2)} USDC**`,
       '',
       `Your deposit address (Base network):`,
       `\`\`\`\n${address}\n\`\`\``,
@@ -84,28 +125,33 @@ async function handleDeposit(interaction, user, wallet, lang) {
 }
 
 /**
- * Route the per-provider follow-up click (wallet_deposit_cdp_onramp /
- * _wert / _transak) to the right order creator.
+ * Step 3 — provider button clicked. Parse provider + amount from
+ * customId (format: wallet_deposit_<provider>__<amount>, where
+ * <provider> can itself contain one underscore — e.g. cdp_onramp).
  */
 async function handleDepositProvider(interaction, user, wallet, lang) {
   const id = interaction.customId;
   const country = (user.country_code || '').toUpperCase();
 
-  if (id === 'wallet_deposit_cdp_onramp') {
-    return _handleCdp(interaction, user, wallet, country);
+  const rest = id.slice('wallet_deposit_'.length);
+  const [providerKey, amountStr] = rest.split('__');
+  const amountUsd = Number(amountStr) || DEFAULT_PRESET_USD;
+
+  if (providerKey === 'cdp_onramp') {
+    return _handleCdp(interaction, user, wallet, country, amountUsd);
   }
-  if (id === 'wallet_deposit_wert') {
-    return _handleChangelly(interaction, user, wallet, country, 'wert');
+  if (providerKey === 'wert') {
+    return _handleChangelly(interaction, user, wallet, country, 'wert', amountUsd);
   }
-  if (id === 'wallet_deposit_transak') {
-    return _handleChangelly(interaction, user, wallet, country, 'transak');
+  if (providerKey === 'transak') {
+    return _handleChangelly(interaction, user, wallet, country, 'transak', amountUsd);
   }
 
   return interaction.reply({ content: 'Unknown deposit provider.', ephemeral: true });
 }
 
 // ─── CDP Onramp (US-only on Day 1, guest checkout) ─────────────
-async function _handleCdp(interaction, user, wallet, country) {
+async function _handleCdp(interaction, user, wallet, country, amountUsd) {
   if (!onramp.isConfigured()) {
     return interaction.reply({
       content: 'Coinbase Onramp is not configured. Please pick a different payment method.',
@@ -124,7 +170,7 @@ async function _handleCdp(interaction, user, wallet, country) {
       walletAddress: wallet.address,
       purchaseCurrency: 'USDC',
       destinationNetwork: 'base',
-      paymentAmount: String(DEFAULT_PRESET_USD),
+      paymentAmount: String(amountUsd),
       paymentCurrency,
       country: country || 'US',
       partnerUserRef: String(user.discord_id).slice(0, 49),
@@ -132,13 +178,12 @@ async function _handleCdp(interaction, user, wallet, country) {
     onrampUrl = session.onrampUrl;
     quote = session.quote;
   } catch (err) {
-    // Trial-cap error — silently fall back to Wert so the user gets
-    // a working path instead of a dead-end. forceExhaust already fired
-    // inside coinbaseOnrampService, so subsequent pickers won't offer
-    // CDP again until the counter resets.
+    // Trial-cap error → silently fall back to Wert. forceExhaust fired
+    // inside coinbaseOnrampService so future pickers won't offer CDP
+    // until the counter resets.
     if (err instanceof onramp.TrialExhaustedError) {
       console.warn(`[Wallet] CDP trial exhausted for ${user.discord_id}; silently falling back to Wert.`);
-      return _handleChangelly(interaction, user, wallet, country, 'wert', {
+      return _handleChangelly(interaction, user, wallet, country, 'wert', amountUsd, {
         alreadyDeferred: true,
         fallbackFromCdp: true,
       });
@@ -148,7 +193,7 @@ async function _handleCdp(interaction, user, wallet, country) {
       content: [
         '**\u{1F4B3} Deposit USDC — Coinbase**',
         '',
-        'We couldn\'t generate a Coinbase payment link right now. Please pick another payment method from the previous menu, or deposit USDC directly to the Base address shown there.',
+        'We couldn\'t generate a Coinbase payment link right now. Please pick another payment method or deposit USDC directly to the Base address shown earlier.',
       ].join('\n'),
     });
   }
@@ -166,7 +211,7 @@ async function _handleCdp(interaction, user, wallet, country) {
 
   return interaction.editReply({
     content: [
-      '**\u{1F4B3} Deposit USDC — Coinbase**',
+      `**\u{1F4B3} Deposit $${amountUsd} USDC — Coinbase**`,
       '',
       '1. Click **Buy USDC** below — no Coinbase account needed',
       '2. Pay with **Apple Pay** or **debit card**',
@@ -179,7 +224,7 @@ async function _handleCdp(interaction, user, wallet, country) {
 }
 
 // ─── Wert / Transak via Changelly ───────────────────────────────
-async function _handleChangelly(interaction, user, wallet, country, preferredProviderCode, opts = {}) {
+async function _handleChangelly(interaction, user, wallet, country, preferredProviderCode, amountUsd, opts = {}) {
   if (!changelly.isConfigured()) {
     if (opts.alreadyDeferred) {
       return interaction.editReply({
@@ -192,8 +237,6 @@ async function _handleChangelly(interaction, user, wallet, country, preferredPro
     });
   }
 
-  // When we're called from the CDP fallback path, deferReply was
-  // already invoked by _handleCdp — calling it again would throw.
   if (!opts.alreadyDeferred) {
     await interaction.deferReply({ ephemeral: true });
   }
@@ -202,7 +245,7 @@ async function _handleChangelly(interaction, user, wallet, country, preferredPro
     const order = await changelly.createOrder({
       userId: interaction.user.id,
       walletAddress: wallet.address,
-      amountUsd: DEFAULT_PRESET_USD,
+      amountUsd,
       countryCode: country || 'US',
       stateCode: user.state_code || null,
       preferredProviderCode,
@@ -220,8 +263,8 @@ async function _handleChangelly(interaction, user, wallet, country, preferredPro
       const providerLabel = actualProvider.charAt(0).toUpperCase() + actualProvider.slice(1);
 
       const headerTag = opts.fallbackFromCdp
-        ? '**\u{1F4B3} Deposit USDC — ' + providerLabel + '** (Apple Pay / card via Coinbase is temporarily unavailable — here\'s the next-best option)'
-        : `**\u{1F4B3} Deposit USDC — ${providerLabel}**`;
+        ? `**\u{1F4B3} Deposit $${amountUsd} USDC — ${providerLabel}** (Apple Pay / card via Coinbase is temporarily unavailable — here's the next-best option)`
+        : `**\u{1F4B3} Deposit $${amountUsd} USDC — ${providerLabel}**`;
 
       return interaction.editReply({
         content: [
@@ -251,4 +294,4 @@ async function _handleChangelly(interaction, user, wallet, country, preferredPro
   });
 }
 
-module.exports = { handleDeposit, handleDepositProvider };
+module.exports = { handleDeposit, handleDepositAmountModal, handleDepositProvider };

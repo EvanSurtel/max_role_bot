@@ -1,17 +1,18 @@
-// Cash out to fiat / gift cards — multi-provider picker.
+// Cash out flow:
 //
-// Initial click on "Cash Out" shows one button per provider available
-// for the user's country (via paymentRouter). The user picks; that click
-// routes to a per-provider handler that actually mints the URL.
-//
-// Day 1: Transak via Changelly is the primary fiat-bank route for most
-// users. Bitrefill is always shown as a no-KYC alternative (gift cards
-// instead of bank). CDP offramp is feature-flagged off until approval.
+//   Click "Cash Out"       → opens amount modal (pre-filled with their
+//                            available USDC balance as a suggestion)
+//   Submit amount modal    → shows provider picker with amount in button
+//                            customIds (wallet_cashout_<provider>__<amount>)
+//   Click provider button  → mints the URL for that provider / amount
 
 const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } = require('discord.js');
 const { USDC_PER_UNIT } = require('../../config/constants');
 const changelly = require('../../services/changellyService');
@@ -19,17 +20,68 @@ const onramp = require('../../services/coinbaseOnrampService');
 const bitrefill = require('../../services/bitrefillService');
 const paymentRouter = require('../../services/paymentRouter');
 
+const MIN_CASHOUT_USDC = 5;
 const STYLE_BY_INDEX = [ButtonStyle.Success, ButtonStyle.Primary, ButtonStyle.Secondary, ButtonStyle.Secondary];
 
 /**
- * Initial "Cash Out" click — show picker with one button per available
- * provider.
+ * Step 1 — user clicks "Cash Out". Open a modal asking how much USDC
+ * to cash out. The user's available balance is shown in the label so
+ * they know the upper bound.
  */
 async function handleCashOut(interaction, user, wallet, lang) {
-  const country = (user.country_code || '').toUpperCase();
   const availableUsdc = Number(wallet.balance_available) / USDC_PER_UNIT;
 
-  const options = paymentRouter.getOfframpOptions({ country, amountUsdc: availableUsdc });
+  if (availableUsdc < MIN_CASHOUT_USDC) {
+    return interaction.reply({
+      content: `You need at least **$${MIN_CASHOUT_USDC} USDC** available to cash out. Current available: $${availableUsdc.toFixed(2)}.`,
+      ephemeral: true,
+    });
+  }
+
+  const modal = new ModalBuilder()
+    .setCustomId('wallet_cashout_amount_modal')
+    .setTitle('Cash Out USDC');
+
+  const amountInput = new TextInputBuilder()
+    .setCustomId('cashout_amount_usdc')
+    .setLabel(`How much USDC? (you have $${availableUsdc.toFixed(2)})`)
+    .setPlaceholder(`e.g. ${availableUsdc.toFixed(2)}`)
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMinLength(1)
+    .setMaxLength(10);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
+
+  return interaction.showModal(modal);
+}
+
+/**
+ * Step 2 — amount modal submitted. Validate, show provider picker with
+ * amount encoded in each button's customId.
+ */
+async function handleCashOutAmountModal(interaction, user, wallet, lang) {
+  const raw = interaction.fields.getTextInputValue('cashout_amount_usdc').trim();
+  const amount = Number(raw.replace(/[^0-9.]/g, ''));
+  const availableUsdc = Number(wallet.balance_available) / USDC_PER_UNIT;
+
+  if (!Number.isFinite(amount) || amount < MIN_CASHOUT_USDC) {
+    return interaction.reply({
+      content: `Invalid amount. Enter a USDC number of at least ${MIN_CASHOUT_USDC}.`,
+      ephemeral: true,
+    });
+  }
+  if (amount > availableUsdc) {
+    return interaction.reply({
+      content: `You only have **$${availableUsdc.toFixed(2)} USDC** available. Enter a smaller amount.`,
+      ephemeral: true,
+    });
+  }
+  const amountUsdc = Math.round(amount * 100) / 100;
+
+  const country = (user.country_code || '').toUpperCase();
+
+  const options = paymentRouter.getOfframpOptions({ country, amountUsdc });
 
   if (options.length === 0) {
     return interaction.reply({
@@ -42,9 +94,10 @@ async function handleCashOut(interaction, user, wallet, lang) {
     });
   }
 
+  const amountStr = String(amountUsdc);
   const buttons = options.slice(0, 5).map((opt, idx) =>
     new ButtonBuilder()
-      .setCustomId(`wallet_cashout_${opt.provider}`)
+      .setCustomId(`wallet_cashout_${opt.provider}__${amountStr}`)
       .setLabel(opt.label)
       .setStyle(opt.primary ? ButtonStyle.Success : STYLE_BY_INDEX[idx] || ButtonStyle.Secondary),
   );
@@ -53,9 +106,7 @@ async function handleCashOut(interaction, user, wallet, lang) {
 
   return interaction.reply({
     content: [
-      '**\u{1F4B8} Cash Out**',
-      '',
-      `Available balance: **$${availableUsdc.toFixed(2)} USDC**`,
+      `**\u{1F4B8} Cash Out $${amountUsdc.toFixed(2)} USDC**`,
       '',
       '**Pick a cash-out method:**',
       ...descLines,
@@ -66,27 +117,35 @@ async function handleCashOut(interaction, user, wallet, lang) {
 }
 
 /**
- * Route the per-provider follow-up click.
+ * Step 3 — provider button clicked. Parse provider + amount from the
+ * customId.
  */
 async function handleCashOutProvider(interaction, user, wallet, lang) {
   const id = interaction.customId;
   const country = (user.country_code || '').toUpperCase();
 
-  if (id === 'wallet_cashout_cdp_offramp') {
-    return _handleCdpOfframp(interaction, user, wallet, country);
+  const rest = id.slice('wallet_cashout_'.length);
+  const [providerKey, amountStr] = rest.split('__');
+  const amountUsdc = Number(amountStr) || 0;
+  if (amountUsdc <= 0) {
+    return interaction.reply({ content: 'Invalid cash-out amount.', ephemeral: true });
   }
-  if (id === 'wallet_cashout_transak') {
-    return _handleChangellySell(interaction, user, wallet, country, 'transak');
+
+  if (providerKey === 'cdp_offramp') {
+    return _handleCdpOfframp(interaction, user, wallet, country, amountUsdc);
   }
-  if (id === 'wallet_cashout_bitrefill') {
-    return _handleBitrefill(interaction, user);
+  if (providerKey === 'transak') {
+    return _handleChangellySell(interaction, user, wallet, country, 'transak', amountUsdc);
+  }
+  if (providerKey === 'bitrefill') {
+    return _handleBitrefill(interaction, user, amountUsdc);
   }
 
   return interaction.reply({ content: 'Unknown cash-out provider.', ephemeral: true });
 }
 
 // ─── CDP Offramp — gated behind CDP_OFFRAMP_ENABLED ─────────────
-async function _handleCdpOfframp(interaction, user, wallet, country) {
+async function _handleCdpOfframp(interaction, user, wallet, country, amountUsdc) {
   if (!onramp.isConfigured()) {
     return interaction.reply({
       content: 'Coinbase cash-out is not configured. Pick a different option.',
@@ -115,6 +174,7 @@ async function _handleCdpOfframp(interaction, user, wallet, country) {
     defaultAsset: 'USDC',
     defaultNetwork: 'base',
     partnerUserId: wallet.address.slice(0, 49),
+    presetCryptoAmount: String(amountUsdc),
   });
   const offrampUrl = `https://pay.coinbase.com/v3/sell/input?${params.toString()}`;
 
@@ -124,11 +184,11 @@ async function _handleCdpOfframp(interaction, user, wallet, country) {
 
   return interaction.editReply({
     content: [
-      '**\u{1F4B8} Cash Out — Coinbase**',
+      `**\u{1F4B8} Cash Out $${amountUsdc} USDC — Coinbase**`,
       '',
       '1. Click **Cash Out USDC** — opens Coinbase',
       '2. Sign into your Coinbase account (required for bank payouts)',
-      '3. Select amount and payout method (bank, PayPal, etc.)',
+      '3. Confirm the amount and payout method (bank, PayPal, etc.)',
       '4. Cash arrives in your account within minutes',
     ].join('\n'),
     components: [openButton],
@@ -136,7 +196,7 @@ async function _handleCdpOfframp(interaction, user, wallet, country) {
 }
 
 // ─── Transak via Changelly — primary bank cash-out on Day 1 ─────
-async function _handleChangellySell(interaction, user, wallet, country, preferredProviderCode) {
+async function _handleChangellySell(interaction, user, wallet, country, preferredProviderCode, amountUsdc) {
   if (!changelly.isConfigured()) {
     return interaction.reply({
       content: 'Changelly is not configured. Pick a different option.',
@@ -146,13 +206,11 @@ async function _handleChangellySell(interaction, user, wallet, country, preferre
 
   await interaction.deferReply({ ephemeral: true });
 
-  const availableUsdc = (Number(wallet.balance_available) / USDC_PER_UNIT).toFixed(2);
-
   try {
     const result = await changelly.createSellOrder({
       userId: user.discord_id,
       walletAddress: wallet.address,
-      amountUsdc: availableUsdc,
+      amountUsdc: amountUsdc.toFixed(2),
       countryCode: country || 'US',
       stateCode: user.state_code || null,
       preferredProviderCode,
@@ -168,7 +226,7 @@ async function _handleChangellySell(interaction, user, wallet, country, preferre
 
       return interaction.editReply({
         content: [
-          `**\u{1F4B8} Cash Out — ${providerLabel}**`,
+          `**\u{1F4B8} Cash Out $${amountUsdc} USDC — ${providerLabel}**`,
           '',
           '1. Click **Cash Out USDC** — opens the payout page',
           '2. Complete ID verification (one-time, ~2–5 minutes)',
@@ -192,12 +250,7 @@ async function _handleChangellySell(interaction, user, wallet, country, preferre
 }
 
 // ─── Bitrefill — no-KYC gift card route, always available ───────
-async function _handleBitrefill(interaction, user) {
-  if (!bitrefill.isConfigured()) {
-    // Link still works without the affiliate code — just without attribution.
-    // We don't hard-block on it.
-  }
-
+async function _handleBitrefill(interaction, user, amountUsdc) {
   const url = bitrefill.buildAffiliateLink(user.discord_id);
 
   const openButton = new ActionRowBuilder().addComponents(
@@ -206,7 +259,7 @@ async function _handleBitrefill(interaction, user) {
 
   return interaction.reply({
     content: [
-      '**\u{1F4B8} Cash Out — Gift Cards (Bitrefill)**',
+      `**\u{1F4B8} Cash Out $${amountUsdc} USDC — Gift Cards (Bitrefill)**`,
       '',
       '1. Click **Open Bitrefill** — goes straight to their site',
       '2. Pick the gift card brand you want (Amazon, Steam, Apple, Uber, 1,000+ others)',
@@ -218,4 +271,8 @@ async function _handleBitrefill(interaction, user) {
   });
 }
 
-module.exports = { handleCashOut, handleCashOutProvider };
+module.exports = {
+  handleCashOut,
+  handleCashOutAmountModal,
+  handleCashOutProvider,
+};

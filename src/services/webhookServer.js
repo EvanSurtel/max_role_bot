@@ -77,10 +77,60 @@ function startWebhookServer(client) {
         status,
         currencyTo,
         amountTo,
-        payoutAddress,
+        amountFrom,
+        currencyFrom,
+        providerCode,
+        type,           // 'buy' (onramp) or 'sell' (offramp)
       } = payload || {};
 
-      console.log(`[Changelly] Webhook: order=${externalOrderId} user=${externalUserId} status=${status} amount=${amountTo} ${currencyTo}`);
+      console.log(`[Changelly] Webhook: order=${externalOrderId} user=${externalUserId} provider=${providerCode} type=${type} status=${status}`);
+
+      // Idempotency — dedupe replayed webhooks on (provider, externalOrderId+status).
+      // Status is part of the key because we want to process each state
+      // transition (created / processing / completed) once, but not
+      // process the same transition twice.
+      if (externalOrderId && status) {
+        try {
+          const paymentEventRepo = require('../database/repositories/paymentEventRepo');
+          const inserted = paymentEventRepo.record({
+            provider: 'changelly',
+            eventId: `${externalOrderId}:${status}`,
+            eventType: type,
+            orderId: String(externalOrderId),
+            status,
+            payload,
+          });
+          if (!inserted) {
+            console.log(`[Changelly] Duplicate event ${externalOrderId}:${status} — skipping.`);
+            return;
+          }
+        } catch (dedupeErr) {
+          console.warn('[Changelly] Dedupe check failed, processing anyway:', dedupeErr.message);
+        }
+      }
+
+      // Wert LKYC lifetime tracking — increment on completed Wert buy.
+      // Only counts *completed* on-ramp purchases; refunds/expired/etc.
+      // are not counted.
+      if ((status === 'completed' || status === 'finished') &&
+          providerCode === 'wert' &&
+          (type === 'buy' || currencyFrom)) {
+        try {
+          const userRepo = require('../database/repositories/userRepo');
+          const wertKyc = require('../database/repositories/wertKycRepo');
+          const dbUser = userRepo.findByDiscordId(String(externalUserId));
+          if (dbUser) {
+            // amountFrom is the fiat the user paid (USD). Fallback to amountTo if missing.
+            const usd = parseFloat(amountFrom ?? amountTo ?? '0') || 0;
+            if (usd > 0) {
+              const newTotal = wertKyc.addLifetime(dbUser.id, usd);
+              console.log(`[Changelly] Wert lifetime for user ${dbUser.id}: +$${usd} → $${newTotal.toFixed(2)}`);
+            }
+          }
+        } catch (err) {
+          console.warn('[Changelly] Wert lifetime increment failed:', err.message);
+        }
+      }
 
       if (!externalUserId || !discordClient) return;
 
@@ -158,14 +208,30 @@ function startWebhookServer(client) {
       // counter (otherwise anyone could POST to this endpoint and
       // accelerate trial burn).
       const secret = process.env.CDP_WEBHOOK_SECRET;
-      const signature = req.headers['x-cc-webhook-signature'] || req.headers['x-webhook-signature'];
+      // Coinbase's webhook signature header isn't publicly documented
+      // for CDP Onramp specifically. Their Commerce product uses
+      // `x-cc-webhook-signature`; we also accept the generic variants
+      // in case CDP's is different. First matching header wins.
+      const signature =
+        req.headers['x-cc-webhook-signature'] ||
+        req.headers['x-cdp-webhook-signature'] ||
+        req.headers['x-webhook-signature'] ||
+        req.headers['coinbase-signature'] ||
+        req.headers['x-signature'];
       if (secret) {
         try {
           const crypto = require('crypto');
           const body = JSON.stringify(req.body);
           const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
-          if (!signature || signature !== expected) {
-            console.warn('[CDP] Webhook signature mismatch — ignoring');
+          // Constant-time compare to avoid timing-based signature oracle.
+          let verified = false;
+          if (signature) {
+            const a = Buffer.from(String(signature));
+            const b = Buffer.from(expected);
+            verified = a.length === b.length && crypto.timingSafeEqual(a, b);
+          }
+          if (!verified) {
+            console.warn('[CDP] Webhook signature mismatch — ignoring (tried x-cc-webhook-signature, x-cdp-webhook-signature, x-webhook-signature, coinbase-signature, x-signature)');
             return;
           }
         } catch (verifyErr) {
