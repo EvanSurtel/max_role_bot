@@ -152,6 +152,12 @@ async function handleCashOutProvider(interaction, user, wallet, lang) {
   // both are money-moving actions. Prevents a user from bypassing the
   // withdraw quota by pivoting to the cashout flow. Bitrefill is
   // affiliate-link only (no backend action), so it's excluded.
+  //
+  // Record quota ATTEMPT-wise, not success-wise: if we only record on
+  // provider-link success, a user hitting provider errors (region not
+  // supported, Changelly rate-limited, CDP session expired) could
+  // retry indefinitely. Recording on attempt treats cashout symmetrically
+  // with withdraw and closes the spam loophole.
   if (providerKey !== 'bitrefill') {
     const quota = rateLimiter.checkQuota(String(user.discord_id), 'WITHDRAW_PER_24H');
     if (quota.blocked) {
@@ -160,6 +166,7 @@ async function handleCashOutProvider(interaction, user, wallet, lang) {
         ephemeral: true,
       });
     }
+    rateLimiter.recordQuota(String(user.discord_id), 'WITHDRAW_PER_24H');
   }
 
   if (providerKey === 'cdp_offramp') {
@@ -248,7 +255,7 @@ async function _handleChangellySell(interaction, user, wallet, country, preferre
     });
 
     if (result?.redirectUrl) {
-      rateLimiter.recordQuota(String(user.discord_id), 'WITHDRAW_PER_24H');
+      // Quota already recorded at the top of handleCashOutProvider.
       const openButton = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setURL(result.redirectUrl).setLabel('Cash Out USDC').setStyle(ButtonStyle.Link),
       );

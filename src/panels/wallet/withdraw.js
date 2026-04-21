@@ -181,6 +181,17 @@ async function executeUsdcWithdraw(interaction, user, amountUsdc, address, lang)
       balanceHeld: freshWallet.balance_held,
     });
 
+    // Record quota BEFORE the on-chain attempt so failed attempts still
+    // count against the daily cap. Otherwise a user hitting on-chain
+    // errors (bad address, Paymaster OOM, network revert) could retry
+    // indefinitely — `recordQuota` on success only leaves no quota
+    // pressure on failures, turning WITHDRAW_PER_24H into a "max 3
+    // SUCCESSFUL withdrawals" instead of "max 3 withdrawal attempts".
+    // The global on-chain cooldown (60s between any two on-chain ops)
+    // is recorded here too for the same reason.
+    rateLimiter.recordOnchainAction(user.discord_id);
+    rateLimiter.recordQuota(user.discord_id, 'WITHDRAW_PER_24H');
+
     let signature;
     try {
       const result = await transactionService.transferUsdc(
@@ -202,9 +213,6 @@ async function executeUsdcWithdraw(interaction, user, amountUsdc, address, lang)
 
     const { postTransaction } = require('../../utils/transactionFeed');
     postTransaction({ type: 'withdrawal', username: user.server_username, discordId: user.discord_id, amount: `$${amountUsdc.toFixed(2)}`, currency: 'USDC', fromAddress: freshWallet.address, toAddress: address, signature, memo: `Withdrawal of $${amountUsdc.toFixed(2)} USDC` });
-
-    rateLimiter.recordOnchainAction(user.discord_id);
-    rateLimiter.recordQuota(user.discord_id, 'WITHDRAW_PER_24H');
 
     walletRepo.releaseLock(user.id);
     return interaction.editReply({

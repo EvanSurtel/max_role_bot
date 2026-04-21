@@ -23,21 +23,33 @@ async function triggerDispute(client, matchId) {
   const match = matchRepo.findById(matchId);
   if (!match) return;
 
-  if (match.status === MATCH_STATUS.DISPUTED) {
-    console.log(`[MatchResult] Match #${matchId} already disputed, skipping`);
-    return;
-  }
-
-  // Completed matches cannot be re-disputed (winnings already disbursed)
-  if (match.status === MATCH_STATUS.COMPLETED) {
-    console.warn(`[MatchResult] triggerDispute refused \u2014 match #${matchId} is already completed`);
+  // Atomic claim — only one caller wins the ACTIVE|VOTING → DISPUTED
+  // transition. Without this, two near-simultaneous dispute triggers
+  // (e.g. captain disagreement + a separate user clicking dispute)
+  // would both pass the read-check, both call updateStatus (second
+  // is a no-op), and both post duplicate admin-resolve panels + ping
+  // staff twice. atomicStatusTransition uses BEGIN IMMEDIATE so the
+  // second caller sees the new status and returns cleanly.
+  const claimed = matchRepo.atomicStatusTransition(
+    matchId,
+    [MATCH_STATUS.ACTIVE, MATCH_STATUS.VOTING],
+    MATCH_STATUS.DISPUTED,
+  );
+  if (!claimed) {
+    const refreshed = matchRepo.findById(matchId);
+    if (refreshed?.status === MATCH_STATUS.DISPUTED) {
+      console.log(`[MatchResult] Match #${matchId} already disputed by another caller \u2014 skipping duplicate admin panel post`);
+    } else if (refreshed?.status === MATCH_STATUS.COMPLETED) {
+      console.warn(`[MatchResult] triggerDispute refused \u2014 match #${matchId} is already completed`);
+    } else {
+      console.warn(`[MatchResult] triggerDispute race lost for match #${matchId} (status=${refreshed?.status || 'unknown'})`);
+    }
     return;
   }
 
   const challenge = challengeRepo.findById(match.challenge_id);
   if (!challenge) return;
 
-  matchRepo.updateStatus(matchId, MATCH_STATUS.DISPUTED);
   challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.DISPUTED);
 
   // Post dispute in the existing shared-chat channel
