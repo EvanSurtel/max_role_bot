@@ -30,10 +30,16 @@ function getLifetimeUsd(userId) {
 function addLifetime(userId, amountUsd) {
   const delta = parseFloat(amountUsd) || 0;
   if (delta === 0) return getLifetimeUsd(userId);
+  // printf('%.2f', ...) rounds to 2 decimals at write time so the
+  // TEXT column never drifts past cents. Repeatedly reading a float,
+  // adding, and restringifying otherwise accumulates floating-point
+  // rounding error (e.g. 0.1 + 0.2 = 0.30000000000000004) which,
+  // across many small deposits, can underreport the lifetime total
+  // by several cents and let a user sneak past the $1,000 cap.
   db.prepare(`
     UPDATE users
-    SET wert_lifetime_usd = CAST(
-      CAST(COALESCE(wert_lifetime_usd, '0') AS REAL) + ? AS TEXT
+    SET wert_lifetime_usd = printf('%.2f',
+      CAST(COALESCE(wert_lifetime_usd, '0') AS REAL) + ?
     )
     WHERE id = ?
   `).run(delta, userId);

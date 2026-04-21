@@ -261,7 +261,19 @@ async function _handleChangelly(interaction, user, wallet, country, preferredPro
   // Changelly requires state for US; existing users who onboarded
   // before the state_code migration have NULL. Prompt them to enter
   // it in-line rather than letting the /orders call silently fail.
+  //
+  // IMPORTANT: showModal MUST be the first response to a button
+  // interaction AND cannot be called on an already-deferred
+  // interaction. If we got here via the CDP→Wert fallback path
+  // (opts.alreadyDeferred=true), we cannot open a modal — instead
+  // surface a plain editReply asking the user to try the dedicated
+  // Wert/Transak button first so they see the modal fresh.
   if (country === 'US' && !user.state_code) {
+    if (opts.alreadyDeferred) {
+      return interaction.editReply({
+        content: 'We need your US state on file before we can route deposits to Wert/Transak. Please click **Deposit USDC** again and pick the non-Coinbase option — the form will open.',
+      });
+    }
     const { ModalBuilder: MB, TextInputBuilder: TI, TextInputStyle: TIS, ActionRowBuilder: AR } = require('discord.js');
     const modal = new MB()
       .setCustomId('wallet_deposit_state_modal')
@@ -274,6 +286,9 @@ async function _handleChangelly(interaction, user, wallet, country, preferredPro
       .setMinLength(2)
       .setMaxLength(2);
     modal.addComponents(new AR().addComponents(input));
+    // showModal must run synchronously from the interaction handler;
+    // no await / async work should precede it or the 3-second
+    // response window may close.
     return interaction.showModal(modal);
   }
 

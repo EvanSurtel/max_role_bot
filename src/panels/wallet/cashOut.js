@@ -19,6 +19,7 @@ const changelly = require('../../services/changellyService');
 const onramp = require('../../services/coinbaseOnrampService');
 const bitrefill = require('../../services/bitrefillService');
 const paymentRouter = require('../../services/paymentRouter');
+const rateLimiter = require('../../utils/rateLimiter');
 
 const MIN_CASHOUT_USDC = 5;
 const STYLE_BY_INDEX = [ButtonStyle.Success, ButtonStyle.Primary, ButtonStyle.Secondary, ButtonStyle.Secondary];
@@ -147,6 +148,20 @@ async function handleCashOutProvider(interaction, user, wallet, lang) {
     });
   }
 
+  // Rate limit cash-outs under the same 24h quota as withdrawals —
+  // both are money-moving actions. Prevents a user from bypassing the
+  // withdraw quota by pivoting to the cashout flow. Bitrefill is
+  // affiliate-link only (no backend action), so it's excluded.
+  if (providerKey !== 'bitrefill') {
+    const quota = rateLimiter.checkQuota(String(user.discord_id), 'WITHDRAW_PER_24H');
+    if (quota.blocked) {
+      return interaction.reply({
+        content: `You've used all ${quota.max} cash-outs / withdrawals for the day. Try again in ~${Math.ceil(quota.remainingSeconds / 3600)}h.`,
+        ephemeral: true,
+      });
+    }
+  }
+
   if (providerKey === 'cdp_offramp') {
     return _handleCdpOfframp(interaction, user, wallet, country, amountUsdc);
   }
@@ -233,6 +248,7 @@ async function _handleChangellySell(interaction, user, wallet, country, preferre
     });
 
     if (result?.redirectUrl) {
+      rateLimiter.recordQuota(String(user.discord_id), 'WITHDRAW_PER_24H');
       const openButton = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setURL(result.redirectUrl).setLabel('Cash Out USDC').setStyle(ButtonStyle.Link),
       );

@@ -291,42 +291,63 @@ function startWebhookServer(client) {
 
         console.log(`[CDP] Webhook: event=${eventType} status=${status} order=${orderId} partnerUserRef=${partnerUserRef}`);
 
-        // Idempotency — dedupe on (provider, eventId). Coinbase retries
-        // on 5xx, so the same event can arrive multiple times.
-        if (eventId) {
-          try {
-            const paymentEventRepo = require('../database/repositories/paymentEventRepo');
-            const inserted = paymentEventRepo.record({
-              provider: 'coinbase',
-              eventId: `${eventId}:${status || eventType}`,
-              eventType,
-              orderId: orderId ? String(orderId) : null,
-              status,
-              payload,
-            });
-            if (!inserted) {
-              console.log(`[CDP] Duplicate event ${eventId} — skipping.`);
-              return;
-            }
-          } catch (dedupeErr) {
-            console.warn('[CDP] Dedupe check failed, processing anyway:', dedupeErr.message);
-          }
-        }
+        // Dedupe + trial-counter increment MUST be atomic. If the
+        // dedupe INSERT committed but the bot crashed before the
+        // increment ran, the retry would see the event as "already
+        // processed" and skip — our counter would be under-reported
+        // forever, letting users perform more CDP transactions than
+        // the trial cap allows. Wrapping both in a single SQLite
+        // transaction (via better-sqlite3's db.transaction) makes them
+        // commit together or not at all.
+        const paymentEventRepo = require('../database/repositories/paymentEventRepo');
+        const cdpTrial = require('./cdpTrialService');
+        const rootDb = require('../database/db');
 
-        // Increment trial counter on confirmed onramp completions.
-        // Accept both event-type signals (.success) and status signals
-        // (ONRAMP_ORDER_STATUS_COMPLETED) — Coinbase docs aren't
-        // 100% explicit on which fires, so either qualifies.
+        let dedupeInserted = true;
+        let newCount = null;
+
         const isOnrampCompleted =
           eventType === 'onramp.transaction.success' ||
           (eventType === 'onramp.transaction.updated' && status === 'ONRAMP_ORDER_STATUS_COMPLETED') ||
           status === 'ONRAMP_ORDER_STATUS_COMPLETED';
+        const purchaseAmountNum = parseFloat(purchaseAmount);
+        const hasRealValue = Number.isFinite(purchaseAmountNum) && purchaseAmountNum > 0;
 
-        if (isOnrampCompleted) {
-          const cdpTrial = require('./cdpTrialService');
-          const newCount = cdpTrial.incrementTrialCounter();
+        if (eventId) {
+          try {
+            rootDb.transaction(() => {
+              const inserted = paymentEventRepo.record({
+                provider: 'coinbase',
+                eventId: `${eventId}:${status || eventType}`,
+                eventType,
+                orderId: orderId ? String(orderId) : null,
+                status,
+                payload,
+              });
+              if (!inserted) {
+                dedupeInserted = false;
+                return;
+              }
+              if (isOnrampCompleted && hasRealValue) {
+                newCount = cdpTrial.incrementTrialCounter();
+              }
+            })();
+          } catch (txErr) {
+            console.warn('[CDP] Webhook atomic tx failed:', txErr.message);
+          }
+        } else if (isOnrampCompleted && hasRealValue) {
+          // No eventId to dedupe on — fall back to bare increment.
+          newCount = cdpTrial.incrementTrialCounter();
+        }
+
+        if (!dedupeInserted) {
+          console.log(`[CDP] Duplicate event ${eventId} — skipping.`);
+          return;
+        }
+
+        // Post-commit logging + transaction feed.
+        if (newCount != null) {
           console.log(`[CDP] Trial counter → ${newCount}/${cdpTrial.getStatus().max} (orderId=${orderId} user=${partnerUserRef} amount=${purchaseAmount})`);
-
           try {
             const { postTransaction } = require('../utils/transactionFeed');
             postTransaction({
@@ -334,6 +355,8 @@ function startWebhookServer(client) {
               memo: `CDP Onramp completed — ${purchaseAmount} USDC to ${partnerUserRef}. Trial counter ${newCount}/${cdpTrial.getStatus().max}`,
             });
           } catch { /* best effort */ }
+        } else if (isOnrampCompleted && !hasRealValue) {
+          console.warn(`[CDP] Completed event had zero purchaseAmount (${purchaseAmount}) — NOT incrementing trial counter.`);
         }
       } catch (err) {
         console.error('[CDP] Webhook handler error:', err.message);

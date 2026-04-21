@@ -211,11 +211,39 @@ async function createOrder({ userId, walletAddress, amountUsd, countryCode, stat
 
   console.log(`[Changelly] Order created for user ${userId} via ${providerCode}: orderId=${data.orderId || data.id || 'unknown'}`);
 
+  const redirectUrl = data.redirectUrl || data.paymentUrl || data.redirect_url;
+  if (!_isTrustedProviderUrl(redirectUrl)) {
+    console.error(`[Changelly] Untrusted redirectUrl in order response: ${redirectUrl}`);
+    return null;
+  }
+
   return {
     orderId: data.orderId || data.id,
-    redirectUrl: data.redirectUrl || data.paymentUrl || data.redirect_url,
+    redirectUrl,
     providerCode,
   };
+}
+
+// Trusted domain allowlist for provider redirect URLs. Changelly returns
+// a `redirectUrl` from each underlying provider's checkout page — if
+// Changelly's response is tampered with (MITM, compromised endpoint)
+// we refuse to render a Discord link button pointing at an attacker
+// domain. `url.hostname.endsWith(domain)` covers subdomains like
+// `widget.wert.io` / `global.transak.com`.
+const TRUSTED_PROVIDER_REDIRECT_DOMAINS = [
+  'changelly.com',
+  'wert.io',
+  'transak.com',
+  'moonpay.com',
+  'banxa.com',
+];
+function _isTrustedProviderUrl(url) {
+  if (typeof url !== 'string' || !url.startsWith('https://')) return false;
+  let parsed;
+  try { parsed = new URL(url); } catch { return false; }
+  return TRUSTED_PROVIDER_REDIRECT_DOMAINS.some(d =>
+    parsed.hostname === d || parsed.hostname.endsWith('.' + d),
+  );
 }
 
 /**
@@ -329,9 +357,15 @@ async function createSellOrder({ userId, walletAddress, amountUsdc, countryCode,
 
   console.log(`[Changelly] Sell order created for user ${userId} via ${providerCode}: orderId=${data.orderId || data.id || 'unknown'}`);
 
+  const redirectUrl = data.redirectUrl || data.paymentUrl || data.redirect_url;
+  if (!_isTrustedProviderUrl(redirectUrl)) {
+    console.error(`[Changelly] Untrusted sell-order redirectUrl: ${redirectUrl}`);
+    return null;
+  }
+
   return {
     orderId: data.orderId || data.id,
-    redirectUrl: data.redirectUrl || data.paymentUrl || data.redirect_url,
+    redirectUrl,
     providerCode,
   };
 }
