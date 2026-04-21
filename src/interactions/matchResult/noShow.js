@@ -103,7 +103,24 @@ async function handleNoShowReport(interaction) {
 
   const otherTeam = reporterTeam === 1 ? 2 : 1;
 
-  matchRepo.updateStatus(matchId, MATCH_STATUS.DISPUTED);
+  // Atomic claim — a captain spam-clicking "confirm" on the no-show
+  // button, or both captains reporting simultaneously, would otherwise
+  // both pass the status===ACTIVE check and both post the admin
+  // resolve panel to the alerts channel (duplicate staff pings,
+  // duplicate buttons). atomicStatusTransition gives the first caller
+  // an exclusive ACTIVE → DISPUTED win; the second sees the new status
+  // and exits cleanly.
+  const claimed = matchRepo.atomicStatusTransition(
+    matchId,
+    [MATCH_STATUS.ACTIVE],
+    MATCH_STATUS.DISPUTED,
+  );
+  if (!claimed) {
+    return interaction.reply({
+      content: 'This match was just disputed by another report. No action needed.',
+      ephemeral: true,
+    });
+  }
   challengeRepo.updateStatus(match.challenge_id, CHALLENGE_STATUS.DISPUTED);
 
   await interaction.reply({
