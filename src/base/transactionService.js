@@ -31,30 +31,66 @@ async function _getEscrowOwnerSmartAccount() {
 /**
  * Send a gasless UserOp via Smart Account + Paymaster.
  * Uses prepareAndSendUserOperation (1-step server-side) as primary.
+ *
+ * Errors thrown from this function are tagged with `.stage`:
+ *   'pre_submit'  — the UserOp was never submitted on-chain. Safe to
+ *                   credit back / retry; there is no outstanding tx.
+ *   'post_submit' — the UserOp was submitted (we have a userOpHash)
+ *                   but confirmation was not observed within the CDP
+ *                   wait window. The on-chain outcome is UNKNOWN —
+ *                   it may still land minutes later. Callers MUST
+ *                   NOT credit the user back on this error class;
+ *                   route the row to pending_verification and let
+ *                   pendingWithdrawSweeper resolve it by polling
+ *                   cdp.evm.getUserOperation.
+ * On 'post_submit' errors, `.userOpHash` and `.smartAccountAddress`
+ * are attached so the caller can persist them.
  */
 async function _sendUserOp(smartAccount, calls) {
   const cdp = getCdpClient();
   const network = getCdpNetwork();
 
-  const result = await cdp.evm.prepareAndSendUserOperation({
-    smartAccount,
-    network,
-    calls: calls.map(c => ({
-      to: c.to,
-      value: c.value ?? 0n,
-      data: c.data || '0x',
-    })),
-  });
-
-  const receipt = await cdp.evm.waitForUserOperation({
-    smartAccountAddress: smartAccount.address,
-    userOpHash: result.userOpHash,
-  });
-
-  if (receipt.status === 'complete' && receipt.transactionHash) {
-    return receipt.transactionHash;
+  let result;
+  try {
+    result = await cdp.evm.prepareAndSendUserOperation({
+      smartAccount,
+      network,
+      calls: calls.map(c => ({
+        to: c.to,
+        value: c.value ?? 0n,
+        data: c.data || '0x',
+      })),
+    });
+  } catch (err) {
+    err.stage = 'pre_submit';
+    throw err;
   }
-  return result.userOpHash;
+
+  try {
+    const receipt = await cdp.evm.waitForUserOperation({
+      smartAccountAddress: smartAccount.address,
+      userOpHash: result.userOpHash,
+    });
+
+    if (receipt.status === 'complete' && receipt.transactionHash) {
+      return receipt.transactionHash;
+    }
+    // waitForUserOperation returned a non-complete receipt (unusual
+    // but possible). Treat as post-submit uncertainty.
+    const err = new Error(`UserOp ${result.userOpHash} not complete (status=${receipt.status})`);
+    err.stage = 'post_submit';
+    err.userOpHash = result.userOpHash;
+    err.smartAccountAddress = smartAccount.address;
+    throw err;
+  } catch (err) {
+    if (err.stage === 'post_submit') throw err;
+    // wait threw (timeout, RPC blip, etc.) — UserOp was submitted;
+    // don't know if it landed.
+    err.stage = 'post_submit';
+    err.userOpHash = result.userOpHash;
+    err.smartAccountAddress = smartAccount.address;
+    throw err;
+  }
 }
 
 /**

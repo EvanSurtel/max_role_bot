@@ -12,6 +12,26 @@ const stmts = {
   `),
   updateStatus: db.prepare('UPDATE transactions SET status = ? WHERE id = ?'),
   updateStatusAndHash: db.prepare('UPDATE transactions SET status = ?, tx_hash = ?, memo = COALESCE(?, memo) WHERE id = ?'),
+  setVerificationPending: db.prepare(`
+    UPDATE transactions
+    SET status = 'pending_verification',
+        user_op_hash = ?,
+        smart_account_address = ?,
+        memo = COALESCE(?, memo)
+    WHERE id = ?
+  `),
+  findPendingVerification: db.prepare(`
+    SELECT * FROM transactions
+    WHERE status = 'pending_verification'
+      AND user_op_hash IS NOT NULL
+    ORDER BY created_at ASC
+  `),
+  findPendingOutflowsForUser: db.prepare(`
+    SELECT * FROM transactions
+    WHERE user_id = ?
+      AND type IN ('withdrawal', 'refund')
+      AND status IN ('pending_onchain', 'pending_verification')
+  `),
   // Find recent pending-onchain inflows (disbursement / refund /
   // dispute_hold_credit) for a user so the deposit poller can match
   // incoming USDC to an already-known intent rather than mis-labeling
@@ -73,6 +93,46 @@ const transactionRepo = {
 
   updateStatusAndHash(id, status, txHash, memoAppend = null) {
     return stmts.updateStatusAndHash.run(status, txHash, memoAppend, id);
+  },
+
+  /**
+   * Mark a withdrawal (or other outbound tx) as pending on-chain
+   * verification. The UserOp was submitted but we don't yet know if
+   * it landed — the pendingWithdrawSweeper polls CDP / the chain and
+   * resolves the row to 'completed' or 'failed'.
+   */
+  setVerificationPending(id, userOpHash, smartAccountAddress, memoAppend = null) {
+    return stmts.setVerificationPending.run(userOpHash, smartAccountAddress, memoAppend, id);
+  },
+
+  findPendingVerification() {
+    return stmts.findPendingVerification.all();
+  },
+
+  /**
+   * Return pending outbound tx rows for a user (withdrawal, refund)
+   * whose on-chain state is still unresolved. Used by reconciliation
+   * to factor in-flight outflows into the expected DB vs on-chain
+   * diff — otherwise every mid-withdraw poll alerts as a mismatch.
+   */
+  findPendingOutflowsForUser(userId) {
+    return stmts.findPendingOutflowsForUser.all(userId);
+  },
+
+  /**
+   * Return pending inbound tx rows for a user that have NOT yet been
+   * credited to their DB balance (disbursement / refund TO user /
+   * dispute_hold_credit). Same idea as findPendingOutflowsForUser but
+   * for the inflow direction — on-chain may already have the credit
+   * while DB hasn't caught up.
+   */
+  findPendingInflowsForUserAll(userId) {
+    return db.prepare(`
+      SELECT * FROM transactions
+      WHERE user_id = ?
+        AND type IN ('disbursement', 'refund', 'dispute_hold_credit')
+        AND status IN ('pending_onchain', 'pending_verification')
+    `).all(userId);
   },
 };
 

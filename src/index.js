@@ -64,6 +64,13 @@ client.once('ready', async () => {
     const reconciliationService = require('./services/reconciliationService');
     reconciliationService.startReconciliation();
 
+    // Start the pending-withdrawal verification sweeper. Resolves
+    // withdrawals whose UserOp landed on-chain after our wait
+    // window expired (DB stays debited, tx eventually lands) OR
+    // didn't land at all (credit back after verification window).
+    const pendingWithdrawSweeper = require('./services/pendingWithdrawSweeper');
+    pendingWithdrawSweeper.startSweeper();
+
     // Start escrow health monitoring
     const healthService = require('./services/healthService');
     healthService.startHealthChecks(client);
@@ -173,6 +180,13 @@ async function shutdown(signal) {
     reconciliationService.stopReconciliation();
   } catch (err) {
     console.error('[Shutdown] Error stopping reconciliation:', err.message || err);
+  }
+
+  try {
+    const pendingWithdrawSweeper = require('./services/pendingWithdrawSweeper');
+    pendingWithdrawSweeper.stopSweeper();
+  } catch (err) {
+    console.error('[Shutdown] Error stopping withdraw sweeper:', err.message || err);
   }
 
   try {

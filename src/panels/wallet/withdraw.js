@@ -202,10 +202,43 @@ async function executeUsdcWithdraw(interaction, user, amountUsdc, address, lang)
       );
       signature = result.signature;
     } catch (txErr) {
+      // Branch on error stage. A pre-submit failure means the UserOp
+      // never hit the bundler — safe to credit the user back. A
+      // post-submit failure means the UserOp IS out there with a
+      // userOpHash but we didn't see confirmation; the tx may still
+      // land minutes later. Crediting back on post-submit is the
+      // exact bug that caused the DB drift residual risk: if the
+      // UserOp lands after we refund, the user effectively withdraws
+      // twice (one DB credit + one on-chain transfer). Instead we
+      // mark the row 'pending_verification' and let the sweeper poll.
+      if (txErr.stage === 'post_submit' && txErr.userOpHash) {
+        transactionRepo.setVerificationPending(
+          pendingRow.id,
+          txErr.userOpHash,
+          txErr.smartAccountAddress || freshWallet.address,
+          `Withdrawal awaiting on-chain verification: ${txErr.message}`,
+        );
+        walletRepo.releaseLock(user.id);
+        return interaction.editReply({
+          content: [
+            '⏳ **Withdrawal submitted — confirmation pending.**',
+            '',
+            `We sent your **$${amountUsdc.toFixed(2)} USDC** transfer to the Base network but didn't see it confirm within the wait window. The tx may still be landing.`,
+            '',
+            'Your balance stays debited until we verify on-chain. If the tx didn\'t actually land, the balance will be restored automatically within ~10 minutes.',
+            '',
+            `Tracking id: \`${txErr.userOpHash}\``,
+          ].join('\n'),
+          embeds: [],
+          components: [],
+        });
+      }
+      // Pre-submit (or any other "never-submitted" error) — credit
+      // back immediately, it's safe.
       try {
         walletRepo.creditAvailable(user.id, amountSmallest.toString());
       } catch { /* best-effort */ }
-      transactionRepo.updateStatusAndHash(pendingRow.id, 'failed', null, `Withdrawal failed: ${txErr.message}`);
+      transactionRepo.updateStatusAndHash(pendingRow.id, 'failed', null, `Withdrawal failed (pre-submit): ${txErr.message}`);
       throw txErr;
     }
 
