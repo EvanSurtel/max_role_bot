@@ -20,6 +20,36 @@ function getCdpNetwork() {
 // Cached escrow-owner Smart Account so we don't re-fetch per call.
 let _escrowOwnerSmart = null;
 
+// Cached auto-resolved paymaster URL — logged once at startup so we
+// can compare it to the one shown in the CDP dashboard. If they
+// differ (different hostname, different client-api-key suffix), the
+// Paymaster is configured on a DIFFERENT project or client key than
+// the one the SDK is resolving, and every UserOp silently goes
+// bare — ERC-4337 AA21 "didn't pay prefund" at the EntryPoint.
+// See sendUserOperation.js:57-63 and getBaseNodeRpcUrl.ts in the
+// CDP SDK for the auto-resolve path.
+let _paymasterDiagnosticRun = false;
+function _logPaymasterDiagnostic(network) {
+  if (_paymasterDiagnosticRun) return;
+  _paymasterDiagnosticRun = true;
+  const explicit = process.env.PAYMASTER_RPC_URL;
+  if (explicit) {
+    console.log(`[Paymaster] Mode: explicit. Using PAYMASTER_RPC_URL env var: ${explicit}`);
+    return;
+  }
+  // Auto-resolve path: SDK hits /apikeys/v1/tokens/active with the
+  // Secret API Key JWT, gets a Client API Key id back, and builds
+  // https://api.cdp.coinbase.com/rpc/v1/<network>/<id>. If that id
+  // doesn't match the Paymaster key in your CDP dashboard (i.e.
+  // Paymaster is configured on a different project or client key),
+  // the Paymaster is never hit; UserOps go bare and fail AA21.
+  // We can't preview the resolved URL from the app without
+  // re-implementing the SDK's JWT flow, but we CAN warn loudly.
+  console.log(`[Paymaster] Mode: auto-resolve (no PAYMASTER_RPC_URL env var set).`);
+  console.log(`[Paymaster] SDK will call /apikeys/v1/tokens/active with CDP_API_KEY_ID and use the returned client-key id.`);
+  console.log(`[Paymaster] If CDP dashboard billing stays at $0 sponsored and UserOps throw AA21 "sender balance and deposit together is 0", the auto-resolved id doesn't match your configured Paymaster. Fix: set PAYMASTER_RPC_URL=<exact URL from your CDP dashboard \u2192 Paymaster \u2192 Configuration> and restart.`);
+}
+
 async function _getEscrowOwnerSmartAccount() {
   if (_escrowOwnerSmart) return _escrowOwnerSmart;
   const { smartAccount } = await getSmartAccountFromRef('escrow-owner', 'escrow-owner-smart');
@@ -49,6 +79,11 @@ async function _getEscrowOwnerSmartAccount() {
 async function _sendUserOp(smartAccount, calls) {
   const cdp = getCdpClient();
   const network = getCdpNetwork();
+
+  // Log paymaster mode once on the first UserOp, so operators see in
+  // stdout whether the SDK is auto-resolving or using the explicit
+  // env var. No-op on subsequent calls.
+  _logPaymasterDiagnostic(network);
 
   // Paymaster handling:
   //   - On network === "base" (mainnet) with no paymasterUrl, the CDP
