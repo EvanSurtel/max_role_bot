@@ -19,9 +19,11 @@
 //   On-ramp
 //     US         → CDP guest (0% fee, Apple Pay / card) primary,
 //                   Wert fallback if CDP trial exhausted
-//     UK         → Transak primary (Wert doesn't cover UK)
-//     EU/CA/AU   → Wert primary (LKYC up to $1k), Transak secondary
-//     elsewhere  → Wert primary, Transak secondary
+//     non-US     → Wert primary (LKYC up to $1k, typed-only), Transak
+//                   secondary (full ID required). UK is included in
+//                   this default now — prior code special-cased UK to
+//                   Transak-only based on outdated Wert coverage docs;
+//                   Wert does route UK through their LKYC flow today.
 //
 //   Off-ramp
 //     All        → Transak primary (Changelly),
@@ -36,11 +38,8 @@ const wertKyc = require('../database/repositories/wertKycRepo');
 // the public FAQ claiming US/UK/CA. Update this set when they expand.
 const CDP_GUEST_ONRAMP_COUNTRIES = new Set(['US']);
 
-// Wert's coverage map — everywhere EXCEPT UK per their docs.
-const WERT_UNSUPPORTED = new Set(['GB']);
-
-// Transak is global (including UK). We still gate on Changelly having
-// an offer for the country + amount at order time.
+// Transak is global. We still gate on Changelly having an offer for
+// the country + amount at order time.
 
 /**
  * @typedef {Object} ProviderOption
@@ -94,11 +93,11 @@ function getOnrampOptions({ country, amountUsd, userId }) {
   }
 
   // Wert — card payments with LKYC (typed-only up to $1,000 lifetime).
-  // Available everywhere EXCEPT UK. Once the user has crossed the cap,
+  // Available globally including UK. Once the user has crossed the cap,
   // we suppress Wert entirely and let Transak take the slot — otherwise
   // the user would hit Wert's own KYC gate mid-flow after clicking our
   // "no ID needed" button.
-  if (!WERT_UNSUPPORTED.has(c)) {
+  {
     const wertBlocked = userId != null && wertKyc.isOverCap(userId);
     if (!wertBlocked) {
       let wertDesc = 'No ID upload needed under $1,000 lifetime. 4% + $1 fee. Powered by Wert.';
@@ -127,15 +126,13 @@ function getOnrampOptions({ country, amountUsd, userId }) {
     }
   }
 
-  // Transak — global card / bank with full document KYC. Primary in UK
-  // (where Wert is unavailable), secondary elsewhere. Also becomes the
-  // Wert-replacement once the user is over the LKYC cap.
+  // Transak — global card / bank with full document KYC. Always shown
+  // as the secondary option; becomes the Wert-replacement once the user
+  // is over the $1k LKYC cap.
   options.push({
     provider: 'transak',
-    label: c === 'GB' ? 'Pay with Card (Transak)' : 'Pay with Card (Transak — ID required)',
-    description: c === 'GB'
-      ? 'ID verification required. Fee: 3.29% + $0.99 card / 0.49% + £1 Faster Payments — paid to Transak, not Rank $.'
-      : 'ID verification required. Fee: 3.29% + $0.99 — paid to Transak, not Rank $.',
+    label: 'Pay with Card (Transak — ID required)',
+    description: 'ID verification required. Fee: 3.29% + $0.99 — paid to Transak, not Rank $.',
     feePctEstimate: 0.0329,
     kycRequired: 'full',
     primary: options.length === 0,  // primary if neither CDP nor Wert claimed it
