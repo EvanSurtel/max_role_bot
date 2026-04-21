@@ -855,7 +855,7 @@ async function notifyTeam2Teammates(guild, challenge) {
             try { await dmUser.send(timeoutText); } catch { /* DM now blocked */ }
           }
 
-          await challengeServiceRef.cancelChallenge(challenge.id);
+          await challengeServiceRef.cancelChallenge(challenge.id, guild.client);
 
           if (fallbackChannel) {
             setTimeout(async () => {

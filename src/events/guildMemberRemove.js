@@ -44,7 +44,7 @@ module.exports = {
         if (FORMING_STATUSES.includes(challenge.status)) {
           // Challenge is still forming — cancel it
           try {
-            await challengeService.cancelChallenge(challenge.id);
+            await challengeService.cancelChallenge(challenge.id, member.client);
             cancelledIds.push(challenge.id);
             console.log(
               `[GuildMemberRemove] Cancelled challenge #${challenge.id} — ${tag} (${playerRecord.role}) left the server`,

@@ -297,6 +297,35 @@ module.exports = {
             id.startsWith('admin_goback_')) {
           return await matchResult.handleButton(interaction);
         }
+        // Mid-match cancel request flow (captain-initiated, needs
+        // opposing captain approval). Order matters: the longer
+        // customId prefixes must be matched before the shorter ones
+        // so `match_cancel_req_confirm_` doesn't route to
+        // `match_cancel_request_`.
+        if (id.startsWith('match_cancel_req_confirm_')) {
+          const matchCancelRequest = require('../interactions/matchCancelRequest');
+          return await matchCancelRequest.handleRequestConfirm(interaction);
+        }
+        if (id.startsWith('match_cancel_acc_confirm_')) {
+          const matchCancelRequest = require('../interactions/matchCancelRequest');
+          return await matchCancelRequest.handleAcceptConfirm(interaction);
+        }
+        if (id.startsWith('match_cancel_accept_')) {
+          const matchCancelRequest = require('../interactions/matchCancelRequest');
+          return await matchCancelRequest.handleAcceptButton(interaction);
+        }
+        if (id.startsWith('match_cancel_reject_')) {
+          const matchCancelRequest = require('../interactions/matchCancelRequest');
+          return await matchCancelRequest.handleRejectButton(interaction);
+        }
+        if (id.startsWith('match_cancel_request_')) {
+          const matchCancelRequest = require('../interactions/matchCancelRequest');
+          return await matchCancelRequest.handleRequestButton(interaction);
+        }
+        if (id === 'match_cancel_nevermind') {
+          const matchCancelRequest = require('../interactions/matchCancelRequest');
+          return await matchCancelRequest.handleNevermind(interaction);
+        }
         // Create Dispute button from lobby
         if (id === 'create_dispute') {
           return await disputeCreate.handleCreateDispute(interaction);

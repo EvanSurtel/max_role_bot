@@ -303,8 +303,9 @@ async function handleDecline(interaction, challenge, player, user) {
     console.error('[TeammateResponse] Error notifying creator of decline:', err);
   }
 
-  // Cancel the entire challenge (refunds all held funds)
-  await challengeService.cancelChallenge(challenge.id);
+  // Cancel the entire challenge (refunds all held funds + cleans
+  // up orphan invite channels for any teammates that had DMs off).
+  await challengeService.cancelChallenge(challenge.id, interaction.client);
 
   // Delete the notification channel after a short delay — only when
   // the invite came via a private server channel. DMs persist.

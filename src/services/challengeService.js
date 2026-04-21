@@ -140,7 +140,11 @@ async function notifyTeammates(guild, challenge) {
             try { await dmUser.send(timeoutText); } catch { /* DM now blocked */ }
           }
 
-          await cancelChallenge(challenge.id);
+          // Pass guild.client so cancelChallenge can delete invite
+          // channels for any OTHER pending teammates that also had
+          // fallback channels created — we can't clean those up here
+          // from the timeout scope.
+          await cancelChallenge(challenge.id, guild.client);
 
           // Only the fallback channel can/should be deleted. DMs persist.
           if (fallbackChannel) {
@@ -244,11 +248,20 @@ async function postToBoard(client, challenge) {
 }
 
 /**
- * Cancel a challenge — refund all held funds, update status, clean up channels/messages.
+ * Cancel a challenge — refund all held funds, update status, delete
+ * private invite channels that were created as a fallback for
+ * teammates with DMs disabled.
  *
  * @param {number} challengeId - The challenge ID.
+ * @param {import('discord.js').Client} [client] - Optional Discord
+ *   client. When provided, orphaned private invite channels stored
+ *   in `challenge_players.notification_channel_id` are fetched and
+ *   deleted. Callers running from timer handlers / non-interaction
+ *   contexts may not have one — in that case the channels are left
+ *   in place (logged as a warning) rather than skipping the rest of
+ *   the cancel.
  */
-async function cancelChallenge(challengeId) {
+async function cancelChallenge(challengeId, client = null) {
   const challenge = challengeRepo.findById(challengeId);
   if (!challenge) {
     console.error(`[ChallengeService] Challenge ${challengeId} not found for cancellation`);
@@ -289,27 +302,36 @@ async function cancelChallenge(challengeId) {
     }
   }
 
-  // Delete any notification channels that were created
+  // Delete any private invite channels that were created as a DM
+  // fallback. These only exist when a teammate had DMs disabled and
+  // we had to route the invite through a private server channel
+  // (see notifyTeammates). DMs themselves can't be deleted by bots
+  // (Discord API limit), but the stale embed in a DM auto-fades as
+  // the user sees the cancel result elsewhere.
   const players = challengePlayerRepo.findByChallengeId(challengeId);
-  for (const player of players) {
-    if (player.notification_channel_id) {
-      try {
-        // We need to fetch the channel — but we don't have the client here.
-        // The notification_channel_id is stored; callers with access to guild
-        // should handle cleanup. We'll still attempt to note it.
-        console.log(`[ChallengeService] Notification channel ${player.notification_channel_id} should be cleaned up for challenge ${challengeId}`);
-      } catch {
-        // Ignore
+  const channelIds = players
+    .map(p => p.notification_channel_id)
+    .filter(Boolean);
+
+  if (channelIds.length > 0) {
+    if (client) {
+      for (const channelId of channelIds) {
+        try {
+          const channel = client.channels.cache.get(channelId)
+            || await client.channels.fetch(channelId).catch(() => null);
+          if (channel) {
+            await channelService.deleteChannel(channel);
+          }
+        } catch (err) {
+          console.warn(`[ChallengeService] Failed to delete invite channel ${channelId} for cancelled #${challengeId}: ${err.message}`);
+        }
       }
+    } else {
+      console.warn(`[ChallengeService] cancelChallenge(${challengeId}) called without client — ${channelIds.length} invite channel(s) not deleted: ${channelIds.join(', ')}`);
     }
   }
 
-  // If there's a challenge board message, attempt to note it for cleanup
-  if (challenge.challenge_message_id && challenge.challenge_channel_id) {
-    console.log(`[ChallengeService] Board message ${challenge.challenge_message_id} in ${challenge.challenge_channel_id} should be cleaned up for challenge ${challengeId}`);
-  }
-
-  console.log(`[ChallengeService] Challenge #${challengeId} cancelled`);
+  console.log(`[ChallengeService] Challenge #${challengeId} cancelled${channelIds.length > 0 ? ` (cleaned ${channelIds.length} invite channels)` : ''}`);
 }
 
 /**

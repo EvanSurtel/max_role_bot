@@ -30,8 +30,9 @@ function registerAll(client) {
       return;
     }
 
-    // Cancel the challenge (refund held funds, set status)
-    await challengeService.cancelChallenge(challengeId);
+    // Cancel the challenge (refund held funds, set status, clean up
+    // any invite channels left over from DMs-disabled teammates).
+    await challengeService.cancelChallenge(challengeId, client);
 
     // Update to expired rather than cancelled
     challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.EXPIRED);
@@ -57,8 +58,8 @@ function registerAll(client) {
     challengePlayerRepo.updateStatus(challengePlayerId, PLAYER_STATUS.DECLINED);
     console.log(`[TimerHandler] teammate_accept: player ${challengePlayerId} timed out, declining`);
 
-    // Cancel the entire challenge
-    await challengeService.cancelChallenge(player.challenge_id);
+    // Cancel the entire challenge (+ invite channel cleanup)
+    await challengeService.cancelChallenge(player.challenge_id, client);
 
     console.log(`[TimerHandler] teammate_accept: challenge ${player.challenge_id} cancelled due to teammate timeout`);
   });

@@ -135,6 +135,7 @@ async function createMatchChannels(client, challenge, matchId) {
     new ButtonBuilder().setCustomId(`report_won_${match.id}`).setLabel(t('match_channel.btn_we_won', sharedLang)).setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`report_lost_${match.id}`).setLabel(t('match_channel.btn_we_lost', sharedLang)).setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId(`noshow_report_${match.id}`).setLabel(t('match_channel.btn_no_show', sharedLang)).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`match_cancel_request_${match.id}`).setLabel('Request Cancel').setStyle(ButtonStyle.Secondary),
   );
 
   const voteLangRow = buildLanguageDropdownRow(sharedLang);

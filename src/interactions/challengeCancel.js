@@ -103,7 +103,7 @@ async function handleConfirmedCancel(interaction) {
   try {
     await interaction.update({ content: t('challenge_cancel.cancelling', lang), embeds: [], components: [] });
 
-    await challengeService.cancelChallenge(challengeId);
+    await challengeService.cancelChallenge(challengeId, interaction.client);
     await disableBoardMessage(interaction.client, challenge);
 
     const { postTransaction } = require('../utils/transactionFeed');
