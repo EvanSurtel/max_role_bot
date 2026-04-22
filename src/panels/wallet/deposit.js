@@ -196,15 +196,16 @@ async function _handleCdp(interaction, user, wallet, country, amountUsd) {
     amountUsd = perTxMax;
   }
 
-  // Always request the Coinbase Onramp session as US + USD. Coinbase's
-  // one-click-buy API rejects most non-US countries outright, but the
-  // resulting widget URL handles every user correctly: US users get
-  // guest checkout (Apple Pay / card, no account), non-US users are
-  // prompted to sign in to their Coinbase account. Trying to pass
-  // e.g. country='CA' just 403s at the API and we never get a URL
-  // to show the user.
-  const apiCountry = 'US';
-  const paymentCurrency = 'USD';
+  // Pass the user's actual country + their native fiat currency so
+  // Coinbase's widget matches their real payment method. If we hard-
+  // code USD for a CA user whose bank is CAD, Coinbase's widget
+  // renders "The currency you selected does not match your payment
+  // method, please enter a CAD amount" and the Confirm button sits
+  // disabled. FIAT_BY_COUNTRY maps ISO country → local currency; we
+  // fall back to USD for anything unmapped (which Coinbase's widget
+  // then lets the user switch in-widget).
+  const apiCountry = country || 'US';
+  const paymentCurrency = FIAT_BY_COUNTRY[apiCountry] || 'USD';
 
   let onrampUrl;
   let quote = null;
