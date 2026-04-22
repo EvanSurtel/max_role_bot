@@ -103,12 +103,20 @@ function getOnrampOptions({ country, amountUsd, userId, demo = false }) {
     const perTxMax = cdpTrial.getMaxPerTxUsd();
     const fitsInTrialCap = amountUsd == null || amountUsd <= perTxMax;
     if (fitsInTrialCap) {
+      // Guest checkout (no Coinbase account required) is US-only per
+      // Coinbase. Users in any other country must sign into an
+      // existing Coinbase account to complete the purchase. We always
+      // highlight "No fees" since trial-mode + the zero-fee USDC
+      // promotion waives Coinbase's card fee.
+      const isUs = c === 'US';
       options.push({
         provider: 'cdp_onramp',
         label: 'Coinbase Onramp',
-        description: 'Guest checkout — no Coinbase account needed. Pay with Apple Pay, Google Pay, or credit / debit card. Powered by Coinbase.',
+        description: isUs
+          ? 'No fees. **Guest checkout** — no Coinbase account needed. Pay with Apple Pay, Google Pay, or credit / debit card. Powered by Coinbase.'
+          : 'No fees. **Coinbase account required.** Pay with Apple Pay, Google Pay, or credit / debit card linked to your Coinbase account.',
         feePctEstimate: 0,
-        kycRequired: 'none',
+        kycRequired: isUs ? 'none' : 'coinbase_account',
         primary: true,
       });
     }
