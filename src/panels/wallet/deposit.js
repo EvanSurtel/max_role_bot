@@ -90,8 +90,9 @@ const FIAT_BY_COUNTRY = {
 const STYLE_BY_INDEX = [ButtonStyle.Success, ButtonStyle.Primary, ButtonStyle.Secondary, ButtonStyle.Secondary];
 
 /**
- * Step 1 — user clicks "Deposit USDC". Open a modal asking for the
- * USD amount they want to deposit.
+ * Step 1 — user clicks "Deposit USDC". Open a modal asking how much
+ * USDC they want to receive. Coinbase / Wert / Transak each quote the
+ * equivalent local-fiat cost on their widget side.
  */
 async function handleDeposit(interaction, user, wallet, lang) {
   const modal = new ModalBuilder()
@@ -100,7 +101,7 @@ async function handleDeposit(interaction, user, wallet, lang) {
 
   const amountInput = new TextInputBuilder()
     .setCustomId('deposit_amount_usd')
-    .setLabel(`How much USD? (min $${MIN_DEPOSIT_USD}, max $${MAX_DEPOSIT_USD})`)
+    .setLabel(`How much USDC? (min $${MIN_DEPOSIT_USD}, max $${MAX_DEPOSIT_USD})`)
     .setPlaceholder(`e.g. ${DEFAULT_PRESET_USD}`)
     .setStyle(TextInputStyle.Short)
     .setRequired(true)
@@ -121,7 +122,7 @@ async function handleDepositAmountModal(interaction, user, wallet, lang) {
   const amount = Number(raw.replace(/[^0-9.]/g, ''));
   if (!Number.isFinite(amount) || amount < MIN_DEPOSIT_USD || amount > MAX_DEPOSIT_USD) {
     return interaction.reply({
-      content: `Invalid amount. Enter a USD number between $${MIN_DEPOSIT_USD} and $${MAX_DEPOSIT_USD}.`,
+      content: `Invalid amount. Enter a USDC amount between $${MIN_DEPOSIT_USD} and $${MAX_DEPOSIT_USD}.`,
       ephemeral: true,
     });
   }
@@ -209,7 +210,7 @@ async function handleDepositProvider(interaction, user, wallet, lang) {
   // isn't enough; the handler is the trust boundary.
   if (!Number.isFinite(amountUsd) || amountUsd < MIN_DEPOSIT_USD || amountUsd > MAX_DEPOSIT_USD) {
     return interaction.reply({
-      content: `Invalid amount. Enter a USD amount between $${MIN_DEPOSIT_USD} and $${MAX_DEPOSIT_USD}.`,
+      content: `Invalid amount. Enter a USDC amount between $${MIN_DEPOSIT_USD} and $${MAX_DEPOSIT_USD}.`,
       ephemeral: true,
     });
   }
@@ -248,14 +249,16 @@ async function _handleCdp(interaction, user, wallet, country, amountUsd) {
     amountUsd = perTxMax;
   }
 
-  // Pass the user's actual country + their native fiat currency so
-  // Coinbase's widget matches their real payment method. If we hard-
-  // code USD for a CA user whose bank is CAD, Coinbase's widget
-  // renders "The currency you selected does not match your payment
-  // method, please enter a CAD amount" and the Confirm button sits
-  // disabled. FIAT_BY_COUNTRY maps ISO country → local currency; we
-  // fall back to USD for anything unmapped (which Coinbase's widget
-  // then lets the user switch in-widget).
+  // Target the USDC amount the user asked for (purchaseAmount) rather
+  // than a fiat amount to spend (paymentAmount). This way, a CA user
+  // asking for 5 USDC gets a widget that quotes ~6.86 CAD to pay for
+  // exactly 5 USDC — matching what they actually expect to receive.
+  // Previously we sent paymentAmount=5 + paymentCurrency=CAD and the
+  // widget charged 5 CAD (~3.60 USD), delivering only ~3.60 USDC.
+  //
+  // paymentCurrency is still passed so the widget knows which local
+  // rail to render in the "you pay" line (CAD for CA, etc). Coinbase
+  // falls back to USD on their side if the rail isn't enabled.
   const apiCountry = country || 'US';
   const paymentCurrency = FIAT_BY_COUNTRY[apiCountry] || 'USD';
 
@@ -266,7 +269,7 @@ async function _handleCdp(interaction, user, wallet, country, amountUsd) {
       walletAddress: wallet.address,
       purchaseCurrency: 'USDC',
       destinationNetwork: 'base',
-      paymentAmount: String(amountUsd),
+      purchaseAmount: String(amountUsd), // amountUsd is actually USDC target (≈USD)
       paymentCurrency,
       country: apiCountry,
       partnerUserRef: String(user.discord_id).slice(0, 49),

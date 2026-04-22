@@ -86,8 +86,12 @@ async function _signJwt({ host, path }) {
  * @param {string} opts.walletAddress - Destination wallet (on Base).
  * @param {string} [opts.purchaseCurrency='USDC']
  * @param {string} [opts.destinationNetwork='base']
- * @param {string|number} opts.paymentAmount - Fiat amount, e.g. "50".
- * @param {string} opts.paymentCurrency - ISO fiat code (USD / CAD / GBP).
+ * @param {string|number} [opts.purchaseAmount] - Crypto amount to receive (USDC). Use this when
+ *   you want the widget to quote "how much fiat you pay" from a fixed USDC target.
+ * @param {string|number} [opts.paymentAmount] - Fiat amount to spend. Use this when you want
+ *   "spend $5 of fiat, see how much USDC that gets." Mutually exclusive with purchaseAmount;
+ *   if both are passed, purchaseAmount wins (the widget prefers crypto presets).
+ * @param {string} [opts.paymentCurrency] - ISO fiat code (USD / CAD / GBP / ...).
  * @param {string} [opts.paymentMethod='CARD'] - CARD | APPLE_PAY | ACH | PAYPAL.
  * @param {string} opts.country - ISO 3166-1 alpha-2 (US / CA / GB).
  * @param {string} [opts.subdivision] - US state code (required when country=US).
@@ -98,6 +102,7 @@ async function createOneClickBuySession({
   walletAddress,
   purchaseCurrency = 'USDC',
   destinationNetwork = 'base',
+  purchaseAmount,
   paymentAmount,
   paymentCurrency,
   paymentMethod,     // optional — omitting lets Coinbase surface guest-compatible methods (e.g. Apple Pay) instead of pinning to one
@@ -128,15 +133,26 @@ async function createOneClickBuySession({
 
   const jwt = await _signJwt({ host: SESSIONS_HOST, path: SESSIONS_PATH });
 
+  // Prefer purchaseAmount (crypto target) if provided — the common
+  // UX is "user says I want N USDC" and the widget then quotes the
+  // matching local-fiat cost. paymentAmount (fiat target) is kept
+  // for back-compat with older callers. Coinbase's /sessions endpoint
+  // accepts either; sending both is undefined so we only include one.
   const body = {
     destinationAddress: walletAddress,
     purchaseCurrency,
     destinationNetwork,
-    paymentAmount: String(paymentAmount),
-    paymentCurrency,
     country,
     partnerUserRef,
   };
+  if (paymentCurrency) body.paymentCurrency = paymentCurrency;
+  if (purchaseAmount != null) {
+    body.purchaseAmount = String(purchaseAmount);
+  } else if (paymentAmount != null) {
+    body.paymentAmount = String(paymentAmount);
+  } else {
+    throw new Error('createOneClickBuySession: either purchaseAmount or paymentAmount required');
+  }
   if (paymentMethod) body.paymentMethod = paymentMethod;
   if (subdivision) body.subdivision = subdivision;
 
