@@ -33,17 +33,18 @@
 const cdpTrial = require('./cdpTrialService');
 const wertKyc = require('../database/repositories/wertKycRepo');
 
-// Countries where we surface CDP Onramp in the real wallet channel.
-// Per Rishabh Jain (CDP team) on 2026-04-21, CDP guest checkout is
-// US-only today despite the public FAQ claiming US/UK/CA. We keep
-// CA in this set anyway for the operator's own demo recording (CA-
-// based) — Coinbase's widget will either route the CA session via
-// the public-FAQ path or surface a region error; either way the
-// button is visible for the video. Drop CA back out of this set once
-// the trial upgrade is approved and we want the prod router to
-// reflect Rishabh's guidance strictly.
-// Demo channel bypasses this gate entirely via the `demo` flag.
+// Countries where we surface CDP Onramp / Offramp in the real wallet
+// channel. Per Rishabh Jain (CDP team) on 2026-04-21, CDP guest
+// checkout is US-only today despite the public FAQ claiming US/UK/CA.
+// We keep CA in these sets anyway for the operator's own demo
+// recording (CA-based) — Coinbase's widget will either route the CA
+// session via the public-FAQ path or surface a region error; either
+// way the buttons are visible for the video. Drop CA back out of
+// these sets once the trial upgrade is approved and we want the prod
+// router to reflect Rishabh's guidance strictly.
+// Demo channel bypasses these gates entirely via the `demo` flag.
 const CDP_GUEST_ONRAMP_COUNTRIES = new Set(['US', 'CA']);
+const CDP_GUEST_OFFRAMP_COUNTRIES = new Set(['US', 'CA']);
 
 // Transak is global. We still gate on Changelly having an offer for
 // the country + amount at order time.
@@ -173,13 +174,20 @@ function getOnrampOptions({ country, amountUsd, userId, demo = false }) {
  * @returns {ProviderOption[]}
  */
 function getOfframpOptions({ country, amountUsdc, demo = false }) {
+  const c = (country || '').toUpperCase();
   const options = [];
 
-  // CDP offramp — normally gated behind CDP_OFFRAMP_ENABLED (we
-  // disable on Day 1 to preserve trial counter for Onramp US
-  // deposits). The demo channel bypasses this gate so Coinbase's
-  // review team can see the offramp flow regardless.
-  if (cdpTrial.canUseOfframp() || demo) {
+  // CDP offramp visibility:
+  //   - Demo channel: always show (CDP credentials must be present).
+  //   - Real wallet channel, country in CDP_GUEST_OFFRAMP_COUNTRIES
+  //     (US / CA today): show regardless of CDP_OFFRAMP_ENABLED flag
+  //     so the operator can record the full cash-out flow without
+  //     flipping env vars. Other countries still honor the flag as
+  //     a global kill switch.
+  const cdpAllowed = demo
+    ? (process.env.CDP_API_KEY_ID && process.env.CDP_PROJECT_ID)
+    : (CDP_GUEST_OFFRAMP_COUNTRIES.has(c) || cdpTrial.canUseOfframp());
+  if (cdpAllowed) {
     options.push({
       provider: 'cdp_offramp',
       label: 'Cash out to bank (Coinbase)',
