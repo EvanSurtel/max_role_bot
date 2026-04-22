@@ -26,13 +26,65 @@ const MIN_DEPOSIT_USD = 5;
 const MAX_DEPOSIT_USD = 1000;
 const DEFAULT_PRESET_USD = 50;
 
-// ISO 3166-1 alpha-2 → Onramp fiat currency. Coinbase's Onramp supports
-// USD / CAD / GBP / EUR / AUD presets; anything else falls back to USD.
+// ISO 3166-1 alpha-2 → Onramp fiat currency, covering every country
+// where Coinbase Onramp operates. Coinbase doesn't publish a static
+// country→currency dump (the definitive runtime source is their
+// `/onramp/v1/buy/options?country=XX` endpoint), so this map pairs
+// each supported country with its ISO-4217 primary currency. Widget
+// behavior when we send a local currency that Coinbase's rail
+// doesn't route: the widget auto-falls-back to USD on its side
+// (per CDP docs on generating-quotes).
+//
+// Sourced from:
+//   - CDP Onramp FAQ (April 2026): "Onramp is available in all
+//     countries Coinbase operates in EXCEPT Japan"
+//     https://docs.cdp.coinbase.com/onramp/additional-resources/faq
+//   - CDP Countries & Currencies docs
+//     https://docs.cdp.coinbase.com/onramp/coinbase-hosted-onramp/countries-&-currencies
+//   - Coinbase country availability (help.coinbase.com +
+//     coinbase.com/country-availability)
+//   - coinbase/cbpay-js SDK: presetFiatAmount only natively supports
+//     USD/CAD/GBP/EUR — other currencies are accepted but widget may
+//     re-render amount in USD if the rail isn't enabled for that pair.
+//
+// EXCLUDED on purpose:
+//   - JP (Coinbase operates, Onramp does not per CDP FAQ)
+//   - OFAC / sanctioned regions (CN, CU, IR, KP, SY, RU and
+//     regional variants, VE, MM, BY, AF, IQ, LY, SD, SS, ZW, YE)
 const FIAT_BY_COUNTRY = {
-  CA: 'CAD', GB: 'GBP', AU: 'AUD',
-  AT: 'EUR', BE: 'EUR', CY: 'EUR', DE: 'EUR', EE: 'EUR', ES: 'EUR', FI: 'EUR',
-  FR: 'EUR', GR: 'EUR', IE: 'EUR', IT: 'EUR', LT: 'EUR', LU: 'EUR', LV: 'EUR',
-  MT: 'EUR', NL: 'EUR', PT: 'EUR', SI: 'EUR', SK: 'EUR',
+  AD: 'EUR', AE: 'AED', AG: 'XCD', AI: 'XCD', AL: 'ALL', AO: 'AOA',
+  AR: 'ARS', AT: 'EUR', AU: 'AUD', AW: 'AWG', AZ: 'AZN', BA: 'BAM',
+  BB: 'BBD', BE: 'EUR', BG: 'BGN', BJ: 'XOF', BM: 'BMD', BO: 'BOB',
+  BR: 'BRL', BS: 'BSD', BW: 'BWP', BZ: 'BZD',
+  CA: 'CAD', CH: 'CHF', CI: 'XOF', CL: 'CLP', CO: 'COP', CR: 'CRC',
+  CV: 'CVE', CY: 'EUR', CZ: 'CZK',
+  DE: 'EUR', DK: 'DKK', DM: 'XCD', DO: 'DOP',
+  EC: 'USD', EE: 'EUR', EG: 'EGP', ES: 'EUR',
+  FI: 'EUR', FJ: 'FJD', FR: 'EUR',
+  GB: 'GBP', GD: 'XCD', GE: 'GEL', GG: 'GBP', GH: 'GHS', GI: 'GIP',
+  GL: 'DKK', GR: 'EUR', GT: 'GTQ', GY: 'GYD',
+  HK: 'HKD', HN: 'HNL', HR: 'EUR', HU: 'HUF',
+  ID: 'IDR', IE: 'EUR', IL: 'ILS', IM: 'GBP', IN: 'INR', IS: 'ISK',
+  IT: 'EUR',
+  JE: 'GBP', JM: 'JMD', JO: 'JOD',
+  KE: 'KES', KG: 'KGS', KN: 'XCD', KR: 'KRW', KW: 'KWD', KY: 'KYD',
+  KZ: 'KZT',
+  LC: 'XCD', LI: 'CHF', LK: 'LKR', LT: 'EUR', LU: 'EUR', LV: 'EUR',
+  MA: 'MAD', MC: 'EUR', MD: 'MDL', ME: 'EUR', MG: 'MGA', MK: 'MKD',
+  MN: 'MNT', MS: 'XCD', MT: 'EUR', MU: 'MUR', MW: 'MWK', MX: 'MXN',
+  MY: 'MYR', MZ: 'MZN',
+  NA: 'NAD', NG: 'NGN', NI: 'NIO', NL: 'EUR', NO: 'NOK', NZ: 'NZD',
+  OM: 'OMR',
+  PA: 'PAB', PE: 'PEN', PG: 'PGK', PH: 'PHP', PK: 'PKR', PL: 'PLN',
+  PT: 'EUR', PY: 'PYG',
+  QA: 'QAR',
+  RO: 'RON', RW: 'RWF',
+  SA: 'SAR', SC: 'SCR', SE: 'SEK', SG: 'SGD', SI: 'EUR', SK: 'EUR',
+  SM: 'EUR', SN: 'XOF', SR: 'SRD', SV: 'USD', SZ: 'SZL',
+  TC: 'USD', TH: 'THB', TR: 'TRY', TT: 'TTD', TW: 'TWD', TZ: 'TZS',
+  UA: 'UAH', UG: 'UGX', US: 'USD', UY: 'UYU', UZ: 'UZS',
+  VC: 'XCD', VG: 'USD', VN: 'VND',
+  ZA: 'ZAR', ZM: 'ZMW',
 };
 
 const STYLE_BY_INDEX = [ButtonStyle.Success, ButtonStyle.Primary, ButtonStyle.Secondary, ButtonStyle.Secondary];
