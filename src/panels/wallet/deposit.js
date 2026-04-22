@@ -20,6 +20,7 @@ const {
 const changelly = require('../../services/changellyService');
 const onramp = require('../../services/coinbaseOnrampService');
 const paymentRouter = require('../../services/paymentRouter');
+const { isDemoChannelContext } = require('../coinbaseReviewDemoPanel');
 
 const MIN_DEPOSIT_USD = 5;
 const MAX_DEPOSIT_USD = 1000;
@@ -74,10 +75,16 @@ async function handleDepositAmountModal(interaction, user, wallet, lang) {
   }
   const amountUsd = Math.round(amount * 100) / 100; // 2-decimal round
 
-  const country = (user.country_code || '').toUpperCase();
+  // Demo channel override: the Coinbase review team may be anywhere
+  // geographically, but they need to exercise the CDP guest-checkout
+  // flow (which is US-only in production). Force country=US AND
+  // pass demo=true so the router bypasses the CDP_ONRAMP_ENABLED
+  // feature flag + the country-restriction gate.
+  const demo = isDemoChannelContext(interaction);
+  const country = demo ? 'US' : (user.country_code || '').toUpperCase();
   const address = wallet.address;
 
-  const options = paymentRouter.getOnrampOptions({ country, amountUsd, userId: user.id });
+  const options = paymentRouter.getOnrampOptions({ country, amountUsd, userId: user.id, demo });
 
   if (options.length === 0) {
     return interaction.reply({
@@ -133,7 +140,13 @@ async function handleDepositAmountModal(interaction, user, wallet, lang) {
  */
 async function handleDepositProvider(interaction, user, wallet, lang) {
   const id = interaction.customId;
-  const country = (user.country_code || '').toUpperCase();
+  // Same demo-channel override as the amount modal above — keeps the
+  // provider branch (CDP / Wert / Transak) consistent with what the
+  // user was shown in the picker, and ensures the CDP Onramp session
+  // is minted with country='US' for a non-US reviewer.
+  const country = isDemoChannelContext(interaction)
+    ? 'US'
+    : (user.country_code || '').toUpperCase();
 
   const rest = id.slice('wallet_deposit_'.length);
   const [providerKey, amountStr] = rest.split('__');

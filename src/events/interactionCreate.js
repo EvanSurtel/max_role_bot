@@ -330,12 +330,10 @@ module.exports = {
         if (id === 'create_dispute') {
           return await disputeCreate.handleCreateDispute(interaction);
         }
-        // "View My Wallet" button on the public wallet panel
-        if (id === 'coinbase_review_demo') {
-          const { handleCoinbaseReviewDemoButton } = require('../panels/coinbaseReviewDemoPanel');
-          return await handleCoinbaseReviewDemoButton(interaction);
-        }
-
+        // "View My Wallet" button — shared between the public wallet
+        // channel and the Coinbase review demo channel. Both post
+        // the same panel; the downstream deposit / cashout handlers
+        // detect demo-channel context to strip country restrictions.
         if (id === 'wallet_view_open') {
           return await walletPanel.handleWalletViewOpen(interaction);
         }

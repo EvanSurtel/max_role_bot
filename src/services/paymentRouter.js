@@ -59,9 +59,13 @@ const CDP_GUEST_ONRAMP_COUNTRIES = new Set(['US']);
  * @param {number} [args.userId] - Internal user id; if provided, the
  *                                  Wert option's label/description
  *                                  reflect the user's lifetime LKYC cap.
+ * @param {boolean} [args.demo=false] - If true, include CDP onramp
+ *   even when CDP_ONRAMP_ENABLED=false. Callers pass this from the
+ *   Coinbase review demo channel so reviewers always see CDP, no
+ *   matter what feature flags the operator has set.
  * @returns {ProviderOption[]}
  */
-function getOnrampOptions({ country, amountUsd, userId }) {
+function getOnrampOptions({ country, amountUsd, userId, demo = false }) {
   const c = (country || '').toUpperCase();
   const options = [];
 
@@ -74,7 +78,16 @@ function getOnrampOptions({ country, amountUsd, userId }) {
   // Fee messaging during trial: Coinbase waives their card fee on
   // trial-sized transactions, so we show "no fees" for ≤$5 deposits.
   // Post-approval, CDP_ZERO_FEE_USDC flips the copy to 0% globally.
-  if (CDP_GUEST_ONRAMP_COUNTRIES.has(c) && cdpTrial.canUseOnramp()) {
+  //
+  // Demo channel: bypass the CDP_ONRAMP_ENABLED feature flag (but
+  // still honor the trial counter — reviewers burning the prod trial
+  // counter is fine, that's the whole point of them testing the
+  // flow). Bypass the US-only country restriction too so a non-US
+  // reviewer can click through the guest-checkout widget.
+  const cdpAllowed = demo
+    ? (process.env.CDP_API_KEY_ID && process.env.CDP_PROJECT_ID) // credentials present
+    : (CDP_GUEST_ONRAMP_COUNTRIES.has(c) && cdpTrial.canUseOnramp());
+  if (cdpAllowed) {
     const perTxMax = cdpTrial.getMaxPerTxUsd();
     const fitsInTrialCap = amountUsd == null || amountUsd <= perTxMax;
     if (fitsInTrialCap) {
@@ -146,14 +159,20 @@ function getOnrampOptions({ country, amountUsd, userId }) {
  * @param {Object} args
  * @param {string} args.country - ISO 3166-1 alpha-2
  * @param {number} args.amountUsdc - Amount of USDC being cashed out
+ * @param {boolean} [args.demo=false] - If true, include CDP offramp
+ *   even when CDP_OFFRAMP_ENABLED=false. Used by the Coinbase review
+ *   demo channel so reviewers can exercise the offramp flow before
+ *   we flip the feature flag globally.
  * @returns {ProviderOption[]}
  */
-function getOfframpOptions({ country, amountUsdc }) {
+function getOfframpOptions({ country, amountUsdc, demo = false }) {
   const options = [];
 
-  // CDP offramp — gated behind approval flag. Disabled on Day 1 to
-  // preserve trial counter for Onramp US deposits.
-  if (cdpTrial.canUseOfframp()) {
+  // CDP offramp — normally gated behind CDP_OFFRAMP_ENABLED (we
+  // disable on Day 1 to preserve trial counter for Onramp US
+  // deposits). The demo channel bypasses this gate so Coinbase's
+  // review team can see the offramp flow regardless.
+  if (cdpTrial.canUseOfframp() || demo) {
     options.push({
       provider: 'cdp_offramp',
       label: 'Cash out to bank (Coinbase)',
