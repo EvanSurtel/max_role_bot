@@ -33,10 +33,17 @@
 const cdpTrial = require('./cdpTrialService');
 const wertKyc = require('../database/repositories/wertKycRepo');
 
-// Countries where CDP Onramp guest checkout is actually live. Per
-// Rishabh Jain (CDP team) on 2026-04-21, this is US-only today despite
-// the public FAQ claiming US/UK/CA. Update this set when they expand.
-const CDP_GUEST_ONRAMP_COUNTRIES = new Set(['US']);
+// Countries where we surface CDP Onramp in the real wallet channel.
+// Per Rishabh Jain (CDP team) on 2026-04-21, CDP guest checkout is
+// US-only today despite the public FAQ claiming US/UK/CA. We keep
+// CA in this set anyway for the operator's own demo recording (CA-
+// based) — Coinbase's widget will either route the CA session via
+// the public-FAQ path or surface a region error; either way the
+// button is visible for the video. Drop CA back out of this set once
+// the trial upgrade is approved and we want the prod router to
+// reflect Rishabh's guidance strictly.
+// Demo channel bypasses this gate entirely via the `demo` flag.
+const CDP_GUEST_ONRAMP_COUNTRIES = new Set(['US', 'CA']);
 
 // Transak is global. We still gate on Changelly having an offer for
 // the country + amount at order time.
