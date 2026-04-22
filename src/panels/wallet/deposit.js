@@ -196,7 +196,15 @@ async function _handleCdp(interaction, user, wallet, country, amountUsd) {
     amountUsd = perTxMax;
   }
 
-  const paymentCurrency = FIAT_BY_COUNTRY[country] || 'USD';
+  // Always request the Coinbase Onramp session as US + USD. Coinbase's
+  // one-click-buy API rejects most non-US countries outright, but the
+  // resulting widget URL handles every user correctly: US users get
+  // guest checkout (Apple Pay / card, no account), non-US users are
+  // prompted to sign in to their Coinbase account. Trying to pass
+  // e.g. country='CA' just 403s at the API and we never get a URL
+  // to show the user.
+  const apiCountry = 'US';
+  const paymentCurrency = 'USD';
 
   let onrampUrl;
   let quote = null;
@@ -207,20 +215,19 @@ async function _handleCdp(interaction, user, wallet, country, amountUsd) {
       destinationNetwork: 'base',
       paymentAmount: String(amountUsd),
       paymentCurrency,
-      country: country || 'US',
+      country: apiCountry,
       partnerUserRef: String(user.discord_id).slice(0, 49),
     });
     onrampUrl = session.onrampUrl;
     quote = session.quote;
   } catch (err) {
-    // Trial-cap error → silently fall back to Wert. forceExhaust fired
-    // inside coinbaseOnrampService so future pickers won't offer CDP
-    // until the counter resets.
+    // Only TrialExhaustedError justifies a silent Wert fallback —
+    // that's the one case where our API quota is actually gone and
+    // the user shouldn't see a broken Coinbase error. Everything
+    // else (country reject, malformed request, network blip) should
+    // surface a clear message, not bounce the user to Wert.
     if (err instanceof onramp.TrialExhaustedError) {
       console.warn(`[Wallet] CDP trial exhausted for ${user.discord_id} @ $${amountUsd}; silently falling back to Wert.`);
-      // Ops visibility — logged to the cash-tx feed so admins can see
-      // how often the silent fallback fires without leaking it to the
-      // user.
       try {
         const { postTransaction } = require('../../utils/transactionFeed');
         postTransaction({
@@ -239,7 +246,9 @@ async function _handleCdp(interaction, user, wallet, country, amountUsd) {
       content: [
         '**\u{1F4B3} Deposit USDC — Coinbase**',
         '',
-        'We couldn\'t generate a Coinbase payment link right now. Please pick another payment method or deposit USDC directly to the Base address shown earlier.',
+        'We couldn\'t generate a Coinbase payment link right now. Please pick another payment method (Wert or Transak) or deposit USDC directly to the Base address shown earlier.',
+        '',
+        `_Error: ${err.message}_`,
       ].join('\n'),
     });
   }

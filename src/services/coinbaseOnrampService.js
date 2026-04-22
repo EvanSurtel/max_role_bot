@@ -47,18 +47,24 @@ function isConfigured() {
  * Is this HTTP response from Coinbase's Onramp API likely a trial-cap
  * signal? Coinbase doesn't expose a single error code for this; they
  * return 403 or 429 with messages like "Project tier exceeded" or
- * "monthly limit reached". We match heuristically.
+ * "monthly limit reached". We match heuristically — but we do NOT
+ * treat bare 403 as trial cap, because Coinbase also returns 403
+ * for country-not-supported and other policy rejections. Treating
+ * those as trial-cap would force-exhaust the local counter and kill
+ * CDP routing for every other user forever.
  */
 function _looksLikeTrialCap(status, bodyText) {
-  if (status === 403 || status === 429) return true;
+  if (status === 429) return true;
   const msg = String(bodyText || '').toLowerCase();
-  return (
-    msg.includes('limit') ||
-    msg.includes('tier') ||
-    msg.includes('quota') ||
+  const mentionsCap =
     msg.includes('trial') ||
-    msg.includes('exceeded')
-  );
+    msg.includes('quota') ||
+    msg.includes('tier') ||
+    msg.includes('monthly limit') ||
+    msg.includes('usage limit') ||
+    msg.includes('transaction limit') ||
+    msg.includes('exceeded');
+  return mentionsCap;
 }
 
 async function _signJwt({ host, path }) {
@@ -103,19 +109,18 @@ async function createOneClickBuySession({
     throw new Error('CDP_API_KEY_ID and CDP_API_KEY_SECRET must be set');
   }
 
-  // Close the TOCTOU window between picker render and session mint —
-  // if the counter flipped to exhausted while the user was deciding,
-  // bail now so deposit.js takes the silent Wert fallback instead of
-  // handing out a session Coinbase will reject.
-  try {
-    const cdpTrial = require('./cdpTrialService');
-    if (!cdpTrial.canUseOnramp()) {
-      throw new TrialExhaustedError('trial cap reached between picker render and session mint');
-    }
-  } catch (e) {
-    if (e instanceof TrialExhaustedError) throw e;
-    // cdpTrial unavailable — fall through, let Coinbase enforce.
-  }
+  // Previously this function had a TOCTOU guard calling
+  // cdpTrial.canUseOnramp() and throwing TrialExhaustedError if it
+  // returned false. That threw for ANY reason canUseOnramp returned
+  // false — including CDP_ONRAMP_ENABLED being unset on an operator's
+  // env even when the router had just decided (via country-in-set
+  // bypass) that CDP should be shown. Result: user clicks "Coinbase
+  // Onramp", mint call short-circuits, deposit.js silently falls
+  // back to Wert — which looks broken.
+  //
+  // We rely on Coinbase's own API to enforce trial caps; the /sessions
+  // endpoint returns 429 + explicit text if the trial is exhausted.
+  // _looksLikeTrialCap() below is tightened accordingly.
 
   if (partnerUserRef && String(partnerUserRef).length > 49) {
     console.warn(`[CDP] partnerUserRef length ${String(partnerUserRef).length} > 49; truncating. Value: ${String(partnerUserRef).slice(0, 49)}`);
