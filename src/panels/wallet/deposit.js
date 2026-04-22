@@ -75,13 +75,13 @@ async function handleDepositAmountModal(interaction, user, wallet, lang) {
   }
   const amountUsd = Math.round(amount * 100) / 100; // 2-decimal round
 
-  // Demo channel override: the Coinbase review team may be anywhere
-  // geographically, but they need to exercise the CDP guest-checkout
-  // flow (which is US-only in production). Force country=US AND
-  // pass demo=true so the router bypasses the CDP_ONRAMP_ENABLED
-  // feature flag + the country-restriction gate.
+  // Demo channel: pass demo=true so the router bypasses the country
+  // restriction + CDP_ONRAMP_ENABLED flag to make the Coinbase button
+  // visible. Do NOT force country=US — the description copy should
+  // still reflect where the reviewer actually is (US = guest checkout,
+  // non-US = Coinbase account required) so they see honest UI.
   const demo = isDemoChannelContext(interaction);
-  const country = demo ? 'US' : (user.country_code || '').toUpperCase();
+  const country = (user.country_code || '').toUpperCase();
   const address = wallet.address;
 
   const options = paymentRouter.getOnrampOptions({ country, amountUsd, userId: user.id, demo });

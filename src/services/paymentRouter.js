@@ -103,20 +103,18 @@ function getOnrampOptions({ country, amountUsd, userId, demo = false }) {
     const perTxMax = cdpTrial.getMaxPerTxUsd();
     const fitsInTrialCap = amountUsd == null || amountUsd <= perTxMax;
     if (fitsInTrialCap) {
-      // Guest checkout (no Coinbase account required) is US-only per
-      // Coinbase. Users in any other country must sign into an
-      // existing Coinbase account to complete the purchase. We always
-      // highlight "No fees" since trial-mode + the zero-fee USDC
-      // promotion waives Coinbase's card fee.
-      const isUs = c === 'US';
+      // ONE unified description that names both paths, so Coinbase's
+      // review team sees our UI is honest about guest-checkout being
+      // US-only and requiring an account elsewhere. Apple Pay /
+      // Google Pay / card all route through Coinbase's widget either
+      // way. "No fees" is always accurate during the zero-fee USDC
+      // promotion + trial mode.
       options.push({
         provider: 'cdp_onramp',
         label: 'Coinbase Onramp',
-        description: isUs
-          ? 'No fees. **Guest checkout** — no Coinbase account needed. Pay with Apple Pay, Google Pay, or credit / debit card. Powered by Coinbase.'
-          : 'No fees. **Coinbase account required.** Pay with Apple Pay, Google Pay, or credit / debit card linked to your Coinbase account.',
+        description: 'No fees. **Guest checkout** available for US users (no Coinbase account needed). **Non-US users must sign in with a Coinbase account.** Pay with Apple Pay, Google Pay, or credit / debit card. Powered by Coinbase.',
         feePctEstimate: 0,
-        kycRequired: isUs ? 'none' : 'coinbase_account',
+        kycRequired: c === 'US' ? 'none' : 'coinbase_account',
         primary: true,
       });
     }
@@ -200,7 +198,7 @@ function getOfframpOptions({ country, amountUsdc, demo = false }) {
     options.push({
       provider: 'cdp_offramp',
       label: 'Coinbase Offramp',
-      description: 'Cash out USDC to your bank or PayPal through Coinbase. Requires a Coinbase account with a linked payout method.',
+      description: 'Cash out USDC to your bank or PayPal through Coinbase. **Requires a Coinbase account with a linked payout method** (available globally).',
       feePctEstimate: process.env.CDP_ZERO_FEE_USDC === 'true' ? 0 : 0.005,
       kycRequired: 'coinbase_account',
       primary: true,
