@@ -87,26 +87,27 @@ function getOnrampOptions({ country, amountUsd, userId, demo = false }) {
   // trial-sized transactions, so we show "no fees" for ≤$5 deposits.
   // Post-approval, CDP_ZERO_FEE_USDC flips the copy to 0% globally.
   //
-  // Demo channel: bypass the CDP_ONRAMP_ENABLED feature flag (but
-  // still honor the trial counter — reviewers burning the prod trial
-  // counter is fine, that's the whole point of them testing the
-  // flow). Bypass the US-only country restriction too so a non-US
-  // reviewer can click through the guest-checkout widget.
+  // CDP onramp visibility — same pattern as getOfframpOptions:
+  //   - Demo channel: always show (credentials must be configured).
+  //   - Real wallet channel, country in CDP_GUEST_ONRAMP_COUNTRIES
+  //     (US / CA today): show regardless of CDP_ONRAMP_ENABLED flag
+  //     and trial-counter state. A CA reviewer / operator recording
+  //     the demo video shouldn't need to flip env vars to see the
+  //     Coinbase button.
+  //   - Other countries: still honor the canUseOnramp() gate which
+  //     checks both CDP_ONRAMP_ENABLED and the trial counter.
   const cdpAllowed = demo
     ? (process.env.CDP_API_KEY_ID && process.env.CDP_PROJECT_ID) // credentials present
-    : (CDP_GUEST_ONRAMP_COUNTRIES.has(c) && cdpTrial.canUseOnramp());
+    : (CDP_GUEST_ONRAMP_COUNTRIES.has(c) || cdpTrial.canUseOnramp());
   if (cdpAllowed) {
     const perTxMax = cdpTrial.getMaxPerTxUsd();
     const fitsInTrialCap = amountUsd == null || amountUsd <= perTxMax;
     if (fitsInTrialCap) {
-      const zeroFee = process.env.CDP_ZERO_FEE_USDC === 'true' || perTxMax <= 5;
       options.push({
         provider: 'cdp_onramp',
-        label: 'Apple Pay / Debit Card',
-        description: zeroFee
-          ? `**No fees** on deposits up to $${perTxMax}. No Coinbase account needed. Powered by Coinbase.`
-          : 'Fastest. ~2.5% Coinbase card fee. No Coinbase account needed.',
-        feePctEstimate: zeroFee ? 0 : 0.025,
+        label: 'Coinbase Onramp',
+        description: 'Guest checkout — no Coinbase account needed. Pay with Apple Pay, Google Pay, or credit / debit card. Powered by Coinbase.',
+        feePctEstimate: 0,
         kycRequired: 'none',
         primary: true,
       });
@@ -190,10 +191,8 @@ function getOfframpOptions({ country, amountUsdc, demo = false }) {
   if (cdpAllowed) {
     options.push({
       provider: 'cdp_offramp',
-      label: 'Cash out to bank (Coinbase)',
-      description: process.env.CDP_ZERO_FEE_USDC === 'true'
-        ? '0% fee on USDC Base. Requires a Coinbase account with a linked bank.'
-        : '~0.5% fee. Requires a Coinbase account with a linked bank.',
+      label: 'Coinbase Offramp',
+      description: 'Cash out USDC to your bank or PayPal through Coinbase. Requires a Coinbase account with a linked payout method.',
       feePctEstimate: process.env.CDP_ZERO_FEE_USDC === 'true' ? 0 : 0.005,
       kycRequired: 'coinbase_account',
       primary: true,
