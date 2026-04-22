@@ -320,12 +320,20 @@ async function _handleCdp(interaction, user, wallet, country, amountUsd) {
     ? `Preview: **${quote.paymentTotal} ${quote.paymentCurrency}** → **${quote.purchaseAmount} USDC**`
     : '';
 
+  // Step-2 copy: list every payment method Coinbase Onramp accepts,
+  // not just Apple Pay / debit. Users have rejected the option when
+  // the copy undersold it. Guest-checkout availability (US only)
+  // is also called out so non-US users aren't surprised by the
+  // sign-in prompt.
+  const isUsCountry = apiCountry === 'US';
   return interaction.editReply({
     content: [
       `**\u{1F4B3} Deposit $${amountUsd} USDC — Coinbase**`,
       '',
-      '1. Click **Buy USDC** below — no Coinbase account needed',
-      '2. Pay with **Apple Pay** or **debit card**',
+      '1. Click **Buy USDC** below — opens the Coinbase Onramp widget',
+      isUsCountry
+        ? '2. Pay with **Apple Pay**, **Google Pay**, **credit card**, **debit card**, or **bank transfer** — no Coinbase account needed (guest checkout)'
+        : '2. Sign in with your Coinbase account, then pay with **Apple Pay**, **Google Pay**, **credit card**, **debit card**, or **bank transfer**',
       '3. USDC arrives in your wallet within a few minutes',
       quoteLine ? '' : null,
       quoteLine || null,
