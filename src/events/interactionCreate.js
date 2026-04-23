@@ -337,6 +337,13 @@ module.exports = {
         if (id === 'wallet_view_open') {
           return await walletPanel.handleWalletViewOpen(interaction);
         }
+        // Self-custody upgrade button on the wallet ephemeral —
+        // mints a one-time link nonce + DMs the user a setup URL
+        // pointing at the wallet web surface (Vercel).
+        if (id === 'wallet_self_custody_setup') {
+          const { handleSelfCustodySetup } = require('../panels/wallet/selfCustodySetup');
+          return await handleSelfCustodySetup(interaction);
+        }
         // "🌐 Language" button — appears on every public bot panel
         if (id === 'show_language_picker') {
           return await languageSwitcher.handleShowLanguagePicker(interaction);
