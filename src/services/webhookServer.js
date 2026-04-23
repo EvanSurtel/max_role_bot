@@ -363,6 +363,170 @@ function startWebhookServer(client) {
       }
     });
 
+  // ─── Internal API for the wallet web surface ─────────────────────
+  //
+  // These endpoints are called only by our Next.js app on Vercel.
+  // Authed via an HMAC-style shared-secret header (X-Internal-Secret)
+  // that matches process.env.WALLET_WEB_INTERNAL_SECRET. Without the
+  // header (or with a wrong value) the endpoints 401.
+  //
+  // Endpoints:
+  //   POST /api/internal/link/redeem
+  //   POST /api/internal/wallet/grant
+  //   POST /api/internal/wallet/observed-revoke   (web reports a user-
+  //                                                signed revoke landed)
+
+  function _internalAuth(req, res, next) {
+    const expected = process.env.WALLET_WEB_INTERNAL_SECRET;
+    if (!expected) {
+      console.error('[Internal API] WALLET_WEB_INTERNAL_SECRET not set — rejecting all internal calls');
+      res.status(503).json({ error: 'internal api not configured' });
+      return;
+    }
+    const provided = req.headers['x-internal-secret'];
+    if (!provided || typeof provided !== 'string') {
+      res.status(401).json({ error: 'missing X-Internal-Secret header' });
+      return;
+    }
+    // Constant-time compare to avoid timing-leak of the secret.
+    const a = Buffer.from(provided);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length || !require('crypto').timingSafeEqual(a, b)) {
+      res.status(401).json({ error: 'invalid X-Internal-Secret' });
+      return;
+    }
+    next();
+  }
+
+  app.post('/api/internal/link/redeem', express.json(), _internalAuth, (req, res) => {
+    try {
+      const { nonce, purpose } = req.body || {};
+      const linkNonceService = require('./linkNonceService');
+      const result = linkNonceService.redeem({ nonce, purpose });
+      if (!result.ok) {
+        res.status(400).json({ error: result.error });
+        return;
+      }
+      res.json({
+        discordId: result.discordId,
+        discordTag: result.discordTag,
+        userId: result.userId,
+        purpose: result.purpose,
+      });
+    } catch (err) {
+      console.error('[Internal API] /link/redeem error:', err.message);
+      res.status(500).json({ error: 'internal error' });
+    }
+  });
+
+  app.post('/api/internal/wallet/grant', express.json(), _internalAuth, async (req, res) => {
+    // Web posts the signed SpendPermission + the user's Smart Wallet
+    // address. We persist it as 'pending', bind the address to the
+    // user record (so deposits / matches start using it), and kick
+    // off the on-chain approveWithSignature in the background. The
+    // approval may take a few seconds to land — caller doesn't wait.
+    try {
+      const { userId, smartWalletAddress, permission, signature } = req.body || {};
+      if (!userId || !smartWalletAddress || !permission || !signature) {
+        res.status(400).json({ error: 'userId, smartWalletAddress, permission, signature required' });
+        return;
+      }
+
+      const userRepo = require('../database/repositories/userRepo');
+      const walletRepo = require('../database/repositories/walletRepo');
+      const spendPermissionService = require('./spendPermissionService');
+
+      const user = userRepo.findById(userId);
+      if (!user) {
+        res.status(404).json({ error: 'user not found' });
+        return;
+      }
+
+      // Sanity: permission.account must match the smartWalletAddress
+      // the user is reporting. If they differ the browser is buggy
+      // (or a forged grant for a different account is being submitted).
+      if (String(permission.account).toLowerCase() !== String(smartWalletAddress).toLowerCase()) {
+        res.status(400).json({ error: 'permission.account does not match smartWalletAddress' });
+        return;
+      }
+
+      const row = await spendPermissionService.recordUserGrant({
+        userId,
+        permission,
+        signature,
+      });
+
+      // Bind the Smart Wallet address to the user's wallet record. If
+      // they already had a CDP Server Wallet from earlier, we keep
+      // the row but flip wallet_type so future flows take the new
+      // path. funds_available stays accurate via the deposit poller.
+      const wallet = walletRepo.findByUserId(userId);
+      if (wallet) {
+        const db = require('../database/db');
+        db.prepare(`
+          UPDATE wallets
+          SET wallet_type = 'coinbase_smart_wallet',
+              smart_wallet_address = @smart,
+              migrated_at = COALESCE(migrated_at, datetime('now'))
+          WHERE user_id = @userId
+        `).run({ smart: smartWalletAddress.toLowerCase(), userId });
+      } else {
+        walletRepo.create({
+          userId,
+          address: smartWalletAddress,
+          accountRef: null,
+          smartAccountRef: null,
+        });
+        const db = require('../database/db');
+        db.prepare(`
+          UPDATE wallets
+          SET wallet_type = 'coinbase_smart_wallet',
+              smart_wallet_address = @smart,
+              migrated_at = datetime('now')
+          WHERE user_id = @userId
+        `).run({ smart: smartWalletAddress.toLowerCase(), userId });
+      }
+
+      // Lazy-approve in the background — don't block the HTTP response
+      // on the on-chain UserOp confirmation. If this fails, the next
+      // spendForUser call lazy-approves again.
+      spendPermissionService.approveOnChain(row.id).catch((err) => {
+        console.error(`[Internal API] approveOnChain background failed for row ${row.id}: ${err.message}`);
+      });
+
+      res.json({ ok: true, permissionId: row.id });
+    } catch (err) {
+      console.error('[Internal API] /wallet/grant error:', err.message);
+      res.status(500).json({ error: err.message || 'internal error' });
+    }
+  });
+
+  app.post('/api/internal/wallet/observed-revoke', express.json(), _internalAuth, (req, res) => {
+    // Web reports that a user just signed + broadcast a `revoke()`
+    // call from their Smart Wallet (revoking a SpendPermission they
+    // previously granted us). We update our DB so subsequent
+    // spendForUser() calls fail-fast with NO_ACTIVE_PERMISSION rather
+    // than wasting a UserOp on a guaranteed-revert spend().
+    try {
+      const { permissionHash, txHash } = req.body || {};
+      if (!permissionHash) {
+        res.status(400).json({ error: 'permissionHash required' });
+        return;
+      }
+      const spendPermissionRepo = require('../database/repositories/spendPermissionRepo');
+      const row = spendPermissionRepo.findByHash(permissionHash);
+      if (!row) {
+        res.status(404).json({ error: 'permission not found' });
+        return;
+      }
+      spendPermissionRepo.setRevoked(row.id, txHash || null);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error('[Internal API] /wallet/observed-revoke error:', err.message);
+      res.status(500).json({ error: 'internal error' });
+    }
+  });
+
   app.use((req, res) => {
     res.status(404).send('not found');
   });
