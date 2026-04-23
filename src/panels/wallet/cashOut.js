@@ -194,6 +194,13 @@ async function handleCashOutProvider(interaction, user, wallet, lang) {
 }
 
 // ─── CDP Offramp — gated behind CDP_OFFRAMP_ENABLED ─────────────
+//
+// Same reason as deposit._handleCdp: CDP requires clientIp on the
+// session-token POST, and Discord interactions don't carry a real user
+// IP. We mint a one-time link nonce with the cash-out context, DM/reply
+// a link to the wallet web surface, and let the web page call the bot
+// with the real x-forwarded-for IP. The bot then mints the CDP session
+// token with clientIp attached and returns the offramp URL.
 async function _handleCdpOfframp(interaction, user, wallet, country, amountUsdc) {
   if (!onramp.isConfigured()) {
     return interaction.reply({
@@ -201,44 +208,49 @@ async function _handleCdpOfframp(interaction, user, wallet, country, amountUsdc)
       ephemeral: true,
     });
   }
-
-  await interaction.deferReply({ ephemeral: true });
-
-  let sessionToken;
-  try {
-    sessionToken = await onramp.createSessionToken({
-      walletAddress: wallet.address,
-      assets: ['USDC'],
-      blockchains: ['base'],
-    });
-  } catch (err) {
-    console.error('[Wallet] CDP Offramp session token failed:', err.message);
-    return interaction.editReply({
-      content: 'We couldn\'t generate a Coinbase cash-out link right now. Please pick a different option.',
+  if (!process.env.WALLET_WEB_BASE_URL) {
+    return interaction.reply({
+      content: 'Coinbase cash-out routing is not configured (web surface URL missing). Pick a different option.',
+      ephemeral: true,
     });
   }
 
-  const params = new URLSearchParams({
-    sessionToken,
-    defaultAsset: 'USDC',
-    defaultNetwork: 'base',
-    partnerUserId: wallet.address.slice(0, 49),
-    presetCryptoAmount: String(amountUsdc),
-  });
-  const offrampUrl = `https://pay.coinbase.com/v3/sell/input?${params.toString()}`;
+  await interaction.deferReply({ ephemeral: true });
+
+  let url;
+  try {
+    const linkNonceService = require('../../services/linkNonceService');
+    url = linkNonceService.mintLink({
+      userId: user.id,
+      purpose: 'cashout-cdp',
+      ttlSeconds: 600,
+      metadata: {
+        walletAddress: wallet.address,
+        amountUsdc,
+      },
+    });
+  } catch (err) {
+    console.error('[Wallet] Coinbase Offramp link mint failed:', err.message);
+    return interaction.editReply({
+      content: 'We couldn\'t prepare your Coinbase cash-out link right now. Please pick a different option.',
+    });
+  }
 
   const openButton = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setURL(offrampUrl).setLabel('Cash Out USDC').setStyle(ButtonStyle.Link),
+    new ButtonBuilder().setURL(url).setLabel('Continue to Coinbase').setStyle(ButtonStyle.Link),
   );
 
   return interaction.editReply({
     content: [
       `**\u{1F4B8} Cash Out $${amountUsdc} USDC — Coinbase**`,
       '',
-      '1. Click **Cash Out USDC** — opens Coinbase',
-      '2. Sign into your Coinbase account (required for bank payouts)',
-      '3. Confirm the amount and payout method (bank, PayPal, etc.)',
-      '4. Cash arrives in your account within minutes',
+      '1. Click **Continue to Coinbase** below — opens a one-time secure page on Rank $',
+      '2. That page hands off to the Coinbase cash-out widget',
+      '3. Sign into your Coinbase account (required for bank payouts)',
+      '4. Confirm the amount and payout method (bank, PayPal, etc.)',
+      '5. Cash arrives in your account within minutes',
+      '',
+      '_The link expires in 10 minutes. Single use._',
     ].join('\n'),
     components: [openButton],
   });

@@ -97,6 +97,18 @@ client.once('ready', async () => {
       console.error('[Boot] Webhook server failed to start:', err.message);
     }
 
+    // Watch the SpendPermissionManager contract for revoke events so
+    // user-initiated revokes (signed from their own wallet) flip our
+    // DB immediately rather than only being caught on the next failed
+    // spend attempt. Safe no-op if ESCROW_OWNER_SMART_ADDRESS isn't
+    // configured yet.
+    try {
+      const spmListener = require('./services/spendPermissionEventListener');
+      spmListener.start();
+    } catch (err) {
+      console.error('[Boot] SpendPermission event listener failed to start:', err.message);
+    }
+
     // Schedule daily health summary (every 24h)
     setInterval(() => {
       healthService.postDailySummary(client).catch(err => {
@@ -213,6 +225,13 @@ async function shutdown(signal) {
     stopWebhookServer();
   } catch (err) {
     console.error('[Shutdown] Error stopping webhook server:', err.message || err);
+  }
+
+  try {
+    const spmListener = require('./services/spendPermissionEventListener');
+    spmListener.stop();
+  } catch (err) {
+    console.error('[Shutdown] Error stopping SpendPermission listener:', err.message || err);
   }
 
   client.destroy();

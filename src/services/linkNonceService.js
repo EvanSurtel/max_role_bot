@@ -14,7 +14,7 @@
 const crypto = require('crypto');
 const linkNonceRepo = require('../database/repositories/linkNonceRepo');
 
-const VALID_PURPOSES = new Set(['setup', 'withdraw', 'renew', 'deposit-cdp']);
+const VALID_PURPOSES = new Set(['setup', 'withdraw', 'renew', 'deposit-cdp', 'cashout-cdp']);
 
 /**
  * Generate a one-time nonce for a Discord user, persist it, and
@@ -42,7 +42,11 @@ function mintLink({ userId, purpose, ttlSeconds = 600, metadata = null }) {
   // URL path uses 'deposit/coinbase' for the CDP-onramp purpose so the
   // user-facing route reads naturally; everything else mirrors purpose.
   const trimmed = baseUrl.replace(/\/$/, '');
-  const path = purpose === 'deposit-cdp' ? 'deposit/coinbase' : purpose;
+  const PATH_OVERRIDES = {
+    'deposit-cdp': 'deposit/coinbase',
+    'cashout-cdp': 'cashout/coinbase',
+  };
+  const path = PATH_OVERRIDES[purpose] || purpose;
   return `${trimmed}/${path}?t=${nonce}`;
 }
 

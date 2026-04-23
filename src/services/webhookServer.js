@@ -456,20 +456,26 @@ function startWebhookServer(client) {
         signature,
       });
 
-      // Bind the Smart Wallet address to the user's wallet record. If
-      // they already had a CDP Server Wallet from earlier, we keep
-      // the row but flip wallet_type so future flows take the new
-      // path. funds_available stays accurate via the deposit poller.
+      // Bind the Smart Wallet address to the user's wallet record. For
+      // existing users who had a CDP Server Wallet we (a) stash the old
+      // address in legacy_cdp_address so the fund-migration script can
+      // sweep from it, then (b) flip wallet.address itself to the new
+      // Smart Wallet address so every downstream consumer (deposit
+      // poller, Onramp destination, wallet panel, withdraw) routes to
+      // the self-custody wallet from this moment on.
       const wallet = walletRepo.findByUserId(userId);
+      const smartLower = smartWalletAddress.toLowerCase();
+      const db = require('../database/db');
       if (wallet) {
-        const db = require('../database/db');
         db.prepare(`
           UPDATE wallets
           SET wallet_type = 'coinbase_smart_wallet',
               smart_wallet_address = @smart,
+              legacy_cdp_address = COALESCE(legacy_cdp_address, address),
+              address = @smart,
               migrated_at = COALESCE(migrated_at, datetime('now'))
           WHERE user_id = @userId
-        `).run({ smart: smartWalletAddress.toLowerCase(), userId });
+        `).run({ smart: smartLower, userId });
       } else {
         walletRepo.create({
           userId,
@@ -477,14 +483,13 @@ function startWebhookServer(client) {
           accountRef: null,
           smartAccountRef: null,
         });
-        const db = require('../database/db');
         db.prepare(`
           UPDATE wallets
           SET wallet_type = 'coinbase_smart_wallet',
               smart_wallet_address = @smart,
               migrated_at = datetime('now')
           WHERE user_id = @userId
-        `).run({ smart: smartWalletAddress.toLowerCase(), userId });
+        `).run({ smart: smartLower, userId });
       }
 
       // Lazy-approve in the background — don't block the HTTP response
@@ -560,6 +565,63 @@ function startWebhookServer(client) {
       }
     } catch (err) {
       console.error('[Internal API] /cdp/onramp/mint error:', err.message);
+      res.status(500).json({ error: 'internal error' });
+    }
+  });
+
+  // Mint a CDP Offramp session token on behalf of a user. Parallel to
+  // /cdp/onramp/mint but for cash-out. Returns the full Coinbase offramp
+  // URL built from the session token + preset amount.
+  //
+  // Body: { nonce, clientIp }
+  // Response: { offrampUrl } or { error }
+  app.post('/api/internal/cdp/offramp/mint', express.json(), _internalAuth, async (req, res) => {
+    try {
+      const { nonce, clientIp } = req.body || {};
+      if (!nonce || !clientIp) {
+        res.status(400).json({ error: 'nonce and clientIp required' });
+        return;
+      }
+
+      const linkNonceService = require('./linkNonceService');
+      const redeemed = linkNonceService.redeem({ nonce, purpose: 'cashout-cdp' });
+      if (!redeemed.ok) {
+        res.status(400).json({ error: redeemed.error });
+        return;
+      }
+
+      const meta = redeemed.metadata || {};
+      const { walletAddress, amountUsdc } = meta;
+      if (!walletAddress || !amountUsdc) {
+        res.status(400).json({ error: 'nonce metadata missing required fields' });
+        return;
+      }
+
+      const onramp = require('./coinbaseOnrampService');
+      try {
+        const sessionToken = await onramp.createSessionToken({
+          walletAddress,
+          assets: ['USDC'],
+          blockchains: ['base'],
+          clientIp,
+        });
+
+        const params = new URLSearchParams({
+          sessionToken,
+          defaultAsset: 'USDC',
+          defaultNetwork: 'base',
+          partnerUserId: String(walletAddress).slice(0, 49),
+          presetCryptoAmount: String(amountUsdc),
+        });
+        const offrampUrl = `https://pay.coinbase.com/v3/sell/input?${params.toString()}`;
+
+        res.json({ offrampUrl });
+      } catch (err) {
+        console.error('[Internal API] /cdp/offramp/mint failed:', err.message);
+        res.status(502).json({ error: err.message || 'cdp session mint failed' });
+      }
+    } catch (err) {
+      console.error('[Internal API] /cdp/offramp/mint error:', err.message);
       res.status(500).json({ error: 'internal error' });
     }
   });

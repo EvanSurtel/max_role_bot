@@ -84,9 +84,18 @@ function randomSalt(): bigint {
   return BigInt('0x' + hex);
 }
 
-export default function SetupClient() {
+/**
+ * `purpose` controls the link-redeem purpose + copy tweaks. 'setup' =
+ * first-time wallet create; 'renew' = user already has a Smart Wallet
+ * and we're collecting a fresh SpendPermission signature to replace
+ * an expired/expiring one. Signing UX is identical; only labels and
+ * the redeem purpose differ. The backend supersedes prior permissions
+ * automatically when a new one lands in /api/wallet/grant.
+ */
+export default function SetupClient({ purpose = 'setup' }: { purpose?: 'setup' | 'renew' } = {}) {
   const params = useSearchParams();
   const nonce = params.get('t');
+  const isRenew = purpose === 'renew';
 
   const [status, setStatus] = useState<Status>('redeeming');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -107,13 +116,17 @@ export default function SetupClient() {
   useEffect(() => {
     if (!nonce) {
       setStatus('error');
-      setErrorMsg('Missing setup link. Open the link the bot DMed you in Discord — it includes a one-time token.');
+      setErrorMsg(
+        isRenew
+          ? 'Missing renewal link. Open the link the bot DMed you in Discord — it includes a one-time token.'
+          : 'Missing setup link. Open the link the bot DMed you in Discord — it includes a one-time token.',
+      );
       return;
     }
     fetch('/api/link/redeem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nonce, purpose: 'setup' }),
+      body: JSON.stringify({ nonce, purpose }),
     })
       .then(async (r) => {
         const body = await r.json().catch(() => ({}));
@@ -126,7 +139,7 @@ export default function SetupClient() {
         setErrorMsg(err.message);
         setStatus('error');
       });
-  }, [nonce]);
+  }, [nonce, purpose, isRenew]);
 
   // Reflect wallet connection into our flow state
   useEffect(() => {
@@ -242,7 +255,7 @@ export default function SetupClient() {
   if (status === 'redeeming') {
     return (
       <main>
-        <h1>Setting up your wallet…</h1>
+        <h1>{isRenew ? 'Renewing your permission…' : 'Setting up your wallet…'}</h1>
         <p className="muted">Verifying your link.</p>
       </main>
     );
@@ -254,7 +267,7 @@ export default function SetupClient() {
         <h1>Something went wrong</h1>
         <p>{errorMsg}</p>
         <p className="muted">
-          Open Discord and use the most recent setup link the bot sent you.
+          Open Discord and use the most recent {isRenew ? 'renewal' : 'setup'} link the bot sent you.
           Each link is valid for 10 minutes and works once.
         </p>
       </main>
@@ -266,8 +279,9 @@ export default function SetupClient() {
       <main>
         <h1>✅ You&apos;re all set</h1>
         <p>
-          Your self-custody wallet is live. Head back to Discord — your wallet
-          panel will show the new address.
+          {isRenew
+            ? 'Your new daily limit is active. The previous permission has been replaced.'
+            : 'Your self-custody wallet is live. Head back to Discord — your wallet panel will show the new address.'}
         </p>
         {resultTxHint && <p className="muted">{resultTxHint}</p>}
         <p className="muted">
@@ -283,7 +297,7 @@ export default function SetupClient() {
 
   return (
     <main>
-      <h1>Set up your Rank $ wallet</h1>
+      <h1>{isRenew ? 'Renew your daily limit' : 'Set up your Rank $ wallet'}</h1>
       {discordTag && (
         <p>
           Signed in as <strong>{discordTag}</strong>.
@@ -291,11 +305,11 @@ export default function SetupClient() {
       )}
 
       <div className="card">
-        <h2>Step 1 — Create your wallet</h2>
+        <h2>Step 1 — {isRenew ? 'Reconnect your wallet' : 'Create your wallet'}</h2>
         <p>
-          You&apos;re about to create your own crypto wallet on Base. It&apos;s
-          locked by your phone or computer&apos;s built-in passkey
-          (Face ID / Touch ID / Windows Hello / security key).
+          {isRenew
+            ? 'Reconnect the same Coinbase Smart Wallet you created during setup — the renewal has to be signed by the same passkey.'
+            : 'You’re about to create your own crypto wallet on Base. It’s locked by your phone or computer’s built-in passkey (Face ID / Touch ID / Windows Hello / security key).'}
         </p>
         <p>
           <strong>
@@ -310,7 +324,9 @@ export default function SetupClient() {
             onClick={handleConnect}
             disabled={status === 'connecting' || connectPending}
           >
-            {status === 'connecting' || connectPending ? 'Opening passkey…' : 'Create Wallet'}
+            {status === 'connecting' || connectPending
+              ? 'Opening passkey…'
+              : isRenew ? 'Connect Wallet' : 'Create Wallet'}
           </button>
         ) : (
           <>

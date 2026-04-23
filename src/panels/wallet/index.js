@@ -101,6 +101,16 @@ async function handleWalletSubButton(interaction) {
   }
 
   if (id === 'wallet_withdraw') {
+    // Smart-wallet users can't have the bot sign a transfer for them —
+    // the passkey-owned Smart Wallet only accepts signatures from the
+    // user's passkey. DM/ephemeral them a one-time link to the web
+    // surface where they sign the USDC.transfer themselves. Legacy CDP
+    // Server Wallet users still go through the bot-signed modal flow.
+    const isSmartWallet = wallet.wallet_type === 'coinbase_smart_wallet';
+    if (isSmartWallet) {
+      const { handleSmartWalletWithdraw } = require('./selfCustodyWithdraw');
+      return handleSmartWalletWithdraw(interaction);
+    }
     const { showWithdrawModal } = require('./withdraw');
     return showWithdrawModal(interaction, lang);
   }
