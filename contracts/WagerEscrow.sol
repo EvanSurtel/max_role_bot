@@ -137,6 +137,53 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
         emit Deposited(matchId, player, amount);
     }
 
+    /**
+     * @notice Same as depositToEscrow, but pulls the USDC from an
+     *         arbitrary `source` address rather than from `player`.
+     *         Used by the self-custody flow: the bot's spender Smart
+     *         Account pulls USDC out of the user's Coinbase Smart
+     *         Wallet via SpendPermissionManager.spend (landing the
+     *         funds in the spender's own address), then calls this
+     *         function with source=spender, player=userSmartWalletAddr
+     *         so the escrow record still keys off the real player
+     *         address while the transferFrom pulls from the spender.
+     *
+     *         `source` must have approved this contract for at least
+     *         entryAmount of USDC. `player` is used only to mark
+     *         hasDeposited and emit the Deposited event — its balance
+     *         is not touched.
+     *
+     * @param matchId The match to deposit into.
+     * @param player  Player's address (keys hasDeposited + event).
+     * @param source  Address the USDC is pulled from via transferFrom.
+     */
+    function depositFromSpender(
+        uint256 matchId,
+        address player,
+        address source
+    ) external onlyOwner nonReentrant {
+        Match storage m = matches[matchId];
+        require(m.entryAmount > 0, "Match does not exist");
+        require(!m.resolved, "Match already resolved");
+        require(!m.cancelled, "Match already cancelled");
+        require(m.depositsCount < m.playerCount, "All deposits received");
+        require(!hasDeposited[matchId][player], "Player already deposited");
+        require(player != address(0), "Player cannot be zero");
+        require(source != address(0), "Source cannot be zero");
+
+        uint256 amount = m.entryAmount;
+
+        // Pull USDC from the spender's address into this contract.
+        usdc.safeTransferFrom(source, address(this), amount);
+
+        m.depositsCount += 1;
+        m.totalDeposited += amount;
+        totalActiveEscrow += amount;
+        hasDeposited[matchId][player] = true;
+
+        emit Deposited(matchId, player, amount);
+    }
+
     // ─── Resolve ────────────────────────────────────────────────
 
     /**

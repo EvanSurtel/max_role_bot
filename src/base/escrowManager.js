@@ -24,10 +24,16 @@ const transactionService = require('./transactionService');
 const { getProvider } = require('./connection');
 const { USDC_PER_UNIT, TRANSACTION_TYPE } = require('../config/constants');
 
-// The escrow contract ABI (JSON format for CDP invokeContract)
+// The escrow contract ABI (JSON format for CDP invokeContract).
+// depositFromSpender is the self-custody deposit path: the bot's
+// spender Smart Account has already pulled USDC from the user's
+// Smart Wallet via SpendPermissionManager.spend, and now calls this
+// with source=spender so the contract pulls from there while still
+// keying the match record off the real player address.
 const ESCROW_ABI_JSON = [
   { name: 'createMatch', type: 'function', inputs: [{ name: 'matchId', type: 'uint256' }, { name: 'entryAmount', type: 'uint256' }, { name: 'playerCount', type: 'uint8' }], outputs: [] },
   { name: 'depositToEscrow', type: 'function', inputs: [{ name: 'matchId', type: 'uint256' }, { name: 'player', type: 'address' }], outputs: [] },
+  { name: 'depositFromSpender', type: 'function', inputs: [{ name: 'matchId', type: 'uint256' }, { name: 'player', type: 'address' }, { name: 'source', type: 'address' }], outputs: [] },
   { name: 'resolveMatch', type: 'function', inputs: [{ name: 'matchId', type: 'uint256' }, { name: 'winners', type: 'address[]' }, { name: 'amounts', type: 'uint256[]' }], outputs: [] },
   { name: 'cancelMatch', type: 'function', inputs: [{ name: 'matchId', type: 'uint256' }, { name: 'players', type: 'address[]' }, { name: 'refunds', type: 'uint256[]' }], outputs: [] },
 ];
@@ -89,6 +95,22 @@ function releaseFunds(userId, amountUsdc, challengeId) {
 async function approveEscrowForUser(userId) {
   const walletRecord = walletRepo.findByUserId(userId);
   if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
+
+  // Self-custody wallets must NOT be asked to approve the escrow
+  // contract from the user's wallet — the whole point of the
+  // SpendPermission model is that the operator (escrow-owner-smart)
+  // is the only entity with a bounded allowance on the user's funds,
+  // and match deposits route spender → WagerEscrow, not player →
+  // WagerEscrow. Approving the escrow from the user's wallet would
+  // give the operator an unbounded escape hatch around the daily cap
+  // — exactly the custody regression we're avoiding.
+  if (walletRecord.wallet_type === 'coinbase_smart_wallet') {
+    console.log(
+      `[Escrow] User ${userId} is on self-custody path — skipping user-side escrow approve. ` +
+      `Match deposits route via SpendPermissionManager.spend + depositFromSpender.`,
+    );
+    return { hash: null, skipped: true, reason: 'self-custody' };
+  }
 
   // Idempotency guard: skip the on-chain approve if the user already
   // has a large allowance to the escrow. We approve MAX_UINT256, so
@@ -165,6 +187,17 @@ async function depositToEscrow(userId, matchId, challengeId) {
   const walletRecord = walletRepo.findByUserId(userId);
   if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
 
+  // Self-custody (Coinbase Smart Wallet) users route through a
+  // completely different on-chain path: SpendPermissionManager.spend
+  // pulls USDC from the user's Smart Wallet to the bot's spender
+  // Smart Account, then WagerEscrow.depositFromSpender pulls from
+  // the spender into the escrow contract. The user's passkey is
+  // never touched at match time — the per-day SpendPermission they
+  // signed at /setup is what gates the pull.
+  if (walletRecord.wallet_type === 'coinbase_smart_wallet') {
+    return _depositToEscrowSelfCustody(userId, matchId, challengeId, walletRecord);
+  }
+
   console.log(`[Escrow] depositToEscrow: user=${userId} match=${matchId} address=${walletRecord.address}`);
 
   // Check on-chain USDC balance
@@ -233,6 +266,96 @@ async function depositToEscrow(userId, matchId, challengeId) {
 
   console.log(`[Escrow] User ${userId} deposited to match #${matchId}: ${hash}`);
   return { hash };
+}
+
+// ─── On-chain: self-custody deposit path (SpendPermission + depositFromSpender) ───
+
+/**
+ * Self-custody variant of depositToEscrow. Two on-chain steps:
+ *
+ *   1. SpendPermissionManager.spend(perm, entryAmount) — pulls USDC
+ *      out of the user's Coinbase Smart Wallet into the bot's spender
+ *      Smart Account. Gated by the per-day allowance the user signed
+ *      at /setup; bounded, revocable, user-visible.
+ *   2. WagerEscrow.depositFromSpender(matchId, playerAddr, spenderAddr)
+ *      — pulls those same USDC out of the spender into the escrow
+ *      contract. The match record still keys off the user's real
+ *      Smart Wallet address so resolveMatch pays winners back to
+ *      their own wallets (never the spender).
+ *
+ * Pre-condition: the spender Smart Account must have approved the
+ * WagerEscrow contract for USDC at least once. The deploy script
+ * for a new WagerEscrow contract does this as part of bring-up.
+ *
+ * Both calls are gasless UserOps through the CDP Paymaster via
+ * transactionService._sendOwnerTx (same path escrowManager already
+ * uses for every admin operation).
+ */
+async function _depositToEscrowSelfCustody(userId, matchId, challengeId, walletRecord) {
+  console.log(
+    `[Escrow] self-custody depositToEscrow: user=${userId} match=${matchId} ` +
+    `smartWallet=${walletRecord.address}`,
+  );
+
+  // Read entry amount from the on-chain match record (source of truth)
+  const provider = getProvider();
+  const escrowAbi = ['function getMatch(uint256) view returns (tuple(uint256,uint8,uint8,uint256,bool,bool))'];
+  const escrowContract = new ethers.Contract(_escrowAddress(), escrowAbi, provider);
+  const matchData = await escrowContract.getMatch(matchId);
+  const entryAmount = matchData[0]; // BigInt, smallest units
+
+  if (entryAmount === 0n) {
+    throw new Error(`Match ${matchId} does not exist on-chain`);
+  }
+
+  // Step 1 — pull USDC from user's Smart Wallet to our spender via SPM
+  const spendPermissionService = require('../services/spendPermissionService');
+  let spendTxHash;
+  try {
+    const res = await spendPermissionService.spendForUser(userId, entryAmount);
+    spendTxHash = res.txHash;
+    console.log(`[Escrow]   SPM.spend ok: ${spendTxHash}`);
+  } catch (err) {
+    // Surface permission-level errors clearly; match service uses the
+    // message + code to decide whether to DM the user a renew link.
+    console.error(`[Escrow]   SPM.spend failed: ${err.code || ''} ${err.message}`);
+    throw err;
+  }
+
+  // Step 2 — escrow contract pulls those USDC from our spender
+  const { hash } = await transactionService.invokeContract(
+    _ownerAddress(),
+    _escrowAddress(),
+    'depositFromSpender',
+    {
+      matchId: String(matchId),
+      player: walletRecord.address,
+      source: _ownerAddress(),
+    },
+    ESCROW_ABI_JSON,
+  );
+
+  // Zero out held balance in DB (funds now in escrow contract). Mirror
+  // the legacy path — balance_held drops by entryAmount.
+  const freshWallet = walletRepo.findByUserId(userId);
+  const newHeld = (BigInt(freshWallet.balance_held) - entryAmount).toString();
+  walletRepo.updateBalance(userId, {
+    balanceAvailable: freshWallet.balance_available,
+    balanceHeld: newHeld,
+  });
+
+  transactionRepo.create({
+    type: TRANSACTION_TYPE.ESCROW_IN,
+    userId, challengeId, amountUsdc: entryAmount.toString(),
+    txHash: hash,
+    fromAddress: walletRecord.address,
+    toAddress: _escrowAddress(),
+    status: 'completed',
+    memo: `Escrow deposit (self-custody) for match #${matchId} — SPM tx ${spendTxHash}`,
+  });
+
+  console.log(`[Escrow] User ${userId} deposited to match #${matchId} (self-custody): ${hash}`);
+  return { hash, spendTxHash };
 }
 
 // ─── On-chain: transfer all players' USDC to escrow ────────────

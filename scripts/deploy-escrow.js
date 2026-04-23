@@ -161,6 +161,53 @@ async function main() {
   console.log(`[Deploy] ✅ Ownership transferred to Smart Account`);
   console.log();
 
+  // ─── Smart Account approves WagerEscrow for USDC ───────────────
+  // Required for the self-custody deposit path. When a smart-wallet
+  // player joins a match the flow is:
+  //   (1) SpendPermissionManager.spend(perm, entry) →
+  //       USDC flows from user's Smart Wallet to escrow-owner-smart
+  //   (2) WagerEscrow.depositFromSpender(matchId, player, source) →
+  //       escrow contract does transferFrom(escrow-owner-smart, ...)
+  //
+  // Step 2 requires escrow-owner-smart to have approved the WagerEscrow
+  // contract. We do it here as part of deploy bring-up — one UserOp,
+  // max allowance, never needs to be redone. Gasless via Paymaster.
+  console.log('[Deploy] Approving WagerEscrow from escrow-owner-smart for USDC (self-custody deposit path)...');
+  try {
+    const MAX_UINT256 = (1n << 256n) - 1n;
+    const approveIface = new ethers.Interface([
+      'function approve(address spender, uint256 value) returns (bool)',
+    ]);
+    const approveData = approveIface.encodeFunctionData('approve', [deployedAddress, MAX_UINT256]);
+
+    const userOpResult = await cdp.evm.prepareAndSendUserOperation({
+      smartAccount,
+      network: cdpNetwork,
+      ...(process.env.PAYMASTER_RPC_URL ? { paymasterUrl: process.env.PAYMASTER_RPC_URL } : {}),
+      calls: [
+        {
+          to: usdcAddress,
+          value: 0n,
+          data: approveData,
+        },
+      ],
+    });
+    console.log(`[Deploy]   approve UserOp: ${userOpResult.userOpHash}`);
+    // Wait for the UserOp to land so subsequent match deposits don't
+    // race against an unconfirmed approval.
+    await cdp.evm.waitForUserOperation({
+      smartAccountAddress: smartAccount.address,
+      userOpHash: userOpResult.userOpHash,
+    });
+    console.log('[Deploy] ✅ escrow-owner-smart approved WagerEscrow for USDC');
+  } catch (err) {
+    // Non-fatal — operator can run `scripts/approve-escrow-from-spender.js`
+    // later if this step fails. Surface loudly though.
+    console.error(`[Deploy] WARNING: escrow-owner-smart approve failed: ${err.message}`);
+    console.error('[Deploy] Self-custody match deposits will revert until this approve lands.');
+  }
+  console.log();
+
   console.log('═'.repeat(72));
   console.log(`[Deploy] ✅ Deployment complete`);
   console.log(`[Deploy] Contract:      ${deployedAddress}`);
