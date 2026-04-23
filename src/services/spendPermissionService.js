@@ -297,6 +297,57 @@ async function approveOnChain(rowId) {
  *   On-chain revert (e.g. period exhausted) — SPM contract error
  *     bubbles up; caller should distinguish.
  */
+/**
+ * Build the list of SPM calls needed to pull `amountUsdcSmallest` from
+ * the user's Smart Wallet, WITHOUT submitting any UserOp. Returns:
+ *   { calls: [{to, data}, ...], permissionId: number }
+ *
+ * - If the permission is already 'approved' on-chain, returns a single
+ *   spend() call.
+ * - If the permission is still 'pending' (signed but the bot's
+ *   approveWithSignature never landed), returns [approveWithSignature,
+ *   spend] so the batch covers both in one atomic UserOp.
+ *
+ * This is what escrowManager's self-custody deposit uses so it can
+ * fuse our SPM pull + WagerEscrow.depositFromSpender into a single
+ * UserOp — eliminating the "SPM.spend succeeded but depositFromSpender
+ * failed, USDC orphaned at the spender" failure mode (audit C3).
+ *
+ * Throws NO_ACTIVE_PERMISSION / ALLOWANCE_EXCEEDED just like spendForUser.
+ */
+function buildSpendCalls(userId, amountUsdcSmallest) {
+  const active = spendPermissionRepo.findActiveForUser(userId)
+    || spendPermissionRepo.findAllForUser(userId).find(r => r.status === 'pending');
+
+  if (!active) {
+    const e = new Error('No active SpendPermission for user');
+    e.code = 'NO_ACTIVE_PERMISSION';
+    throw e;
+  }
+  if (BigInt(amountUsdcSmallest) > BigInt(active.allowance)) {
+    const e = new Error(`Spend ${amountUsdcSmallest} exceeds permission allowance ${active.allowance}`);
+    e.code = 'ALLOWANCE_EXCEEDED';
+    throw e;
+  }
+
+  const struct = _rowToStruct(active);
+  const calls = [];
+
+  if (active.status === 'pending') {
+    calls.push({
+      to: SPEND_PERMISSION_MANAGER_ADDRESS,
+      data: _spmIface.encodeFunctionData('approveWithSignature', [struct, active.signature]),
+    });
+  }
+
+  calls.push({
+    to: SPEND_PERMISSION_MANAGER_ADDRESS,
+    data: _spmIface.encodeFunctionData('spend', [struct, BigInt(amountUsdcSmallest)]),
+  });
+
+  return { calls, permissionId: active.id, wasPending: active.status === 'pending' };
+}
+
 async function spendForUser(userId, amountUsdcSmallest) {
   const active = spendPermissionRepo.findActiveForUser(userId)
     || spendPermissionRepo.findAllForUser(userId).find(r => r.status === 'pending');
@@ -359,5 +410,6 @@ module.exports = {
   recordUserGrant,
   approveOnChain,
   spendForUser,
+  buildSpendCalls,
   revokePermission,
 };

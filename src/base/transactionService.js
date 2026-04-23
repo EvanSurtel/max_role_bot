@@ -181,6 +181,34 @@ async function _sendOwnerTx(to, data, value = 0n) {
 }
 
 /**
+ * Batched variant of _sendOwnerTx — sends multiple calls in a single
+ * UserOp. Atomic: the ERC-4337 bundler executes all calls in one tx,
+ * either all succeed or all revert together.
+ *
+ * Used by the self-custody match-deposit path to fuse
+ * SpendPermissionManager.spend and WagerEscrow.depositFromSpender
+ * into one atomic step — so we can't orphan USDC at escrow-owner-smart
+ * when step 2 fails after step 1 succeeded (audit C3).
+ *
+ * @param {{to: string, data: string, value?: bigint}[]} calls
+ * @returns {Promise<string>} the on-chain tx hash
+ */
+async function _sendOwnerTxBatch(calls) {
+  if (!Array.isArray(calls) || calls.length === 0) {
+    throw new Error('_sendOwnerTxBatch: calls must be a non-empty array');
+  }
+  const smartAccount = await _getEscrowOwnerSmartAccount();
+  return await _sendUserOp(
+    smartAccount,
+    calls.map(c => ({
+      to: c.to,
+      value: BigInt(c.value || 0n),
+      data: c.data || '0x',
+    })),
+  );
+}
+
+/**
  * Get the Smart Account for a user from their stored refs.
  */
 async function _getUserSmartAccount(refs) {
@@ -253,5 +281,6 @@ module.exports = {
   transferSol,
   invokeContract,
   _sendOwnerTx, // exported for spendPermissionService — same Paymaster-sponsored UserOp path
+  _sendOwnerTxBatch, // exported for escrowManager self-custody deposit — atomic SPM.spend + depositFromSpender
   approveUsdc,
 };
