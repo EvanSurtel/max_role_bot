@@ -47,10 +47,18 @@ function start() {
   if (_started) return;
   _started = true;
 
-  const spender = process.env.ESCROW_OWNER_SMART_ADDRESS || process.env.NEXT_PUBLIC_BOT_SPENDER_ADDRESS;
+  // CDP_OWNER_ADDRESS is the canonical env var for escrow-owner-smart
+  // across the rest of the bot (see escrowManager.js `_ownerAddress`).
+  // Keep the _SMART_ADDRESS / BOT_SPENDER fallbacks for forward-compat
+  // if we ever split the naming, but CDP_OWNER_ADDRESS is what's
+  // actually in .env today.
+  const spender =
+    process.env.CDP_OWNER_ADDRESS ||
+    process.env.ESCROW_OWNER_SMART_ADDRESS ||
+    process.env.NEXT_PUBLIC_BOT_SPENDER_ADDRESS;
   if (!spender) {
     console.warn(
-      '[SpendPermissionEventListener] ESCROW_OWNER_SMART_ADDRESS not set — skipping revoke listener. User-initiated revokes will only be caught on the next failed spend.',
+      '[SpendPermissionEventListener] CDP_OWNER_ADDRESS not set — skipping revoke listener. User-initiated revokes will only be caught on the next failed spend.',
     );
     return;
   }

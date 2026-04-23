@@ -419,22 +419,127 @@ function startWebhookServer(client) {
     }
   });
 
-  app.post('/api/internal/wallet/grant', express.json(), _internalAuth, async (req, res) => {
-    // Web posts the signed SpendPermission + the user's Smart Wallet
-    // address. We persist it as 'pending', bind the address to the
-    // user record (so deposits / matches start using it), and kick
-    // off the on-chain approveWithSignature in the background. The
-    // approval may take a few seconds to land — caller doesn't wait.
+  // Non-consuming lookup. Used by /setup and /renew on page load so
+  // the UI can show "signed in as X" without burning the nonce if
+  // the user bails mid-flow. The grant endpoint is what actually
+  // consumes the nonce, atomically with the DB write.
+  app.post('/api/internal/link/peek', express.json(), _internalAuth, (req, res) => {
     try {
-      const { userId, smartWalletAddress, permission, signature } = req.body || {};
-      if (!userId || !smartWalletAddress || !permission || !signature) {
-        res.status(400).json({ error: 'userId, smartWalletAddress, permission, signature required' });
+      const { nonce, purpose } = req.body || {};
+      const linkNonceService = require('./linkNonceService');
+      const result = linkNonceService.peek({ nonce, purpose });
+      if (!result.ok) {
+        res.status(400).json({ error: result.error });
+        return;
+      }
+      res.json({
+        discordId: result.discordId,
+        discordTag: result.discordTag,
+        userId: result.userId,
+        purpose: result.purpose,
+      });
+    } catch (err) {
+      console.error('[Internal API] /link/peek error:', err.message);
+      res.status(500).json({ error: 'internal error' });
+    }
+  });
+
+  app.post('/api/internal/wallet/grant', express.json(), _internalAuth, async (req, res) => {
+    // Grant endpoint hardened per audit findings C1/H3/H6:
+    //
+    //   - Consumes the nonce HERE (not in a prior /link/redeem call)
+    //     so the web can't submit a grant for a userId different from
+    //     the one the nonce was minted for.
+    //   - Verifies permission.spender exactly matches CDP_OWNER_ADDRESS
+    //     — rejects grants against a misconfigured web env.
+    //   - Verifies the EIP-712 signature SYNCHRONOUSLY via viem's
+    //     ERC-6492-aware verifyTypedData before writing anything.
+    //   - Does NOT flip wallet.address until the on-chain
+    //     approveWithSignature UserOp confirms. So a forged grant that
+    //     somehow slips past verification still can't redirect the
+    //     user's deposit / Onramp destination.
+    try {
+      const { nonce, userId, smartWalletAddress, permission, signature, purpose } = req.body || {};
+      if (!nonce || !userId || !smartWalletAddress || !permission || !signature) {
+        res.status(400).json({ error: 'nonce, userId, smartWalletAddress, permission, signature required' });
+        return;
+      }
+
+      const expectedPurpose = purpose === 'renew' ? 'renew' : 'setup';
+      const linkNonceService = require('./linkNonceService');
+      const redeemed = linkNonceService.redeem({ nonce, purpose: expectedPurpose });
+      if (!redeemed.ok) {
+        res.status(400).json({ error: redeemed.error });
+        return;
+      }
+
+      // Nonce must bind to the same user the web is claiming. A web
+      // bug or malicious caller that passed a different userId is
+      // rejected here.
+      if (redeemed.userId !== userId) {
+        console.warn(
+          `[Internal API] /wallet/grant userId mismatch: nonce for user ${redeemed.userId}, ` +
+          `request claims ${userId}. Possible forged grant — rejected.`,
+        );
+        res.status(400).json({ error: 'userId does not match nonce binding' });
+        return;
+      }
+
+      // permission.account must match the smartWalletAddress the user
+      // is reporting. Mismatch = browser bug or tampering.
+      if (String(permission.account).toLowerCase() !== String(smartWalletAddress).toLowerCase()) {
+        res.status(400).json({ error: 'permission.account does not match smartWalletAddress' });
+        return;
+      }
+
+      // permission.spender must match our backend Smart Account. If
+      // the web env has a stale/wrong spender, every grant signed
+      // during that window is useless (bot can't spend against it).
+      // Better to reject up front than to debug silent match-start
+      // reverts later. Compares to CDP_OWNER_ADDRESS — the repo's
+      // canonical env var for escrow-owner-smart.
+      const expectedSpender = String(process.env.CDP_OWNER_ADDRESS || '').toLowerCase();
+      if (!expectedSpender) {
+        res.status(503).json({ error: 'CDP_OWNER_ADDRESS not configured on bot' });
+        return;
+      }
+      if (String(permission.spender).toLowerCase() !== expectedSpender) {
+        console.warn(
+          `[Internal API] /wallet/grant rejected — permission.spender=${permission.spender} ` +
+          `but CDP_OWNER_ADDRESS=${expectedSpender}. Stale NEXT_PUBLIC_BOT_SPENDER_ADDRESS?`,
+        );
+        res.status(400).json({ error: 'permission.spender does not match bot backend spender' });
+        return;
+      }
+
+      // Basic permission shape validation (audit M2).
+      const spendPermissionService = require('./spendPermissionService');
+      const USDC_ADDR = spendPermissionService.USDC_BASE_MAINNET.toLowerCase();
+      if (String(permission.token).toLowerCase() !== USDC_ADDR) {
+        res.status(400).json({ error: 'permission.token must be USDC on Base' });
+        return;
+      }
+      try {
+        const allowance = BigInt(permission.allowance);
+        if (allowance <= 0n) throw new Error('allowance must be positive');
+        const period = Number(permission.period);
+        const start = Number(permission.start);
+        const end = Number(permission.end);
+        if (!Number.isFinite(period) || period <= 0) throw new Error('period must be positive');
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+          throw new Error('end must be > start');
+        }
+        // Refuse permissions that run more than 2 years — unusual and
+        // ties the user to a signature they may regret.
+        const maxEnd = Math.floor(Date.now() / 1000) + (2 * 365 * 24 * 60 * 60);
+        if (end > maxEnd) throw new Error('end more than 2 years in the future');
+      } catch (shapeErr) {
+        res.status(400).json({ error: `invalid permission shape: ${shapeErr.message}` });
         return;
       }
 
       const userRepo = require('../database/repositories/userRepo');
       const walletRepo = require('../database/repositories/walletRepo');
-      const spendPermissionService = require('./spendPermissionService');
 
       const user = userRepo.findById(userId);
       if (!user) {
@@ -442,64 +547,79 @@ function startWebhookServer(client) {
         return;
       }
 
-      // Sanity: permission.account must match the smartWalletAddress
-      // the user is reporting. If they differ the browser is buggy
-      // (or a forged grant for a different account is being submitted).
-      if (String(permission.account).toLowerCase() !== String(smartWalletAddress).toLowerCase()) {
-        res.status(400).json({ error: 'permission.account does not match smartWalletAddress' });
+      // Block mid-match wallet-type changes (audit L5). If the user
+      // has funds locked in an active match, refuse to accept a new
+      // grant — the payout address would change mid-flight.
+      const currentWallet = walletRepo.findByUserId(userId);
+      if (currentWallet && BigInt(currentWallet.balance_held || 0) > 0n) {
+        res.status(409).json({
+          error: 'Cannot upgrade wallet while a match is in progress. Finish or cancel it first.',
+        });
         return;
       }
 
-      const row = await spendPermissionService.recordUserGrant({
-        userId,
-        permission,
-        signature,
-      });
-
-      // Bind the Smart Wallet address to the user's wallet record. For
-      // existing users who had a CDP Server Wallet we (a) stash the old
-      // address in legacy_cdp_address so the fund-migration script can
-      // sweep from it, then (b) flip wallet.address itself to the new
-      // Smart Wallet address so every downstream consumer (deposit
-      // poller, Onramp destination, wallet panel, withdraw) routes to
-      // the self-custody wallet from this moment on.
-      const wallet = walletRepo.findByUserId(userId);
-      const smartLower = smartWalletAddress.toLowerCase();
-      const db = require('../database/db');
-      if (wallet) {
-        db.prepare(`
-          UPDATE wallets
-          SET wallet_type = 'coinbase_smart_wallet',
-              smart_wallet_address = @smart,
-              legacy_cdp_address = COALESCE(legacy_cdp_address, address),
-              address = @smart,
-              migrated_at = COALESCE(migrated_at, datetime('now'))
-          WHERE user_id = @userId
-        `).run({ smart: smartLower, userId });
-      } else {
-        walletRepo.create({
+      // Synchronous signature verification (viem + ERC-6492). Throws
+      // if the sig is bad or malformed.
+      let row;
+      try {
+        row = await spendPermissionService.recordUserGrant({
           userId,
-          address: smartWalletAddress,
-          accountRef: null,
-          smartAccountRef: null,
+          permission,
+          signature,
         });
-        db.prepare(`
-          UPDATE wallets
-          SET wallet_type = 'coinbase_smart_wallet',
-              smart_wallet_address = @smart,
-              migrated_at = datetime('now')
-          WHERE user_id = @userId
-        `).run({ smart: smartLower, userId });
+      } catch (sigErr) {
+        console.warn(`[Internal API] /wallet/grant sig verification failed for user ${userId}: ${sigErr.message}`);
+        res.status(400).json({ error: 'signature verification failed' });
+        return;
       }
 
-      // Lazy-approve in the background — don't block the HTTP response
-      // on the on-chain UserOp confirmation. If this fails, the next
-      // spendForUser call lazy-approves again.
-      spendPermissionService.approveOnChain(row.id).catch((err) => {
+      // Respond to the caller now — the on-chain approve + the
+      // wallet.address flip happen async below.
+      res.json({ ok: true, permissionId: row.id });
+
+      // Background: lift the permission on-chain, then flip the user's
+      // wallet.address to the Smart Wallet once approveWithSignature
+      // confirms. Flipping AFTER on-chain confirmation means a grant
+      // that somehow passes local validation but on-chain validation
+      // rejects (e.g. the user revoked between signing and submission)
+      // does NOT redirect their deposits to the attacker's address.
+      spendPermissionService.approveOnChain(row.id).then(() => {
+        try {
+          const wallet = walletRepo.findByUserId(userId);
+          const smartLower = smartWalletAddress.toLowerCase();
+          const db = require('../database/db');
+          if (wallet) {
+            db.prepare(`
+              UPDATE wallets
+              SET wallet_type = 'coinbase_smart_wallet',
+                  smart_wallet_address = @smart,
+                  legacy_cdp_address = COALESCE(legacy_cdp_address, address),
+                  address = @smart,
+                  migrated_at = COALESCE(migrated_at, datetime('now'))
+              WHERE user_id = @userId
+            `).run({ smart: smartLower, userId });
+          } else {
+            walletRepo.create({
+              userId,
+              address: smartWalletAddress,
+              accountRef: null,
+              smartAccountRef: null,
+            });
+            db.prepare(`
+              UPDATE wallets
+              SET wallet_type = 'coinbase_smart_wallet',
+                  smart_wallet_address = @smart,
+                  migrated_at = datetime('now')
+              WHERE user_id = @userId
+            `).run({ smart: smartLower, userId });
+          }
+          console.log(`[Internal API] Wallet flipped to self-custody for user ${userId} after on-chain approve`);
+        } catch (flipErr) {
+          console.error(`[Internal API] Wallet flip failed for user ${userId}: ${flipErr.message}`);
+        }
+      }).catch((err) => {
         console.error(`[Internal API] approveOnChain background failed for row ${row.id}: ${err.message}`);
       });
-
-      res.json({ ok: true, permissionId: row.id });
     } catch (err) {
       console.error('[Internal API] /wallet/grant error:', err.message);
       res.status(500).json({ error: err.message || 'internal error' });
@@ -524,14 +644,19 @@ function startWebhookServer(client) {
         return;
       }
 
+      // Peek first, consume only after CDP succeeds. A 429 / 5xx /
+      // TrialExhaustedError from Coinbase shouldn't burn the user's
+      // one-time link — they should be able to click the Discord
+      // button again and retry against a different provider without
+      // having to generate a fresh link.
       const linkNonceService = require('./linkNonceService');
-      const redeemed = linkNonceService.redeem({ nonce, purpose: 'deposit-cdp' });
-      if (!redeemed.ok) {
-        res.status(400).json({ error: redeemed.error });
+      const peeked = linkNonceService.peek({ nonce, purpose: 'deposit-cdp' });
+      if (!peeked.ok) {
+        res.status(400).json({ error: peeked.error });
         return;
       }
 
-      const meta = redeemed.metadata || {};
+      const meta = peeked.metadata || {};
       const { walletAddress, amountUsd, country, paymentCurrency, subdivision, partnerUserRef } = meta;
       if (!walletAddress || !amountUsd || !country) {
         res.status(400).json({ error: 'nonce metadata missing required fields' });
@@ -551,6 +676,8 @@ function startWebhookServer(client) {
           partnerUserRef,
           clientIp,
         });
+        // Consume only after the CDP mint succeeds.
+        linkNonceService.redeem({ nonce, purpose: 'deposit-cdp' });
         res.json({ onrampUrl: session.onrampUrl, quote: session.quote || null });
       } catch (err) {
         // TrialExhaustedError still bubbles up as a normal 500 here.
@@ -583,14 +710,15 @@ function startWebhookServer(client) {
         return;
       }
 
+      // Peek-then-consume — same reasoning as /cdp/onramp/mint.
       const linkNonceService = require('./linkNonceService');
-      const redeemed = linkNonceService.redeem({ nonce, purpose: 'cashout-cdp' });
-      if (!redeemed.ok) {
-        res.status(400).json({ error: redeemed.error });
+      const peeked = linkNonceService.peek({ nonce, purpose: 'cashout-cdp' });
+      if (!peeked.ok) {
+        res.status(400).json({ error: peeked.error });
         return;
       }
 
-      const meta = redeemed.metadata || {};
+      const meta = peeked.metadata || {};
       const { walletAddress, amountUsdc } = meta;
       if (!walletAddress || !amountUsdc) {
         res.status(400).json({ error: 'nonce metadata missing required fields' });
@@ -615,6 +743,7 @@ function startWebhookServer(client) {
         });
         const offrampUrl = `https://pay.coinbase.com/v3/sell/input?${params.toString()}`;
 
+        linkNonceService.redeem({ nonce, purpose: 'cashout-cdp' });
         res.json({ offrampUrl });
       } catch (err) {
         console.error('[Internal API] /cdp/offramp/mint failed:', err.message);

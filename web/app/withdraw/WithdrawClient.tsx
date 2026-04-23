@@ -96,7 +96,14 @@ export default function WithdrawClient() {
       setErrorMsg('Missing withdrawal link. Open the link the bot DMed you in Discord.');
       return;
     }
-    fetch('/api/link/redeem', {
+    // Peek, don't consume. The withdraw flow doesn't currently post
+    // anything back to the bot (the transfer goes directly on-chain
+    // via the user's passkey), so the nonce is only used for
+    // identity surfacing — consuming on page load would burn the
+    // user's link if they bail mid-flow. TODO: log the observed
+    // withdraw tx back to the bot once we add a /withdraw-observed
+    // endpoint; at that point the nonce can be consumed then.
+    fetch('/api/link/peek', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nonce, purpose: 'withdraw' }),

@@ -120,29 +120,69 @@ function _normalizePermission(p) {
 
 /**
  * Verify the user's EIP-712 signature over the permission, against
- * their Smart Wallet address (perm.account). Smart Wallet sigs are
- * ERC-1271 (contract-based) and may be ERC-6492-wrapped if the wallet
- * isn't deployed yet — we delegate to ethers' verifyTypedData which
- * handles both cases via on-chain isValidSignature.
+ * their Smart Wallet address (perm.account). Smart Wallet signatures
+ * are ERC-1271 (contract-based) and may be ERC-6492-wrapped if the
+ * wallet hasn't been deployed on-chain yet. viem's verifyTypedData
+ * handles all three cases — raw ECDSA, deployed-wallet ERC-1271, and
+ * counterfactual-wallet ERC-6492 — via a universal-validator call
+ * against a public Base client. Returns { valid: boolean }.
+ *
+ * Synchronous (i.e. non-deferred) verification is the audit fix for
+ * C1/H3: if a malicious web caller submits a grant with a forged
+ * signature, we MUST reject it before writing the row or flipping
+ * wallet.address — otherwise an attacker who knows / steals the
+ * shared secret can bind arbitrary Smart Wallet addresses to any
+ * Discord user and steal future deposits.
  */
 async function verifySignature(perm, signature) {
   const norm = _normalizePermission(perm);
-  const domain = _eip712Domain(_chainId());
+  const { createPublicClient, http } = require('viem');
+  const { base, baseSepolia } = require('viem/chains');
+  const viemUtils = require('viem/utils');
 
-  // For ERC-1271 / ERC-6492 verification we need to call the chain.
-  // ethers v6 has an asymmetry: verifyTypedData does ECDSA recovery
-  // (won't work for Smart Wallet); for contract sigs we need to call
-  // isValidSignature on the wallet contract directly. ERC-6492-wrapped
-  // signatures need to use the universal validator instead.
-  //
-  // Implementation: for now, accept the signature, persist as 'pending',
-  // and validate on-chain when we attempt approveWithSignature (the
-  // contract itself rejects bad sigs). Add a dedicated 6492-aware
-  // validator call here once the universal-validator package is wired.
-  // TODO(self-custody): wire ethers UniversalSigValidator or viem's
-  // verifyTypedData (which handles 6492 natively) before exposing this
-  // service to user input from production.
-  return { valid: true, deferredCheck: true };
+  const chain = getNetwork() === 'sepolia' ? baseSepolia : base;
+  const transportUrl =
+    process.env.BASE_RPC_URL ||
+    (chain === baseSepolia ? 'https://sepolia.base.org' : 'https://mainnet.base.org');
+
+  const client = createPublicClient({ chain, transport: http(transportUrl) });
+
+  const domain = {
+    name: 'Spend Permission Manager',
+    version: '1',
+    chainId: chain.id,
+    verifyingContract: SPEND_PERMISSION_MANAGER_ADDRESS,
+  };
+
+  // viem's verifyTypedData calls the universal signature validator
+  // under the hood (ERC-6492 deploy-and-validate pattern), so it
+  // works for both deployed Smart Wallets and counterfactual ones.
+  try {
+    const valid = await client.verifyTypedData({
+      address: norm.account,
+      domain,
+      types: SPEND_PERMISSION_TYPES,
+      primaryType: 'SpendPermission',
+      message: {
+        account: norm.account,
+        spender: norm.spender,
+        token: norm.token,
+        allowance: norm.allowance,
+        period: norm.period,
+        start: norm.start,
+        end: norm.end,
+        salt: norm.salt,
+        extraData: norm.extraData,
+      },
+      signature,
+    });
+    return { valid: Boolean(valid) };
+  } catch (err) {
+    // verifyTypedData throws on malformed inputs (bad hex, bad
+    // address, etc). Treat as invalid rather than leaking the error.
+    console.warn(`[SpendPermission] verifyTypedData threw: ${err.message}`);
+    return { valid: false };
+  }
 }
 
 /**

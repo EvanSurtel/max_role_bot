@@ -170,6 +170,15 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
         require(!hasDeposited[matchId][player], "Player already deposited");
         require(player != address(0), "Player cannot be zero");
         require(source != address(0), "Source cannot be zero");
+        // Defense in depth: this entry point is for the spender-pull
+        // path only (spender pulls from itself into escrow after
+        // SpendPermissionManager.spend lands funds there). If code
+        // ever regresses and tries to pass source=player here, fall
+        // back to the legacy depositToEscrow so the custody invariant
+        // "operator only moves user funds via SpendPermission" can't
+        // be silently bypassed by an unbounded ERC-20 approve the
+        // user may have accidentally given to WagerEscrow.
+        require(source != player, "Use depositToEscrow for self-funded pulls");
 
         uint256 amount = m.entryAmount;
 

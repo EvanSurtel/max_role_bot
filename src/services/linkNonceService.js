@@ -51,6 +51,57 @@ function mintLink({ userId, purpose, ttlSeconds = 600, metadata = null }) {
 }
 
 /**
+ * Internal helper — takes a row (from either peek or consume) and
+ * shapes it for the caller. Factored out so peek() and redeem()
+ * return the same structure.
+ */
+function _shapeRow(row) {
+  const userRepo = require('../database/repositories/userRepo');
+  const user = userRepo.findById(row.user_id);
+  if (!user) {
+    return { ok: false, error: 'Account not found' };
+  }
+  let metadata = null;
+  if (row.metadata) {
+    try { metadata = JSON.parse(row.metadata); }
+    catch { metadata = null; }
+  }
+  return {
+    ok: true,
+    userId: row.user_id,
+    discordId: user.discord_id,
+    discordTag: user.server_username || user.cod_ign || `user-${user.discord_id}`,
+    purpose: row.purpose,
+    metadata,
+  };
+}
+
+/**
+ * Non-destructive validation of a nonce. Returns the same shape as
+ * redeem() but does NOT mark the nonce consumed — that's the caller's
+ * responsibility once the downstream work (e.g. CDP session mint,
+ * on-chain approve) actually succeeds. Use this in flows where a
+ * transient external-API failure shouldn't burn the user's one-time
+ * link.
+ */
+function peek({ nonce, purpose }) {
+  if (!nonce || typeof nonce !== 'string') {
+    return { ok: false, error: 'Missing nonce' };
+  }
+  if (!VALID_PURPOSES.has(purpose)) {
+    return { ok: false, error: 'Invalid purpose' };
+  }
+  const row = linkNonceRepo.peek(nonce);
+  if (!row) {
+    return { ok: false, error: 'Link expired or already used' };
+  }
+  if (row.purpose !== purpose) {
+    return { ok: false, error: 'Link purpose mismatch' };
+  }
+  return _shapeRow(row);
+}
+
+/**
  * Validate + consume a nonce on behalf of the web surface. Called
  * from the internal HTTP endpoint, never exposed publicly.
  *
@@ -76,27 +127,7 @@ function redeem({ nonce, purpose }) {
     // Caller is trying to redeem a setup-link as a withdraw-link, etc.
     return { ok: false, error: 'Link purpose mismatch' };
   }
-
-  // Look up Discord ID from internal user id so the browser knows
-  // who it's binding the wallet to.
-  const userRepo = require('../database/repositories/userRepo');
-  const user = userRepo.findById(row.user_id);
-  if (!user) {
-    return { ok: false, error: 'Account not found' };
-  }
-  let metadata = null;
-  if (row.metadata) {
-    try { metadata = JSON.parse(row.metadata); }
-    catch { metadata = null; }
-  }
-  return {
-    ok: true,
-    userId: row.user_id,
-    discordId: user.discord_id,
-    discordTag: user.server_username || user.cod_ign || `user-${user.discord_id}`,
-    purpose: row.purpose,
-    metadata,
-  };
+  return _shapeRow(row);
 }
 
-module.exports = { mintLink, redeem };
+module.exports = { mintLink, peek, redeem };

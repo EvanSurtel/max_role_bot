@@ -68,6 +68,21 @@ const linkNonceRepo = {
     return stmts.findByNonce.get(nonce);
   },
 
+  /**
+   * Non-destructive lookup — returns the row if the nonce exists, is
+   * not expired, and has not been consumed. Returns null otherwise.
+   * Used by flows that want to validate the nonce up front but defer
+   * consumption until a later step succeeds (so a transient CDP error
+   * doesn't burn the user's one-time link).
+   */
+  peek(nonce) {
+    const row = stmts.findByNonce.get(nonce);
+    if (!row) return null;
+    if (row.consumed_at) return null;
+    if (new Date(row.expires_at).getTime() <= Date.now()) return null;
+    return row;
+  },
+
   pruneOld() {
     return stmts.pruneOld.run();
   },

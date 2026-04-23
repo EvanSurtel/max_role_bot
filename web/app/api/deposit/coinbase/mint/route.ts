@@ -26,17 +26,34 @@ import { NextRequest } from 'next/server';
  */
 
 function extractClientIp(req: NextRequest): string | null {
-  const xff = req.headers.get('x-forwarded-for');
-  if (xff) {
-    // x-forwarded-for is a comma-separated chain "client, proxy1, proxy2".
-    // The leftmost entry is the original client. Trim and validate.
-    const first = xff.split(',')[0].trim();
+  // SECURITY: On Vercel, `x-forwarded-for` includes whatever the
+  // browser sent as its own XFF header BEFORE Vercel appends the true
+  // edge-observed source IP. So the leftmost entry is attacker-
+  // controlled and must never be trusted. Vercel sets `x-real-ip`
+  // and `x-vercel-forwarded-for` to the single verified source IP,
+  // overwriting any client-supplied value. Prefer those.
+  //
+  // Prior implementation read xff.split(',')[0] which is spoofable —
+  // that broke CDP's clientIp binding (CDP relies on it to ensure
+  // the resulting session URL can only be redeemed by the originating
+  // viewer). Fixed here by reading Vercel's verified headers only.
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp && realIp.trim()) return realIp.trim();
+
+  const vercelFF = req.headers.get('x-vercel-forwarded-for');
+  if (vercelFF && vercelFF.trim()) {
+    // x-vercel-forwarded-for is set by Vercel's own edge to the
+    // verified source IP; it does not include client-supplied values.
+    const first = vercelFF.split(',')[0].trim();
     if (first) return first;
   }
-  const xri = req.headers.get('x-real-ip');
-  if (xri) return xri.trim();
+
+  // Cloudflare fallback for non-Vercel deploys (e.g. bot-side webhook
+  // behind Cloudflare). Safe because Cloudflare strips client-supplied
+  // cf-connecting-ip and writes the true source IP.
   const cf = req.headers.get('cf-connecting-ip');
-  if (cf) return cf.trim();
+  if (cf && cf.trim()) return cf.trim();
+
   return null;
 }
 

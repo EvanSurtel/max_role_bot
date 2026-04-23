@@ -7,15 +7,22 @@ import { NextRequest } from 'next/server';
  */
 
 function extractClientIp(req: NextRequest): string | null {
-  const xff = req.headers.get('x-forwarded-for');
-  if (xff) {
-    const first = xff.split(',')[0].trim();
+  // See deposit/coinbase/mint/route.ts for the full reasoning. In
+  // short: x-forwarded-for's leftmost entry is browser-controlled on
+  // Vercel and MUST NOT be trusted. Prefer x-real-ip /
+  // x-vercel-forwarded-for which Vercel sets to the verified source IP.
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp && realIp.trim()) return realIp.trim();
+
+  const vercelFF = req.headers.get('x-vercel-forwarded-for');
+  if (vercelFF && vercelFF.trim()) {
+    const first = vercelFF.split(',')[0].trim();
     if (first) return first;
   }
-  const xri = req.headers.get('x-real-ip');
-  if (xri) return xri.trim();
+
   const cf = req.headers.get('cf-connecting-ip');
-  if (cf) return cf.trim();
+  if (cf && cf.trim()) return cf.trim();
+
   return null;
 }
 

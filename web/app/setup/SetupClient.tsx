@@ -103,6 +103,10 @@ export default function SetupClient({ purpose = 'setup' }: { purpose?: 'setup' |
   const [discordTag, setDiscordTag] = useState<string | null>(null);
   const [selectedLimit, setSelectedLimit] = useState<Limit | null>(null);
   const [resultTxHint, setResultTxHint] = useState<string | null>(null);
+  // The nonce is kept live through the whole flow (just peeked on
+  // load, not consumed) so a transient failure mid-flow — user
+  // cancels passkey, network blip — doesn't burn the user's link.
+  // The bot consumes it atomically when the grant lands.
 
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -123,7 +127,7 @@ export default function SetupClient({ purpose = 'setup' }: { purpose?: 'setup' |
       );
       return;
     }
-    fetch('/api/link/redeem', {
+    fetch('/api/link/peek', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nonce, purpose }),
@@ -230,6 +234,8 @@ export default function SetupClient({ purpose = 'setup' }: { purpose?: 'setup' |
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          nonce,                 // consumed atomically on the bot side
+          purpose,               // 'setup' | 'renew'
           userId,
           smartWalletAddress: address,
           permission: {
