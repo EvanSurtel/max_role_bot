@@ -16,6 +16,23 @@ const nextConfig = {
     serverActions: { bodySizeLimit: '1mb' },
   },
 
+  // Silence non-fatal "Module not found" warnings from optional peer
+  // deps that wagmi's connectors pull in but we don't actually use:
+  //   - @react-native-async-storage/async-storage  ← MetaMask RN-only
+  //   - pino-pretty                                ← WalletConnect
+  //                                                   logger, dev-only
+  // Marking them external + falsy resolves the warnings without
+  // bloating the bundle. We don't ship MetaMask connector or RN code.
+  webpack: (config) => {
+    config.resolve = config.resolve || {};
+    config.resolve.fallback = {
+      ...(config.resolve.fallback || {}),
+      '@react-native-async-storage/async-storage': false,
+      'pino-pretty': false,
+    };
+    return config;
+  },
+
   async headers() {
     return [
       {
