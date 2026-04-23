@@ -26,8 +26,31 @@ const userRepo = require('../database/repositories/userRepo');
 const walletRepo = require('../database/repositories/walletRepo');
 const { getProvider, getNetwork } = require('../base/connection');
 
+// SpendPermissionManager singleton on Base mainnet + sepolia. Same
+// address (deterministic deploy). Source of truth: the CDP SDK
+// constants file at node_modules/@coinbase/cdp-sdk/_cjs/spend-permissions/constants.js
+// (we don't import from there because the package doesn't expose
+// that subpath via its exports field — would break on SDK upgrade).
 const SPEND_PERMISSION_MANAGER_ADDRESS = '0xf85210B21cC50302F477BA56686d2019dC9b67Ad';
 const USDC_BASE_MAINNET = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+
+// Minimal ABI fragment — only the functions we actually call. Defining
+// inline so we're not coupled to where the CDP SDK chooses to surface
+// the full ABI in any given version. The struct shape MUST match the
+// deployed contract exactly; verify against
+// https://basescan.org/address/0xf85210B21cC50302F477BA56686d2019dC9b67Ad#code
+// if there's ever doubt.
+const SPM_TUPLE_TYPE = 'tuple(address account, address spender, address token, uint160 allowance, uint48 period, uint48 start, uint48 end, uint256 salt, bytes extraData)';
+const SPM_MINIMAL_ABI = [
+  `function approveWithSignature(${SPM_TUPLE_TYPE} permission, bytes signature)`,
+  `function spend(${SPM_TUPLE_TYPE} permission, uint160 value)`,
+  `function revoke(${SPM_TUPLE_TYPE} permission)`,
+  `function revokeAsSpender(${SPM_TUPLE_TYPE} permission)`,
+  `function getHash(${SPM_TUPLE_TYPE} permission) view returns (bytes32)`,
+  `function isApproved(${SPM_TUPLE_TYPE} permission) view returns (bool)`,
+  `function isRevoked(${SPM_TUPLE_TYPE} permission) view returns (bool)`,
+];
+const _spmIface = new ethers.Interface(SPM_MINIMAL_ABI);
 
 // EIP-712 SpendPermission type — must match the deployed contract's
 // expected struct exactly. Source: @coinbase/cdp-sdk types +
@@ -159,42 +182,85 @@ async function recordUserGrant({ userId, permission, signature }) {
 }
 
 /**
+ * Convert a stored DB row back into the struct the SPM contract expects.
+ * BigInt-typed fields (allowance, salt) come out of SQLite as strings;
+ * the contract ABI expects native BigInt for uint160/uint256.
+ */
+function _rowToStruct(row) {
+  return {
+    account:   ethers.getAddress(row.account),
+    spender:   ethers.getAddress(row.spender),
+    token:     ethers.getAddress(row.token),
+    allowance: BigInt(row.allowance),
+    period:    Number(row.period),
+    start:     Number(row.start_ts),
+    end:       Number(row.end_ts),
+    salt:      BigInt(row.salt),
+    extraData: row.extra_data || '0x',
+  };
+}
+
+/**
  * Lift a pending SpendPermission on-chain via approveWithSignature.
  * Called either:
- *   - immediately after recordUserGrant (eager)
+ *   - immediately after recordUserGrant (eager) so the first spend works
  *   - lazily on the first spend() attempt (cheaper for grants the user
  *     never actually exercises)
  *
- * Uses our existing escrow-owner-smart Smart Account as the sender —
- * UserOp sponsored by CDP Paymaster, no ETH required.
+ * Uses our escrow-owner-smart Smart Account as the sender — UserOp
+ * sponsored by CDP Paymaster, no ETH required. We can't use
+ * cdp.evm.createSpendPermission here because it submits `approve` from
+ * the user's account (only works for CDP-managed accounts); we need
+ * `approveWithSignature(struct, sig)` called from our spender so the
+ * user's prior off-chain signature is what authorizes the on-chain
+ * approval.
  *
- * NOTE (impl): the actual on-chain submission is wired up in the
- * follow-up commit that touches transactionService.js. This skeleton
- * defines the contract; the body throws until then so callers fail
- * loudly rather than silently no-op.
+ * Idempotent: if status is already 'approved', returns the row.
  */
 async function approveOnChain(rowId) {
   const row = spendPermissionRepo.findById(rowId);
   if (!row) throw new Error(`spend_permission ${rowId} not found`);
-  if (row.status !== 'pending') return row; // idempotent
+  if (row.status === 'approved') return row;
+  if (row.status === 'revoked' || row.status === 'expired' || row.status === 'superseded') {
+    throw new Error(`Cannot approve spend_permission ${rowId} — status is ${row.status}`);
+  }
 
-  // TODO(self-custody): call SpendPermissionManager.approveWithSignature
-  // via cdp.evm.createSpendPermission({ spendPermission, network: 'base' }).
-  // On confirmation, spendPermissionRepo.markApprovedAndSupersedeOthers(rowId, txHash).
-  throw new Error('approveOnChain: implementation pending — see TODO in spendPermissionService');
+  const struct = _rowToStruct(row);
+  const data = _spmIface.encodeFunctionData('approveWithSignature', [struct, row.signature]);
+
+  const { _sendOwnerTx } = require('../base/transactionService');
+  let txHash;
+  try {
+    txHash = await _sendOwnerTx(SPEND_PERMISSION_MANAGER_ADDRESS, data);
+  } catch (err) {
+    console.error(`[SpendPermission] approveWithSignature failed for row ${rowId}: ${err.message}`);
+    throw err;
+  }
+
+  spendPermissionRepo.markApprovedAndSupersedeOthers(rowId, txHash);
+  console.log(`[SpendPermission] Row ${rowId} approved on-chain (tx ${txHash})`);
+  return spendPermissionRepo.findById(rowId);
 }
 
 /**
- * Pull `amount` USDC from the user's Smart Wallet to our spender
- * address (escrow-owner-smart) via SpendPermissionManager.spend.
- * Returns { txHash, blockNumber } on success. Throws if no active
- * permission, allowance exhausted in current period, or on-chain revert.
+ * Pull `amountUsdcSmallest` USDC from the user's Smart Wallet to our
+ * spender address (escrow-owner-smart) via SpendPermissionManager.spend.
+ * Returns the on-chain tx hash on success.
  *
- * Same impl note as approveOnChain — concrete CDP SDK call lands in
- * the follow-up commit.
+ * Lazy on-chain approve: if the active permission is still 'pending'
+ * (signed by user, not yet lifted), we approve first then spend. Both
+ * UserOps are gasless via Paymaster.
+ *
+ * Errors:
+ *   NO_ACTIVE_PERMISSION   — user has no usable permission row
+ *   ALLOWANCE_EXCEEDED     — request > the per-period cap
+ *   On-chain revert (e.g. period exhausted) — SPM contract error
+ *     bubbles up; caller should distinguish.
  */
 async function spendForUser(userId, amountUsdcSmallest) {
-  const active = spendPermissionRepo.findActiveForUser(userId);
+  const active = spendPermissionRepo.findActiveForUser(userId)
+    || spendPermissionRepo.findAllForUser(userId).find(r => r.status === 'pending');
+
   if (!active) {
     const e = new Error('No active SpendPermission for user');
     e.code = 'NO_ACTIVE_PERMISSION';
@@ -206,30 +272,43 @@ async function spendForUser(userId, amountUsdcSmallest) {
     throw e;
   }
 
-  // TODO(self-custody): call escrowOwnerSmart.useSpendPermission({
-  //   spendPermission: { account, spender, token, allowance, period,
-  //     start, end, salt, extraData }, value: BigInt(amountUsdcSmallest),
-  //   network: 'base' });
-  // Returns { userOpHash, status }. On status==='complete', wait for
-  // receipt then return tx hash. On AllowanceExceeded revert from the
-  // contract, surface ALLOWANCE_EXCEEDED to the caller.
-  throw new Error('spendForUser: implementation pending — see TODO in spendPermissionService');
+  // Lazy approve if needed — first spend kicks the on-chain approval.
+  if (active.status === 'pending') {
+    await approveOnChain(active.id);
+  }
+
+  const struct = _rowToStruct(active);
+  const data = _spmIface.encodeFunctionData('spend', [struct, BigInt(amountUsdcSmallest)]);
+
+  const { _sendOwnerTx } = require('../base/transactionService');
+  const txHash = await _sendOwnerTx(SPEND_PERMISSION_MANAGER_ADDRESS, data);
+  console.log(`[SpendPermission] Spent ${amountUsdcSmallest} units for user ${userId} (tx ${txHash}, permission_hash=${active.permission_hash})`);
+  return { txHash, permissionId: active.id };
 }
 
 /**
- * Revoke an active permission. Either user-initiated (from the web
- * surface, signed by their passkey) or backend-initiated
- * (revokeAsSpender, called from admin tooling).
+ * Revoke an active permission. Always calls revokeAsSpender from our
+ * spender Smart Account — that's the on-chain function that lets the
+ * spender (us) drop their own grant without needing the user's
+ * signature. User-initiated revoke is a separate code path that
+ * happens client-side from the wallet web surface (user signs revoke
+ * via their passkey); when that lands on-chain we observe it via the
+ * SPM event and call setRevoked() then.
  */
-async function revokePermission(rowId, { asSpender = false } = {}) {
+async function revokePermission(rowId) {
   const row = spendPermissionRepo.findById(rowId);
   if (!row) throw new Error(`spend_permission ${rowId} not found`);
   if (row.status === 'revoked') return row;
 
-  // TODO(self-custody): call SpendPermissionManager.revoke (user) or
-  // revokeAsSpender (backend). On confirmation,
-  // spendPermissionRepo.setRevoked(rowId, txHash).
-  throw new Error('revokePermission: implementation pending — see TODO in spendPermissionService');
+  const struct = _rowToStruct(row);
+  const data = _spmIface.encodeFunctionData('revokeAsSpender', [struct]);
+
+  const { _sendOwnerTx } = require('../base/transactionService');
+  const txHash = await _sendOwnerTx(SPEND_PERMISSION_MANAGER_ADDRESS, data);
+
+  spendPermissionRepo.setRevoked(rowId, txHash);
+  console.log(`[SpendPermission] Row ${rowId} revoked as spender (tx ${txHash})`);
+  return spendPermissionRepo.findById(rowId);
 }
 
 module.exports = {

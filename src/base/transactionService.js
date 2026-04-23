@@ -252,5 +252,6 @@ module.exports = {
   transferEth,
   transferSol,
   invokeContract,
+  _sendOwnerTx, // exported for spendPermissionService — same Paymaster-sponsored UserOp path
   approveUsdc,
 };
