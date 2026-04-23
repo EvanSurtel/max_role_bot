@@ -18,15 +18,22 @@ export default function Page() {
       <div className="card">
         <h2>How it works</h2>
         <p>
-          Each Rank $ player has their own Coinbase Smart Wallet on Base.
-          You own it via your device passkey (Face ID, Touch ID, Windows Hello,
-          security key) — Rank $ never holds your private key.
+          Each Rank $ player has their own crypto wallet on Base, locked by
+          your phone or computer&apos;s built-in passkey (Face ID, Touch ID,
+          Windows Hello, security key). <strong>Only you can sign — Rank $
+          never holds your private key.</strong>
         </p>
         <p>
-          Funding, in-app actions, and external withdrawals all happen with
-          your explicit signature. The bot can only pull funds within the
-          spending allowance you set, and you can revoke that allowance at
-          any time on-chain.
+          When you join matches, Rank $ pulls funds from your wallet up to a
+          <strong> daily limit you set yourself</strong> — like a daily debit-card
+          limit. You&apos;re not pre-paying anything; the limit just caps how
+          much can be charged, so you don&apos;t have to approve every match
+          one by one.
+        </p>
+        <p>
+          You can change or turn off that limit anytime, and you can send your
+          USDC out to any other wallet whenever you want — your funds, your
+          control.
         </p>
       </div>
 

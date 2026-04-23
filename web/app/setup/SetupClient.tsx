@@ -84,11 +84,15 @@ export default function SetupClient() {
       <p>Signed in as <strong>{discordTag}</strong>.</p>
 
       <div className="card">
-        <h2>Step 1 — Create your Coinbase Smart Wallet</h2>
+        <h2>Step 1 — Create your wallet</h2>
         <p>
-          You&apos;ll be asked to set up a passkey using Face ID, Touch ID,
-          Windows Hello, or a security key. This passkey is what controls
-          your wallet — Rank $ never sees it.
+          You&apos;re about to create your own crypto wallet on Base. It&apos;s
+          locked by your phone or computer&apos;s built-in passkey
+          (Face ID / Touch ID / Windows Hello / security key).
+        </p>
+        <p>
+          <strong>Only you can sign with it. Rank $ never sees your passkey
+          and can never move your funds without your permission.</strong>
         </p>
         {/* Wallet connect button lands in next commit */}
         <button className="btn" disabled>
@@ -97,13 +101,41 @@ export default function SetupClient() {
       </div>
 
       <div className="card">
-        <h2>Step 2 — Approve in-app spending limit</h2>
+        <h2>Step 2 — Set your daily match limit</h2>
         <p>
-          You&apos;ll sign one permission letting the Rank $ bot pull up to
-          a daily cap from your wallet (for joining matches). You can revoke
-          this anytime.
+          Pick the <strong>most you&apos;d ever want Rank $ to charge you in
+          a single day</strong> for joining matches. Think of it like a daily
+          debit-card limit you set yourself.
         </p>
+        <p>
+          <strong>You&apos;re not paying anything now.</strong> This just sets
+          a cap so you don&apos;t need to approve every match individually.
+          Rank $ can never charge more than your limit, and you can change or
+          turn it off anytime.
+        </p>
+        <p className="muted">
+          Pick whatever fits how you play:
+        </p>
+        <ul style={{ marginLeft: 20, marginBottom: 16 }}>
+          <li><strong>$50/day</strong> — casual, a few small matches</li>
+          <li><strong>$200/day</strong> — regular player</li>
+          <li><strong>$1,000/day</strong> — high-stakes / tournament weekends</li>
+        </ul>
         <p className="muted">Available after Step 1.</p>
+      </div>
+
+      <div className="card">
+        <h2>What you can do later</h2>
+        <p className="muted" style={{ marginBottom: 8 }}>
+          • <strong>Withdraw</strong> — send your USDC anywhere, anytime, signed by your passkey.
+        </p>
+        <p className="muted" style={{ marginBottom: 8 }}>
+          • <strong>Change your limit</strong> — raise it, lower it, or set it back to zero.
+        </p>
+        <p className="muted">
+          • <strong>Revoke</strong> — turn off Rank $&apos;s ability to charge you entirely.
+          Your wallet keeps working; the bot just can&apos;t pull funds anymore.
+        </p>
       </div>
     </main>
   );
