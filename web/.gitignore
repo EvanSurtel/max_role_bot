@@ -15,4 +15,5 @@ build/
 .DS_Store
 *.pem
 .tsbuildinfo
+tsconfig.tsbuildinfo
 next-env.d.ts
