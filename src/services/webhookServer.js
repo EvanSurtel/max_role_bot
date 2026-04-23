@@ -501,6 +501,69 @@ function startWebhookServer(client) {
     }
   });
 
+  // Mint a CDP Onramp one-click-buy session on behalf of a user. Called
+  // by the web surface (Vercel) AFTER the user has loaded
+  // /deposit/coinbase?t=<nonce> in their browser — the web captures
+  // the user's real IP from the request and forwards it here so the
+  // outbound CDP /sessions call carries clientIp (CDP requires this so
+  // the resulting widget URL can only be redeemed by the originating
+  // viewer; without it any leak of the URL would be trivially abusable).
+  //
+  // Body: { nonce, clientIp }
+  // Response: { onrampUrl, quote? } or { error }
+  app.post('/api/internal/cdp/onramp/mint', express.json(), _internalAuth, async (req, res) => {
+    try {
+      const { nonce, clientIp } = req.body || {};
+      if (!nonce || !clientIp) {
+        res.status(400).json({ error: 'nonce and clientIp required' });
+        return;
+      }
+
+      const linkNonceService = require('./linkNonceService');
+      const redeemed = linkNonceService.redeem({ nonce, purpose: 'deposit-cdp' });
+      if (!redeemed.ok) {
+        res.status(400).json({ error: redeemed.error });
+        return;
+      }
+
+      const meta = redeemed.metadata || {};
+      const { walletAddress, amountUsd, country, paymentCurrency, subdivision, partnerUserRef } = meta;
+      if (!walletAddress || !amountUsd || !country) {
+        res.status(400).json({ error: 'nonce metadata missing required fields' });
+        return;
+      }
+
+      const onramp = require('./coinbaseOnrampService');
+      try {
+        const session = await onramp.createOneClickBuySession({
+          walletAddress,
+          purchaseCurrency: 'USDC',
+          destinationNetwork: 'base',
+          purchaseAmount: String(amountUsd),
+          paymentCurrency,
+          country,
+          subdivision,
+          partnerUserRef,
+          clientIp,
+        });
+        res.json({ onrampUrl: session.onrampUrl, quote: session.quote || null });
+      } catch (err) {
+        // TrialExhaustedError still bubbles up as a normal 500 here.
+        // The web surface decides what to render — we don't have the
+        // bot's silent-fallback-to-Wert path available from this entry
+        // point because the original Discord interaction has long since
+        // been resolved. The web page surfaces the failure and the user
+        // can pick a different provider back in Discord.
+        const status = err && err.name === 'TrialExhaustedError' ? 503 : 502;
+        console.error('[Internal API] /cdp/onramp/mint failed:', err.message);
+        res.status(status).json({ error: err.message || 'cdp session mint failed' });
+      }
+    } catch (err) {
+      console.error('[Internal API] /cdp/onramp/mint error:', err.message);
+      res.status(500).json({ error: 'internal error' });
+    }
+  });
+
   app.post('/api/internal/wallet/observed-revoke', express.json(), _internalAuth, (req, res) => {
     // Web reports that a user just signed + broadcast a `revoke()`
     // call from their Smart Wallet (revoking a SpendPermission they

@@ -229,10 +229,33 @@ async function handleDepositProvider(interaction, user, wallet, lang) {
 }
 
 // ─── CDP Onramp (US-only on Day 1, guest checkout) ─────────────
+//
+// CDP requires the session-token POST to carry the originating user's
+// IP (clientIp) — without it the resulting Onramp URL fails review
+// because anyone who scraped the link could redeem it from any IP.
+// The bot can't capture a real user IP from a Discord interaction —
+// Discord proxies all traffic, we only ever see Discord's edge IPs.
+//
+// So instead of minting the CDP session here, we mint a one-time link
+// nonce, stash the deposit context (wallet, amount, country, fiat) on
+// the nonce, and DM/ephemeral the user a URL to the wallet web surface
+// at <WALLET_WEB_BASE_URL>/deposit/coinbase?t=<nonce>. When the user
+// loads that page, the Vercel server-component reads their real IP
+// from x-forwarded-for and POSTs it to /api/internal/cdp/onramp/mint
+// alongside the nonce. The bot redeems the nonce, mints the CDP
+// session WITH clientIp, and returns the onramp URL — which the web
+// page then redirects the user to. The user's IP is the same one they
+// load Coinbase from, so CDP's binding check passes.
 async function _handleCdp(interaction, user, wallet, country, amountUsd) {
   if (!onramp.isConfigured()) {
     return interaction.reply({
       content: 'Coinbase Onramp is not configured. Please pick a different payment method.',
+      ephemeral: true,
+    });
+  }
+  if (!process.env.WALLET_WEB_BASE_URL) {
+    return interaction.reply({
+      content: 'Coinbase Onramp routing is not configured (web surface URL missing). Please pick a different payment method.',
       ephemeral: true,
     });
   }
@@ -249,89 +272,53 @@ async function _handleCdp(interaction, user, wallet, country, amountUsd) {
     amountUsd = perTxMax;
   }
 
-  // Target the USDC amount the user asked for (purchaseAmount) rather
-  // than a fiat amount to spend (paymentAmount). This way, a CA user
-  // asking for 5 USDC gets a widget that quotes ~6.86 CAD to pay for
-  // exactly 5 USDC — matching what they actually expect to receive.
-  // Previously we sent paymentAmount=5 + paymentCurrency=CAD and the
-  // widget charged 5 CAD (~3.60 USD), delivering only ~3.60 USDC.
-  //
-  // paymentCurrency is still passed so the widget knows which local
-  // rail to render in the "you pay" line (CAD for CA, etc). Coinbase
-  // falls back to USD on their side if the rail isn't enabled.
   const apiCountry = country || 'US';
   const paymentCurrency = FIAT_BY_COUNTRY[apiCountry] || 'USD';
 
-  let onrampUrl;
-  let quote = null;
+  let url;
   try {
-    const session = await onramp.createOneClickBuySession({
-      walletAddress: wallet.address,
-      purchaseCurrency: 'USDC',
-      destinationNetwork: 'base',
-      purchaseAmount: String(amountUsd), // amountUsd is actually USDC target (≈USD)
-      paymentCurrency,
-      country: apiCountry,
-      partnerUserRef: String(user.discord_id).slice(0, 49),
+    const linkNonceService = require('../../services/linkNonceService');
+    url = linkNonceService.mintLink({
+      userId: user.id,
+      purpose: 'deposit-cdp',
+      ttlSeconds: 600,
+      metadata: {
+        walletAddress: wallet.address,
+        amountUsd,
+        country: apiCountry,
+        paymentCurrency,
+        partnerUserRef: String(user.discord_id).slice(0, 49),
+      },
     });
-    onrampUrl = session.onrampUrl;
-    quote = session.quote;
   } catch (err) {
-    // Only TrialExhaustedError justifies a silent Wert fallback —
-    // that's the one case where our API quota is actually gone and
-    // the user shouldn't see a broken Coinbase error. Everything
-    // else (country reject, malformed request, network blip) should
-    // surface a clear message, not bounce the user to Wert.
-    if (err instanceof onramp.TrialExhaustedError) {
-      console.warn(`[Wallet] CDP trial exhausted for ${user.discord_id} @ $${amountUsd}; silently falling back to Wert.`);
-      try {
-        const { postTransaction } = require('../../utils/transactionFeed');
-        postTransaction({
-          type: 'cdp_fallback_to_wert',
-          discordId: String(user.discord_id),
-          memo: `CDP trial exhausted mid-request ($${amountUsd}) — silently routed to Wert`,
-        });
-      } catch { /* best effort */ }
-      return _handleChangelly(interaction, user, wallet, country, 'wert', amountUsd, {
-        alreadyDeferred: true,
-        fallbackFromCdp: true,
-      });
-    }
-    console.error('[Wallet] Coinbase Onramp session failed:', err.message);
+    console.error('[Wallet] Coinbase Onramp link mint failed:', err.message);
     return interaction.editReply({
       content: [
         '**\u{1F4B3} Deposit USDC — Coinbase**',
         '',
-        'We couldn\'t generate a Coinbase payment link right now. Please pick another payment method (Wert or Transak) or deposit USDC directly to the Base address shown earlier.',
-        '',
-        `_Error: ${err.message}_`,
+        'We couldn\'t prepare your Coinbase payment link right now. Please pick another payment method or try again in a moment.',
       ].join('\n'),
     });
   }
 
   const openButton = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setURL(onrampUrl)
-      .setLabel('Buy USDC')
+      .setURL(url)
+      .setLabel('Continue to Coinbase')
       .setStyle(ButtonStyle.Link),
   );
 
-  const quoteLine = quote?.paymentTotal
-    ? `Preview: **${quote.paymentTotal} ${quote.paymentCurrency}** → **${quote.purchaseAmount} USDC**`
-    : '';
-
-  // Single unified step-2 copy that covers both cases so the user
-  // sees the full picture regardless of where we think they are.
   return interaction.editReply({
     content: [
       `**\u{1F4B3} Deposit $${amountUsd} USDC — Coinbase**`,
       '',
-      '1. Click **Buy USDC** below — opens the Coinbase Onramp widget',
-      '2. Pay with **Apple Pay**, **Google Pay**, **credit card**, **debit card**, or **bank transfer**. **US users:** guest checkout, no Coinbase account needed. **Non-US users:** sign in with your Coinbase account to continue.',
-      '3. USDC arrives in your wallet within a few minutes',
-      quoteLine ? '' : null,
-      quoteLine || null,
-    ].filter(l => l !== null).join('\n'),
+      '1. Click **Continue to Coinbase** below — opens a one-time secure page on Rank $',
+      '2. That page hands off to the Coinbase Onramp widget',
+      '3. Pay with **Apple Pay**, **Google Pay**, **credit card**, **debit card**, or **bank transfer**. **US users:** guest checkout, no Coinbase account needed. **Non-US users:** sign in with your Coinbase account to continue.',
+      '4. USDC arrives in your wallet within a few minutes',
+      '',
+      '_The link expires in 10 minutes. Single use._',
+    ].join('\n'),
     components: [openButton],
   });
 }

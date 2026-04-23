@@ -14,7 +14,7 @@
 const crypto = require('crypto');
 const linkNonceRepo = require('../database/repositories/linkNonceRepo');
 
-const VALID_PURPOSES = new Set(['setup', 'withdraw', 'renew']);
+const VALID_PURPOSES = new Set(['setup', 'withdraw', 'renew', 'deposit-cdp']);
 
 /**
  * Generate a one-time nonce for a Discord user, persist it, and
@@ -26,7 +26,7 @@ const VALID_PURPOSES = new Set(['setup', 'withdraw', 'renew']);
  * @param {number} [args.ttlSeconds=600] - 10 min default
  * @returns {string} the full URL to DM the user
  */
-function mintLink({ userId, purpose, ttlSeconds = 600 }) {
+function mintLink({ userId, purpose, ttlSeconds = 600, metadata = null }) {
   if (!VALID_PURPOSES.has(purpose)) {
     throw new Error(`Invalid link purpose: ${purpose}`);
   }
@@ -36,11 +36,14 @@ function mintLink({ userId, purpose, ttlSeconds = 600 }) {
   }
 
   const nonce = crypto.randomBytes(32).toString('hex');
-  linkNonceRepo.create({ nonce, userId, purpose, ttlSeconds });
+  linkNonceRepo.create({ nonce, userId, purpose, ttlSeconds, metadata });
 
   // baseUrl might or might not have a trailing slash; normalize.
+  // URL path uses 'deposit/coinbase' for the CDP-onramp purpose so the
+  // user-facing route reads naturally; everything else mirrors purpose.
   const trimmed = baseUrl.replace(/\/$/, '');
-  return `${trimmed}/${purpose}?t=${nonce}`;
+  const path = purpose === 'deposit-cdp' ? 'deposit/coinbase' : purpose;
+  return `${trimmed}/${path}?t=${nonce}`;
 }
 
 /**
@@ -77,12 +80,18 @@ function redeem({ nonce, purpose }) {
   if (!user) {
     return { ok: false, error: 'Account not found' };
   }
+  let metadata = null;
+  if (row.metadata) {
+    try { metadata = JSON.parse(row.metadata); }
+    catch { metadata = null; }
+  }
   return {
     ok: true,
     userId: row.user_id,
     discordId: user.discord_id,
     discordTag: user.server_username || user.cod_ign || `user-${user.discord_id}`,
     purpose: row.purpose,
+    metadata,
   };
 }
 

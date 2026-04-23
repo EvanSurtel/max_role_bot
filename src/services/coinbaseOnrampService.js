@@ -96,6 +96,13 @@ async function _signJwt({ host, path }) {
  * @param {string} opts.country - ISO 3166-1 alpha-2 (US / CA / GB).
  * @param {string} [opts.subdivision] - US state code (required when country=US).
  * @param {string} opts.partnerUserRef - Unique user id (<=49 chars).
+ * @param {string} [opts.clientIp] - End-user's IP address (NOT the bot
+ *   server's IP). CDP requires this on session-token requests so the
+ *   resulting quote/widget is bound to the originating viewer; without
+ *   it an attacker who scraped the URL could redeem the quote from
+ *   anywhere. We capture it on the web surface (Vercel) where the user
+ *   actually loads the redirect page, and forward it through the bot
+ *   internal API to here. Pass IPv4 or IPv6.
  * @returns {Promise<{ onrampUrl: string, quote?: object }>}
  */
 async function createOneClickBuySession({
@@ -109,6 +116,7 @@ async function createOneClickBuySession({
   country,
   subdivision,
   partnerUserRef,
+  clientIp,
 }) {
   if (!isConfigured()) {
     throw new Error('CDP_API_KEY_ID and CDP_API_KEY_SECRET must be set');
@@ -155,6 +163,7 @@ async function createOneClickBuySession({
   }
   if (paymentMethod) body.paymentMethod = paymentMethod;
   if (subdivision) body.subdivision = subdivision;
+  if (clientIp) body.clientIp = clientIp;
 
   const res = await fetch(`https://${SESSIONS_HOST}${SESSIONS_PATH}`, {
     method: 'POST',
@@ -192,14 +201,23 @@ async function createOneClickBuySession({
  * @param {string} opts.walletAddress
  * @param {string[]} [opts.assets=['USDC']]
  * @param {string[]} [opts.blockchains=['base']]
+ * @param {string} [opts.clientIp] - End-user's IP. CDP binds the
+ *   resulting session token to this IP for security; pass-through
+ *   from the web surface, never the bot's own IP.
  * @returns {Promise<string>}
  */
-async function createSessionToken({ walletAddress, assets = ['USDC'], blockchains = ['base'] }) {
+async function createSessionToken({ walletAddress, assets = ['USDC'], blockchains = ['base'], clientIp }) {
   if (!isConfigured()) {
     throw new Error('CDP_API_KEY_ID and CDP_API_KEY_SECRET must be set');
   }
 
   const jwt = await _signJwt({ host: LEGACY_HOST, path: LEGACY_TOKEN_PATH });
+
+  const tokenBody = {
+    addresses: [{ address: walletAddress, blockchains }],
+    assets,
+  };
+  if (clientIp) tokenBody.clientIp = clientIp;
 
   const res = await fetch(`https://${LEGACY_HOST}${LEGACY_TOKEN_PATH}`, {
     method: 'POST',
@@ -207,10 +225,7 @@ async function createSessionToken({ walletAddress, assets = ['USDC'], blockchain
       'Authorization': `Bearer ${jwt}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      addresses: [{ address: walletAddress, blockchains }],
-      assets,
-    }),
+    body: JSON.stringify(tokenBody),
   });
 
   if (!res.ok) {

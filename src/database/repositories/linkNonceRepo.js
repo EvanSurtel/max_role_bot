@@ -17,8 +17,8 @@ const db = require('../db');
 
 const stmts = {
   insert: db.prepare(`
-    INSERT INTO discord_link_nonces (nonce, user_id, purpose, expires_at)
-    VALUES (@nonce, @userId, @purpose, @expiresAt)
+    INSERT INTO discord_link_nonces (nonce, user_id, purpose, expires_at, metadata)
+    VALUES (@nonce, @userId, @purpose, @expiresAt, @metadata)
   `),
   findByNonce: db.prepare('SELECT * FROM discord_link_nonces WHERE nonce = ?'),
   consume: db.prepare(`
@@ -39,10 +39,11 @@ const linkNonceRepo = {
    * Insert a new nonce for the given user + purpose. TTL defaults
    * to 10 minutes from now.
    */
-  create({ nonce, userId, purpose, ttlSeconds = 600 }) {
+  create({ nonce, userId, purpose, ttlSeconds = 600, metadata = null }) {
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
-    stmts.insert.run({ nonce, userId, purpose, expiresAt });
-    return { nonce, userId, purpose, expiresAt };
+    const metaStr = metadata == null ? null : JSON.stringify(metadata);
+    stmts.insert.run({ nonce, userId, purpose, expiresAt, metadata: metaStr });
+    return { nonce, userId, purpose, expiresAt, metadata };
   },
 
   findByNonce(nonce) {
