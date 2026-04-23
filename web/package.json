@@ -1,0 +1,32 @@
+{
+  "name": "rank-wallet-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-custody wallet surface for the Rank $ Discord bot. Hosts Coinbase Smart Wallet creation, EIP-712 SpendPermission signing, and external withdrawals via WebAuthn passkey. Deploys to Vercel; the Discord bot DMs users a one-time link into here for the actions that require a real cryptographic user signature (initial setup, renew, withdraw).",
+  "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start -p 3100",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@coinbase/onchainkit": "^0.38.0",
+    "@coinbase/wallet-sdk": "^4.3.0",
+    "@tanstack/react-query": "^5.59.0",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "viem": "^2.21.0",
+    "wagmi": "^2.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
