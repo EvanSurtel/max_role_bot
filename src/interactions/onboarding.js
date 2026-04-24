@@ -311,77 +311,49 @@ async function handleRegistrationModal(interaction) {
       WHERE id = ?
     `).run(displayName, codIgn, codUid, regionLabel, country, countryCode, stateCode, region, depositRegion, user.id);
 
-    // Generate Base wallet (concurrency-limited to avoid CDP API overload)
+    // Self-custody registration: no longer create a CDP Server Wallet
+    // during onboarding. Instead, mint a one-time /setup link and the
+    // user creates their own Coinbase Smart Wallet via passkey on the
+    // web surface. The `wallets` row gets inserted later, by the
+    // /api/internal/wallet/grant handler, once the user signs the
+    // SpendPermission and the on-chain approveWithSignature lands.
+    //
+    // Why: the whole self-custody migration (and CDP approval) rests
+    // on users owning their own wallets from day 0. Minting a custodial
+    // CDP Server Wallet here and then asking them to "Upgrade" later
+    // creates a two-tier fleet (legacy vs self-custody) and every new
+    // user starts on the wrong side. Direct-to-self-custody at
+    // registration puts every new user on the right path immediately.
     let wallet = walletRepo.findByUserId(user.id);
+    let setupUrl = null;
     if (!wallet) {
-      if (_activeRegistrations >= MAX_CONCURRENT_REGISTRATIONS) {
-        return interaction.editReply({
-          content: 'Server is processing several registrations at once. Please try again in 30 seconds.',
-          embeds: [], components: [],
-        });
-      }
-      _activeRegistrations++;
-      let walletData;
-      try {
-        walletData = await walletManager.generateWallet(user.id);
-      } catch (walletErr) {
-        _activeRegistrations--;
-        console.error(`[Onboarding] Wallet generation failed for user ${user.id}:`, walletErr.message);
-        return interaction.editReply({
-          content: 'Wallet creation failed. Please try clicking Accept TOS again in a moment.',
-          embeds: [], components: [],
-        });
-      }
-      _activeRegistrations--;
-      const { address, accountRef, smartAccountRef } = walletData;
-      wallet = walletRepo.create({
-        userId: user.id,
-        address,
-        accountRef,
-        smartAccountRef,
-      });
-
-      // NOW accept TOS — after wallet is confirmed created. If we
-      // accepted TOS before wallet generation and wallet failed,
-      // the user would be stuck (accepted_tos=1 but no wallet,
-      // and the "already registered" guard would block re-entry).
+      // Accept TOS upfront. Previously we deferred TOS until wallet
+      // creation succeeded so a CDP failure wouldn't leave the user
+      // stuck "registered but no wallet." That concern doesn't apply
+      // to the self-custody path — nonce minting is a local DB insert
+      // that effectively cannot fail. If the /setup web flow fails
+      // later, they can be re-sent a setup link any time.
       userRepo.acceptTos(user.id);
 
-      let escrowApprovalFailed = false;
       try {
-        const { approveEscrowForUser } = require('../base/escrowManager');
-        await approveEscrowForUser(user.id);
-      } catch (err) {
-        escrowApprovalFailed = true;
-        console.warn(`[Onboarding] Escrow approval failed for user ${user.id}:`, err.message);
-
-        // Alert admins so they can monitor
-        const approvalAlertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
-        if (approvalAlertChannelId) {
-          try {
-            const alertCh = interaction.client.channels.cache.get(approvalAlertChannelId);
-            if (alertCh) {
-              const approvalAlertEmbed = new EmbedBuilder()
-                .setTitle('Escrow Approval Failed During Onboarding')
-                .setColor(0xe74c3c)
-                .setDescription([
-                  `<@${discordId}> registered successfully but USDC escrow approval failed.`,
-                  '',
-                  `**User ID:** ${user.id}`,
-                  `**Wallet:** \`${wallet.address}\``,
-                  `**Error:** ${err.message}`,
-                  '',
-                  'The approval will be retried automatically at first match entry (`depositToEscrow` checks allowance).',
-                ].join('\n'))
-                .setTimestamp();
-              await alertCh.send({ embeds: [approvalAlertEmbed] });
-            }
-          } catch (alertErr) {
-            console.error('[Onboarding] Failed to send escrow approval alert:', alertErr.message);
-          }
-        }
+        const linkNonceService = require('../services/linkNonceService');
+        setupUrl = linkNonceService.mintLink({
+          userId: user.id,
+          purpose: 'setup',
+          ttlSeconds: 24 * 60 * 60, // 24h for first-time setup — more forgiving than the 10m upgrade links
+        });
+      } catch (mintErr) {
+        console.error(`[Onboarding] Setup link mint failed for user ${user.id}: ${mintErr.message}`);
+        return interaction.editReply({
+          content: 'Registration succeeded but we couldn\'t generate your wallet setup link. An admin will fix this shortly.',
+          embeds: [], components: [],
+        });
       }
     }
+    // escrowApprovalFailed is now always false for self-custody users —
+    // the escrow approve step is irrelevant on this path (only the
+    // SpendPermission daily cap gates the spender).
+    const escrowApprovalFailed = false;
 
     // Assign member role
     const guild = interaction.guild;
@@ -411,14 +383,38 @@ async function handleRegistrationModal(interaction) {
       console.warn(`[Onboarding] Rank role sync failed:`, err.message);
     }
 
-    // Registration complete embed
+    // Registration complete embed. Two variants based on whether the
+    // user is a new self-custody registrant (needs to complete /setup
+    // to get their wallet) or returning (wallet already exists).
     const walletChannelMention = process.env.WALLET_CHANNEL_ID
       ? `<#${process.env.WALLET_CHANNEL_ID}>`
       : '**#wallet**';
+
     const completeEmbed = new EmbedBuilder()
       .setTitle(t('onboarding.complete_title', lang))
-      .setColor(0x2ecc71)
-      .setDescription([
+      .setColor(0x2ecc71);
+
+    if (setupUrl) {
+      // Brand-new user: guide them to /setup to create their wallet.
+      completeEmbed.setDescription([
+        `👋 Welcome, **${displayName}**!`,
+        '',
+        '**One last step — create your self-custody wallet.**',
+        '',
+        'Click the link below to create your own crypto wallet on Base. It\'s locked by your phone or computer\'s built-in passkey (Face ID / Touch ID / Windows Hello / security key) — **only you can sign. Rank $ never sees your passkey.**',
+        '',
+        `🔐 **${setupUrl}**`,
+        '',
+        '_This link is valid for 24 hours and works once._',
+        '',
+        `**${t('onboarding.complete_field_name', lang)}:** ${displayName}`,
+        `**${t('onboarding.complete_field_ign', lang)}:** ${codIgn}`,
+        `**${t('onboarding.complete_field_uid', lang)}:** ${codUid}`,
+        `**${t('onboarding.complete_field_region', lang)}:** ${regionLabel}`,
+      ].join('\n'));
+    } else {
+      // Returning user with existing wallet — legacy flow copy.
+      completeEmbed.setDescription([
         t('onboarding.complete_welcome', lang, { name: displayName }),
         '',
         t('onboarding.complete_set_up', lang),
@@ -439,6 +435,7 @@ async function handleRegistrationModal(interaction) {
         '',
         t('onboarding.complete_good_luck', lang),
       ].join('\n'));
+    }
 
     await interaction.editReply({ embeds: [completeEmbed], components: [], content: '' });
 
@@ -471,7 +468,7 @@ async function handleRegistrationModal(interaction) {
               `**COD UID:** ${codUid}`,
               `**Region:** ${regionLabel}`,
               `**Country:** ${country}`,
-              `**Wallet:** \`${wallet.address}\``,
+              `**Wallet:** ${wallet?.address ? `\`${wallet.address}\`` : '_pending self-custody setup_'}`,
             ].join('\n'))
             .setTimestamp();
           await alertChannel.send({ embeds: [adminEmbed] });
@@ -489,7 +486,7 @@ async function handleRegistrationModal(interaction) {
         type: 'user_registered',
         username: displayName,
         discordId,
-        memo: `${country} ${displayName} | IGN: ${codIgn} | UID: ${codUid} | Region: ${regionLabel} | Wallet: ${wallet.address}`,
+        memo: `${country} ${displayName} | IGN: ${codIgn} | UID: ${codUid} | Region: ${regionLabel} | Wallet: ${wallet?.address || 'pending setup'}`,
       });
     } catch { /* */ }
 
