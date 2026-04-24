@@ -22,7 +22,8 @@ async function handleWalletViewOpen(interaction) {
 
   const wallet = walletRepo.findByUserId(user.id);
   if (!wallet) {
-    return interaction.reply({ content: t('common.wallet_not_found', lang), ephemeral: true });
+    const { handleWalletPendingSetup } = require('./pendingSetup');
+    return handleWalletPendingSetup(interaction, user);
   }
 
   const { buildWalletView } = require('../walletPanelView');

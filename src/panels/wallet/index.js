@@ -35,7 +35,8 @@ async function handleWalletSubButton(interaction) {
 
   const wallet = walletRepo.findByUserId(user.id);
   if (!wallet) {
-    return interaction.reply({ content: t('common.wallet_not_found', lang), ephemeral: true });
+    const { handleWalletPendingSetup } = require('./pendingSetup');
+    return handleWalletPendingSetup(interaction, user);
   }
 
   if (id === 'wallet_deposit') {
@@ -130,7 +131,10 @@ async function handleWalletAmountModal(interaction) {
   const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) return interaction.reply({ content: 'User not found.', ephemeral: true });
   const wallet = walletRepo.findByUserId(user.id);
-  if (!wallet) return interaction.reply({ content: 'Wallet not found.', ephemeral: true });
+  if (!wallet) {
+    const { handleWalletPendingSetup } = require('./pendingSetup');
+    return handleWalletPendingSetup(interaction, user);
+  }
   const lang = langFor(interaction);
 
   if (id === 'wallet_deposit_amount_modal') return handleDepositAmountModal(interaction, user, wallet, lang);
