@@ -274,6 +274,36 @@ async function transferToEscrow(matchId, challengeId, allPlayers, entryAmountUsd
   console.log(`[Escrow] transferToEscrow: match=${matchId} challenge=${challengeId} entry=${entryAmountUsdc} players=${playerCount}`);
   console.log(`[Escrow]   player IDs: ${allPlayers.map(p => p.user_id).join(', ')}`);
 
+  // Pre-flight on-chain balance check. For self-custody users the DB
+  // `balance_available` can drift from reality — the user can drain
+  // their Smart Wallet via `/withdraw` or any external transfer and
+  // the bot won't know until a deposit-poller reconcile (every 30s).
+  // If we submit the match-start batch without checking, a drained
+  // player's SPM.spend reverts — which aborts the loop mid-way and
+  // leaves the on-chain match in a partial-deposit state requiring
+  // cancel + per-player refund. Cheaper to fail fast here: if any
+  // player lacks on-chain funds, throw before createMatch so the
+  // caller can cancel cleanly with no on-chain cleanup needed.
+  const provider = getProvider();
+  const usdcCheck = new ethers.Contract(
+    walletManager.USDC_CONTRACT,
+    ['function balanceOf(address) view returns (uint256)'],
+    provider,
+  );
+  const needed = BigInt(entryAmountUsdc);
+  for (const player of allPlayers) {
+    const w = walletRepo.findByUserId(player.user_id);
+    if (!w) throw new Error(`No wallet for user ${player.user_id}`);
+    const bal = await usdcCheck.balanceOf(w.address);
+    if (bal < needed) {
+      throw new Error(
+        `Player ${player.user_id} has insufficient on-chain USDC ` +
+        `(have ${bal.toString()}, need ${needed.toString()}). ` +
+        `Match not started.`,
+      );
+    }
+  }
+
   await createOnChainMatch(matchId, entryAmountUsdc, playerCount);
 
   for (const player of allPlayers) {

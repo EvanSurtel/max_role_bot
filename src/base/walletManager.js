@@ -1,24 +1,20 @@
-// Base wallet management — CDP Smart Accounts (@coinbase/cdp-sdk).
+// Base wallet helpers + CDP SDK client.
 //
-// Every user gets a CDP Smart Account (ERC-4337) with a CDP server
-// account as the owner. This gives us:
-//   - Gasless transactions via Paymaster (Base Sepolia = free, mainnet = CDP Paymaster)
-//   - Batched calls (multiple ERC-20 ops in one UserOp)
-//   - Server-side key management (bot never touches private keys)
+// Self-custody architecture: end-user wallets are user-owned Coinbase
+// Smart Wallets created in the user's browser via keys.coinbase.com
+// passkey. The bot never creates, sees, or holds their key material.
+// `generateWallet` (which previously minted CDP-managed Smart Accounts
+// for end users) was removed in the self-custody cleanup — nothing
+// here generates user wallets anymore.
 //
-// Architecture:
-//   CDP EOA (owner) ---owns---> Smart Account (ERC-4337)
-//   The owner signs UserOps; the Smart Account is the on-chain address.
-//
-// The bot stores:
-//   - address           = Smart Account address (the on-chain wallet users see)
-//   - account_ref       = owner account name (for getOrCreateAccount lookup)
-//   - smart_account_ref = Smart Account name (for getOrCreateSmartAccount lookup)
-//   - iv, tag, salt     = empty (CDP manages keys)
-//
-// Sending transactions:
-//   - Primary: cdp.evm.sendUserOperation() via Smart Account (gasless)
-//   - Fallback: cdp.evm.sendTransaction() via owner EOA (needs ETH for gas)
+// What this file still does:
+//   - Exposes a cached CdpClient singleton
+//   - `getSmartAccountFromRef`: reconstructs the escrow-owner-smart
+//     Smart Account from its stored name (so transactionService can
+//     sign admin UserOps)
+//   - `getUsdcBalance` / `getEthBalance`: read-only chain helpers used
+//     by the deposit poller and admin panels
+//   - USDC_CONTRACT constant + ERC20_ABI used across the codebase
 
 const { CdpClient } = require('@coinbase/cdp-sdk');
 const { ethers } = require('ethers');

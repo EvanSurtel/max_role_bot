@@ -10,11 +10,10 @@ Custody model is **self-custody**: every user owns their own Coinbase Smart Wall
 - **Discord**: discord.js v14 — buttons, modals, user select menus (NO slash commands except /rank)
 - **Database**: SQLite via better-sqlite3, WAL mode, migrations in `src/database/migrations/` (001–022)
 - **Blockchain**: Base mainnet (Coinbase L2, chain ID 8453) — `ethers.js` v6 with FallbackProvider (primary + fallback RPC); `viem` v2 for ERC-6492-aware EIP-712 signature verification on the bot side
-- **Smart Contract**: `contracts/WagerEscrow.sol` — production at `0x2DabDC8E1Cc7580f07e5807e72ecF23c5D2AeB59`. Entry points: `createMatch`, `depositToEscrow` (legacy users, user self-approved), `depositFromSpender` (self-custody users, spender-approved via SPM), `resolveMatch`, `cancelMatch`, `emergencyWithdraw` (unallocated only). Tracks `totalActiveEscrow`.
+- **Smart Contract**: `contracts/WagerEscrow.sol` — production at `0x2DabDC8E1Cc7580f07e5807e72ecF23c5D2AeB59`. Entry points: `createMatch`, `depositFromSpender` (the only deposit path — spender-approved via SPM), `resolveMatch`, `cancelMatch`, `emergencyWithdraw` (unallocated only). `depositToEscrow` also exists on the bytecode for back-compat but is no longer called by the bot. Tracks `totalActiveEscrow`.
 - **SpendPermissionManager**: Coinbase singleton on Base at `0xf85210B21cC50302F477BA56686d2019dC9b67Ad`. Mediates every self-custody user→escrow pull via `spend(permission, amount)`.
 - **Wallets**:
-  - *Self-custody (default for new registrations, April 2026 onward)*: user-owned Coinbase Smart Wallet (ERC-4337), passkey-gated, created in the user's browser via the Coinbase Smart Wallet SDK on `keys.coinbase.com`. User is the sole owner. The bot never holds, sees, or can derive the signing key.
-  - *Legacy*: CDP Smart Accounts (ERC-4337) created for users who onboarded before the migration. Keys held by Coinbase CDP, never stored locally. The legacy code path still works; legacy users can migrate via the "Upgrade to Self-Custody" button.
+  - User-owned **Coinbase Smart Wallet** (ERC-4337), passkey-gated, created in the user's browser via the Coinbase Smart Wallet SDK on `keys.coinbase.com`. The user is the sole owner. The bot never holds, sees, or can derive the signing key. This is the only supported wallet model — the previous CDP Server Wallet path was removed once the self-custody migration completed.
 - **Gas**: 100% gasless at runtime via CDP Paymaster (UserOps). The `escrow-owner` EOA signs ONE transaction ever (deploy + transferOwnership). The runtime owner is a Smart Account (`escrow-owner-smart`, currently `0x407AA75dC2f0D3B7A50dceCbC4BC061Ff92542e6`) routed via `_sendOwnerTx` / `_sendOwnerTxBatch`.
 - **Token**: USDC (ERC-20, 6 decimals) at `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`. ETH used only for edge-case admin withdrawals.
 - **Web hosting**: Next.js app in `web/` deployed on Vercel (`max-role-bot.vercel.app`). Serves `/setup`, `/renew`, `/withdraw`, and the Coinbase Onramp/Offramp clientIp bridges at `/deposit/coinbase` + `/cashout/coinbase`.
@@ -64,8 +63,6 @@ User withdraws    → Bot DMs a /withdraw link
                     authority over withdrawals (FinCEN "unhosted wallet"
                     posture preserved)
 ```
-
-Legacy (pre-migration) users still have `wallet_type = 'cdp_server'` and keep working on the original path: bot-signed USDC transfers, CDP-held key material. They can click the "Upgrade to Self-Custody" button at any time to migrate. `scripts/migrate-funds-to-smart-wallet.js` sweeps leftover USDC from the legacy CDP address into their new Smart Wallet after setup.
 
 Every arrow is an on-chain Base transaction with a hash on BaseScan. All bot-side on-chain calls route through the escrow-owner-smart Smart Account → UserOp → Paymaster → zero gas cost.
 
@@ -129,10 +126,8 @@ src/
                                   # for real clientIp)
       cashOut.js                  # Cash out provider picker + handlers
                                   # (CDP Offramp routes to web bridge)
-      withdraw.js, withdrawEth.js, withdrawMenu.js  # Legacy withdraw
-      selfCustodySetup.js         # "Upgrade to Self-Custody" button
-                                  # (legacy users migrating)
-      selfCustodyWithdraw.js      # Smart-wallet users withdraw via web
+      withdrawMenu.js             # Cash-out vs send-to-external choice
+      selfCustodyWithdraw.js      # User-signed USDC transfer via /withdraw
       pendingSetup.js             # Shown when user registered but
                                   # hasn't completed /setup yet
       history.js, refresh.js
@@ -228,9 +223,6 @@ scripts/
                                   # USDC approve (needed for depositFromSpender)
   approve-escrow-from-spender.js  # Standalone/recovery: escrow-owner-smart
                                   # USDC.approve(WagerEscrow, MAX). Idempotent.
-  migrate-funds-to-smart-wallet.js  # Sweep USDC from legacy CDP Server
-                                  # Wallet → user's Smart Wallet after they
-                                  # complete /setup. --dry-run by default.
   create-owner-wallet.js          # Creates escrow-owner EOA +
                                   # escrow-owner-smart Smart Account
   emergency-cancel-match.js       # Break-glass recovery for stuck matches
@@ -250,7 +242,7 @@ memory/                           # Auto-memory files for future sessions
 ## Key Conventions
 
 - **No slash commands** except `/rank`. All user interactions via button panels.
-- **No DMs for notifications** — private server channels only. Exceptions: teammate invites (DM-first w/ channel fallback), rank promotion/demotion, and the "Upgrade to Self-Custody" / withdraw link delivery (DM-first with ephemeral fallback — both contain one-time tokens, DM is the right channel for private credential-adjacent material).
+- **No DMs for notifications** — private server channels only. Exceptions: teammate invites (DM-first w/ channel fallback), rank promotion/demotion, and withdraw-link delivery (DM-first with ephemeral fallback — the link contains a one-time token, DM is the right channel for private credential-adjacent material).
 - **Panel toggles in place**: toggle buttons (language, filter, etc.) must `interaction.update()` the original message. No new ephemeral replies.
 - **Display names**: never rely on `<@id>` alone in embed field values. Plain text first, mention as fallback.
 - **Amounts**: Stored as strings in USDC smallest units (6 decimals). Use `BigInt` for arithmetic.
@@ -282,24 +274,6 @@ wallet_type = 'coinbase_smart_wallet'
 address = user's Smart Wallet address (same value as smart_wallet_address)
 account_ref = 'self-custody'
 legacy_cdp_address = NULL
-
---- OR (legacy user) ---
-
-wallet_type = 'cdp_server'         (pre-migration state)
-address = CDP Smart Account address
-account_ref = CDP account name
-   │
-   │  User clicks "Upgrade to Self-Custody", completes /setup
-   ▼
-wallet_type = 'coinbase_smart_wallet'
-smart_wallet_address = Smart Wallet address
-legacy_cdp_address = <old CDP address>   (preserved for sweep)
-address = Smart Wallet address            (flipped)
-account_ref = <old CDP account name>      (not cleared — harmless)
-   │
-   │  Operator runs `node scripts/migrate-funds-to-smart-wallet.js --user <id>`
-   ▼
-Legacy CDP wallet drained into new Smart Wallet
 ```
 
 ## Deposit / Onramp Flow
@@ -469,5 +443,4 @@ Quick tunnels rotate the URL every time `cloudflared` restarts. For a permanent 
 
 - **New contract + new allowlist rules must be in place before any self-custody user can join a match.** The bot's atomic deposit UserOp touches USDC.approve (initially, from escrow-owner-smart), SPM.approveWithSignature, SPM.spend, and WagerEscrow.depositFromSpender. Missing any in the allowlist → AA21 errors.
 - **escrow-owner-smart must have USDC.approve(WagerEscrow, MAX) on-chain** before any self-custody match can start. `deploy-escrow.js` does this automatically; `approve-escrow-from-spender.js` is the recovery path.
-- **Legacy users migrate on their own schedule** via the Upgrade button. After they complete `/setup`, sweep their legacy CDP balance with `migrate-funds-to-smart-wallet.js --user <discord_id>`.
 - **Old WagerEscrow contract** at `0xA00E7cCdaE3978cb0f25cB8BadaA2B9d26b62747` is still on-chain but no longer referenced in `.env`. Any matches that were live on it at cutover resolve/cancel via the old address directly (operators can call from escrow-owner-smart manually). Drain its leftover balance via `emergencyWithdraw` to the escrow-owner-smart.

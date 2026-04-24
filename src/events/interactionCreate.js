@@ -367,8 +367,8 @@ module.exports = {
         if (id === 'dispute_nevermind') {
           return interaction.update({ content: 'Dispute cancelled.', embeds: [], components: [] });
         }
-        // Onboarding TOS buttons + wallet refresh button
-        if (id.startsWith('tos_') || id === 'wallet_refresh') {
+        // Onboarding TOS buttons
+        if (id.startsWith('tos_')) {
           return await onboarding.handleButton(interaction);
         }
         // Wallet action buttons (copy, withdraw, history) — in wallet channel

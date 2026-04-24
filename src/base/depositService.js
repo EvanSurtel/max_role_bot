@@ -151,11 +151,41 @@ async function checkDeposits() {
           await walletManager.getUsdcBalance(wallet.address),
         );
 
+        const snapshotAvail = BigInt(wallet.balance_available);
+        const snapshotHeld = BigInt(wallet.balance_held);
+
+        // Bi-directional reconciliation. Self-custody users own their
+        // own wallet, so they can move USDC out of it at any time:
+        //   - the `/withdraw` web flow (user-signed USDC.transfer)
+        //   - any external transfer from Coinbase Wallet or elsewhere
+        // The bot doesn't see these outflows live. If on-chain balance
+        // dropped below the DB snapshot, sync DB down to match reality.
+        // Without this, `balance_available` stays inflated and
+        // `canAfford()` greenlights match entries the user can no
+        // longer fund — which would later revert inside the atomic
+        // match-start UserOp.
+        //
+        // The wallet-lock check above (line 144) already skips this
+        // branch during an in-flight match deposit where balance_held
+        // is mid-update, so this can't race the debit-before-send
+        // pattern for on-chain outflows the bot itself initiated.
+        if (onChainBalance < snapshotAvail) {
+          const newAvail = onChainBalance.toString();
+          walletRepo.updateBalance(wallet.user_id, {
+            balanceAvailable: newAvail,
+            balanceHeld: snapshotHeld.toString(),
+          });
+          console.log(
+            `[Deposits] User ${wallet.user_id} on-chain drop detected: ` +
+            `balance_available ${snapshotAvail.toString()} → ${newAvail} ` +
+            `(on-chain ${onChainBalance.toString()}, external withdraw/transfer)`,
+          );
+          continue;
+        }
+
         if (onChainBalance === 0n) continue;
 
         // Quick check against stale snapshot
-        const snapshotAvail = BigInt(wallet.balance_available);
-        const snapshotHeld = BigInt(wallet.balance_held);
         if (onChainBalance <= snapshotAvail + snapshotHeld) continue;
 
         // Skip dust deposits — anything below $0.01 USDC is ignored

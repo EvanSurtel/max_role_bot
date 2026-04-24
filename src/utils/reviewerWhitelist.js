@@ -1,63 +1,26 @@
-// CDP reviewer whitelist.
+// Demo-channel auto-provision helper.
 //
-// Coinbase Developer Platform reviewers need to exercise the full
-// self-custody wallet flow (onboarding → setup link → passkey → daily
-// limit → deposit / cashout) during application review. But they're
-// not real Rank $ players — forcing them through the COD-specific
-// registration form (IGN, in-game UID, country for leaderboard
-// placement) is friction they don't need.
+// In the review / demo channel (configured via DEMO_CHANNEL_ID),
+// anyone clicking "View My Wallet" who isn't already a registered
+// Rank $ player gets a minimal user row created automatically so
+// they can exercise the wallet flow — wallet setup, deposit, cashout —
+// without going through the COD-specific registration form. Access
+// control is the Discord channel perms themselves; no additional
+// allowlist is enforced in code.
 //
-// This whitelist lets specific Discord IDs skip the COD form entirely
-// and go straight to the self-custody setup link, same as every real
-// user gets post-onboarding-refactor. The reviewer still does the
-// one-time email + passkey on keys.coinbase.com — that step is the
-// actual self-custody proof point and cannot be skipped.
-//
-// Configured via env var CDP_REVIEWER_DISCORD_IDS — comma-separated
-// list of Discord user IDs. Example:
-//   CDP_REVIEWER_DISCORD_IDS=1283157620236222550,1197537330672705568
-
-let _cached = null;
-
-function _load() {
-  const raw = process.env.CDP_REVIEWER_DISCORD_IDS || '';
-  return new Set(
-    raw
-      .split(',')
-      .map(s => s.trim())
-      .filter(s => s.length > 0),
-  );
-}
+// Previously this file also exported an `isReviewer(discordId)` check
+// driven by a CDP_REVIEWER_DISCORD_IDS env var. That was dropped in
+// 5d2650a once the demo channel was made open to anyone who can see it.
 
 /**
- * Is this Discord ID a CDP reviewer (per the whitelist)?
- * @param {string} discordId
- * @returns {boolean}
- */
-function isReviewer(discordId) {
-  if (!discordId) return false;
-  if (_cached === null) _cached = _load();
-  return _cached.has(String(discordId));
-}
-
-/**
- * Force-reload the whitelist from env. Call this if the env var
- * changes at runtime (normally: restart the bot instead).
- */
-function reload() {
-  _cached = _load();
-}
-
-/**
- * Ensure a minimal user row exists for a reviewer. No COD form, no
- * region/country select — just enough to satisfy downstream code that
- * expects userRepo.findByDiscordId to return non-null for any active
- * interaction. TOS is pre-accepted (reviewers aren't real players so
- * the gating doesn't apply). Display name is derived from the Discord
- * tag so the transaction feed shows something readable.
+ * Ensure a minimal user row exists for a demo-channel clicker. Just
+ * enough to satisfy downstream code that expects userRepo.findByDiscordId
+ * to return non-null for any active interaction. TOS is pre-accepted
+ * (demo-channel users aren't real players so the gating doesn't
+ * apply). Display name is derived from the Discord tag so the
+ * transaction feed shows something readable.
  *
- * Idempotent: if the reviewer already has a user row, returns it
- * untouched.
+ * Idempotent: if the user already has a row, returns it untouched.
  *
  * @param {string} discordId
  * @param {string} tag - Discord username (for display)
@@ -74,7 +37,7 @@ function ensureReviewerUser(discordId, tag = null) {
   // feed, admin notifications, etc.) doesn't blow up on null displays.
   // Country defaults to US — same as the demo channel's country
   // override — so CDP Onramp shows every provider option to the
-  // reviewer regardless of where they're actually signing in from.
+  // clicker regardless of where they're actually signing in from.
   db.prepare(`
     UPDATE users
     SET accepted_tos = 1,
@@ -90,10 +53,10 @@ function ensureReviewerUser(discordId, tag = null) {
     WHERE id = @id
   `).run({
     id: user.id,
-    display: tag ? `CDP Reviewer (${tag})` : `CDP Reviewer`,
-    codUid: `cdp-review-${discordId.slice(-8)}`,
+    display: tag ? `Demo User (${tag})` : `Demo User`,
+    codUid: `demo-${discordId.slice(-8)}`,
   });
   return userRepo.findByDiscordId(discordId);
 }
 
-module.exports = { isReviewer, reload, ensureReviewerUser };
+module.exports = { ensureReviewerUser };

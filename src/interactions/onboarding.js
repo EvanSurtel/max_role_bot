@@ -569,7 +569,7 @@ async function handleCountrySelect(interaction) {
 async function sendWalletPanel(channel, wallet, user = null) {
   const { buildWalletView } = require('../panels/walletPanelView');
   const lang = (user && user.language) || 'en';
-  const view = buildWalletView(wallet, user, lang, null);
+  const view = buildWalletView(wallet, user, lang);
   await channel.send(view);
 }
 
@@ -591,11 +591,8 @@ async function handleWalletRefresh(interaction) {
 
   await interaction.deferUpdate();
 
-  let solBalance = '0';
-  try { solBalance = await walletManager.getEthBalance(wallet.address); } catch { /* */ }
-
   const lang = user.language || 'en';
-  const view = buildWalletView(wallet, user, lang, solBalance);
+  const view = buildWalletView(wallet, user, lang);
   await interaction.editReply(view);
 }
 
