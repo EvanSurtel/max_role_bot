@@ -90,60 +90,6 @@ function releaseFunds(userId, amountUsdc, challengeId) {
   }
 }
 
-// ─── On-chain: approve escrow to spend user's USDC ─────────────
-
-async function approveEscrowForUser(userId) {
-  const walletRecord = walletRepo.findByUserId(userId);
-  if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
-
-  // Self-custody wallets must NOT be asked to approve the escrow
-  // contract from the user's wallet — the whole point of the
-  // SpendPermission model is that the operator (escrow-owner-smart)
-  // is the only entity with a bounded allowance on the user's funds,
-  // and match deposits route spender → WagerEscrow, not player →
-  // WagerEscrow. Approving the escrow from the user's wallet would
-  // give the operator an unbounded escape hatch around the daily cap
-  // — exactly the custody regression we're avoiding.
-  if (walletRecord.wallet_type === 'coinbase_smart_wallet') {
-    console.log(
-      `[Escrow] User ${userId} is on self-custody path — skipping user-side escrow approve. ` +
-      `Match deposits route via SpendPermissionManager.spend + depositFromSpender.`,
-    );
-    return { hash: null, skipped: true, reason: 'self-custody' };
-  }
-
-  // Idempotency guard: skip the on-chain approve if the user already
-  // has a large allowance to the escrow. We approve MAX_UINT256, so
-  // any existing allowance > 1 billion USDC units (1000 USDC) is a
-  // strong signal the prior approve already landed — no need to
-  // sponsor a redundant UserOp through the Paymaster. This is the
-  // "Max 1 approve ever" rule enforced at the source: it's cheap on
-  // the chain (one eth_call) and saves real money on the Paymaster.
-  try {
-    const provider = getProvider();
-    const allowanceAbi = ['function allowance(address owner, address spender) view returns (uint256)'];
-    const usdcContract = new ethers.Contract(walletManager.USDC_CONTRACT, allowanceAbi, provider);
-    const current = await usdcContract.allowance(walletRecord.address, _escrowAddress());
-    // 1 billion in USDC smallest units = 1,000 USDC. Any existing
-    // approval above that is plainly a prior MAX approval.
-    if (current > 1_000_000_000n) {
-      console.log(`[Escrow] User ${userId} already has sufficient escrow allowance (${current.toString()}) — skipping approve UserOp`);
-      return { hash: null, skipped: true };
-    }
-  } catch (err) {
-    console.warn(`[Escrow] Pre-approve allowance check failed for user ${userId} (will approve anyway):`, err.message);
-  }
-
-  const { hash } = await transactionService.approveUsdc(
-    walletRecord.address,
-    _escrowAddress(),
-    { ownerRef: walletRecord.account_ref, smartRef: walletRecord.smart_account_ref },
-  );
-
-  console.log(`[Escrow] Approved escrow for user ${userId}: ${hash}`);
-  return { hash, skipped: false };
-}
-
 // ─── On-chain: create match in the contract ────────────────────
 
 async function createOnChainMatch(matchId, entryAmountUsdc, playerCount) {
@@ -183,95 +129,9 @@ async function createOnChainMatch(matchId, entryAmountUsdc, playerCount) {
 
 // ─── On-chain: deposit player's USDC into escrow ───────────────
 
-async function depositToEscrow(userId, matchId, challengeId) {
-  const walletRecord = walletRepo.findByUserId(userId);
-  if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
-
-  // Self-custody (Coinbase Smart Wallet) users route through a
-  // completely different on-chain path: SpendPermissionManager.spend
-  // pulls USDC from the user's Smart Wallet to the bot's spender
-  // Smart Account, then WagerEscrow.depositFromSpender pulls from
-  // the spender into the escrow contract. The user's passkey is
-  // never touched at match time — the per-day SpendPermission they
-  // signed at /setup is what gates the pull.
-  if (walletRecord.wallet_type === 'coinbase_smart_wallet') {
-    return _depositToEscrowSelfCustody(userId, matchId, challengeId, walletRecord);
-  }
-
-  console.log(`[Escrow] depositToEscrow: user=${userId} match=${matchId} address=${walletRecord.address}`);
-
-  // Check on-chain USDC balance
-  const checkProvider = getProvider();
-  const balAbi = ['function balanceOf(address) view returns (uint256)'];
-  const usdcForBal = new ethers.Contract(walletManager.USDC_CONTRACT, balAbi, checkProvider);
-  const onChainBal = await usdcForBal.balanceOf(walletRecord.address);
-  console.log(`[Escrow]   on-chain USDC: ${onChainBal.toString()} (${(Number(onChainBal) / 1e6).toFixed(2)} USDC)`);
-
-  // Verify the user's Smart Account has approved the escrow contract
-  const allowanceAbi = ['function allowance(address owner, address spender) view returns (uint256)'];
-  const usdcContract = new ethers.Contract(walletManager.USDC_CONTRACT, allowanceAbi, checkProvider);
-  const allowance = await usdcContract.allowance(walletRecord.address, _escrowAddress());
-  console.log(`[Escrow]   allowance: ${allowance.toString()}`);
-
-  if (allowance === 0n) {
-    console.warn(`[Escrow]   user ${userId} has no escrow allowance — retrying approval`);
-    await approveEscrowForUser(userId);
-    const newAllowance = await usdcContract.allowance(walletRecord.address, _escrowAddress());
-    console.log(`[Escrow]   allowance after retry: ${newAllowance.toString()}`);
-  }
-
-  // Static call to check if depositToEscrow would revert
-  try {
-    const testAbi = ['function depositToEscrow(uint256 matchId, address player)'];
-    const testContract = new ethers.Contract(_escrowAddress(), testAbi, checkProvider);
-    await testContract.depositToEscrow.staticCall(matchId, walletRecord.address, { from: _ownerAddress() });
-    console.log(`[Escrow]   static call OK — proceeding with real tx`);
-  } catch (staticErr) {
-    console.error(`[Escrow]   static call REVERTED: ${staticErr.reason || staticErr.message}`);
-    throw new Error(`depositToEscrow would revert for user ${userId}: ${staticErr.reason || staticErr.message}`);
-  }
-
-  // The contract owner calls depositToEscrow which does transferFrom(player, contract, amount)
-  const { hash } = await transactionService.invokeContract(
-    _ownerAddress(),
-    _escrowAddress(),
-    'depositToEscrow',
-    { matchId: String(matchId), player: walletRecord.address },
-    ESCROW_ABI_JSON,
-  );
-
-  // Zero out held balance in DB (funds now in contract)
-  const provider = getProvider();
-  const escrowAbi = ['function getMatch(uint256) view returns (tuple(uint256,uint8,uint8,uint256,bool,bool))'];
-  const escrowContract = new ethers.Contract(_escrowAddress(), escrowAbi, provider);
-  const matchData = await escrowContract.getMatch(matchId);
-  const entryAmount = matchData[0].toString();
-
-  const freshWallet = walletRepo.findByUserId(userId);
-  const newHeld = (BigInt(freshWallet.balance_held) - BigInt(entryAmount)).toString();
-  walletRepo.updateBalance(userId, {
-    balanceAvailable: freshWallet.balance_available,
-    balanceHeld: newHeld,
-  });
-
-  transactionRepo.create({
-    type: TRANSACTION_TYPE.ESCROW_IN,
-    userId, challengeId, amountUsdc: entryAmount,
-    txHash: hash,
-    fromAddress: walletRecord.address,
-    toAddress: _escrowAddress(),
-    status: 'completed',
-    memo: `Escrow deposit for match #${matchId}`,
-  });
-
-  console.log(`[Escrow] User ${userId} deposited to match #${matchId}: ${hash}`);
-  return { hash };
-}
-
-// ─── On-chain: self-custody deposit path (SpendPermission + depositFromSpender) ───
-
 /**
- * Self-custody variant of depositToEscrow. Two on-chain steps:
+ * Self-custody match deposit. Two on-chain steps batched atomically in
+ * a single UserOp:
  *
  *   1. SpendPermissionManager.spend(perm, entryAmount) — pulls USDC
  *      out of the user's Coinbase Smart Wallet into the bot's spender
@@ -283,15 +143,19 @@ async function depositToEscrow(userId, matchId, challengeId) {
  *      Smart Wallet address so resolveMatch pays winners back to
  *      their own wallets (never the spender).
  *
+ * If the permission is still 'pending' (signed but the grant-time
+ * approveWithSignature never landed), an approveWithSignature call is
+ * prepended to the batch.
+ *
  * Pre-condition: the spender Smart Account must have approved the
  * WagerEscrow contract for USDC at least once. The deploy script
  * for a new WagerEscrow contract does this as part of bring-up.
  *
- * Both calls are gasless UserOps through the CDP Paymaster via
- * transactionService._sendOwnerTx (same path escrowManager already
- * uses for every admin operation).
+ * Gasless UserOp through the CDP Paymaster via _sendOwnerTxBatch.
  */
-async function _depositToEscrowSelfCustody(userId, matchId, challengeId, walletRecord) {
+async function depositToEscrow(userId, matchId, challengeId) {
+  const walletRecord = walletRepo.findByUserId(userId);
+  if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
   console.log(
     `[Escrow] self-custody depositToEscrow: user=${userId} match=${matchId} ` +
     `smartWallet=${walletRecord.address}`,
@@ -730,7 +594,6 @@ module.exports = {
   canAfford,
   holdFunds,
   releaseFunds,
-  approveEscrowForUser,
   createOnChainMatch,
   depositToEscrow,
   transferToEscrow,

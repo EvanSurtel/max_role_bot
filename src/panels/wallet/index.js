@@ -6,8 +6,6 @@ const walletRepo = require('../../database/repositories/walletRepo');
 const { t, langFor } = require('../../locales/i18n');
 
 const { handleWalletViewOpen } = require('./viewOpen');
-const { handleWithdrawModal, handleWithdrawConfirmButton } = require('./withdraw');
-const { handleWithdrawSolModal, handleWithdrawSolMaxModal } = require('./withdrawEth');
 const { handleDepositAmountModal } = require('./deposit');
 const { handleCashOutAmountModal } = require('./cashOut');
 
@@ -22,11 +20,6 @@ const { handleCashOutAmountModal } = require('./cashOut');
 async function handleWalletSubButton(interaction) {
   const id = interaction.customId;
   const lang = langFor(interaction);
-
-  // Withdrawal confirmation buttons
-  if (id === 'wallet_wd_cancel' || id.startsWith('wallet_wd_usdc_') || id.startsWith('wallet_wd_sol_')) {
-    return handleWithdrawConfirmButton(interaction);
-  }
 
   const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) {
@@ -73,47 +66,16 @@ async function handleWalletSubButton(interaction) {
     });
   }
 
-  // MoonPay was removed -- stale cached ephemeral stub
-  if (id === 'wallet_moonpay_deposit' || id === 'wallet_moonpay_withdraw') {
-    return interaction.reply({
-      content: 'This feature is no longer available.',
-      ephemeral: true,
-    });
-  }
-
   if (id === 'wallet_refresh') {
     const { handleRefresh } = require('./refresh');
     return handleRefresh(interaction, user, lang);
   }
 
-  if (id === 'wallet_withdraw_sol') {
-    const { showEthWithdrawOptions } = require('./withdrawEth');
-    return showEthWithdrawOptions(interaction, wallet, lang);
-  }
-
-  if (id === 'wallet_sol_max') {
-    const { showSolMaxModal } = require('./withdrawEth');
-    return showSolMaxModal(interaction);
-  }
-
-  if (id === 'wallet_sol_custom') {
-    const { showSolCustomModal } = require('./withdrawEth');
-    return showSolCustomModal(interaction, lang);
-  }
-
   if (id === 'wallet_withdraw') {
-    // Smart-wallet users can't have the bot sign a transfer for them —
-    // the passkey-owned Smart Wallet only accepts signatures from the
-    // user's passkey. DM/ephemeral them a one-time link to the web
-    // surface where they sign the USDC.transfer themselves. Legacy CDP
-    // Server Wallet users still go through the bot-signed modal flow.
-    const isSmartWallet = wallet.wallet_type === 'coinbase_smart_wallet';
-    if (isSmartWallet) {
-      const { handleSmartWalletWithdraw } = require('./selfCustodyWithdraw');
-      return handleSmartWalletWithdraw(interaction);
-    }
-    const { showWithdrawModal } = require('./withdraw');
-    return showWithdrawModal(interaction, lang);
+    // Self-custody: user signs their own USDC.transfer on the web
+    // surface via passkey. Bot has no signing authority over withdrawals.
+    const { handleSmartWalletWithdraw } = require('./selfCustodyWithdraw');
+    return handleSmartWalletWithdraw(interaction);
   }
 
   if (id === 'wallet_history' || id.startsWith('wallet_history_page_')) {
@@ -140,8 +102,8 @@ async function handleWalletAmountModal(interaction) {
   if (id === 'wallet_deposit_amount_modal') return handleDepositAmountModal(interaction, user, wallet, lang);
   if (id === 'wallet_cashout_amount_modal') return handleCashOutAmountModal(interaction, user, wallet, lang);
   if (id === 'wallet_deposit_state_modal') {
-    // Backfill state_code for pre-migration US users, then nudge them
-    // back to the deposit flow.
+    // Backfill state_code for US users who registered without a state,
+    // then nudge them back to the deposit flow.
     const US_STATES = new Set([
       'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
       'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
@@ -165,8 +127,4 @@ module.exports = {
   handleWalletViewOpen,
   handleWalletSubButton,
   handleWalletAmountModal,
-  handleWithdrawModal,
-  handleWithdrawSolModal,
-  handleWithdrawSolMaxModal,
-  handleWithdrawConfirmButton,
 };

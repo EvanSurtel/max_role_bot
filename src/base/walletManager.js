@@ -61,46 +61,6 @@ function getCdpClient() {
  *   smartAccountRef = Smart Account name (for lookup)
  *   iv, tag, salt   = empty (CDP manages keys)
  *
- * @param {string} [userId] — Discord user ID (used to build unique account names)
- */
-async function generateWallet(userId) {
-  const cdp = getCdpClient();
-  const ownerName = `owner-${userId || Date.now()}`;
-  const smartName = `smart-${userId || Date.now()}`;
-
-  // Step 1: Create the owner EOA (CDP server account — keys in TEE)
-  const owner = await cdp.evm.getOrCreateAccount({ name: ownerName });
-  console.log(`[Wallet] Owner EOA created: ${owner.address} (${ownerName})`);
-
-  // Step 2: Create the Smart Account (ERC-4337) owned by the EOA
-  const smartAccount = await cdp.evm.getOrCreateSmartAccount({
-    name: smartName,
-    owner,
-  });
-  console.log(`[Wallet] Smart Account created: ${smartAccount.address} (${smartName})`);
-
-  // Auto-fund owner with ETH for gas on testnet (fallback path)
-  const network = (process.env.BASE_NETWORK || 'mainnet').toLowerCase();
-  if (network === 'sepolia') {
-    try {
-      await cdp.evm.requestFaucet({ address: owner.address, network: 'base-sepolia', token: 'eth' });
-      console.log(`[Wallet] Faucet ETH sent to owner ${owner.address}`);
-    } catch (err) {
-      console.warn(`[Wallet] Faucet failed (may already have ETH): ${err.message}`);
-    }
-  }
-
-  return {
-    address: smartAccount.address,
-    accountRef: ownerName,
-    smartAccountRef: smartName,
-    iv: '',
-    tag: '',
-    salt: '',
-  };
-}
-
-/**
  * Reconstruct a Smart Account object from stored DB data.
  *
  * This retrieves the owner EOA by name, then retrieves or creates the
@@ -187,7 +147,6 @@ function isAddressValid(address) {
 }
 
 module.exports = {
-  generateWallet,
   getWalletFromEncrypted,
   getSmartAccountFromRef,
   getCdpClient,

@@ -59,26 +59,7 @@ function buildWalletView(wallet, user, lang) {
     new ButtonBuilder().setCustomId('wallet_history').setLabel(t('wallet.btn_history', lang)).setStyle(ButtonStyle.Secondary),
   );
 
-  // Self-custody upgrade row. Shown when the user's wallet is still on
-  // the legacy CDP Server Wallet (operator-signed). Clicking DMs them
-  // a one-time link to wallet.rank.gg / max-role-bot.vercel.app where
-  // they create their own Coinbase Smart Wallet via passkey and set
-  // their daily match limit. After successful migration the wallet
-  // row's wallet_type flips to 'coinbase_smart_wallet' and this row
-  // disappears.
-  const components = [row1];
-  const isLegacy = !wallet.wallet_type || wallet.wallet_type === 'cdp_server';
-  if (isLegacy) {
-    const upgradeRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('wallet_self_custody_setup')
-        .setLabel('🔐 Upgrade to Self-Custody (Recommended)')
-        .setStyle(ButtonStyle.Primary),
-    );
-    components.push(upgradeRow);
-  }
-
-  return { embeds: [embed], components };
+  return { embeds: [embed], components: [row1] };
 }
 
 module.exports = { buildWalletView };

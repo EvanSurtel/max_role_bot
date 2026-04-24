@@ -324,36 +324,29 @@ async function handleRegistrationModal(interaction) {
     // creates a two-tier fleet (legacy vs self-custody) and every new
     // user starts on the wrong side. Direct-to-self-custody at
     // registration puts every new user on the right path immediately.
-    let wallet = walletRepo.findByUserId(user.id);
-    let setupUrl = null;
-    if (!wallet) {
-      // Accept TOS upfront. Previously we deferred TOS until wallet
-      // creation succeeded so a CDP failure wouldn't leave the user
-      // stuck "registered but no wallet." That concern doesn't apply
-      // to the self-custody path — nonce minting is a local DB insert
-      // that effectively cannot fail. If the /setup web flow fails
-      // later, they can be re-sent a setup link any time.
-      userRepo.acceptTos(user.id);
+    // TOS accepted upfront. Previously we deferred TOS until wallet
+    // creation succeeded so a CDP failure wouldn't leave the user
+    // stuck "registered but no wallet." That concern doesn't apply
+    // to the self-custody path — nonce minting is a local DB insert
+    // that effectively cannot fail. If the /setup web flow fails
+    // later, they can be re-sent a setup link any time.
+    userRepo.acceptTos(user.id);
 
-      try {
-        const linkNonceService = require('../services/linkNonceService');
-        setupUrl = linkNonceService.mintLink({
-          userId: user.id,
-          purpose: 'setup',
-          ttlSeconds: 24 * 60 * 60, // 24h for first-time setup — more forgiving than the 10m upgrade links
-        });
-      } catch (mintErr) {
-        console.error(`[Onboarding] Setup link mint failed for user ${user.id}: ${mintErr.message}`);
-        return interaction.editReply({
-          content: 'Registration succeeded but we couldn\'t generate your wallet setup link. An admin will fix this shortly.',
-          embeds: [], components: [],
-        });
-      }
+    let setupUrl;
+    try {
+      const linkNonceService = require('../services/linkNonceService');
+      setupUrl = linkNonceService.mintLink({
+        userId: user.id,
+        purpose: 'setup',
+        ttlSeconds: 24 * 60 * 60, // 24h for first-time setup — more forgiving than the 10m upgrade links
+      });
+    } catch (mintErr) {
+      console.error(`[Onboarding] Setup link mint failed for user ${user.id}: ${mintErr.message}`);
+      return interaction.editReply({
+        content: 'Registration succeeded but we couldn\'t generate your wallet setup link. An admin will fix this shortly.',
+        embeds: [], components: [],
+      });
     }
-    // escrowApprovalFailed is now always false for self-custody users —
-    // the escrow approve step is irrelevant on this path (only the
-    // SpendPermission daily cap gates the spender).
-    const escrowApprovalFailed = false;
 
     // Assign member role
     const guild = interaction.guild;
@@ -383,20 +376,12 @@ async function handleRegistrationModal(interaction) {
       console.warn(`[Onboarding] Rank role sync failed:`, err.message);
     }
 
-    // Registration complete embed. Two variants based on whether the
-    // user is a new self-custody registrant (needs to complete /setup
-    // to get their wallet) or returning (wallet already exists).
-    const walletChannelMention = process.env.WALLET_CHANNEL_ID
-      ? `<#${process.env.WALLET_CHANNEL_ID}>`
-      : '**#wallet**';
-
+    // Registration complete embed — guide them to /setup to create
+    // their self-custody wallet.
     const completeEmbed = new EmbedBuilder()
       .setTitle(t('onboarding.complete_title', lang))
-      .setColor(0x2ecc71);
-
-    if (setupUrl) {
-      // Brand-new user: guide them to /setup to create their wallet.
-      completeEmbed.setDescription([
+      .setColor(0x2ecc71)
+      .setDescription([
         `👋 Welcome, **${displayName}**!`,
         '',
         '**One last step — create your self-custody wallet.**',
@@ -412,44 +397,8 @@ async function handleRegistrationModal(interaction) {
         `**${t('onboarding.complete_field_uid', lang)}:** ${codUid}`,
         `**${t('onboarding.complete_field_region', lang)}:** ${regionLabel}`,
       ].join('\n'));
-    } else {
-      // Returning user with existing wallet — legacy flow copy.
-      completeEmbed.setDescription([
-        t('onboarding.complete_welcome', lang, { name: displayName }),
-        '',
-        t('onboarding.complete_set_up', lang),
-        '',
-        `**${t('onboarding.complete_field_name', lang)}:** ${displayName}`,
-        `**${t('onboarding.complete_field_ign', lang)}:** ${codIgn}`,
-        `**${t('onboarding.complete_field_uid', lang)}:** ${codUid}`,
-        `**${t('onboarding.complete_field_region', lang)}:** ${regionLabel}`,
-        '',
-        `**${t('onboarding.complete_wallet_header', lang)}**`,
-        t('onboarding.complete_wallet_text', lang, { channel: walletChannelMention }),
-        '',
-        `**${t('onboarding.complete_started_header', lang)}**`,
-        `1. ${t('onboarding.complete_started_1', lang)}`,
-        `2. ${t('onboarding.complete_started_2', lang)}`,
-        `3. ${t('onboarding.complete_started_3', lang)}`,
-        `4. ${t('onboarding.complete_started_4', lang)}`,
-        '',
-        t('onboarding.complete_good_luck', lang),
-      ].join('\n'));
-    }
 
     await interaction.editReply({ embeds: [completeEmbed], components: [], content: '' });
-
-    // Warn user if escrow approval failed (non-blocking — approval retried at first match)
-    if (escrowApprovalFailed) {
-      try {
-        await interaction.followUp({
-          content: 'Your wallet was created but the USDC approval step had an issue. This will be retried automatically when you enter your first match. If you see errors when creating a match, try again.',
-          ephemeral: true,
-        });
-      } catch (followUpErr) {
-        console.warn('[Onboarding] Failed to send escrow approval warning to user:', followUpErr.message);
-      }
-    }
 
     // Admin notification
     const alertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
@@ -468,7 +417,7 @@ async function handleRegistrationModal(interaction) {
               `**COD UID:** ${codUid}`,
               `**Region:** ${regionLabel}`,
               `**Country:** ${country}`,
-              `**Wallet:** ${wallet?.address ? `\`${wallet.address}\`` : '_pending self-custody setup_'}`,
+              `**Wallet:** _pending self-custody setup_`,
             ].join('\n'))
             .setTimestamp();
           await alertChannel.send({ embeds: [adminEmbed] });
@@ -486,7 +435,7 @@ async function handleRegistrationModal(interaction) {
         type: 'user_registered',
         username: displayName,
         discordId,
-        memo: `${country} ${displayName} | IGN: ${codIgn} | UID: ${codUid} | Region: ${regionLabel} | Wallet: ${wallet?.address || 'pending setup'}`,
+        memo: `${country} ${displayName} | IGN: ${codIgn} | UID: ${codUid} | Region: ${regionLabel} | Wallet: pending setup`,
       });
     } catch { /* */ }
 
