@@ -3,36 +3,74 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title WagerEscrow
  * @notice Match escrow for USDC wagers on Base.
  *
- * Architecture:
- *   - Each user has their own wallet. The bot signs on their behalf.
- *   - Before any match, each user's wallet must have approved this
- *     contract to spend their USDC via ERC-20 approve().
- *   - createMatch: bot creates a match record on-chain.
- *   - depositToEscrow: bot calls transferFrom to pull each player's
- *     entry amount into this contract.
- *   - resolveMatch: bot (owner) distributes the pot to winners.
- *   - cancelMatch: bot (owner) refunds all locked USDC to players.
+ * Role-based access control (replaces single-owner Ownable):
+ *
+ *   matchOperator — the bot's Smart Account. Day-to-day authority:
+ *     createMatch, depositFromSpender, resolveMatch, cancelMatch.
+ *     Single key held by escrow-owner-smart at CDP. If CDP is
+ *     compromised, the attacker inherits THIS role only — they can
+ *     grief active matches but cannot drain unallocated funds, rotate
+ *     ownership, or lock legitimate admins out.
+ *
+ *   admin — the multisig Safe. Break-glass authority: emergencyWithdraw,
+ *     setMatchOperator (rotate the bot's key if it's compromised),
+ *     transferAdmin (rotate the multisig itself). Only used in rare
+ *     recovery scenarios — routine match operations never touch it.
+ *
+ * Architecture (self-custody):
+ *   - Every user owns their own Coinbase Smart Wallet (passkey-gated).
+ *   - At /setup the user signs an EIP-712 SpendPermission granting
+ *     escrow-owner-smart a bounded, time-limited, revocable USDC
+ *     allowance through SpendPermissionManager.
+ *   - createMatch: bot creates the on-chain match record.
+ *   - depositFromSpender: one atomic UserOp pulls entry from the user's
+ *     Smart Wallet (via SPM.spend) → escrow-owner-smart → WagerEscrow.
+ *   - resolveMatch: bot pays winners directly to their own Smart Wallets.
+ *   - cancelMatch: bot refunds all depositors at their full entry.
  *
  * Safety:
- *   - totalActiveEscrow tracks the sum of all USDC locked in
- *     unresolved/uncancelled matches. emergencyWithdraw can ONLY
- *     withdraw funds NOT allocated to active matches — it cannot
- *     drain player money from in-progress games.
+ *   - totalActiveEscrow tracks USDC locked in unresolved/uncancelled
+ *     matches. emergencyWithdraw (admin-only) is capped at
+ *     contractBalance - totalActiveEscrow — it cannot touch money
+ *     belonging to in-progress games.
+ *   - cancelMatch enforces per-player hasDeposited + no-double-refund
+ *     via hasRefunded + refund == entryAmount.
+ *   - resolveMatch rejects duplicate winners in the array.
  *
- * Every state change emits an event with the matchId so the full
- * history is queryable on BaseScan.
+ * Every state change emits an event so the full history is queryable
+ * on BaseScan or any off-chain indexer.
  */
-contract WagerEscrow is Ownable, ReentrancyGuard {
+contract WagerEscrow is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable usdc;
+
+    // ─── Roles ──────────────────────────────────────────────────
+
+    /// @notice Day-to-day operator. The bot's Smart Account.
+    address public matchOperator;
+
+    /// @notice Break-glass authority. The multisig Safe (or, during
+    ///         bring-up before the Safe is ready, the same address
+    ///         as matchOperator — admin can be rotated to the Safe
+    ///         later via transferAdmin).
+    address public admin;
+
+    modifier onlyMatchOperator() {
+        require(msg.sender == matchOperator, "Not matchOperator");
+        _;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not admin");
+        _;
+    }
 
     /// @notice Running total of USDC locked in active (non-resolved,
     ///         non-cancelled) matches. Incremented on deposit, decremented
@@ -66,16 +104,52 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
     event MatchResolved(uint256 indexed matchId, address[] winners, uint256[] amounts);
     event MatchCancelled(uint256 indexed matchId, address[] players, uint256[] refunds);
     event EmergencyWithdraw(address indexed to, uint256 amount);
+    event MatchOperatorChanged(address indexed previous, address indexed current);
+    event AdminChanged(address indexed previous, address indexed current);
 
     // ─── Constructor ────────────────────────────────────────────
 
     /**
-     * @param _usdc The native USDC contract on Base.
-     *              Mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+     * @param _usdc           Native USDC on Base (mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913)
+     * @param _matchOperator  Initial match operator (bot's escrow-owner-smart Smart Account)
+     * @param _admin          Initial admin (multisig Safe, or the deployer EOA
+     *                        during bring-up if the Safe is deployed later —
+     *                        admin can be rotated to the Safe via transferAdmin)
      */
-    constructor(address _usdc) Ownable(msg.sender) {
+    constructor(address _usdc, address _matchOperator, address _admin) {
         require(_usdc != address(0), "USDC address cannot be zero");
+        require(_matchOperator != address(0), "matchOperator cannot be zero");
+        require(_admin != address(0), "admin cannot be zero");
         usdc = IERC20(_usdc);
+        matchOperator = _matchOperator;
+        admin = _admin;
+        emit MatchOperatorChanged(address(0), _matchOperator);
+        emit AdminChanged(address(0), _admin);
+    }
+
+    // ─── Admin role management ──────────────────────────────────
+
+    /**
+     * @notice Rotate the matchOperator — used if the bot's Smart Account
+     *         key is ever compromised. Admin (multisig) only.
+     */
+    function setMatchOperator(address newOperator) external onlyAdmin {
+        require(newOperator != address(0), "matchOperator cannot be zero");
+        address prev = matchOperator;
+        matchOperator = newOperator;
+        emit MatchOperatorChanged(prev, newOperator);
+    }
+
+    /**
+     * @notice Rotate the admin itself — used to migrate from a
+     *         single-EOA bring-up admin to the multisig Safe, or to
+     *         rotate the Safe address itself later. Admin only.
+     */
+    function transferAdmin(address newAdmin) external onlyAdmin {
+        require(newAdmin != address(0), "admin cannot be zero");
+        address prev = admin;
+        admin = newAdmin;
+        emit AdminChanged(prev, newAdmin);
     }
 
     // ─── Create Match ───────────────────────────────────────────
@@ -90,7 +164,7 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
         uint256 matchId,
         uint256 entryAmount,
         uint8 playerCount
-    ) external onlyOwner {
+    ) external onlyMatchOperator {
         require(matches[matchId].entryAmount == 0, "Match already exists");
         require(entryAmount > 0, "Entry must be > 0");
         require(playerCount >= 2, "Need at least 2 players");
@@ -120,7 +194,7 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
     function depositToEscrow(
         uint256 matchId,
         address player
-    ) external onlyOwner nonReentrant {
+    ) external onlyMatchOperator nonReentrant {
         Match storage m = matches[matchId];
         require(m.entryAmount > 0, "Match does not exist");
         require(!m.resolved, "Match already resolved");
@@ -165,7 +239,7 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
         uint256 matchId,
         address player,
         address source
-    ) external onlyOwner nonReentrant {
+    ) external onlyMatchOperator nonReentrant {
         Match storage m = matches[matchId];
         require(m.entryAmount > 0, "Match does not exist");
         require(!m.resolved, "Match already resolved");
@@ -212,7 +286,7 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
         uint256 matchId,
         address[] calldata winners,
         uint256[] calldata amounts
-    ) external onlyOwner nonReentrant {
+    ) external onlyMatchOperator nonReentrant {
         Match storage m = matches[matchId];
         require(m.entryAmount > 0, "Match does not exist");
         require(!m.resolved, "Already resolved");
@@ -269,7 +343,7 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
         uint256 matchId,
         address[] calldata players,
         uint256[] calldata refunds
-    ) external onlyOwner nonReentrant {
+    ) external onlyMatchOperator nonReentrant {
         Match storage m = matches[matchId];
         require(m.entryAmount > 0, "Match does not exist");
         require(!m.resolved, "Already resolved");
@@ -322,7 +396,7 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
     function emergencyWithdraw(
         address to,
         uint256 amount
-    ) external onlyOwner nonReentrant {
+    ) external onlyAdmin nonReentrant {
         require(to != address(0), "Cannot send to zero address");
         require(amount > 0, "Amount must be > 0");
 

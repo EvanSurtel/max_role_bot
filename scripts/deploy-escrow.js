@@ -116,10 +116,33 @@ async function main() {
   const usdcAddress = process.env.USDC_CONTRACT_ADDRESS || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
   console.log(`[Deploy] USDC address: ${usdcAddress}`);
 
-  // Encode constructor args (USDC address)
-  const iface = new ethers.Interface(abi);
-  const constructorData = iface.encodeDeploy([usdcAddress]);
-  const deployData = bytecode + constructorData.slice(2); // remove 0x from constructor data
+  // matchOperator — always the bot's Smart Account, never changes in
+  // normal operation. Holds day-to-day authority (createMatch,
+  // depositFromSpender, resolveMatch, cancelMatch).
+  const matchOperator = smartAccount.address;
+
+  // admin — holds break-glass authority (emergencyWithdraw, rotate the
+  // matchOperator if the bot's key is compromised, rotate itself).
+  //
+  // Normally this is a multisig Safe (set SAFE_ADMIN_ADDRESS in .env).
+  // During bring-up before the Safe is deployed, admin can fall back
+  // to the Smart Account too — admin is then migrated to the Safe
+  // later via transferAdmin. Clear warning is logged below if the
+  // fallback is used, since that leaves the role-based protection
+  // providing no additional defense vs. the prior single-owner model.
+  const configuredAdmin = (process.env.SAFE_ADMIN_ADDRESS || '').trim();
+  const adminAddress = configuredAdmin || smartAccount.address;
+  if (!configuredAdmin) {
+    console.warn(
+      '[Deploy] WARNING: SAFE_ADMIN_ADDRESS not set — admin role falls ' +
+      'back to escrow-owner-smart. This means the role-based model ' +
+      'provides no additional protection beyond single-owner. Migrate ' +
+      'admin to the multisig Safe via transferAdmin() as soon as the ' +
+      'Safe is deployed.',
+    );
+  }
+  console.log(`[Deploy] matchOperator: ${matchOperator}`);
+  console.log(`[Deploy] admin:         ${adminAddress}${configuredAdmin ? ' (multisig Safe)' : ' (bring-up fallback — migrate to Safe)'}`);
 
   // CDP sendTransaction doesn't support contract creation (no `to` address).
   // Export the owner account's private key and use ethers.js directly.
@@ -132,7 +155,7 @@ async function main() {
 
   console.log('[Deploy] Sending deployment transaction...');
   const factory = new ethers.ContractFactory(abi, bytecode, deployer);
-  const contract = await factory.deploy(usdcAddress);
+  const contract = await factory.deploy(usdcAddress, matchOperator, adminAddress);
   console.log(`[Deploy] TX hash: ${contract.deploymentTransaction().hash}`);
   console.log('[Deploy] Waiting for confirmation...');
 
@@ -141,24 +164,18 @@ async function main() {
 
   console.log(`[Deploy] ✅ WagerEscrow deployed at: ${deployedAddress}`);
   console.log(`[Deploy] View on BaseScan: ${explorerUrl}/address/${deployedAddress}`);
-  console.log();
 
-  // ─── Transfer ownership from EOA to Smart Account ──────────────
-  // After this, the EOA never signs another tx for this contract.
-  // The Smart Account becomes the only authorized caller of
-  // createMatch / resolveMatch / cancelMatch, and every one of
-  // those calls is gasless via the CDP Paymaster.
-  console.log('[Deploy] Transferring ownership to the Smart Account (gasless-ready)...');
-  const transferTx = await contract.transferOwnership(smartAccount.address);
-  console.log(`[Deploy]   transferOwnership TX: ${transferTx.hash}`);
-  await transferTx.wait(1);
-
-  // Sanity-check the new owner on-chain
-  const newOwner = await contract.owner();
-  if (newOwner.toLowerCase() !== smartAccount.address.toLowerCase()) {
-    throw new Error(`Ownership transfer failed. On-chain owner=${newOwner}, expected=${smartAccount.address}`);
+  // Sanity-check the roles on-chain (constructor emitted events but
+  // verifying state confirms the call actually stuck).
+  const onChainMatchOp = await contract.matchOperator();
+  const onChainAdmin = await contract.admin();
+  if (onChainMatchOp.toLowerCase() !== matchOperator.toLowerCase()) {
+    throw new Error(`matchOperator mismatch after deploy: on-chain ${onChainMatchOp}, expected ${matchOperator}`);
   }
-  console.log(`[Deploy] ✅ Ownership transferred to Smart Account`);
+  if (onChainAdmin.toLowerCase() !== adminAddress.toLowerCase()) {
+    throw new Error(`admin mismatch after deploy: on-chain ${onChainAdmin}, expected ${adminAddress}`);
+  }
+  console.log(`[Deploy] ✅ Roles verified on-chain`);
   console.log();
 
   // ─── Smart Account approves WagerEscrow for USDC ───────────────
@@ -210,16 +227,24 @@ async function main() {
 
   console.log('═'.repeat(72));
   console.log(`[Deploy] ✅ Deployment complete`);
-  console.log(`[Deploy] Contract:      ${deployedAddress}`);
-  console.log(`[Deploy] Owner (Smart): ${smartAccount.address}`);
+  console.log(`[Deploy] Contract:       ${deployedAddress}`);
+  console.log(`[Deploy] matchOperator:  ${matchOperator} (bot's Smart Account)`);
+  console.log(`[Deploy] admin:          ${adminAddress}${configuredAdmin ? ' (multisig Safe)' : ' (bring-up fallback — migrate to Safe!)'}`);
   console.log(`[Deploy] View on BaseScan: ${explorerUrl}/address/${deployedAddress}`);
   console.log();
   console.log('Add these to your .env:');
   console.log(`  ESCROW_CONTRACT_ADDRESS=${deployedAddress}`);
   console.log(`  CDP_OWNER_ADDRESS=${smartAccount.address}`);
   console.log();
-  console.log('From now on the EOA is DORMANT. All escrow admin calls route');
+  console.log('From now on the EOA is DORMANT. All match-operator calls route');
   console.log('through the Smart Account via Paymaster — zero gas cost.');
+  if (!configuredAdmin) {
+    console.log();
+    console.log('⚠️  admin is currently the same address as matchOperator.');
+    console.log('    Deploy a 2-of-3 Gnosis Safe at https://safe.global/ on Base,');
+    console.log('    then call transferAdmin(<safe address>) from escrow-owner-smart.');
+    console.log('    Alternatively: redeploy with SAFE_ADMIN_ADDRESS set.');
+  }
   console.log('═'.repeat(72));
 }
 
