@@ -64,39 +64,11 @@ function registerAll(client) {
     console.log(`[TimerHandler] teammate_accept: challenge ${player.challenge_id} cancelled due to teammate timeout`);
   });
 
-  // --- dispute_resolution_finalize: referenceId is dispute_pending_resolutions.id ---
-  // Fires 36 hours after a dispute-resolved match was scheduled. Calls
-  // on-chain WagerEscrow.resolveMatch — transferring USDC from the
-  // escrow contract to the winners' own Smart Wallets — and zeroes
-  // each winner's users.pending_balance. Before this timer fires the
-  // funds sit in the escrow contract, so a disputed winner cannot
-  // front-run the admin-review window by withdrawing early. See
-  // audit C1 (commit log) for the full rationale.
-  //
-  // Safe to re-fire (e.g. after a bot restart mid-hold): the handler
-  // is idempotent via dispute_pending_resolutions.status.
-  timerService.registerHandler('dispute_resolution_finalize', async (pendingId) => {
-    const escrowManager = require('../base/escrowManager');
-    try {
-      await escrowManager.finalizeDisputedDisbursement(pendingId);
-    } catch (err) {
-      console.error(`[TimerHandler] dispute_resolution_finalize failed for row ${pendingId}:`, err.message);
-      const alertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
-      if (alertChannelId) {
-        try {
-          const ch = client?.channels?.cache?.get(alertChannelId);
-          if (ch) {
-            await ch.send({
-              content:
-                `🚨 **Dispute resolution finalize failed** — pending id ${pendingId}.\n` +
-                `Error: ${err.message}\n` +
-                `Admin action: check dispute_pending_resolutions row; funds still in escrow contract.`,
-            });
-          }
-        } catch { /* best effort */ }
-      }
-    }
-  });
+  // Dispute resolutions pay out instantly (via the normal
+  // disburseWinnings path); no dispute-specific timer handler exists
+  // anymore. If old `dispute_resolution_finalize` or `dispute_hold_release`
+  // timer rows are still present in a pre-migration DB, timerService
+  // will log a warning and move on (no-op).
 
   // --- match_inactivity: referenceId is matchId ---
   // Fires after estimated match duration + buffer if no result reported

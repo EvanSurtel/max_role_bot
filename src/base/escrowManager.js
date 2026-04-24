@@ -383,21 +383,11 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
     throw new Error('No winning player IDs provided');
   }
 
-  // Disputed matches must NOT resolve on-chain immediately. The 36-hour
-  // admin-review window only works if the USDC stays in the escrow
-  // contract for those 36 hours — once it's in a winner's self-custody
-  // Smart Wallet, the winner can withdraw instantly and the hold is
-  // fiction. Audit C1 fix.
-  //
-  // Instead, record the intended disbursement in dispute_pending_resolutions,
-  // credit pending_balance for UI display (wallet panel shows "pending,
-  // available in 36h"), and schedule a timer to call on-chain
-  // resolveMatch at release_at. The timer handler is in timerHandlers.js
-  // (dispute_resolution_finalize).
-  if (fromDispute) {
-    return _scheduleDisputedDisbursement(matchId, challengeId, winningPlayerIds, totalPotUsdc);
-  }
-
+  // Disputes resolve instantly. Operator is the sole admin, so the
+  // 36-hour cancellation window that existed pre-refactor added
+  // friction without a real safety payoff. `fromDispute` is kept as
+  // an informational flag on the transaction memo — everything else
+  // runs the same normal on-chain resolveMatch + credit path.
   const disbursements = _buildDisbursements(winningPlayerIds, totalPotUsdc);
   const winnerAddresses = [];
   const winnerAmounts = [];
@@ -410,7 +400,9 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
   if (winnerAddresses.length === 0) throw new Error('No winners with wallets');
 
   const txType = TRANSACTION_TYPE.DISBURSEMENT;
-  const baseMemo = `Winnings for match #${matchId}`;
+  const baseMemo = fromDispute
+    ? `Winnings for match #${matchId} (dispute-resolved)`
+    : `Winnings for match #${matchId}`;
 
   // Pre-log intent BEFORE the on-chain tx. If the bot crashes between
   // the tx landing and the DB credit, the poller can pick the delta
@@ -499,143 +491,6 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
 
   console.log(`[Escrow] Match #${matchId} resolved: ${winnerAddresses.length} winners. TX: ${onChainHash}`);
   return { disbursements, hash: onChainHash };
-}
-
-// ─── Dispute-delayed disbursement ──────────────────────────────
-
-/**
- * Record a dispute-resolved match's pending disbursement without
- * calling on-chain resolveMatch. Credits each winner's pending_balance
- * for UI purposes (their wallet panel shows "pending, available in
- * 36h") and stores the authoritative winner list + amounts in
- * dispute_pending_resolutions so the timer can execute the on-chain
- * resolveMatch at release_at. See audit C1 in commit log for why
- * the hold must happen on-chain rather than in DB.
- *
- * Timer scheduling (via `dispute_resolution_finalize` in
- * timerHandlers.js) is done by the caller at the services/match level
- * — consistent with existing pattern where timer creation lives with
- * business logic, not escrow.
- */
-function _scheduleDisputedDisbursement(matchId, challengeId, winningPlayerIds, totalPotUsdc) {
-  const disputePendingRepo = require('../database/repositories/disputePendingRepo');
-  const { TIMERS } = require('../config/constants');
-
-  // Reject if a pending resolution already exists for this match.
-  // Could only happen if admin dispute-resolves twice, which the
-  // caller should already guard against via match status transitions
-  // — this is defense in depth.
-  const existing = disputePendingRepo.findByMatchId(matchId);
-  if (existing && existing.status === 'pending') {
-    throw new Error(
-      `Match ${matchId} already has a pending dispute resolution (id ${existing.id}). ` +
-      `Cancel it before scheduling a new one.`,
-    );
-  }
-
-  const releaseAt = new Date(Date.now() + TIMERS.DISPUTE_HOLD).toISOString();
-  const row = disputePendingRepo.create({
-    matchId,
-    challengeId,
-    winningPlayerIds,
-    totalPotUsdc,
-    releaseAt,
-  });
-
-  // Credit each winner's pending_balance so the wallet panel can
-  // surface the 36-hour countdown. This is strictly a UI construct
-  // — the USDC itself lives in the WagerEscrow contract and stays
-  // there until the timer fires and calls on-chain resolveMatch.
-  const disbursements = _buildDisbursements(winningPlayerIds, totalPotUsdc);
-  for (const d of disbursements) {
-    if (d.error) continue;
-    try {
-      walletRepo.creditPending(d.userId, d.amount, releaseAt);
-      transactionRepo.create({
-        type: TRANSACTION_TYPE.DISPUTE_HOLD_CREDIT,
-        userId: d.userId, challengeId,
-        amountUsdc: d.amount,
-        txHash: null,
-        fromAddress: _escrowAddress(),
-        toAddress: d.address,
-        status: 'pending_release',
-        memo: `Winnings for match #${matchId} (held on-chain 36h — dispute resolution, pending row ${row.id})`,
-      });
-    } catch (err) {
-      console.error(`[Escrow] pending_balance credit failed for user ${d.userId}: ${err.message}`);
-    }
-  }
-
-  console.log(
-    `[Escrow] Match #${matchId} dispute-pending (row ${row.id}): ` +
-    `${disbursements.filter(d => !d.error).length} winners, release_at ${releaseAt}. ` +
-    `USDC remains in escrow contract until timer fires.`,
-  );
-
-  return { disbursements, hash: null, pendingId: row.id, releaseAt };
-}
-
-/**
- * Fire the on-chain resolveMatch for a previously-scheduled dispute
- * resolution. Called by the `dispute_resolution_finalize` timer at
- * release_at. Reads the row, runs the full disbursement flow (pre-
- * log + resolveMatch + credit balance_available), zeroes pending_
- * balance for each winner, and marks the row as released.
- *
- * Safe to call multiple times per match: early-returns if the row is
- * already 'released' or 'cancelled'.
- */
-async function finalizeDisputedDisbursement(pendingId) {
-  const disputePendingRepo = require('../database/repositories/disputePendingRepo');
-  const row = disputePendingRepo.findById(pendingId);
-  if (!row) {
-    throw new Error(`dispute_pending_resolutions row ${pendingId} not found`);
-  }
-  if (row.status === 'released') {
-    console.log(`[Escrow] Dispute resolution ${pendingId} already released (match ${row.match_id}) — no-op`);
-    return;
-  }
-  if (row.status === 'cancelled') {
-    console.log(`[Escrow] Dispute resolution ${pendingId} was cancelled (match ${row.match_id}) — skipping on-chain resolve`);
-    return;
-  }
-
-  const winningPlayerIds = JSON.parse(row.winning_player_ids);
-  console.log(
-    `[Escrow] Finalizing dispute resolution ${pendingId} for match #${row.match_id}: ` +
-    `${winningPlayerIds.length} winners, ${row.total_pot_usdc} pot`,
-  );
-
-  // disburseWinnings with fromDispute=false runs the full on-chain
-  // resolveMatch path, crediting each winner's balance_available via
-  // the normal pre-log + creditAvailable flow. The pre-log rows are
-  // keyed by challengeId so they slot in naturally.
-  const result = await disburseWinnings(
-    row.match_id,
-    row.challenge_id,
-    winningPlayerIds,
-    row.total_pot_usdc,
-    { fromDispute: false },
-  );
-
-  // Zero out pending_balance for each winner now that the funds
-  // actually landed in balance_available. releasePending returns
-  // the amount moved — we ignore it because the credit has already
-  // happened via disburseWinnings; we just need to clear the
-  // pending_release timer marker on users.
-  const db = require('../database/db');
-  for (const userId of winningPlayerIds) {
-    try {
-      db.prepare("UPDATE users SET pending_balance = '0', pending_release_at = NULL WHERE id = ? AND pending_balance > '0'")
-        .run(userId);
-    } catch (err) {
-      console.error(`[Escrow] Failed to clear pending_balance for user ${userId}: ${err.message}`);
-    }
-  }
-
-  disputePendingRepo.markReleased(pendingId, result.hash);
-  console.log(`[Escrow] Dispute resolution ${pendingId} released (tx ${result.hash})`);
-  return result;
 }
 
 // ─── On-chain: cancel match → refund all ───────────────────────
@@ -823,7 +678,6 @@ module.exports = {
   depositToEscrow,
   transferToEscrow,
   disburseWinnings,
-  finalizeDisputedDisbursement, // called by dispute_resolution_finalize timer
   cancelOnChainMatch,
   refundAll,
 };
