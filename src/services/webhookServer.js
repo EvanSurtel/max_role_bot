@@ -573,51 +573,17 @@ function startWebhookServer(client) {
         return;
       }
 
-      // Respond to the caller now — the on-chain approve + the
-      // wallet.address flip happen async below.
+      // Respond to the caller now. The on-chain approveWithSignature
+      // AND the wallet.address flip happen asynchronously inside
+      // spendPermissionService.approveOnChain — we just kick it off
+      // here and move on. Putting the wallet flip inside approveOnChain
+      // (instead of piggybacking here in a .then()) means manual
+      // retries of approveOnChain also fix the wallet state, avoiding
+      // the "permission approved but no wallet row" state we hit
+      // earlier in testing.
       res.json({ ok: true, permissionId: row.id });
 
-      // Background: lift the permission on-chain, then flip the user's
-      // wallet.address to the Smart Wallet once approveWithSignature
-      // confirms. Flipping AFTER on-chain confirmation means a grant
-      // that somehow passes local validation but on-chain validation
-      // rejects (e.g. the user revoked between signing and submission)
-      // does NOT redirect their deposits to the attacker's address.
-      spendPermissionService.approveOnChain(row.id).then(() => {
-        try {
-          const wallet = walletRepo.findByUserId(userId);
-          const smartLower = smartWalletAddress.toLowerCase();
-          const db = require('../database/db');
-          if (wallet) {
-            db.prepare(`
-              UPDATE wallets
-              SET wallet_type = 'coinbase_smart_wallet',
-                  smart_wallet_address = @smart,
-                  legacy_cdp_address = COALESCE(legacy_cdp_address, address),
-                  address = @smart,
-                  migrated_at = COALESCE(migrated_at, datetime('now'))
-              WHERE user_id = @userId
-            `).run({ smart: smartLower, userId });
-          } else {
-            walletRepo.create({
-              userId,
-              address: smartWalletAddress,
-              accountRef: null,
-              smartAccountRef: null,
-            });
-            db.prepare(`
-              UPDATE wallets
-              SET wallet_type = 'coinbase_smart_wallet',
-                  smart_wallet_address = @smart,
-                  migrated_at = datetime('now')
-              WHERE user_id = @userId
-            `).run({ smart: smartLower, userId });
-          }
-          console.log(`[Internal API] Wallet flipped to self-custody for user ${userId} after on-chain approve`);
-        } catch (flipErr) {
-          console.error(`[Internal API] Wallet flip failed for user ${userId}: ${flipErr.message}`);
-        }
-      }).catch((err) => {
+      spendPermissionService.approveOnChain(row.id).catch((err) => {
         console.error(`[Internal API] approveOnChain background failed for row ${row.id}: ${err.message}`);
       });
     } catch (err) {

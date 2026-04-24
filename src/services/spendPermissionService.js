@@ -279,7 +279,82 @@ async function approveOnChain(rowId) {
 
   spendPermissionRepo.markApprovedAndSupersedeOthers(rowId, txHash);
   console.log(`[SpendPermission] Row ${rowId} approved on-chain (tx ${txHash})`);
+
+  // Reconcile the user's wallets row to self-custody. This was
+  // previously done only in webhookServer.js's grant endpoint callback,
+  // which meant a manual retry of approveOnChain (bypassing the HTTP
+  // grant path) left the permission 'approved' on-chain but the user
+  // had no wallets row — every "View Wallet" click surfaced the
+  // "finish setting up your wallet" prompt even though setup was done.
+  // Moving it here makes approveOnChain the single source of truth:
+  // any code path that flips a permission to 'approved' also flips
+  // the wallet.
+  try {
+    const approvedRow = spendPermissionRepo.findById(rowId);
+    _flipWalletToSelfCustody(approvedRow);
+  } catch (flipErr) {
+    console.error(
+      `[SpendPermission] Wallet flip failed for user ${row.user_id} after row ${rowId} approved: ${flipErr.message}. ` +
+      'Permission is still approved on-chain; a manual reconcile can insert the wallet row.',
+    );
+  }
+
   return spendPermissionRepo.findById(rowId);
+}
+
+/**
+ * After a permission lands on-chain, update the user's wallets row
+ * to point at the Smart Wallet and mark it self-custody. Used as a
+ * side-effect of approveOnChain so it runs whether the approve came
+ * from the HTTP grant endpoint or from a manual retry.
+ *
+ * Accepts an already-approved spend_permissions row (with .user_id
+ * and .account set). Idempotent: if the wallet already has the
+ * correct type + address, the UPDATE is a no-op.
+ */
+function _flipWalletToSelfCustody(row) {
+  if (!row || !row.user_id || !row.account) {
+    throw new Error('_flipWalletToSelfCustody: row.user_id and row.account required');
+  }
+  const walletRepo = require('../database/repositories/walletRepo');
+  const db = require('../database/db');
+  const smartAddr = row.account;
+  const smartLower = String(smartAddr).toLowerCase();
+
+  const existing = walletRepo.findByUserId(row.user_id);
+  if (existing) {
+    // Legacy CDP user upgrading to self-custody, OR an already-flipped
+    // row. Either way, update-in-place. COALESCE preserves the old
+    // CDP address in legacy_cdp_address so the fund-migration script
+    // can sweep from it.
+    db.prepare(`
+      UPDATE wallets
+      SET wallet_type = 'coinbase_smart_wallet',
+          smart_wallet_address = @smart,
+          legacy_cdp_address = COALESCE(legacy_cdp_address, address),
+          address = @smart,
+          migrated_at = COALESCE(migrated_at, datetime('now'))
+      WHERE user_id = @userId
+    `).run({ smart: smartLower, userId: row.user_id });
+  } else {
+    // Brand-new self-custody user with no prior wallet row. accountRef
+    // is required non-null on the current schema (legacy NOT NULL from
+    // XRP/CDP eras); passing 'self-custody' as a sentinel satisfies the
+    // constraint and clearly marks the row as non-CDP on inspection.
+    walletRepo.create({
+      userId: row.user_id,
+      address: smartAddr,
+      accountRef: 'self-custody',
+      smartAccountRef: null,
+    });
+    db.prepare(`
+      UPDATE wallets
+      SET wallet_type = 'coinbase_smart_wallet',
+          smart_wallet_address = @smart,
+          migrated_at = datetime('now')
+      WHERE user_id = @userId
+    `).run({ smart: smartLower, userId: row.user_id });
+  }
 }
 
 /**
