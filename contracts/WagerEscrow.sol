@@ -55,6 +55,10 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
     // matchId → player address → whether they deposited
     mapping(uint256 => mapping(address => bool)) public hasDeposited;
 
+    // matchId → player address → whether they've been refunded.
+    // Used by cancelMatch to prevent double-refunding the same player.
+    mapping(uint256 => mapping(address => bool)) public hasRefunded;
+
     // ─── Events ─────────────────────────────────────────────────
 
     event MatchCreated(uint256 indexed matchId, uint256 entryAmount, uint8 playerCount);
@@ -215,12 +219,27 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
         require(!m.cancelled, "Already cancelled");
         require(winners.length == amounts.length, "Length mismatch");
         require(winners.length > 0, "No winners");
+        // Bound winners.length defensively so a buggy caller can't
+        // exhaust block gas. playerCount is uint8 so this is always
+        // satisfiable by a legitimate match.
+        require(winners.length <= 255, "Too many winners");
 
         uint256 totalPayout;
         for (uint256 i = 0; i < amounts.length; i++) {
             totalPayout += amounts[i];
         }
         require(totalPayout <= m.totalDeposited, "Payout exceeds escrow");
+
+        // Defense in depth: each winner must appear at most once in
+        // the array. Without this the owner could call
+        // resolveMatch([Alice, Alice], [half, half]) and double-pay
+        // one address. Nested O(n²) loop — bounded by the 255-winner
+        // cap above so worst case ~32K ops, trivial.
+        for (uint256 i = 0; i < winners.length; i++) {
+            for (uint256 j = i + 1; j < winners.length; j++) {
+                require(winners[i] != winners[j], "Duplicate winner");
+            }
+        }
 
         m.resolved = true;
 
@@ -256,11 +275,22 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
         require(!m.resolved, "Already resolved");
         require(!m.cancelled, "Already cancelled");
         require(players.length == refunds.length, "Length mismatch");
+        require(players.length <= 255, "Too many players");
 
-        uint256 totalRefund;
-        for (uint256 i = 0; i < refunds.length; i++) {
-            totalRefund += refunds[i];
+        // Defense in depth: each entry in `players` must be a real
+        // depositor for this match, must not be duplicated, and the
+        // refund must equal the entry amount. Without these checks
+        // a buggy caller could pay one player twice (ignoring another)
+        // or over-refund a single player. Single loop sets
+        // hasRefunded[matchId][players[i]] as the per-match dedup key.
+        for (uint256 i = 0; i < players.length; i++) {
+            require(hasDeposited[matchId][players[i]], "Player did not deposit");
+            require(!hasRefunded[matchId][players[i]], "Player already refunded");
+            require(refunds[i] == m.entryAmount, "Refund must equal entry");
+            hasRefunded[matchId][players[i]] = true;
         }
+
+        uint256 totalRefund = m.entryAmount * players.length;
         require(totalRefund <= m.totalDeposited, "Refund exceeds escrow");
 
         m.cancelled = true;
@@ -269,9 +299,7 @@ contract WagerEscrow is Ownable, ReentrancyGuard {
         totalActiveEscrow -= m.totalDeposited;
 
         for (uint256 i = 0; i < players.length; i++) {
-            if (refunds[i] > 0) {
-                usdc.safeTransfer(players[i], refunds[i]);
-            }
+            usdc.safeTransfer(players[i], refunds[i]);
         }
 
         emit MatchCancelled(matchId, players, refunds);

@@ -118,6 +118,16 @@ client.once('ready', async () => {
       console.error('[Boot] SpendPermission event listener failed to start:', err.message);
     }
 
+    // Tunnel health heartbeat. Fetches BOT_PUBLIC_URL/health every 5
+    // minutes; alerts ADMIN_ALERTS_CHANNEL_ID if the Cloudflare quick
+    // tunnel URL has rotated out from under Vercel's config.
+    try {
+      const tunnelHealth = require('./services/tunnelHealthService');
+      tunnelHealth.start(client);
+    } catch (err) {
+      console.error('[Boot] Tunnel health heartbeat failed to start:', err.message);
+    }
+
     // Schedule daily health summary (every 24h)
     setInterval(() => {
       healthService.postDailySummary(client).catch(err => {
@@ -241,6 +251,13 @@ async function shutdown(signal) {
     spmListener.stop();
   } catch (err) {
     console.error('[Shutdown] Error stopping SpendPermission listener:', err.message || err);
+  }
+
+  try {
+    const tunnelHealth = require('./services/tunnelHealthService');
+    tunnelHealth.stop();
+  } catch (err) {
+    console.error('[Shutdown] Error stopping tunnel health heartbeat:', err.message || err);
   }
 
   client.destroy();
