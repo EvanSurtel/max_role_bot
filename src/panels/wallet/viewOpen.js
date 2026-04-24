@@ -15,7 +15,23 @@ const { t, langFor } = require('../../locales/i18n');
  */
 async function handleWalletViewOpen(interaction) {
   const lang = langFor(interaction);
-  const user = userRepo.findByDiscordId(interaction.user.id);
+  const { isReviewer, ensureReviewerUser } = require('../../utils/reviewerWhitelist');
+  const { isDemoChannelContext } = require('../coinbaseReviewDemoPanel');
+
+  // CDP reviewer fast path: skip the onboarding requirement entirely.
+  // A whitelisted reviewer Discord ID clicking View My Wallet gets a
+  // minimal user row auto-provisioned if they don't have one, then
+  // flows straight into the self-custody setup link (same as any
+  // post-registration user). Reviewers still complete the passkey
+  // ceremony — that's the actual self-custody proof — but we spare
+  // them the COD-specific forms (region/country/IGN/UID) since
+  // they're not real players.
+  let user = userRepo.findByDiscordId(interaction.user.id);
+  if (!user && isReviewer(interaction.user.id) && isDemoChannelContext(interaction)) {
+    user = ensureReviewerUser(interaction.user.id, interaction.user.tag || interaction.user.username);
+    console.log(`[ViewWallet] Auto-provisioned reviewer user ${user.id} (discord=${interaction.user.id})`);
+  }
+
   if (!user) {
     return interaction.reply({ content: t('common.onboarding_required', lang), ephemeral: true });
   }
