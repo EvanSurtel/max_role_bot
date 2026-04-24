@@ -53,7 +53,7 @@ async function handleSmartWalletWithdraw(interaction) {
     '',
     url,
     '',
-    'On that page you&apos;ll reconnect your Coinbase Smart Wallet, enter the destination address and amount, and sign with your passkey. Rank $ never touches your keys.',
+    'On that page you’ll reconnect your Coinbase Smart Wallet, enter the destination address and amount, and sign with your passkey. Rank $ never touches your keys.',
   ].join('\n');
 
   let dmDelivered = false;

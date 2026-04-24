@@ -52,9 +52,18 @@ client.once('ready', async () => {
     const { setClient: setRateLimiterClient } = require('./utils/rateLimiter');
     setRateLimiterClient(client);
 
-    // Initialize Base connection
-    const { getProvider } = require('./base/connection');
+    // Initialize Base connection + verify the RPC reports the chain
+    // ID we expect. A BASE_RPC_URL that points at the wrong network
+    // (e.g. sepolia URL with BASE_NETWORK=mainnet) would otherwise
+    // silently misroute every on-chain call.
+    const { getProvider, verifyChainId } = require('./base/connection');
     getProvider();
+    try {
+      await verifyChainId();
+    } catch (chainErr) {
+      console.error('[Boot] FATAL:', chainErr.message);
+      process.exit(1);
+    }
 
     // Start deposit detection polling (Base USDC)
     const depositService = require('./base/depositService');

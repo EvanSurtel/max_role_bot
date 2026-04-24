@@ -72,6 +72,34 @@ function getProvider() {
   return provider;
 }
 
+/**
+ * One-shot sanity check: confirm the configured RPC actually reports
+ * the chain ID we expect. Guards against the silent-miswire case
+ * where BASE_NETWORK=mainnet but BASE_RPC_URL points at a testnet
+ * endpoint (ethers' per-call network hint would let the mismatched
+ * RPC answer without complaint, and every subsequent on-chain call
+ * goes to the wrong network).
+ *
+ * Called from src/index.js boot after migrations have run. Throws
+ * if the chain ID reported by the RPC disagrees with what our env
+ * config expects, causing the bot to fail loudly at startup instead
+ * of silently misrouting match-start UserOps.
+ */
+async function verifyChainId() {
+  const expected = getChainId();
+  const p = getProvider();
+  const net = await p.getNetwork();
+  const actual = Number(net.chainId);
+  if (actual !== expected) {
+    throw new Error(
+      `BASE_NETWORK mismatch: BASE_NETWORK=${getNetwork()} expects chainId ${expected} ` +
+      `but the RPC at BASE_RPC_URL reports chainId ${actual}. ` +
+      `Check BASE_RPC_URL and BASE_NETWORK env vars.`,
+    );
+  }
+  console.log(`[Base] Chain ID verified: ${actual} (${getChainName()})`);
+}
+
 module.exports = {
   getProvider,
   getConnection: getProvider,
@@ -80,4 +108,5 @@ module.exports = {
   getChainName,
   getCdpNetworkId,
   getExplorerUrl,
+  verifyChainId,
 };

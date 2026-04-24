@@ -84,14 +84,24 @@ async function resolveMatch(client, matchId, winningTeam, { fromDispute = false 
       return;
     }
 
-    // Dispute hold timers for winners
-    if (fromDispute) {
+    // Dispute flow: on-chain resolveMatch was deferred to a 36-hour
+    // timer. disburseWinnings() returned `pendingId` pointing at the
+    // dispute_pending_resolutions row; schedule the finalize timer
+    // against it. USDC stays in the escrow contract until the timer
+    // fires — the winner can't withdraw early because the funds
+    // aren't in their wallet yet.
+    if (fromDispute && disburseResult?.pendingId) {
       const timerService = require('../timerService');
       const { TIMERS } = require('../../config/constants');
-      for (const winnerId of winnerUserIds) {
-        timerService.createTimer('dispute_hold_release', winnerId, TIMERS.DISPUTE_HOLD);
-      }
-      console.log(`[MatchService] 36-hour dispute hold timers created for ${winnerUserIds.length} winner(s) of match #${matchId}`);
+      timerService.createTimer(
+        'dispute_resolution_finalize',
+        disburseResult.pendingId,
+        TIMERS.DISPUTE_HOLD,
+      );
+      console.log(
+        `[MatchService] Dispute resolution #${disburseResult.pendingId} scheduled for finalize in 36h. ` +
+        `Funds remain in escrow contract. Releases to ${winnerUserIds.length} winner(s).`,
+      );
     }
   }
 
