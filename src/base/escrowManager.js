@@ -156,116 +156,149 @@ async function createOnChainMatch(matchId, entryAmountUsdc, playerCount) {
 async function depositToEscrow(userId, matchId, challengeId) {
   const walletRecord = walletRepo.findByUserId(userId);
   if (!walletRecord) throw new Error(`No wallet for user ${userId}`);
-  console.log(
-    `[Escrow] self-custody depositToEscrow: user=${userId} match=${matchId} ` +
-    `smartWallet=${walletRecord.address}`,
-  );
 
-  // Read entry amount from the on-chain match record (source of truth)
-  const provider = getProvider();
-  const escrowAbi = ['function getMatch(uint256) view returns (tuple(uint256,uint8,uint8,uint256,bool,bool))'];
-  const escrowContract = new ethers.Contract(_escrowAddress(), escrowAbi, provider);
-  const matchData = await escrowContract.getMatch(matchId);
-  const entryAmount = matchData[0]; // BigInt, smallest units
-
-  if (entryAmount === 0n) {
-    throw new Error(`Match ${matchId} does not exist on-chain`);
-  }
-
-  // Atomic 2-or-3-call UserOp (audit C3 fix). Sequence:
-  //   [optional] SpendPermissionManager.approveWithSignature
-  //              (only if the row is still 'pending' — paymaster may
-  //              have failed the eager approve at grant time)
-  //   SpendPermissionManager.spend(perm, entryAmount)
-  //              pulls USDC from user's Smart Wallet → escrow-owner-smart
-  //   WagerEscrow.depositFromSpender(matchId, player, source=spender)
-  //              pulls those USDC from escrow-owner-smart → WagerEscrow
-  //
-  // Sending all calls in one UserOp means the ERC-4337 bundler
-  // executes them atomically — either every call succeeds and the
-  // funds land in the escrow contract, or every call reverts and the
-  // user's Smart Wallet balance is unchanged. No orphan state where
-  // SPM.spend moved funds to the spender but depositFromSpender never
-  // pulled them into escrow.
-  const spendPermissionService = require('../services/spendPermissionService');
-  let spendSet;
-  try {
-    spendSet = spendPermissionService.buildSpendCalls(userId, entryAmount);
-  } catch (err) {
-    console.error(`[Escrow]   buildSpendCalls failed: ${err.code || ''} ${err.message}`);
-    throw err;
-  }
-
-  // Append the WagerEscrow.depositFromSpender call. All three (or two)
-  // go out in one UserOp below.
-  const escrowIface = new ethers.Interface([
-    'function depositFromSpender(uint256 matchId, address player, address source)',
-  ]);
-  const depositCallData = escrowIface.encodeFunctionData('depositFromSpender', [
-    String(matchId),
-    walletRecord.address,
-    _ownerAddress(),
-  ]);
-
-  const calls = [
-    ...spendSet.calls,
-    { to: _escrowAddress(), data: depositCallData },
-  ];
-
-  console.log(
-    `[Escrow]   submitting atomic UserOp: ${calls.length} calls ` +
-    `(wasPending=${spendSet.wasPending})`,
-  );
-
-  let hash;
-  try {
-    hash = await transactionService._sendOwnerTxBatch(calls);
-  } catch (err) {
-    // If pre_submit, funds untouched — safe to bubble up and let
-    // match-start's catch path DB-unhold / refund.
-    // If post_submit, the UserOp is in flight; caller must treat the
-    // match as pending verification. The pendingWithdrawSweeper
-    // handles this class by polling getUserOperation.
-    console.error(
-      `[Escrow]   self-custody deposit UserOp failed ` +
-      `(stage=${err.stage || 'unknown'}): ${err.message}`,
+  // Wallet lock — prevents the deposit poller's bi-directional
+  // reconciliation from racing our mid-deposit state. Without this,
+  // the poller could see on-chain balance drop (funds leaving for
+  // escrow) while DB balance_held is still elevated, decide that
+  // means an external withdrawal, and clobber balance_available.
+  // Audit C1 fix. Lock auto-expires after 60s (stale-lock protection)
+  // and is explicitly released in finally.
+  const locked = walletRepo.acquireLock(userId);
+  if (!locked) {
+    throw new Error(
+      `Wallet lock for user ${userId} is held by another operation; try again shortly.`,
     );
-    throw err;
   }
 
-  // Success — reconcile DB state. If the permission was pending and
-  // the batched approveWithSignature just landed, flip the DB row to
-  // 'approved' so future spends skip the approve leg.
-  if (spendSet.wasPending) {
-    const spendPermissionRepo = require('../database/repositories/spendPermissionRepo');
-    try {
-      spendPermissionRepo.markApprovedAndSupersedeOthers(spendSet.permissionId, hash);
-    } catch (markErr) {
-      console.warn(`[Escrow]   markApproved failed (non-fatal): ${markErr.message}`);
+  try {
+    console.log(
+      `[Escrow] self-custody depositToEscrow: user=${userId} match=${matchId} ` +
+      `smartWallet=${walletRecord.address}`,
+    );
+
+    // Read entry amount from the on-chain match record (source of truth)
+    const provider = getProvider();
+    const escrowAbi = ['function getMatch(uint256) view returns (tuple(uint256,uint8,uint8,uint256,bool,bool))'];
+    const escrowContract = new ethers.Contract(_escrowAddress(), escrowAbi, provider);
+    const matchData = await escrowContract.getMatch(matchId);
+    const entryAmount = matchData[0]; // BigInt, smallest units
+
+    if (entryAmount === 0n) {
+      throw new Error(`Match ${matchId} does not exist on-chain`);
     }
+
+    // Atomic 2-or-3-call UserOp. Sequence:
+    //   [optional] SpendPermissionManager.approveWithSignature
+    //              (only if the row is still 'pending' — paymaster may
+    //              have failed the eager approve at grant time)
+    //   SpendPermissionManager.spend(perm, entryAmount)
+    //              pulls USDC from user's Smart Wallet → escrow-owner-smart
+    //   WagerEscrow.depositFromSpender(matchId, player, source=spender)
+    //              pulls those USDC from escrow-owner-smart → WagerEscrow
+    //
+    // Sending all calls in one UserOp means the ERC-4337 bundler
+    // executes them atomically — either every call succeeds and the
+    // funds land in the escrow contract, or every call reverts and the
+    // user's Smart Wallet balance is unchanged. No orphan state where
+    // SPM.spend moved funds to the spender but depositFromSpender never
+    // pulled them into escrow.
+    const spendPermissionService = require('../services/spendPermissionService');
+    let spendSet;
+    try {
+      spendSet = spendPermissionService.buildSpendCalls(userId, entryAmount);
+    } catch (err) {
+      console.error(`[Escrow]   buildSpendCalls failed: ${err.code || ''} ${err.message}`);
+      throw err;
+    }
+
+    // Append the WagerEscrow.depositFromSpender call. All three (or two)
+    // go out in one UserOp below.
+    const escrowIface = new ethers.Interface([
+      'function depositFromSpender(uint256 matchId, address player, address source)',
+    ]);
+    const depositCallData = escrowIface.encodeFunctionData('depositFromSpender', [
+      String(matchId),
+      walletRecord.address,
+      _ownerAddress(),
+    ]);
+
+    const calls = [
+      ...spendSet.calls,
+      { to: _escrowAddress(), data: depositCallData },
+    ];
+
+    console.log(
+      `[Escrow]   submitting atomic UserOp: ${calls.length} calls ` +
+      `(wasPending=${spendSet.wasPending})`,
+    );
+
+    let hash;
+    try {
+      hash = await transactionService._sendOwnerTxBatch(calls);
+    } catch (err) {
+      console.error(
+        `[Escrow]   self-custody deposit UserOp failed ` +
+        `(stage=${err.stage || 'unknown'}): ${err.message}`,
+      );
+      if (err.stage === 'post_submit') {
+        // UserOp was submitted but we don't know if it confirmed.
+        // Critical distinction for the match-start error path: if
+        // the tx actually lands later, the user's USDC is in escrow
+        // and refunding their DB hold would double-credit them.
+        // Mark the error with `.escrowStuck = true` so the match
+        // service can skip the automatic refund + alert an admin to
+        // resolve manually by checking BaseScan.
+        err.escrowStuck = true;
+        err.userId = userId;
+        err.matchId = matchId;
+      }
+      throw err;
+    }
+
+    // Success — reconcile DB state. If the permission was pending and
+    // the batched approveWithSignature just landed, flip the DB row to
+    // 'approved' and flip the user's wallet row to self-custody (the
+    // grant handler's normal flip path only fires from /api/internal/
+    // wallet/grant; match-deposit path needs to do the same work so a
+    // user whose grant-time approveOnChain failed still gets their
+    // wallet row updated to reflect reality after the first match).
+    if (spendSet.wasPending) {
+      const spendPermissionRepo = require('../database/repositories/spendPermissionRepo');
+      try {
+        spendPermissionRepo.markApprovedAndSupersedeOthers(spendSet.permissionId, hash);
+        const approvedRow = spendPermissionRepo.findById(spendSet.permissionId);
+        if (approvedRow) {
+          spendPermissionService._flipWalletToSelfCustody(approvedRow);
+        }
+      } catch (markErr) {
+        console.warn(`[Escrow]   markApproved/walletFlip failed (non-fatal): ${markErr.message}`);
+      }
+    }
+
+    // Atomic decrement of balance_held. balance_available is
+    // explicitly NOT touched — funds moved from held directly to the
+    // escrow contract on-chain, never to available. Using
+    // decrementHeld (vs the old updateBalance with a stale
+    // balance_available) avoids clobbering a deposit credit that
+    // raced with the on-chain confirmation.
+    walletRepo.decrementHeld(userId, entryAmount);
+
+    transactionRepo.create({
+      type: TRANSACTION_TYPE.ESCROW_IN,
+      userId, challengeId, amountUsdc: entryAmount.toString(),
+      txHash: hash,
+      fromAddress: walletRecord.address,
+      toAddress: _escrowAddress(),
+      status: 'completed',
+      memo: `Escrow deposit (self-custody, atomic) for match #${matchId}`,
+    });
+
+    console.log(`[Escrow] User ${userId} deposited to match #${matchId} (self-custody atomic): ${hash}`);
+    return { hash };
+  } finally {
+    walletRepo.releaseLock(userId);
   }
-
-  // Zero out held balance in DB (funds now in escrow contract). Mirror
-  // the legacy path — balance_held drops by entryAmount.
-  const freshWallet = walletRepo.findByUserId(userId);
-  const newHeld = (BigInt(freshWallet.balance_held) - entryAmount).toString();
-  walletRepo.updateBalance(userId, {
-    balanceAvailable: freshWallet.balance_available,
-    balanceHeld: newHeld,
-  });
-
-  transactionRepo.create({
-    type: TRANSACTION_TYPE.ESCROW_IN,
-    userId, challengeId, amountUsdc: entryAmount.toString(),
-    txHash: hash,
-    fromAddress: walletRecord.address,
-    toAddress: _escrowAddress(),
-    status: 'completed',
-    memo: `Escrow deposit (self-custody, atomic) for match #${matchId}`,
-  });
-
-  console.log(`[Escrow] User ${userId} deposited to match #${matchId} (self-custody atomic): ${hash}`);
-  return { hash };
 }
 
 // ─── On-chain: transfer all players' USDC to escrow ────────────
@@ -321,22 +354,30 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
   }
 
   const matchPrize = BigInt(totalPotUsdc);
-  const perPlayerShare = matchPrize / BigInt(winningPlayerIds.length);
+  const winnerCount = BigInt(winningPlayerIds.length);
+  const perPlayerShare = matchPrize / winnerCount;
+  // BigInt division truncates. For a 3-way split of $100 USDC (100_000_000
+  // smallest units), each winner gets 33_333_333 → total 99_999_999 → 1
+  // unit of dust stranded in escrow forever. Give the remainder to the
+  // first winner so pot equals payout exactly. Ordering is deterministic
+  // (follows winningPlayerIds order from the caller).
+  const remainder = matchPrize - (perPlayerShare * winnerCount);
 
   const winnerAddresses = [];
   const winnerAmounts = [];
   const disbursements = [];
 
-  for (const userId of winningPlayerIds) {
+  winningPlayerIds.forEach((userId, idx) => {
     const walletRecord = walletRepo.findByUserId(userId);
     if (!walletRecord) {
       disbursements.push({ userId, error: 'no wallet' });
-      continue;
+      return;
     }
+    const share = idx === 0 ? (perPlayerShare + remainder) : perPlayerShare;
     winnerAddresses.push(walletRecord.address);
-    winnerAmounts.push(perPlayerShare.toString());
-    disbursements.push({ userId, address: walletRecord.address, amount: perPlayerShare.toString() });
-  }
+    winnerAmounts.push(share.toString());
+    disbursements.push({ userId, address: walletRecord.address, amount: share.toString() });
+  });
 
   if (winnerAddresses.length === 0) throw new Error('No winners with wallets');
 

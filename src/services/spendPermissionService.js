@@ -487,4 +487,8 @@ module.exports = {
   spendForUser,
   buildSpendCalls,
   revokePermission,
+  _flipWalletToSelfCustody, // exported so escrowManager can call it
+                            // when the match-deposit path lands the
+                            // batched approveWithSignature + spend
+                            // and needs to reconcile the wallet row
 };

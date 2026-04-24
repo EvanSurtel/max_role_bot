@@ -533,6 +533,17 @@ function startWebhookServer(client) {
         // ties the user to a signature they may regret.
         const maxEnd = Math.floor(Date.now() / 1000) + (2 * 365 * 24 * 60 * 60);
         if (end > maxEnd) throw new Error('end more than 2 years in the future');
+        // extraData is an `bytes` on the SPM contract. Coinbase's current
+        // wallet always passes 0x (empty). Cap at a small max to prevent
+        // a caller with the shared secret from submitting a 10 MB hex
+        // string and bloating the DB row + every future spend's calldata.
+        const extra = permission.extraData ?? '0x';
+        if (typeof extra !== 'string' || !/^0x[0-9a-fA-F]*$/.test(extra)) {
+          throw new Error('extraData must be 0x-prefixed hex');
+        }
+        if (extra.length > 2 + 1024) {
+          throw new Error('extraData exceeds 1KB cap');
+        }
       } catch (shapeErr) {
         res.status(400).json({ error: `invalid permission shape: ${shapeErr.message}` });
         return;
@@ -581,11 +592,33 @@ function startWebhookServer(client) {
       // retries of approveOnChain also fix the wallet state, avoiding
       // the "permission approved but no wallet row" state we hit
       // earlier in testing.
+      //
+      // Serialize per-user via walletRepo.acquireLock to avoid the
+      // concurrent-grants race: two valid nonces signed simultaneously
+      // (e.g. user opens two setup pages) would otherwise interleave
+      // markApprovedAndSupersedeOthers, leaving an inconsistent DB +
+      // a second dangling on-chain approved permission. Lock auto-
+      // expires after 60s so a crash mid-approve doesn't deadlock.
       res.json({ ok: true, permissionId: row.id });
 
-      spendPermissionService.approveOnChain(row.id).catch((err) => {
-        console.error(`[Internal API] approveOnChain background failed for row ${row.id}: ${err.message}`);
-      });
+      (async () => {
+        const locked = walletRepo.acquireLock(userId);
+        if (!locked) {
+          console.warn(
+            `[Internal API] approveOnChain skipped for row ${row.id}: ` +
+            `wallet lock held by another operation for user ${userId}. ` +
+            `This grant will be picked up on the next spendForUser lazy-approve.`,
+          );
+          return;
+        }
+        try {
+          await spendPermissionService.approveOnChain(row.id);
+        } catch (err) {
+          console.error(`[Internal API] approveOnChain background failed for row ${row.id}: ${err.message}`);
+        } finally {
+          walletRepo.releaseLock(userId);
+        }
+      })();
     } catch (err) {
       console.error('[Internal API] /wallet/grant error:', err.message);
       res.status(500).json({ error: err.message || 'internal error' });

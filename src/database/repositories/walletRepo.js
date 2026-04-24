@@ -17,6 +17,7 @@ const stmts = {
     UPDATE wallets SET balance_available = @balanceAvailable, balance_held = @balanceHeld
     WHERE user_id = @userId
   `),
+  updateHeldOnly: db.prepare('UPDATE wallets SET balance_held = @balanceHeld WHERE user_id = @userId'),
   activate: db.prepare('UPDATE wallets SET is_activated = 1 WHERE user_id = ?'),
   getAllActivated: db.prepare('SELECT * FROM wallets WHERE is_activated = 1'),
   getAll: db.prepare('SELECT * FROM wallets'),
@@ -83,6 +84,25 @@ const creditAvailableTx = db.transaction((userId, deltaUsdc) => {
     balanceAvailable: (freshAvail + delta).toString(),
     balanceHeld: wallet.balance_held, // preserve held exactly as stored right now
   });
+});
+
+// Atomic decrement of balance_held only. Used by escrowManager when
+// funds leave the "held for upcoming match" state after the on-chain
+// escrow deposit UserOp lands — balance_available is NOT touched
+// (the funds never moved into available; they moved straight from
+// held → escrow contract on-chain). Writing just balance_held avoids
+// clobbering any deposit credits that raced in between the UserOp
+// confirmation and this DB update.
+const decrementHeldTx = db.transaction((userId, amountUsdc) => {
+  const wallet = stmts.findByUserId.get(userId);
+  if (!wallet) throw new Error('Wallet not found');
+  const held = BigInt(wallet.balance_held);
+  const dec = BigInt(amountUsdc);
+  // Clamp at zero rather than throw — defensive; if the DB is already
+  // consistent (held < dec) there's nothing to decrement, but we don't
+  // want this to blow up a successful on-chain escrow deposit.
+  const newHeld = held >= dec ? (held - dec).toString() : '0';
+  stmts.updateHeldOnly.run({ userId, balanceHeld: newHeld });
 });
 
 // Credit winnings to the user's pending_balance in the users table
@@ -169,6 +189,21 @@ const walletRepo = {
 
   getAll() {
     return stmts.getAll.all();
+  },
+
+  /**
+   * Atomically decrement balance_held. Used when an on-chain escrow
+   * deposit lands and funds leave the held state. Does not touch
+   * balance_available — that's owned by the deposit poller / match
+   * resolve paths. Decrementing held alone prevents a stale
+   * read-modify-write from clobbering a deposit credit that raced
+   * with the on-chain confirmation.
+   *
+   * @param {number} userId
+   * @param {string|bigint} amountUsdc  smallest units
+   */
+  decrementHeld(userId, amountUsdc) {
+    return decrementHeldTx(userId, amountUsdc);
   },
 
   /**

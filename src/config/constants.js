@@ -195,6 +195,9 @@ const CHALLENGE_STATUS = {
   DISPUTED: 'disputed',
   CANCELLED: 'cancelled',
   EXPIRED: 'expired',
+  // Match-start escrow UserOp was submitted but confirmation unknown.
+  // See startMatch.js escrowStuck path. Admin resolves manually.
+  PENDING_VERIFICATION: 'pending_verification',
 };
 
 // Match statuses

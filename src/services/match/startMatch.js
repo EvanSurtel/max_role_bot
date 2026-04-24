@@ -98,6 +98,40 @@ async function startMatch(client, challengeId) {
     } catch (err) {
       console.error(`[MatchService] ESCROW FAILURE for match #${match.id}:`, err.message);
 
+      // `escrowStuck` is set by depositToEscrow when the UserOp was
+      // submitted but we don't know if it confirmed (post_submit error
+      // class from the CDP SDK). The tx may still land later \u2014 if it
+      // does and we refunded the DB hold here, the user is double-
+      // credited (DB funds back + on-chain funds in escrow). Skip the
+      // automatic cancel+refund and escalate to admin so a human can
+      // check BaseScan and reconcile.
+      if (err.escrowStuck) {
+        console.error(
+          `[MatchService] STUCK ESCROW for match #${match.id}, user ${err.userId}. ` +
+          `UserOp ${err.userOpHash || '(unknown)'} submitted but confirmation unknown. ` +
+          `NOT auto-refunding \u2014 admin must reconcile. Check BaseScan for the tx.`,
+        );
+        const alertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
+        if (alertChannelId) {
+          try {
+            const alertCh = require('../../index').client?.channels?.cache?.get(alertChannelId)
+              || null;
+            if (alertCh) {
+              await alertCh.send({
+                content:
+                  `\ud83d\udea8 **Stuck escrow deposit** \u2014 match #${match.id}, user ${err.userId}\n` +
+                  `UserOp: \`${err.userOpHash || '(unknown)'}\`\n` +
+                  `Escrow contract: \`${process.env.ESCROW_CONTRACT_ADDRESS}\`\n` +
+                  `Action: check BaseScan for the UserOp. If landed, manually resolveMatch or cancelMatch. If not landed within 10 minutes, run \`scripts/emergency-cancel-match.js --match ${match.id}\` + DB unhold.\n` +
+                  `**Do not click Cancel in Discord** \u2014 that would double-refund.`,
+              });
+            }
+          } catch { /* best effort */ }
+        }
+        challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.PENDING_VERIFICATION);
+        throw err;
+      }
+
       // Cancel on-chain match if any deposits landed
       try {
         const playersWithHolds = allPlayers.filter(p => p.funds_held);

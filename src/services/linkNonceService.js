@@ -35,6 +35,18 @@ function mintLink({ userId, purpose, ttlSeconds = 600, metadata = null }) {
     throw new Error('WALLET_WEB_BASE_URL env var is not set — cannot mint wallet link');
   }
 
+  // Defense in depth: cap metadata size. All callers today pass small
+  // structured objects (walletAddress + amount + country), but if a
+  // future caller ever threaded user-controlled input through here,
+  // an unbounded JSON.stringify could bloat the nonce row. 4KB is
+  // well beyond anything legitimate we pass today.
+  if (metadata !== null && metadata !== undefined) {
+    const serialized = JSON.stringify(metadata);
+    if (serialized.length > 4096) {
+      throw new Error('link nonce metadata exceeds 4KB cap');
+    }
+  }
+
   const nonce = crypto.randomBytes(32).toString('hex');
   linkNonceRepo.create({ nonce, userId, purpose, ttlSeconds, metadata });
 

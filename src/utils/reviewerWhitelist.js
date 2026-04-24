@@ -31,7 +31,19 @@ function ensureReviewerUser(discordId, tag = null) {
   const existing = userRepo.findByDiscordId(discordId);
   if (existing) return existing;
 
-  const user = userRepo.create(discordId);
+  // TOCTOU: two clicks from the same user within ms can both see
+  // existing=null and both call userRepo.create. The second throws a
+  // UNIQUE constraint on users.discord_id. Catch that case and treat
+  // it as "someone else already created the row; re-fetch and use it."
+  let user;
+  try {
+    user = userRepo.create(discordId);
+  } catch (createErr) {
+    const refetched = userRepo.findByDiscordId(discordId);
+    if (refetched) return refetched;
+    throw createErr;
+  }
+
   const db = require('../database/db');
   // Fill in minimal COD-side fields so downstream code (transaction
   // feed, admin notifications, etc.) doesn't blow up on null displays.

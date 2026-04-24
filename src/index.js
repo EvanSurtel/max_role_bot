@@ -242,5 +242,20 @@ async function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
+// Never let the process die from an unhandled async rejection mid-match.
+// Node's default is to print a DeprecationWarning today and terminate in
+// future major versions — either way we want to catch, log, and keep
+// the bot running so already-started matches can resolve. Every high-
+// stakes path (escrowManager, webhookServer) has explicit try/catch;
+// this is the safety net for async work that somehow slipped through.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Process] Unhandled promise rejection:', reason);
+  if (reason && reason.stack) console.error(reason.stack);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[Process] Uncaught exception:', err);
+  if (err && err.stack) console.error(err.stack);
+});
+
 // Login
 client.login(process.env.BOT_TOKEN);
