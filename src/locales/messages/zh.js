@@ -525,7 +525,7 @@ module.exports = {
     result_complete: '**比赛 #{matchId} 完成!**',
     result_winner: '**获胜者: 队伍 {team}**',
     result_match_prize_distributed: '\n**${amount} USDC** 的比赛奖金已分发给获胜者。',
-    result_cleanup: '这些频道将在 30 秒后清理。GG!',
+    result_cleanup: '这些频道将在 2 分钟后清理。GG!',
     captains_agree: '两位队长达成一致: **队伍 {team} 获胜!** 正在结算比赛...',
     captains_disagree: '**队长之间有分歧!** 队伍 1 说队伍 {t1} 赢,队伍 2 说队伍 {t2} 赢。比赛现在**有争议**。',
     match_disputed_title: '**比赛有争议!**',

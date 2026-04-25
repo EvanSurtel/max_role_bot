@@ -527,7 +527,7 @@ module.exports = {
     result_complete: '**Match #{matchId} Selesai!**',
     result_winner: '**Pemenang: Tim {team}**',
     result_match_prize_distributed: '\nHadiah pertandingan **${amount} USDC** sudah didistribusikan ke pemenang.',
-    result_cleanup: 'Channel ini akan dibersihkan dalam 30 detik. GG!',
+    result_cleanup: 'Channel ini akan dibersihkan dalam 2 menit. GG!',
     captains_agree: 'Kedua kapten setuju: **Tim {team} menang!** Menyelesaikan match...',
     captains_disagree: '**Kapten tidak setuju!** Tim 1 bilang Tim {t1} menang, Tim 2 bilang Tim {t2} menang. Match sekarang **dispute**.',
     match_disputed_title: '**Match Dispute!**',

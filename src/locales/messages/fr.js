@@ -527,7 +527,7 @@ module.exports = {
     result_complete: '**Match #{matchId} Terminé !**',
     result_winner: '**Gagnant : Équipe {team}**',
     result_match_prize_distributed: '\nLe prix de **${amount} USDC** a été distribué aux gagnants.',
-    result_cleanup: 'Ces salons seront nettoyés dans 30 secondes. GG !',
+    result_cleanup: 'Ces salons seront nettoyés dans 2 minutes. GG !',
     captains_agree: 'Les deux capitaines sont d\'accord : **L\'Équipe {team} gagne !** Résolution du match...',
     captains_disagree: '**Les capitaines ne sont pas d\'accord !** L\'Équipe 1 dit que l\'Équipe {t1} a gagné, l\'Équipe 2 dit que l\'Équipe {t2} a gagné. Le match est maintenant **en litige**.',
     match_disputed_title: '**Match en Litige !**',

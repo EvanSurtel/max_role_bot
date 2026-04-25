@@ -128,6 +128,20 @@ async function createMatch(client, guild) {
   activeMatches.set(category.id, match);
   saveMatch(match);
 
+  // Reset 7/8/9-player ping flags. Without this, the rejoin-after-no-
+  // show flow (which calls createMatch directly, bypassing the panel
+  // button handler that previously did the reset) would leave the
+  // pings flagged as already fired — so subsequent fills would never
+  // re-ping at the thresholds. Keep this near match-create rather than
+  // post-success: even if Discord-side setup fails below, the player
+  // list has already been spliced out of the queue, so the next fill
+  // is genuinely a new cycle.
+  try {
+    require('../panels/queuePanel').resetPingState();
+  } catch (resetErr) {
+    console.warn(`[Queue] resetPingState failed (non-fatal): ${resetErr.message}`);
+  }
+
   // ── Ping players ─────────────────────────────────────────────
   const mentions = allDiscordIds.map(id => `<@${id}>`).join(' ');
   const timeoutMinutes = (QUEUE_CONFIG.VOICE_JOIN_TIMEOUT / 60_000).toFixed(1);

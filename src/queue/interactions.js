@@ -511,6 +511,21 @@ async function _handleSubSelectButton(interaction) {
     } catch { /* */ }
   }
 
+  // Auto-assign weapon roles + operator if the match is already past
+  // ROLE_SELECT. Otherwise the sub appears in the play phase with
+  // weaponRoles=[] and operator=null — embed shows them as N/A and
+  // the post-match audit trail looks broken. Idempotent helpers, so
+  // safe to call regardless of phase but guarded for clarity.
+  if (['PLAYING', 'VOTING'].includes(match.phase)) {
+    try {
+      const { autoAssignRoles, _autoAssignOperators } = require('./roleSelect');
+      autoAssignRoles(match);
+      _autoAssignOperators(match);
+    } catch (assignErr) {
+      console.warn(`[QueueService] Failed to auto-assign roles/op for sub replacement ${replacement.discordId}: ${assignErr.message}`);
+    }
+  }
+
   if (textChannel) {
     const subLabel = subType === 'fresh' ? 'Fresh Sub' : 'Mid-Series Sub';
     await textChannel.send({
@@ -665,6 +680,42 @@ async function _handleDqSelectButton(interaction) {
     match.players.set(replacement.discordId, repPlayer);
     if (playerTeam === 1) match.team1.push(replacement.discordId);
     else if (playerTeam === 2) match.team2.push(replacement.discordId);
+
+    // Grant channel perms so the replacement can actually see/join the
+    // match channels. Without this they appear on a roster they can't
+    // see — the team lists their handle but they get no notification.
+    const _clientForPerms = setClient();
+    try {
+      const tc = _clientForPerms?.channels?.cache?.get(match.textChannelId);
+      if (tc) {
+        await tc.permissionOverwrites.create(replacement.discordId, {
+          ViewChannel: true, SendMessages: true,
+        });
+      }
+      const vc = _clientForPerms?.channels?.cache?.get(match.voiceChannelId);
+      if (vc) {
+        await vc.permissionOverwrites.create(replacement.discordId, {
+          ViewChannel: true, Connect: true, Speak: true,
+        });
+      }
+    } catch (permErr) {
+      console.warn(`[QueueService] Failed to grant channel perms to DQ replacement ${replacement.discordId}: ${permErr.message}`);
+    }
+
+    // Auto-assign weapon roles + operator if the match is past
+    // ROLE_SELECT — otherwise the replacement shows up at PLAY phase
+    // with `weaponRoles=[]` and `operator=null`, breaking the play
+    // embed display and the post-match stats archive.
+    if (['PLAYING', 'VOTING'].includes(match.phase)) {
+      try {
+        const { autoAssignRoles, _autoAssignOperators } = require('./roleSelect');
+        autoAssignRoles(match);
+        _autoAssignOperators(match);
+      } catch (assignErr) {
+        console.warn(`[QueueService] Failed to auto-assign roles/op for DQ replacement ${replacement.discordId}: ${assignErr.message}`);
+      }
+    }
+
     replacementMsg = `\nReplaced by <@${replacement.discordId}> (${replacement.xp} XP) from the queue.`;
   } else {
     replacementMsg = '\nNo replacement available in the queue.';

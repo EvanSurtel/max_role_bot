@@ -15,6 +15,16 @@ const { pickMaps } = require('../utils/mapPicker');
  * @returns {Promise<void>}
  */
 async function startPlayPhase(match) {
+  // Phase guard: _checkAllRolesComplete (click handler) and
+  // _handleRoleTimeout (timer callback) can both reach here at the
+  // role-select deadline boundary. Without this guard, the play
+  // embed posts twice and the 10-min play timer is set twice — the
+  // second timer fires after the match should have ended, possibly
+  // marking a resolved match as TIMED_OUT.
+  if (match.phase !== 'ROLE_SELECT') {
+    console.warn(`[QueueService] startPlayPhase called on match #${match.id} in phase=${match.phase} — skipping (race-guarded).`);
+    return;
+  }
   match.phase = 'PLAYING';
   if (match.timer) { clearTimeout(match.timer); match.timer = null; }
   console.log(`[QueueService] Match #${match.id} entering PLAYING phase`);

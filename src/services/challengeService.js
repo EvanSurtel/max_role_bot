@@ -10,8 +10,12 @@ const { challengeEmbed, formatUsdc } = require('../utils/embeds');
 const { CHALLENGE_STATUS, PLAYER_STATUS, TIMERS, GAME_MODES, CHALLENGE_TYPE } = require('../config/constants');
 const { t, getLang } = require('../locales/i18n');
 
-// Track active teammate-accept timers so they can be cleared on cancel
-const teammateTimers = new Map(); // `${challengeId}_${playerId}` -> timeout handle
+// Teammate-accept timers are persisted via timerService (DB-backed) so
+// a bot restart during the 10-min decline window doesn't strand the
+// challenge in PENDING_TEAMMATES with held funds. The handler is
+// registered in src/services/timerHandlers.js for type 'teammate_accept'
+// with referenceId = challenge_players.id; on fire it atomically flips
+// PENDING → DECLINED and cancels the challenge (refund all holds).
 
 /**
  * Notify each pending teammate about a challenge invitation.
@@ -144,30 +148,12 @@ async function notifyTeammates(guild, challenge) {
         return;
       }
 
-      // ── Timeout timer — treat no response as decline ────────────
-      const timerKey = `${challenge.id}_${player.id}`;
-      const timer = setTimeout(async () => {
-        teammateTimers.delete(timerKey);
-        try {
-          // Re-check the player's current status in case they already responded
-          const currentPlayer = challengePlayerRepo.findById(player.id);
-          if (!currentPlayer || currentPlayer.status !== PLAYER_STATUS.PENDING) return;
-
-          challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.DECLINED);
-          console.log(`[ChallengeService] Teammate ${player.user_id} timed out for challenge ${challenge.id}`);
-
-          if (dmUser) {
-            const timeoutText = t('notify_team.timeout_msg', lang);
-            try { await dmUser.send(timeoutText); } catch { /* DM now blocked */ }
-          }
-
-          await cancelChallenge(challenge.id, guild.client);
-        } catch (err) {
-          console.error(`[ChallengeService] Error handling teammate timeout:`, err);
-        }
-      }, TIMERS.TEAMMATE_ACCEPT);
-
-      teammateTimers.set(timerKey, timer);
+      // DB-backed timeout timer (registered handler in timerHandlers.js
+      // does the atomic PENDING → DECLINED + cancelChallenge work).
+      // Replaces a bare setTimeout that was lost on bot restart, which
+      // could leave a challenge stuck in PENDING_TEAMMATES with the
+      // captain's USDC held forever.
+      timerService.createTimer('teammate_accept', player.id, TIMERS.TEAMMATE_ACCEPT);
     } catch (err) {
       console.error(`[ChallengeService] Error notifying teammate ${player.user_id}:`, err);
     }
@@ -304,12 +290,14 @@ async function cancelChallenge(challengeId, client = null) {
   // Cancel any pending expiry timer for this challenge
   timerService.cancelTimersByReference('challenge_expiry', challengeId);
 
-  // Clear any teammate accept timers for this challenge
-  for (const [key, timer] of teammateTimers.entries()) {
-    if (key.startsWith(`${challengeId}_`)) {
-      clearTimeout(timer);
-      teammateTimers.delete(key);
-    }
+  // Clear any teammate-accept timers for every player in this
+  // challenge. Timers are keyed by challenge_player.id; iterate the
+  // roster to cancel each one (timerService doesn't support
+  // cancelling by a parent challengeId because the timer reference
+  // is the player row, not the challenge row).
+  const allPlayersForTimerCleanup = challengePlayerRepo.findByChallengeId(challengeId);
+  for (const p of allPlayersForTimerCleanup) {
+    timerService.cancelTimersByReference('teammate_accept', p.id);
   }
 
   // Delete any private invite channels that were created as a DM
@@ -380,16 +368,13 @@ async function handleAllTeammatesAccepted(client, challenge) {
 /**
  * Clear a teammate timer (used when a teammate responds before timeout).
  *
- * @param {number} challengeId - The challenge ID.
+ * @param {number} challengeId - The challenge ID (kept for API compat;
+ *   timer reference is the challenge_player.id, but callers commonly
+ *   pass both).
  * @param {number} playerId - The challenge_player ID.
  */
 function clearTeammateTimer(challengeId, playerId) {
-  const key = `${challengeId}_${playerId}`;
-  const timer = teammateTimers.get(key);
-  if (timer) {
-    clearTimeout(timer);
-    teammateTimers.delete(key);
-  }
+  timerService.cancelTimersByReference('teammate_accept', playerId);
 }
 
 module.exports = {

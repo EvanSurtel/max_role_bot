@@ -527,7 +527,7 @@ module.exports = {
     result_complete: '**اكتملت المباراة #{matchId}!**',
     result_winner: '**الفائز: الفريق {team}**',
     result_match_prize_distributed: '\nتم توزيع جائزة المباراة **${amount} USDC** على الفائزين.',
-    result_cleanup: 'سيتم تنظيف هذه القنوات خلال 30 ثانية. GG!',
+    result_cleanup: 'سيتم تنظيف هذه القنوات خلال دقيقتين. GG!',
     captains_agree: 'كلا القائدين متفقان: **الفريق {team} يفوز!** جارٍ حل المباراة...',
     captains_disagree: '**القائدان غير متفقين!** الفريق 1 يقول إن الفريق {t1} فاز، الفريق 2 يقول إن الفريق {t2} فاز. المباراة الآن **في نزاع**.',
     match_disputed_title: '**المباراة في نزاع!**',

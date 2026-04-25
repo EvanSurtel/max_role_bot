@@ -147,6 +147,33 @@ function registerAll(client) {
 
     console.log(`[TimerHandler] match_inactivity: match ${matchId} auto-disputed after timeout`);
   });
+
+  // --- match_cleanup: referenceId is matchId ---
+  // Fires 120s after a match resolves to delete the match category
+  // and channels. DB-backed so a PM2 restart between resolveMatch and
+  // the scheduled cleanup doesn't leak the entire match category +
+  // 7 channels; otherwise the guild's 500-channel cap is a slow leak.
+  timerService.registerHandler('match_cleanup', async (matchId) => {
+    const match = matchRepo.findById(matchId);
+    if (!match) {
+      console.log(`[TimerHandler] match_cleanup: match ${matchId} not found, skipping`);
+      return;
+    }
+    // Only clean up matches that have actually resolved/cancelled.
+    // If a match is still active (status flipped back to DISPUTED by
+    // a failed disbursement, etc.), keep the channels open.
+    if (match.status !== MATCH_STATUS.COMPLETED && match.status !== MATCH_STATUS.CANCELLED) {
+      console.log(`[TimerHandler] match_cleanup: match ${matchId} status='${match.status}' — not cleaning up`);
+      return;
+    }
+    try {
+      const { cleanupChannels } = require('./match/cleanup');
+      await cleanupChannels(client, matchId);
+      console.log(`[TimerHandler] match_cleanup: match ${matchId} channels deleted`);
+    } catch (err) {
+      console.error(`[TimerHandler] match_cleanup: failed for match ${matchId}: ${err.message}`);
+    }
+  });
 }
 
 module.exports = { registerAll };

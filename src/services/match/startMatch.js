@@ -114,8 +114,11 @@ async function startMatch(client, challengeId) {
         const alertChannelId = process.env.ADMIN_ALERTS_CHANNEL_ID;
         if (alertChannelId) {
           try {
-            const alertCh = require('../../index').client?.channels?.cache?.get(alertChannelId)
-              || null;
+            // src/index.js does not module.exports anything, so the prior
+            // `require('../../index').client` resolved to `{}` and the
+            // alert silently no-op'd — the most important admin signal
+            // in the bot. `client` is already plumbed in as a parameter.
+            const alertCh = client?.channels?.cache?.get(alertChannelId) || null;
             if (alertCh) {
               await alertCh.send({
                 content:

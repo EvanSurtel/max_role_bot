@@ -445,6 +445,26 @@ async function handleUserSelect(interaction) {
       return interaction.reply({ content: t('common.cannot_select_yourself', lang), ephemeral: true, _autoDeleteMs: 60_000 });
     }
 
+    // Self-play protection: collect every cod_uid already in this
+    // challenge (team 1 captain + their teammates) and the acceptor's
+    // cod_uid + already-picked teammates' cod_uids. A pick is rejected
+    // if it shares a cod_uid with any of them. Without this, an
+    // attacker can sit on both teams of a 2v2 cash match using two
+    // Discord accounts linked to the same CODM account, contribute 2x
+    // entry, and "win" 2x entry back to themselves (minus on-chain
+    // dust) — direct USDC farming.
+    const acceptor = userRepo.findByDiscordId(discordId);
+    const reservedCodUids = new Set();
+    if (acceptor && acceptor.cod_uid) reservedCodUids.add(acceptor.cod_uid);
+    for (const t1p of challengePlayerRepo.findByChallengeAndTeam(challengeId, 1)) {
+      const t1u = userRepo.findById(t1p.user_id);
+      if (t1u && t1u.cod_uid) reservedCodUids.add(t1u.cod_uid);
+    }
+    for (const alreadyPicked of flow.teammates) {
+      const ap = userRepo.findByDiscordId(alreadyPicked);
+      if (ap && ap.cod_uid) reservedCodUids.add(ap.cod_uid);
+    }
+
     // Validate each picked teammate
     const { isPlayerBusy } = require('../utils/playerStatus');
     for (const teammateDiscordId of selectedDiscordIds) {
@@ -455,6 +475,14 @@ async function handleUserSelect(interaction) {
       if (!teammateUser || !teammateUser.cod_uid) {
         return interaction.reply({ content: t('common.teammate_not_registered', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true, _autoDeleteMs: 60_000 });
       }
+      if (reservedCodUids.has(teammateUser.cod_uid)) {
+        return interaction.reply({
+          content: `<@${teammateDiscordId}> can't be picked — their COD Mobile account is already on the other team or matches another player in this match.`,
+          ephemeral: true,
+          _autoDeleteMs: 60_000,
+        });
+      }
+      reservedCodUids.add(teammateUser.cod_uid);
       const existing = challengePlayerRepo.findByChallengeAndUser(challengeId, teammateUser.id);
       if (existing) {
         return interaction.reply({ content: t('common.teammate_already_in', lang, { user: `<@${teammateDiscordId}>` }), ephemeral: true, _autoDeleteMs: 60_000 });
@@ -613,6 +641,43 @@ async function handleTeamConfirmedAccept(interaction) {
   const selectedDiscordIds = flow.teammates;
   const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
   const entryUsdc = challenge.entry_amount_usdc;
+
+  // Final self-play check before committing the team. handleUserSelect
+  // already validates each pick at selection time, but the user could
+  // race a teammate-pick + this confirm against a team-1 teammate
+  // accepting concurrently. Re-validate the full team-1 + acceptor +
+  // teammates set here so a slow window doesn't admit a duplicate
+  // cod_uid into the match.
+  {
+    const reservedCodUids = new Set();
+    if (user.cod_uid) reservedCodUids.add(user.cod_uid);
+    for (const t1p of challengePlayerRepo.findByChallengeAndTeam(challengeId, 1)) {
+      const t1u = userRepo.findById(t1p.user_id);
+      if (t1u && t1u.cod_uid) {
+        if (reservedCodUids.has(t1u.cod_uid)) {
+          return interaction.reply({
+            content: 'You cannot accept a challenge where your COD Mobile account is already on the other team.',
+            ephemeral: true,
+            _autoDeleteMs: 60_000,
+          });
+        }
+        reservedCodUids.add(t1u.cod_uid);
+      }
+    }
+    for (const tmDiscordId of selectedDiscordIds) {
+      const tm = userRepo.findByDiscordId(tmDiscordId);
+      if (tm && tm.cod_uid) {
+        if (reservedCodUids.has(tm.cod_uid)) {
+          return interaction.reply({
+            content: `<@${tmDiscordId}>'s COD Mobile account conflicts with another player in this match. Re-pick teammates and try again.`,
+            ephemeral: true,
+            _autoDeleteMs: 60_000,
+          });
+        }
+        reservedCodUids.add(tm.cod_uid);
+      }
+    }
+  }
 
   // Atomically claim the challenge BEFORE doing any money work, any
   // player inserts, or any async UI update. Without this, two
@@ -903,28 +968,13 @@ async function notifyTeam2Teammates(guild, challenge) {
         return;
       }
 
-      // Start a timeout timer — treat as decline if no response
-      const timer = setTimeout(async () => {
-        try {
-          const currentPlayer = challengePlayerRepo.findById(player.id);
-          if (!currentPlayer || currentPlayer.status !== PLAYER_STATUS.PENDING) return;
-
-          challengePlayerRepo.updateStatus(player.id, PLAYER_STATUS.DECLINED);
-          console.log(`[ChallengeAccept] Teammate ${player.user_id} timed out for challenge ${challenge.id}`);
-
-          if (dmUser) {
-            const timeoutText = t('notify_team.timeout_msg', getLang(playerDiscordId));
-            try { await dmUser.send(timeoutText); } catch { /* DM now blocked */ }
-          }
-
-          await challengeServiceRef.cancelChallenge(challenge.id, guild.client);
-        } catch (err) {
-          console.error(`[ChallengeAccept] Error handling teammate timeout:`, err);
-        }
-      }, TIMERS.TEAMMATE_ACCEPT);
-
-      // Timer self-cleans on fire; no shared registry for team 2 timers
-      void timer;
+      // DB-backed timeout via timerService (handler in timerHandlers.js
+      // does the atomic PENDING → DECLINED + cancelChallenge work).
+      // Replaces a bare setTimeout that was lost on bot restart, which
+      // could leave the challenge stuck in ACCEPTED with the captain's
+      // funds AND the acceptor's funds held forever.
+      const timerService = require('../services/timerService');
+      timerService.createTimer('teammate_accept', player.id, TIMERS.TEAMMATE_ACCEPT);
     } catch (err) {
       console.error(`[ChallengeAccept] Error notifying team 2 teammate ${player.user_id}:`, err);
     }

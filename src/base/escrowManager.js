@@ -446,13 +446,51 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
     );
     onChainHash = result.hash;
   } catch (err) {
-    // On-chain call failed entirely — mark the pre-logged rows as
-    // failed so they don't get matched by the poller later.
+    // Distinguish post_submit (UserOp was submitted, confirmation
+    // unknown — funds may have actually moved on-chain) from
+    // pre_submit (genuinely never landed). Marking rows as 'failed'
+    // and letting the caller revert match→DISPUTED on a post_submit
+    // error can cause an admin re-resolve to double-pay winners if
+    // the original UserOp also confirmed.
+    //
+    // Mirrors the post_submit handling in depositToEscrow (line 244).
+    if (err.stage === 'post_submit') {
+      err.escrowStuck = true;
+      err.matchId = matchId;
+      // Save the userOpHash on the pending rows so the deposit
+      // poller can match the on-chain delta when (if) it lands.
+      for (const d of disbursements) {
+        if (d.pendingTxId) {
+          try {
+            transactionRepo.updateStatusAndHash(
+              d.pendingTxId,
+              'pending_onchain',
+              err.userOpHash || null,
+              `${baseMemo} — UserOp post_submit, awaiting confirmation: ${err.message}`,
+            );
+          } catch (logErr) { console.warn(`[Escrow] post_submit pending-row update failed: ${logErr.message}`); }
+        }
+      }
+      // Loud admin alert. Operator must check BaseScan for the userOpHash
+      // BEFORE attempting any retry — re-resolving while the original
+      // UserOp lands later double-pays winners.
+      try {
+        const { postTransaction } = require('../utils/transactionFeed');
+        postTransaction({
+          type: 'balance_mismatch',
+          challengeId,
+          memo: `🚨 disburseWinnings UserOp post_submit on match #${matchId}. UserOp \`${err.userOpHash || '(unknown)'}\` may or may not have landed. **DO NOT manually re-resolve** until you've confirmed status on BaseScan. Pending rows kept in pending_onchain — the deposit poller will reconcile if the tx confirms. Error: ${err.message}`,
+        });
+      } catch (alertErr) { console.warn(`[Escrow] post_submit admin alert failed: ${alertErr.message}`); }
+      throw err;
+    }
+    // pre_submit: nothing landed on-chain. Mark rows failed; caller
+    // will revert match status to DISPUTED so an admin can re-resolve.
     for (const d of disbursements) {
       if (d.pendingTxId) {
         try {
           transactionRepo.updateStatusAndHash(d.pendingTxId, 'failed', null, `${baseMemo} — on-chain call failed: ${err.message}`);
-        } catch { /* ignore */ }
+        } catch (logErr) { console.warn(`[Escrow] disburse failed-row update failed: ${logErr.message}`); }
       }
     }
     throw err;
@@ -485,7 +523,19 @@ async function disburseWinnings(matchId, challengeId, winningPlayerIds, totalPot
           onChainHash,
           `${baseMemo} — DB credit FAILED after on-chain send: ${err.message}`,
         );
-      } catch { /* ignore */ }
+      } catch (logErr) { console.warn(`[Escrow] DB-credit-failed pending-row update failed: ${logErr.message}`); }
+      // Loud admin alert. The on-chain payout already happened; the
+      // user's DB balance hasn't caught up yet. The poller eventually
+      // reconciles, but operators should know in real time so they
+      // can reach out to the user if the desync persists.
+      try {
+        const { postTransaction } = require('../utils/transactionFeed');
+        postTransaction({
+          type: 'balance_mismatch',
+          challengeId,
+          memo: `⚠️ DB credit failed after on-chain disbursement — match #${matchId}, user ${d.userId}, amount ${d.amount} USDC, tx=\`${onChainHash}\`. Pending tx row id=${d.pendingTxId}. Deposit poller will reconcile, but verify within 1h. Error: ${err.message}`,
+        });
+      } catch (alertErr) { console.warn(`[Escrow] DB-credit-failed admin alert failed: ${alertErr.message}`); }
     }
   }
 
@@ -602,11 +652,42 @@ async function cancelOnChainMatch(matchId, challengeId, allPlayers, entryAmountU
     );
     onChainHash = result.hash;
   } catch (err) {
+    // Same post_submit distinction as disburseWinnings — if the
+    // UserOp landed but we threw on confirmation, treating it as a
+    // hard failure means the caller will DB-credit twice (refundAll
+    // pre-cancel hold + creditAvailable post-cancel-success when the
+    // tx eventually confirms). Keep rows pending and surface to
+    // operators.
+    if (err.stage === 'post_submit') {
+      err.escrowStuck = true;
+      err.matchId = matchId;
+      for (const p of playerRows) {
+        if (p.pendingTxId) {
+          try {
+            transactionRepo.updateStatusAndHash(
+              p.pendingTxId,
+              'pending_onchain',
+              err.userOpHash || null,
+              `${baseMemo} — UserOp post_submit, awaiting confirmation: ${err.message}`,
+            );
+          } catch (logErr) { console.warn(`[Escrow] post_submit pending-row update failed: ${logErr.message}`); }
+        }
+      }
+      try {
+        const { postTransaction } = require('../utils/transactionFeed');
+        postTransaction({
+          type: 'balance_mismatch',
+          challengeId,
+          memo: `🚨 cancelOnChainMatch UserOp post_submit on match #${matchId}. UserOp \`${err.userOpHash || '(unknown)'}\` may or may not have landed. **DO NOT manually retry** until you've confirmed status on BaseScan. Pending rows kept in pending_onchain — the deposit poller will reconcile if the tx confirms. Error: ${err.message}`,
+        });
+      } catch (alertErr) { console.warn(`[Escrow] post_submit admin alert failed: ${alertErr.message}`); }
+      throw err;
+    }
     for (const p of playerRows) {
       if (p.pendingTxId) {
         try {
           transactionRepo.updateStatusAndHash(p.pendingTxId, 'failed', null, `${baseMemo} — on-chain call failed: ${err.message}`);
-        } catch { /* ignore */ }
+        } catch (logErr) { console.warn(`[Escrow] cancel failed-row update failed: ${logErr.message}`); }
       }
     }
     throw err;
@@ -626,7 +707,16 @@ async function cancelOnChainMatch(matchId, challengeId, allPlayers, entryAmountU
           onChainHash,
           `${baseMemo} — DB credit FAILED after on-chain send: ${err.message}`,
         );
-      } catch { /* ignore */ }
+      } catch (logErr) { console.warn(`[Escrow] DB-credit-failed pending-row update failed: ${logErr.message}`); }
+      // Match the disburseWinnings pattern — surface to operators.
+      try {
+        const { postTransaction } = require('../utils/transactionFeed');
+        postTransaction({
+          type: 'balance_mismatch',
+          challengeId,
+          memo: `⚠️ DB credit failed after on-chain refund — match #${matchId}, user ${p.userId}, amount ${entryAmountUsdc} USDC, tx=\`${onChainHash}\`. Pending tx row id=${p.pendingTxId}. Deposit poller will reconcile, but verify within 1h. Error: ${err.message}`,
+        });
+      } catch (alertErr) { console.warn(`[Escrow] DB-credit-failed admin alert failed: ${alertErr.message}`); }
     }
   }
 

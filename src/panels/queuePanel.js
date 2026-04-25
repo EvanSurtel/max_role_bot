@@ -341,4 +341,11 @@ module.exports = {
   // to sync the shared panel without the 50-message scan that
   // postQueuePanel does on first-run.
   refreshQueuePanel: _refreshPanelInChannel,
+  // Reset 7/8/9-player ping flags. Called by queueState.createMatch so
+  // EVERY fill cycle (panel button OR rejoin-after-no-show) resets the
+  // pings — without this, the rejoin path bypassed the panel-button
+  // reset and pings stopped firing after a few cycles.
+  resetPingState() {
+    for (const k of Object.keys(_lastPingedAt)) delete _lastPingedAt[k];
+  },
 };

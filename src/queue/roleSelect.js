@@ -338,6 +338,7 @@ module.exports = {
   recordRoleChoice,
   recordOperatorChoice,
   autoAssignRoles,
+  _autoAssignOperators,
   _postRoleSelectMessage,
   _checkAllRolesComplete,
 };

@@ -525,7 +525,7 @@ module.exports = {
     result_complete: '**マッチ #{matchId} 完了！**',
     result_winner: '**勝者：チーム {team}**',
     result_match_prize_distributed: '\n**${amount} USDC** のマッチ賞金が勝者に分配されました。',
-    result_cleanup: 'これらのチャンネルは30秒後にクリーンアップされます。GG！',
+    result_cleanup: 'これらのチャンネルは2分後にクリーンアップされます。GG！',
     captains_agree: '両キャプテンが合意：**チーム {team} の勝利！** マッチを処理中...',
     captains_disagree: '**キャプテンの報告が一致しません！** チーム1はチーム {t1} 勝利、チーム2はチーム {t2} 勝利と主張。マッチは現在 **異議あり** です。',
     match_disputed_title: '**マッチに異議あり！**',

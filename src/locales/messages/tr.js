@@ -528,7 +528,7 @@ module.exports = {
     result_complete: '**Maç #{matchId} Tamamlandı!**',
     result_winner: '**Kazanan: Takım {team}**',
     result_match_prize_distributed: '\n**${amount} USDC** maç ödülü kazananlara dağıtıldı.',
-    result_cleanup: 'Bu kanallar 30 saniye içinde temizlenecek. GG!',
+    result_cleanup: 'Bu kanallar 2 dakika içinde temizlenecek. GG!',
     captains_agree: 'Her iki kaptan da hemfikir: **Takım {team} kazandı!** Maç çözülüyor...',
     captains_disagree: '**Kaptanlar anlaşamadı!** Takım 1 Takım {t1}\'in kazandığını söylüyor, Takım 2 Takım {t2}\'nin kazandığını söylüyor. Maç şimdi **itirazlı**.',
     match_disputed_title: '**Maç İtirazlı!**',

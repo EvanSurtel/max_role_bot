@@ -10,7 +10,8 @@ const { MATCH_STATUS, CHALLENGE_STATUS, CHALLENGE_TYPE, PLAYER_ROLE, GAME_MODES 
 const { t } = require('../../locales/i18n');
 const { buildLanguageDropdownRow } = require('../../utils/languageButtonHelper');
 const { captainLang, postResultToChannels, awardStats } = require('./helpers');
-const { cleanupChannels } = require('./cleanup');
+// cleanupChannels is invoked from the DB-backed `match_cleanup` timer
+// handler in src/services/timerHandlers.js — no longer needed here.
 
 /**
  * Resolve a match after captain voting.
@@ -49,40 +50,67 @@ async function resolveMatch(client, matchId, winningTeam, { fromDispute = false 
 
   // Disburse winnings (cash match only)
   if (challenge.type === CHALLENGE_TYPE.CASH_MATCH && Number(challenge.total_pot_usdc) > 0) {
-    let disburseFailed = false;
-    let disburseError = null;
+    // Three outcomes worth distinguishing:
+    //   onchainSucceeded \u2014 disburseResult.hash is set (or escrowStuck
+    //                      from a post_submit error). Winners were
+    //                      paid (or may have been). DO NOT revert
+    //                      match status \u2014 re-resolve would cause
+    //                      contract.resolveMatch to revert (already
+    //                      paid) and double-pay risk if any retry
+    //                      path succeeds.
+    //   partialDbFailure \u2014 on-chain hash exists, but creditAvailable
+    //                      threw for one or more winners. Pending
+    //                      rows kept; deposit poller reconciles. Match
+    //                      stays COMPLETED. Admin alerted by escrowMgr.
+    //   onchainFailed \u2014 pre_submit error from the bundler. No funds
+    //                   moved on-chain. Revert match to DISPUTED so an
+    //                   admin can re-resolve cleanly.
     let disburseResult = null;
+    let onchainSucceeded = false;
+    let onchainFailed = false;
+    let disburseError = null;
     try {
       disburseResult = await escrowManager.disburseWinnings(
         matchId, match.challenge_id, winnerUserIds, challenge.total_pot_usdc, { fromDispute },
       );
+      // No throw: on-chain resolveMatch landed (disburseResult.hash set).
+      onchainSucceeded = true;
       const failedPayouts = (disburseResult.disbursements || []).filter(d => d.error);
-      const successPayouts = (disburseResult.disbursements || []).filter(d => d.hash || d.signature);
-      if (failedPayouts.length > 0 || successPayouts.length < winnerUserIds.length) {
-        disburseFailed = true;
-        disburseError = failedPayouts.length > 0
-          ? failedPayouts.map(d => `user ${d.userId}: ${d.error}`).join('; ')
-          : `only ${successPayouts.length}/${winnerUserIds.length} winners paid`;
+      if (failedPayouts.length > 0) {
+        disburseError = failedPayouts.map(d => `user ${d.userId}: ${d.error}`).join('; ');
+        console.warn(`[MatchService] Match #${matchId}: on-chain payout landed but ${failedPayouts.length} DB credits failed \u2014 poller will reconcile. ${disburseError}`);
       } else {
         console.log(`[MatchService] Winnings disbursed for match #${matchId}, team ${winningTeam} won`);
       }
     } catch (err) {
-      disburseFailed = true;
       disburseError = err.message;
-      console.error(`[MatchService] Failed to disburse winnings for match #${matchId}:`, err.message);
+      if (err.escrowStuck) {
+        // post_submit: UserOp landed but confirmation unknown. Funds
+        // may already be on-chain. Treat exactly like onchainSucceeded
+        // for status purposes \u2014 we MUST NOT revert to DISPUTED, since
+        // an admin re-resolve would race a confirming UserOp and risk
+        // double-payment. escrowManager already posted a loud admin
+        // alert with the userOpHash so operators can verify on BaseScan.
+        onchainSucceeded = true;
+        console.error(`[MatchService] Match #${matchId} disburseWinnings post_submit (escrowStuck=true). Status stays COMPLETED. Operator must verify on-chain via the alert posted by escrowManager.`);
+      } else {
+        onchainFailed = true;
+        console.error(`[MatchService] Failed to disburse winnings for match #${matchId} (pre_submit, no on-chain change):`, err.message);
+      }
     }
 
-    if (disburseFailed) {
+    if (onchainFailed) {
       matchRepo.atomicStatusTransition(matchId, MATCH_STATUS.COMPLETED, MATCH_STATUS.DISPUTED);
       const { postTransaction } = require('../../utils/transactionFeed');
       postTransaction({
         type: 'balance_mismatch',
         challengeId: match.challenge_id,
-        memo: `\u{1F6A8} Disbursement FAILED for match #${matchId} \u2014 status reverted to DISPUTED. Escrow may have stranded funds. Error: ${disburseError}`,
+        memo: `\u{1F6A8} Disbursement failed BEFORE on-chain submit for match #${matchId} \u2014 status reverted to DISPUTED. Funds still in escrow. Admin can safely re-resolve. Error: ${disburseError}`,
       });
-      console.error(`[MatchService] CRITICAL: disbursement failed for match #${matchId}, status reverted. Admin action required.`);
+      console.error(`[MatchService] CRITICAL: disbursement failed pre_submit for match #${matchId}, status reverted. Admin can safely re-resolve.`);
       return;
     }
+    // onchainSucceeded \u2014 fall through to mark winner + complete.
 
     // Note: dispute-resolved matches pay out instantly (same path as
     // normal match resolutions). The `fromDispute` flag is kept only
@@ -241,12 +269,15 @@ async function resolveMatch(client, matchId, winningTeam, { fromDispute = false 
     console.error(`[MatchService] Rank role sync failed:`, err.message);
   });
 
-  // Schedule channel cleanup after 30 seconds
-  setTimeout(() => {
-    cleanupChannels(client, matchId).catch(err => {
-      console.error(`[MatchService] Error during scheduled cleanup for match #${matchId}:`, err.message);
-    });
-  }, 30 * 1000);
+  // DB-backed cleanup timer (handler in timerHandlers.js calls
+  // cleanupChannels). Replaces a bare setTimeout that was lost on
+  // bot restart, leaking the match category + 7 channels per
+  // restart and would hit Discord's 500-channel-per-guild cap.
+  // 120s gives users time to read the result + use the language
+  // dropdown + lets the dispute-result archiver finish reading
+  // shared_text_id before it's deleted.
+  const timerService = require('../timerService');
+  timerService.createTimer('match_cleanup', matchId, 120_000);
 
   console.log(`[MatchService] Match #${matchId} resolved. Team ${winningTeam} wins.`);
 }

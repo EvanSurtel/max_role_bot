@@ -525,7 +525,7 @@ module.exports = {
     result_complete: '**Match #{matchId} จบแล้ว!**',
     result_winner: '**ผู้ชนะ: Team {team}**',
     result_match_prize_distributed: '\nรางวัลแมตช์ ${amount} USDC ถูกแจกจ่ายให้ผู้ชนะแล้ว',
-    result_cleanup: 'ช่องเหล่านี้จะถูกล้างใน 30 วินาที GG!',
+    result_cleanup: 'ช่องเหล่านี้จะถูกล้างใน 2 นาที GG!',
     captains_agree: 'กัปตันทั้งสองเห็นด้วย: **Team {team} ชนะ!** กำลังตัดสินแมตช์...',
     captains_disagree: '**กัปตันไม่เห็นด้วย!** Team 1 บอกว่า Team {t1} ชนะ Team 2 บอกว่า Team {t2} ชนะ แมตช์ตอนนี้ **disputed**',
     match_disputed_title: '**Match Disputed!**',

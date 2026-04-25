@@ -528,7 +528,7 @@ module.exports = {
     result_complete: '**Match #{matchId} Voltooid!**',
     result_winner: '**Winnaar: Team {team}**',
     result_match_prize_distributed: '\nMatch Prijs van **${amount} USDC** is uitgekeerd aan de winnaars.',
-    result_cleanup: 'Deze kanalen worden over 30 seconden opgeruimd. GG!',
+    result_cleanup: 'Deze kanalen worden over 2 minuten opgeruimd. GG!',
     captains_agree: 'Beide captains zijn het eens: **Team {team} wint!** Match wordt afgewikkeld...',
     captains_disagree: '**Captains zijn het oneens!** Team 1 zegt dat Team {t1} won, Team 2 zegt dat Team {t2} won. Match is nu **in dispuut**.',
     match_disputed_title: '**Match Betwist!**',

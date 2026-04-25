@@ -525,7 +525,7 @@ module.exports = {
     result_complete: '**매치 #{matchId} 완료!**',
     result_winner: '**승자: 팀 {team}**',
     result_match_prize_distributed: '\n**${amount} USDC** 매치 상금이 승자에게 분배되었어요.',
-    result_cleanup: '이 채널들은 30초 후 정리돼요. GG!',
+    result_cleanup: '이 채널들은 2분 후 정리돼요. GG!',
     captains_agree: '양 캡틴 합의: **팀 {team} 승리!** 매치 처리 중...',
     captains_disagree: '**캡틴들의 의견이 달라요!** 팀 1은 팀 {t1} 승리, 팀 2는 팀 {t2} 승리라고 해요. 매치는 이제 **분쟁 중**이에요.',
     match_disputed_title: '**매치 분쟁 발생!**',
