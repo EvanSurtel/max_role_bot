@@ -130,7 +130,7 @@ module.exports = {
       '• Kết quả XP giống như thua (người thắng được XP, người forfeit mất XP)',
       '',
       '**XP Queue Match:** 7.5 phút để xuất hiện',
-      '• No-show = **phạt -200 XP**',
+      '• No-show = **phạt -300 XP**',
       '',
       '**Cách xác minh no-show:**',
       '• Bot kiểm tra xem người chơi đã join voice channel nào của match chưa (team hoặc shared)',

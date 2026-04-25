@@ -25,13 +25,20 @@ function startWebhookServer(client) {
   });
 
   // ─── Changelly Fiat On-Ramp Webhook ─────────────────────────
-  // Changelly verifies via RSA signature over the JSON body, which
-  // express.json() parses after we've grabbed what we need via the
-  // `x-callback-signature` header path below. Json parser is fine here.
-  app.post('/api/changelly/webhook', express.json(), async (req, res) => {
+  // Changelly signs the RAW request body bytes with RSA-SHA256, so we
+  // must capture the exact bytes we received and verify against those.
+  // Using express.json() and then JSON.stringify(req.body) does NOT
+  // round-trip byte-for-byte — whitespace, key ordering, and unicode
+  // escaping all differ across serializers, and any mismatch silently
+  // fails verification and drops the webhook on mainnet. Hence the
+  // raw-body middleware + downstream JSON.parse pattern below, mirroring
+  // the Coinbase Hook0 handler.
+  app.post('/api/changelly/webhook', express.raw({ type: '*/*' }), async (req, res) => {
     res.status(200).json({ ok: true });
 
     try {
+      const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '');
+
       // Verify the callback signature if the public key is configured.
       // On mainnet we REJECT invalid signatures (return early without
       // processing). On sepolia we log and continue since sandbox can
@@ -43,7 +50,6 @@ function startWebhookServer(client) {
         try {
           const crypto = require('crypto');
           const signature = req.headers['x-callback-signature'];
-          const body = JSON.stringify(req.body);
 
           // Key is base64-encoded PEM — decode it first
           let pemKey = callbackPubKey;
@@ -57,7 +63,7 @@ function startWebhookServer(client) {
             format: 'pem',
             type: pemKey.includes('RSA PUBLIC KEY') ? 'pkcs1' : 'spki',
           });
-          sigVerified = crypto.verify('sha256', Buffer.from(body), pubKeyObj, Buffer.from(signature, 'base64'));
+          sigVerified = crypto.verify('sha256', rawBody, pubKeyObj, Buffer.from(signature, 'base64'));
         } catch (verifyErr) {
           console.warn(`[Changelly] Signature verification error: ${verifyErr.message}`);
         }
@@ -72,7 +78,13 @@ function startWebhookServer(client) {
         console.warn('[Changelly] CHANGELLY_CALLBACK_PUBLIC_KEY not set on mainnet — any caller can forge webhooks. Configure production public key.');
       }
 
-      const payload = req.body;
+      let payload;
+      try {
+        payload = JSON.parse(rawBody.toString('utf8'));
+      } catch (parseErr) {
+        console.warn(`[Changelly] Webhook body was not JSON: ${parseErr.message}`);
+        return;
+      }
       const {
         externalOrderId,
         externalUserId, // Discord user ID
@@ -584,41 +596,61 @@ function startWebhookServer(client) {
         return;
       }
 
-      // Respond to the caller now. The on-chain approveWithSignature
-      // AND the wallet.address flip happen asynchronously inside
-      // spendPermissionService.approveOnChain — we just kick it off
-      // here and move on. Putting the wallet flip inside approveOnChain
-      // (instead of piggybacking here in a .then()) means manual
-      // retries of approveOnChain also fix the wallet state, avoiding
-      // the "permission approved but no wallet row" state we hit
-      // earlier in testing.
+      // SYNCHRONOUS approveOnChain — we await the on-chain
+      // approveWithSignature UserOp before returning success to the
+      // browser. Previously this was kicked into a fire-and-forget
+      // (async)() and the browser saw 200 OK before the approval
+      // actually happened. Any transient blip (CDP RPC hiccup, lock
+      // contention, paymaster delay) silently stranded the user with
+      // status='pending' on disk, no wallet row, and a "Finish setting
+      // up" screen the next time they clicked View My Wallet.
+      //
+      // Doing it synchronously means the browser sees real success or
+      // a real error. CDP UserOp confirmation typically takes 10-30s,
+      // so the upstream Next.js fetch needs a 60s timeout (see
+      // web/app/api/wallet/grant/route.ts).
+      //
+      // Defense in depth: spendPermissionSweeper retries any pending
+      // rows that slip past this (bot crash mid-approve, browser closed
+      // before completion, etc).
       //
       // Serialize per-user via walletRepo.acquireLock to avoid the
       // concurrent-grants race: two valid nonces signed simultaneously
-      // (e.g. user opens two setup pages) would otherwise interleave
+      // (user opens two setup pages) would otherwise interleave
       // markApprovedAndSupersedeOthers, leaving an inconsistent DB +
       // a second dangling on-chain approved permission. Lock auto-
       // expires after 60s so a crash mid-approve doesn't deadlock.
-      res.json({ ok: true, permissionId: row.id });
-
-      (async () => {
-        const locked = walletRepo.acquireLock(userId);
-        if (!locked) {
-          console.warn(
-            `[Internal API] approveOnChain skipped for row ${row.id}: ` +
-            `wallet lock held by another operation for user ${userId}. ` +
-            `This grant will be picked up on the next spendForUser lazy-approve.`,
-          );
-          return;
-        }
-        try {
-          await spendPermissionService.approveOnChain(row.id);
-        } catch (err) {
-          console.error(`[Internal API] approveOnChain background failed for row ${row.id}: ${err.message}`);
-        } finally {
-          walletRepo.releaseLock(userId);
-        }
-      })();
+      const locked = walletRepo.acquireLock(userId);
+      if (!locked) {
+        console.warn(
+          `[Internal API] approveOnChain deferred for row ${row.id}: ` +
+          `wallet lock held by another operation for user ${userId}. ` +
+          `Sweeper will pick it up.`,
+        );
+        // Return a 202 so the browser knows the grant was persisted but
+        // the on-chain step is deferred. Web surface treats 202 as soft
+        // success — the sweeper will finish the job within ~60s.
+        res.status(202).json({ ok: true, permissionId: row.id, deferred: true });
+        return;
+      }
+      try {
+        await spendPermissionService.approveOnChain(row.id);
+        res.json({ ok: true, permissionId: row.id });
+      } catch (approveErr) {
+        console.error(
+          `[Internal API] approveOnChain failed for row ${row.id}: ${approveErr.message}`,
+        );
+        // Permission row stays as 'pending' so the sweeper can retry it.
+        // Browser sees the real error; user can retry from the setup page.
+        res.status(502).json({
+          ok: false,
+          error: 'On-chain approval failed; we will retry automatically. Try again in a minute or click View My Wallet to recover.',
+          detail: approveErr.message,
+          permissionId: row.id,
+        });
+      } finally {
+        walletRepo.releaseLock(userId);
+      }
     } catch (err) {
       console.error('[Internal API] /wallet/grant error:', err.message);
       res.status(500).json({ error: err.message || 'internal error' });

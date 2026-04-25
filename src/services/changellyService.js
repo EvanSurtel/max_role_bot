@@ -162,18 +162,31 @@ async function createOrder({ userId, walletAddress, amountUsd, countryCode, stat
     return null;
   }
 
-  // If caller pinned a provider, try it first. If unavailable in this
-  // country / amount combo, fall through to first success offer so the
-  // user gets *some* working path rather than a hard fail.
+  // If caller pinned a provider, require it. Previously this silently
+  // fell through to the first available provider (usually Transak)
+  // when Wert wasn't offered — user clicks "Wert" and gets sent to
+  // Transak with no warning. That confuses people. Now we throw a
+  // PROVIDER_UNAVAILABLE error so the deposit handler can show a
+  // meaningful "Wert isn't available — try Transak instead" message
+  // and let the user choose explicitly.
   const _codeOf = o => (o.providerCode || o.provider?.code || o.provider_code);
   let offer;
   if (preferredProviderCode) {
     offer = successOffers.find(o => _codeOf(o) === preferredProviderCode);
     if (!offer) {
-      console.warn(`[Changelly] Preferred provider ${preferredProviderCode} not available for ${countryCode}; falling back to first success offer.`);
+      const availableCodes = successOffers.map(_codeOf).filter(Boolean);
+      const err = new Error(
+        `${preferredProviderCode} is not available for ${countryCode}` +
+        (availableCodes.length > 0 ? ` right now. Available: ${availableCodes.join(', ')}.` : ' right now.'),
+      );
+      err.code = 'PROVIDER_UNAVAILABLE';
+      err.requestedProvider = preferredProviderCode;
+      err.availableProviders = availableCodes;
+      throw err;
     }
+  } else {
+    offer = successOffers[0];
   }
-  if (!offer) offer = successOffers[0];
   const providerCode = _codeOf(offer);
 
   const webhookHost = process.env.WEBHOOK_HOST || '';

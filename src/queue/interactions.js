@@ -592,11 +592,29 @@ async function _handleDqSelectButton(interaction) {
   const player = match.players.get(targetDiscordId);
   if (!player) return interaction.update({ content: 'Player not in match.', components: [] });
 
-  // Apply DQ penalty
+  // Apply DQ penalty. addXp + xp_history wrapped in one db.transaction
+  // so the player's xp_points column and the leaderboard's xp_history
+  // view can't diverge (rank roles read xp_points, leaderboard sums
+  // xp_history).
   try {
     const user = userRepo.findByDiscordId(targetDiscordId);
     if (user) {
-      userRepo.addXp(user.id, -QUEUE_CONFIG.DQ_PENALTY);
+      const dbRef = require('../database/db');
+      const { getCurrentSeason } = require('../panels/leaderboardPanel');
+      const insertDqXpHistory = dbRef.prepare(
+        'INSERT INTO xp_history (user_id, match_id, match_type, xp_amount, season) VALUES (?, ?, ?, ?, ?)'
+      );
+      const penalizeDqTx = dbRef.transaction((userId) => {
+        // addXp floors at 0; use the returned actual delta for xp_history.
+        const actualDelta = userRepo.addXp(userId, -QUEUE_CONFIG.DQ_PENALTY);
+        if (actualDelta !== 0) {
+          // match_id NULL — xp_history.match_id has a FK to matches(id),
+          // and queue match ids come from a separate sequence in
+          // queue_matches. match_type='queue' identifies these rows.
+          insertDqXpHistory.run(userId, null, 'queue', actualDelta, getCurrentSeason());
+        }
+      });
+      penalizeDqTx(user.id);
     }
     // Log to admin feed
     const { postTransaction: ptxDq } = require('../utils/transactionFeed');

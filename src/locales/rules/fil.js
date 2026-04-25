@@ -130,7 +130,7 @@ module.exports = {
       '• Same XP outcome sa pagkatalo (yung winners ay kumikita ng XP, yung forfeiter ay mawawalan ng XP)',
       '',
       '**XP Queue Matches:** 7.5 minutes para sumipot',
-      '• No-show = **-200 XP penalty**',
+      '• No-show = **-300 XP penalty**',
       '',
       '**Paano ve-verify ang no-shows:**',
       '• Ang bot ay chini-check kung yung players ay nag-join sa kahit anong match voice channel (team o shared)',

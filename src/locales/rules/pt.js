@@ -130,7 +130,7 @@ module.exports = {
       '• Mesmo resultado de XP que perder (vencedores ganham XP, quem não aparece perde XP)',
       '',
       '**Partidas de Fila de XP:** 7.5 minutos pra aparecer',
-      '• Não aparecer = **-200 XP de penalidade**',
+      '• Não aparecer = **-300 XP de penalidade**',
       '',
       '**Como é verificado:**',
       '• O bot verifica se os jogadores entraram em algum canal de voz da partida',

@@ -141,10 +141,10 @@ async function checkDeposits() {
         // while the DB was already debited (debit-before-send pattern).
         // Crediting the delta as a "deposit" would phantom-credit the
         // user. Safer to skip and catch it on the next poll cycle.
-        if (wallet.locked_at) {
-          const lockAge = Date.now() - new Date(wallet.locked_at).getTime();
-          if (lockAge < 120_000) continue; // skip if lock is < 2 min old
-        }
+        // (Lock state moved from wallets.locked_at to in-memory
+        // walletRepo.isLocked() to fix the new-user-no-wallet-row
+        // signup recovery path; the SQL column is no longer used.)
+        if (walletRepo.isLocked(wallet.user_id)) continue;
 
         // Query Base for on-chain USDC balance
         const onChainBalance = BigInt(

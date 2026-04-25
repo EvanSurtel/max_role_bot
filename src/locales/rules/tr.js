@@ -130,7 +130,7 @@ module.exports = {
       '• Kaybetmekle aynı XP sonucu (kazananlar XP kazanır, gelmeyen XP kaybeder)',
       '',
       '**XP Queue Maçları:** Gelmek için 7.5 dakika',
-      '• Gelmemek = **-200 XP ceza**',
+      '• Gelmemek = **-300 XP ceza**',
       '',
       '**No-show nasıl doğrulanır:**',
       '• Bot oyuncuların herhangi bir maç voice kanalına (takım veya shared) girip girmediğini kontrol eder',

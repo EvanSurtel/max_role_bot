@@ -27,6 +27,62 @@ const { _queueChannelOverwrites, _cleanupMatchChannels, findClosestXpReplacement
  * @returns {Promise<object>} The QueueMatch object.
  */
 async function createMatch(client, guild) {
+  // Refuse if matches are paused for a season transition. Backstop
+  // for queuePanel's join-time check; covers the edge where a join
+  // raced past a just-flipped pause and the queue then filled.
+  try {
+    const { isMatchesPaused } = require('../panels/seasonPanel');
+    if (isMatchesPaused()) {
+      console.log('[Queue] createMatch aborted — matches paused for season transition');
+      return null;
+    }
+  } catch { /* season panel not loaded */ }
+
+  // Re-check the queue still has 10+ players. Between the queuePanel
+  // handler's `newSize >= TOTAL_PLAYERS` check and the `await
+  // interaction.update(...)` yield, a concurrent button click can
+  // fire its own createMatch and drain the queue; when this call
+  // resumes from the await, splice(0, 10) would build a short-count
+  // "match" from whatever's left. The guard + splice are both
+  // synchronous so no interleaving can slip between them.
+  if (waitingQueue.length < QUEUE_CONFIG.TOTAL_PLAYERS) {
+    console.log(
+      `[Queue] createMatch aborted — queue no longer full ` +
+      `(have ${waitingQueue.length}, need ${QUEUE_CONFIG.TOTAL_PLAYERS})`,
+    );
+    return null;
+  }
+
+  // Cross-system busy re-check against the would-be match roster.
+  // The join-time check in queuePanel.js catches players who are
+  // ALREADY in a wager/XP match, but a player can join a cash
+  // challenge AFTER joining the queue and before it fills — at
+  // createMatch time they'd be mid-wager and shouldn't be drafted
+  // into a queue match. Scrub busy players out of the queue and
+  // abort if that drops us below TOTAL_PLAYERS. The non-busy
+  // players keep their queue position.
+  const { isPlayerBusy } = require('../utils/playerStatus');
+  const busyDiscordIds = [];
+  for (let i = 0; i < QUEUE_CONFIG.TOTAL_PLAYERS; i++) {
+    const entry = waitingQueue[i];
+    const user = userRepo.findByDiscordId(entry.discordId);
+    if (!user) continue;
+    const busy = isPlayerBusy(user.id, entry.discordId);
+    if (busy.busy) busyDiscordIds.push(entry.discordId);
+  }
+  if (busyDiscordIds.length > 0) {
+    for (const discordId of busyDiscordIds) {
+      const idx = waitingQueue.findIndex(p => p.discordId === discordId);
+      if (idx !== -1) waitingQueue.splice(idx, 1);
+    }
+    console.warn(
+      `[Queue] createMatch aborted — ${busyDiscordIds.length} player(s) ` +
+      `(${busyDiscordIds.join(', ')}) are now busy in another match; ` +
+      `removed from queue. Queue now at ${waitingQueue.length}.`,
+    );
+    return null;
+  }
+
   const id = nextMatchId();
   const match = _newQueueMatch(id);
 
@@ -147,12 +203,32 @@ async function handleNoShows(client, match) {
   }
 
   // ── Penalize no-shows ────────────────────────────────────────
+  // addXp + xp_history wrapped in one db.transaction so the player's
+  // xp_points column and the leaderboard's xp_history view can't
+  // diverge (rank roles read xp_points, leaderboard sums xp_history).
   const { postTransaction: ptxNoShow } = require('../utils/transactionFeed');
+  const dbRef = require('../database/db');
+  const insertNoShowXpHistory = dbRef.prepare(
+    'INSERT INTO xp_history (user_id, match_id, match_type, xp_amount, season) VALUES (?, ?, ?, ?, ?)'
+  );
+  const currentSeason = getCurrentSeason();
+  const penalizeNoShowTx = dbRef.transaction((userId) => {
+    // addXp floors at 0; record the actual delta applied so the
+    // audit trail matches reality for low-XP players.
+    const actualDelta = userRepo.addXp(userId, -QUEUE_CONFIG.NO_SHOW_PENALTY);
+    if (actualDelta !== 0) {
+      // match_id is NULL here: xp_history.match_id has a FK to matches(id),
+      // but queue matches live in queue_matches with a separate id sequence.
+      // Passing match.id (a queue_match id) would trip FOREIGN KEY constraint
+      // failed. The match_type='queue' column already marks the row as queue.
+      insertNoShowXpHistory.run(userId, null, 'queue', actualDelta, currentSeason);
+    }
+  });
   for (const discordId of noShows) {
     try {
       const user = userRepo.findByDiscordId(discordId);
       if (user) {
-        userRepo.addXp(user.id, -QUEUE_CONFIG.NO_SHOW_PENALTY);
+        penalizeNoShowTx(user.id);
 
         ptxNoShow({
           type: 'queue_no_show',
@@ -299,12 +375,16 @@ async function resolveMatch(client, match, winningTeam) {
   const awardWinTx = db.transaction((userId) => {
     userRepo.addXp(userId, QUEUE_CONFIG.WIN_XP);
     userRepo.addWin(userId);
-    insertXpHistory.run(userId, match.id, 'queue', QUEUE_CONFIG.WIN_XP, season);
+    // match_id NULL — see no-show penalty above for FK reasoning.
+    insertXpHistory.run(userId, null, 'queue', QUEUE_CONFIG.WIN_XP, season);
   });
   const awardLossTx = db.transaction((userId, penalize) => {
     if (penalize) {
-      userRepo.addXp(userId, -QUEUE_CONFIG.LOSS_XP);
-      insertXpHistory.run(userId, match.id, 'queue', -QUEUE_CONFIG.LOSS_XP, season);
+      // addXp floors at 0; use the returned actual delta for xp_history.
+      const actualDelta = userRepo.addXp(userId, -QUEUE_CONFIG.LOSS_XP);
+      if (actualDelta !== 0) {
+        insertXpHistory.run(userId, null, 'queue', actualDelta, season);
+      }
     }
     userRepo.addLoss(userId);
   });

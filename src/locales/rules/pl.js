@@ -130,7 +130,7 @@ module.exports = {
       '• Ten sam wynik XP co przegrana (zwycięzcy dostają XP, nieobecny traci XP)',
       '',
       '**Mecze Kolejki XP:** 7.5 minuty, żeby się pojawić',
-      '• Brak obecności = **kara -200 XP**',
+      '• Brak obecności = **kara -300 XP**',
       '',
       '**Jak sprawdzana jest nieobecność:**',
       '• Bot sprawdza, czy gracze dołączyli do jakiegoś voice\'a meczu (drużyny albo shared)',

@@ -130,7 +130,7 @@ module.exports = {
       '• Stesso risultato XP che perdere (i vincitori guadagnano XP, chi non si presenta perde XP)',
       '',
       '**Match Coda XP:** 7,5 minuti per presentarsi',
-      '• Mancata presentazione = **penalità -200 XP**',
+      '• Mancata presentazione = **penalità -300 XP**',
       '',
       '**Come vengono verificate le mancate presentazioni:**',
       '• Il bot controlla se i giocatori sono entrati in qualche canale vocale del match (team o condiviso)',

@@ -20,7 +20,6 @@ const onramp = require('../../services/coinbaseOnrampService');
 const bitrefill = require('../../services/bitrefillService');
 const paymentRouter = require('../../services/paymentRouter');
 const rateLimiter = require('../../utils/rateLimiter');
-const { isDemoChannelContext } = require('../coinbaseReviewDemoPanel');
 
 const MIN_CASHOUT_USDC = 5;
 const STYLE_BY_INDEX = [ButtonStyle.Success, ButtonStyle.Primary, ButtonStyle.Secondary, ButtonStyle.Secondary];
@@ -81,14 +80,9 @@ async function handleCashOutAmountModal(interaction, user, wallet, lang) {
   }
   const amountUsdc = Math.round(amount * 100) / 100;
 
-  // Demo channel override — Coinbase reviewers need to see the CDP
-  // offramp regardless of where they're registered AND regardless of
-  // the CDP_OFFRAMP_ENABLED feature flag. Force US + pass demo=true
-  // to include the CDP option unconditionally for reviewers.
-  const demo = isDemoChannelContext(interaction);
-  const country = demo ? 'US' : (user.country_code || '').toUpperCase();
+  const country = (user.country_code || '').toUpperCase();
 
-  const options = paymentRouter.getOfframpOptions({ country, amountUsdc, demo });
+  const options = paymentRouter.getOfframpOptions({ country, amountUsdc });
 
   if (options.length === 0) {
     return interaction.reply({
@@ -131,12 +125,7 @@ async function handleCashOutAmountModal(interaction, user, wallet, lang) {
  */
 async function handleCashOutProvider(interaction, user, wallet, lang) {
   const id = interaction.customId;
-  // Same demo-channel override as the amount modal — keep the
-  // provider branch consistent with the picker and let the CDP
-  // offramp session mint for a non-US reviewer.
-  const country = isDemoChannelContext(interaction)
-    ? 'US'
-    : (user.country_code || '').toUpperCase();
+  const country = (user.country_code || '').toUpperCase();
 
   const rest = id.slice('wallet_cashout_'.length);
   const [providerKey, amountStr] = rest.split('__');

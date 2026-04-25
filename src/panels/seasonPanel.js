@@ -275,6 +275,27 @@ async function handleSeasonModal(interaction) {
 
   await interaction.deferReply();
 
+  // Re-check both invariants AT modal-submit time, not just at the
+  // initial button click. Between the click and the modal submit:
+  //   - a queue match could form (queue join/create currently checks
+  //     matches_paused, but defense in depth here too),
+  //   - matches_paused could be flipped back on by another admin,
+  //   - a wager challenge accept could land if a deferred path was
+  //     in flight when pause flipped on.
+  // Without this re-check, the XP reset would clobber a freshly-
+  // started match's roster mid-game.
+  if (!isMatchesPaused()) {
+    return interaction.editReply({
+      content: 'Cannot end season: match creation is no longer paused. Pause matches first, then retry.',
+    });
+  }
+  const activeAtSubmit = getActiveMatchCount();
+  if (activeAtSubmit > 0) {
+    return interaction.editReply({
+      content: t('season_panel.cannot_end', lang, { n: activeAtSubmit }),
+    });
+  }
+
   try {
     // 1. Save season snapshot — the xp_history table already has all data
     //    Just log the season end event

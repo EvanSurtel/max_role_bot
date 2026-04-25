@@ -117,7 +117,6 @@ src/
     leaderboardPanel.js, seasonPanel.js, escrowPanel.js, ranksPanel.js,
     howItWorksPanel.js, rulesPanel.js, welcomePanel.js, xpMatchPanel.js,
     publicWalletPanel.js, adminWalletViewerPanel.js, walletPanelView.js,
-    coinbaseReviewDemoPanel.js   # Public CDP review/demo channel
     wallet/                       # Wallet panel router + sub-flows
       index.js                    # Router
       viewOpen.js                 # "View My Wallet" button
@@ -179,9 +178,6 @@ src/
     rank.js                       # /rank slash command + rank card builder
     rank-context.js               # Right-click "View Rank" user context menu
   utils/
-    reviewerWhitelist.js          # ensureReviewerUser() auto-provisions
-                                  # minimal user rows for anyone clicking
-                                  # in the review demo channel
     crypto.js                     # AES-256-GCM + HKDF per-user key
                                   # (legacy, unused on self-custody path)
     embeds.js, rankCardRenderer.js, rankRoleSync.js, transactionFeed.js,
@@ -257,7 +253,6 @@ memory/                           # Auto-memory files for future sessions
 - **SpendPermission signature verification**: Synchronous via viem's `verifyTypedData` (ERC-6492-capable via universal validator). Forged sigs rejected before any DB write — never defer to on-chain `approveWithSignature` as the only check.
 - **Nonce binding on grants**: `/api/internal/wallet/grant` consumes the setup nonce atomically in the same request; the nonce's stored `user_id` must match the `userId` in the grant body. Prevents a compromised web layer from rebinding wallet addresses.
 - **wallet.address flip happens AFTER on-chain approve confirms**, not at grant intake. `spendPermissionService.approveOnChain` owns the wallet-row creation/update as a side effect — any code path that approves a permission also flips the wallet, so manual retries don't skip it.
-- **Demo channel fast path**: anyone clicking View My Wallet in the channel `DEMO_CHANNEL_ID` gets auto-provisioned (see `utils/reviewerWhitelist.js` — misnomer, no whitelist enforced, any Discord ID works) with a minimal user row and an ephemeral setup link. Scoped to that channel only.
 - **Admin roles**: `ADMIN_ROLE_ID`, `OWNER_ROLE_ID`, `CEO_ROLE_ID`, `ADS_ROLE_ID` — all admin-equivalent.
 
 ## Self-Custody Wallet Lifecycle
@@ -311,7 +306,6 @@ See `.env.example`. Key vars:
 - `WAGER_CHANNEL_ID`, `CHALLENGES_CHANNEL_ID`, `ADMIN_ALERTS_CHANNEL_ID`
 - `TRANSACTIONS_CHANNEL_ID`, `XP_TRANSACTIONS_CHANNEL_ID`
 - `RANKED_QUEUE_CHANNEL_ID`, `QUEUE_STATS_CHANNEL_ID`, `WAGER_STATS_CHANNEL_ID`, `QUEUE_PING_ROLE_ID`
-- `DEMO_CHANNEL_ID` (optional — public review/demo channel where unregistered users can exercise the wallet flow)
 - `MIN_WAGER_USDC`, `MAX_WAGER_USDC`, `MIN_WITHDRAWAL_USDC`
 - `MEMBER_ROLE_ID`
 

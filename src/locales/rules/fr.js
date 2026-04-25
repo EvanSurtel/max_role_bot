@@ -130,7 +130,7 @@ module.exports = {
       '• Même résultat XP que perdre (les gagnants gagnent de l\'XP, le forfait en perd)',
       '',
       '**Matchs File XP :** 7,5 minutes pour se présenter',
-      '• Non-présentation = **pénalité de -200 XP**',
+      '• Non-présentation = **pénalité de -300 XP**',
       '',
       '**Comment les non-présentations sont vérifiées :**',
       '• Le bot vérifie si les joueurs ont rejoint un canal vocal du match (équipe ou partagé)',

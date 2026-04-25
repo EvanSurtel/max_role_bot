@@ -171,13 +171,27 @@ function nextMatchId() {
 }
 
 /**
- * Startup recovery. Loads active queue_matches rows and rehydrates
- * the in-memory activeMatches Map so in-progress lobbies survive a
- * bot restart. Also seeds _matchIdCounter to MAX(id) so new matches
- * never collide with persisted ones.
+ * Startup recovery. Loads active queue_matches rows, cancels any
+ * mid-flight matches, and seeds _matchIdCounter to MAX(id) so new
+ * matches never collide with persisted ones.
  *
- * Called from src/index.js after Discord client is ready. Must be
- * called BEFORE any queue interactions are accepted.
+ * Why cancel instead of resume: each phase (captain vote, captain
+ * pick, role select, play) keeps its own in-memory state — the
+ * setTimeout handle, Discord message refs for the current UI,
+ * pending captain-pick operators, etc. None of that survives a
+ * restart. Rehydrating the row but leaving `timer: null` stranded
+ * the match — 10 players waiting for a phase advance that never
+ * fires. Better to cancel cleanly and tell the queue channel to
+ * re-queue than to leave ghosts in activeMatches.
+ *
+ * Queue matches are XP-only with no money at stake and XP is only
+ * written on RESOLVED, so cancelling here is a no-op for user
+ * balances.
+ *
+ * Called from src/index.js after Discord client is ready (via
+ * setClient). Must be called BEFORE any queue interactions are
+ * accepted so stale Discord channels get cleaned up before users
+ * can interact with them.
  */
 function recoverFromDb() {
   try {
@@ -188,26 +202,42 @@ function recoverFromDb() {
     const rows = queueMatchRepo.findActive();
     if (rows.length === 0) {
       console.log('[QueueRecovery] No active queue matches to recover');
-      return { recovered: 0, skipped: 0 };
+      return { cancelled: 0 };
     }
 
-    let recovered = 0;
-    let skipped = 0;
+    const { _cleanupMatchChannels } = require('./helpers');
+    let cancelled = 0;
+
     for (const match of rows) {
-      if (!match.categoryId) {
-        // No Discord channels ever attached — skip, mark cancelled.
+      try {
         queueMatchRepo.markCancelled(match.id);
-        skipped++;
-        continue;
+        cancelled++;
+        console.warn(
+          `[QueueRecovery] Cancelled mid-flight match #${match.id} ` +
+          `(phase=${match.phase}) — players must re-queue.`,
+        );
+
+        // Best-effort Discord channel cleanup. Fire-and-forget so a
+        // single failure doesn't block recovery of other rows.
+        if (match.categoryId && _client) {
+          _cleanupMatchChannels(_client, match).catch((err) => {
+            console.error(
+              `[QueueRecovery] Channel cleanup failed for match #${match.id}: ${err.message}`,
+            );
+          });
+        }
+      } catch (err) {
+        console.error(
+          `[QueueRecovery] Failed to cancel match #${match.id}: ${err.message}`,
+        );
       }
-      activeMatches.set(match.categoryId, match);
-      recovered++;
     }
-    console.log(`[QueueRecovery] Recovered ${recovered} active queue match(es), skipped ${skipped} without category`);
-    return { recovered, skipped };
+
+    console.log(`[QueueRecovery] Cancelled ${cancelled} mid-flight queue match(es)`);
+    return { cancelled };
   } catch (err) {
     console.error('[QueueRecovery] Failed to recover from DB:', err.message);
-    return { recovered: 0, skipped: 0, error: err.message };
+    return { cancelled: 0, error: err.message };
   }
 }
 

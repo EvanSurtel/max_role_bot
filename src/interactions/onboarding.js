@@ -145,9 +145,38 @@ async function handleButton(interaction) {
     const discordId = interaction.user.id;
     const lang = langFor(interaction);
 
+    // Only block if the user is FULLY registered (accepted_tos AND
+    // has a wallet row). A user with accepted_tos=1 but no wallet is
+    // stuck — could be a leftover demo-channel auto-provision (now
+    // removed), an incomplete prior registration, or a manually-
+    // recovered row. Re-entering the registration flow is the
+    // intended behaviour for those cases. Mirrors the same check
+    // already applied at submit time below (~line 289).
     const existingUser = userRepo.findByDiscordId(discordId);
     if (existingUser && existingUser.accepted_tos === 1) {
-      return interaction.reply({ content: t('onboarding.already_registered', lang), ephemeral: true, _autoDeleteMs: 60_000 });
+      const existingWallet = walletRepo.findByUserId(existingUser.id);
+      if (existingWallet) {
+        // Fully registered. Idempotently re-grant the member role on
+        // every TOS-accept click — covers the case where a moderator
+        // (or another bot) wiped the role and the user is trying to
+        // recover. Adding a role they already have is a no-op.
+        try {
+          const memberRoleId = process.env.MEMBER_ROLE_ID;
+          if (memberRoleId && interaction.guild) {
+            const member = await interaction.guild.members.fetch(discordId).catch(() => null);
+            if (member && !member.roles.cache.has(memberRoleId)) {
+              await member.roles.add(memberRoleId);
+              console.log(`[Onboarding] Re-granted MEMBER role to already-registered user ${discordId}`);
+            }
+          }
+        } catch (roleErr) {
+          console.warn(`[Onboarding] Failed to re-grant member role for ${discordId}: ${roleErr.message}`);
+        }
+        return interaction.reply({ content: t('onboarding.already_registered', lang), ephemeral: true, _autoDeleteMs: 60_000 });
+      }
+      // accepted_tos=1 but no wallet — fall through to the region
+      // dropdown so they can finish registration.
+      console.log(`[Onboarding] User ${discordId} has accepted_tos=1 but no wallet — re-entering registration flow`);
     }
 
     // Step 1: Region dropdown
@@ -338,7 +367,13 @@ async function handleRegistrationModal(interaction) {
       setupUrl = linkNonceService.mintLink({
         userId: user.id,
         purpose: 'setup',
-        ttlSeconds: 24 * 60 * 60, // 24h for first-time setup — more forgiving than the 10m upgrade links
+        // 2h TTL caps the window in which a leaked Discord DM link
+        // could be redeemed by an attacker to bind their own Smart
+        // Wallet to the victim's Rank $ account. If the user doesn't
+        // complete setup in time, any wallet-panel click (View
+        // Wallet, Deposit, etc.) re-mints a fresh link via
+        // pendingSetup.js — so tightening the window has no UX cost.
+        ttlSeconds: 2 * 60 * 60,
       });
     } catch (mintErr) {
       console.error(`[Onboarding] Setup link mint failed for user ${user.id}: ${mintErr.message}`);
@@ -390,7 +425,7 @@ async function handleRegistrationModal(interaction) {
         '',
         `🔐 **${setupUrl}**`,
         '',
-        '_This link is valid for 24 hours and works once._',
+        '_This link is valid for 2 hours and works once. If it expires, click **View My Wallet** in your wallet channel for a fresh link._',
         '',
         `**${t('onboarding.complete_field_name', lang)}:** ${displayName}`,
         `**${t('onboarding.complete_field_ign', lang)}:** ${codIgn}`,

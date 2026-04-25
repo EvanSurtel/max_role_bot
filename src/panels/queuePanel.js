@@ -179,6 +179,24 @@ async function handleQueueButton(interaction) {
       });
     }
 
+    // Block queue join while season-end pause is active. Without
+    // this, players could accumulate in the queue during the season-
+    // transition window and form a fresh match between the admin's
+    // "End Season" click and the XP reset, which would clobber the
+    // new match's roster with starting XP. seasonPanel's
+    // handleSeasonModal also re-checks matches_paused at submit
+    // time as defense in depth.
+    try {
+      const { isMatchesPaused } = require('./seasonPanel');
+      if (isMatchesPaused()) {
+        return interaction.reply({
+          content: 'Match creation is paused for a season transition. Try again once the new season starts.',
+          ephemeral: true,
+          _autoDeleteMs: 15_000,
+        });
+      }
+    } catch { /* season panel not loaded — fall through */ }
+
     // Check if already in queue
     if (queueService.isInQueue(discordId)) {
       return interaction.reply({

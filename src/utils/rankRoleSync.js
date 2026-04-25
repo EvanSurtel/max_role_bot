@@ -1,8 +1,9 @@
 // Rank role assignment.
 //
 // XP source of truth: local users.xp_points. Tier is derived directly
-// from RANK_TIERS in constants.js. Crowned is position-based — first N
-// users (by xp_points DESC) who have crossed the Obsidian threshold.
+// from RANK_TIERS in constants.js. Crowned is position-based — the top
+// N users by xp_points DESC, restricted to those who have crossed the
+// Obsidian threshold.
 //
 // Triggered from:
 //   - matchService.resolveMatch (every match participant, batched)
@@ -72,8 +73,10 @@ async function syncRank(client, userId) {
 
     const userPoints = user.xp_points || 0;
 
-    // Crowned = first N users who reached Obsidian (4500+ XP).
-    // Must have Obsidian-level XP AND be in the first N to reach it.
+    // Crowned = top N by xp_points among users at or above the
+    // Obsidian threshold. Ties broken by lower id (earlier row) via
+    // SQLite's stable-but-undefined default ordering — good enough
+    // given that identical xp_points values are rare at 4500+.
     let inTopN = false;
     try {
       if (userPoints >= obsidianMinXp) {

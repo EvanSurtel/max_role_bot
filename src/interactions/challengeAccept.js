@@ -708,6 +708,37 @@ async function handleTeamConfirmedAccept(interaction) {
     // Clean up acceptFlows
     acceptFlows.delete(discordId);
 
+    // notifyTeam2Teammates may have cancelled the challenge mid-flight
+    // (e.g. a teammate had DMs disabled → auto-decline → cancelChallenge
+    // → status flipped to CANCELLED + acceptor refunded). If that
+    // happened, do NOT mark the board ACCEPTED and do NOT lie to the
+    // acceptor — they need to know their teammate was unreachable so
+    // they can pick someone else. Money is already refunded inside
+    // cancelChallenge; we just have to surface the error.
+    const postNotifyChallenge = challengeRepo.findById(challengeId);
+    if (postNotifyChallenge && postNotifyChallenge.status === CHALLENGE_STATUS.CANCELLED) {
+      // Find which teammate(s) ended up DECLINED so we can name them
+      // in the error message.
+      const team2Players = challengePlayerRepo.findByChallengeAndTeam(challengeId, 2);
+      const declinedTeammates = team2Players
+        .filter(p => p.role !== PLAYER_ROLE.CAPTAIN && p.status === PLAYER_STATUS.DECLINED)
+        .map(p => userRepo.findById(p.user_id))
+        .filter(Boolean);
+      const declinedMentions = declinedTeammates.length
+        ? declinedTeammates.map(u => `<@${u.discord_id}>`).join(', ')
+        : 'one or more of your teammates';
+      return interaction.editReply({
+        content: [
+          `**Could not start match #${challenge.display_number || challengeId}.**`,
+          '',
+          `${declinedMentions} has direct messages disabled, so we couldn't deliver the invite.`,
+          '',
+          'Your entry has been refunded. Ask them to enable **User Settings → Privacy & Safety → Allow direct messages from server members**, or pick different teammates and try again.',
+        ].join('\n'),
+        components: [],
+      });
+    }
+
     // Record rate-limit hit on successful team accept. The actual
     // on-chain escrow tx happens later when the last teammate
     // confirms (via matchService.startMatch), but from THIS user's
@@ -731,6 +762,25 @@ async function handleTeamConfirmedAccept(interaction) {
     });
   } catch (err) {
     console.error(`[ChallengeAccept] Error in team accept flow for challenge #${challengeId}:`, err);
+    // If we threw AFTER holdFunds succeeded but BEFORE returning success,
+    // the acceptor's USDC is still locked in balance_held and the
+    // challenge is stuck in ACCEPTED with a potentially-partial
+    // challenge_players roster. Mirror the 1v1 path: refund everyone
+    // whose funds are currently held for this challenge, and put the
+    // challenge back to OPEN so someone else can try to accept.
+    // Both operations are idempotent / no-op if nothing was held.
+    try { escrowManager.refundAll(challengeId); } catch (refundErr) {
+      console.error(
+        `[ChallengeAccept] refundAll during catch failed for challenge #${challengeId}: ${refundErr.message}`,
+      );
+    }
+    try {
+      challengeRepo.atomicStatusTransition(
+        challengeId,
+        CHALLENGE_STATUS.ACCEPTED,
+        CHALLENGE_STATUS.OPEN,
+      );
+    } catch { /* best effort */ }
     acceptFlows.delete(discordId);
     return interaction.editReply({
       content: 'Something went wrong. Please try again.',

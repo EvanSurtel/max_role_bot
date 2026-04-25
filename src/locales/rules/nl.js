@@ -130,7 +130,7 @@ module.exports = {
       '• Zelfde XP uitkomst als verliezen (winnaars krijgen XP, degene die niet komt opdagen verliest XP)',
       '',
       '**XP Queue Matches:** 7.5 minuten om op te komen dagen',
-      '• No-show = **-200 XP straf**',
+      '• No-show = **-300 XP straf**',
       '',
       '**Hoe no-shows worden geverifieerd:**',
       '• Bot checkt of spelers in een match voice channel zijn gekomen (team of shared)',

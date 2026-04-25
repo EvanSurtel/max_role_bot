@@ -130,7 +130,7 @@ module.exports = {
       '• Same XP outcome as losing (winners gain XP, forfeiter loses XP)',
       '',
       '**XP Queue Matches:** 7.5 minutes to show up',
-      '• No-show = **-200 XP penalty**',
+      '• No-show = **-300 XP penalty**',
       '',
       '**How no-shows are verified:**',
       '• Bot checks if players joined any match voice channel (team or shared)',

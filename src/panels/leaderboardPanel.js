@@ -394,8 +394,13 @@ async function handleAdminModal(interaction) {
     if (isNaN(xpAmount)) return interaction.reply({ content: t('leaderboard_panel.invalid_xp', lang), ephemeral: true });
     const user = userRepo.findByDiscordId(targetId);
     if (!user) return interaction.reply({ content: t('leaderboard_panel.user_not_found_msg', lang, { id: targetId }), ephemeral: true });
-    userRepo.addXp(user.id, xpAmount);
-    db.prepare('INSERT INTO xp_history (user_id, match_id, match_type, xp_amount, season) VALUES (?, NULL, ?, ?, ?)').run(user.id, 'admin_adjust', xpAmount, getCurrentSeason());
+    // addXp floors at 0 (no negative XP); use the returned actual delta
+    // so xp_history reflects what was really applied — important for
+    // admin-typed negative adjustments that would have undershot.
+    const actualDelta = userRepo.addXp(user.id, xpAmount);
+    if (actualDelta !== 0) {
+      db.prepare('INSERT INTO xp_history (user_id, match_id, match_type, xp_amount, season) VALUES (?, NULL, ?, ?, ?)').run(user.id, 'admin_adjust', actualDelta, getCurrentSeason());
+    }
     logAdminAction(interaction.user.id, 'adjust_xp', 'user', user.id, { xpAmount, reason });
 
     // Re-sync the user's rank role — they may have crossed a tier

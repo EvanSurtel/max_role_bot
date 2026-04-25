@@ -43,10 +43,13 @@ export async function POST(req: NextRequest) {
         'X-Internal-Secret': secret,
       },
       body: JSON.stringify(body),
-      // The bot's /grant endpoint persists synchronously and kicks off
-      // the on-chain approve in the background, so upstream should be
-      // fast (<500ms). 15s ceiling leaves headroom for cold SQLite.
-      signal: AbortSignal.timeout(15_000),
+      // The bot's /grant endpoint now AWAITS the on-chain
+      // approveWithSignature UserOp before responding (CDP UserOp
+      // confirmation runs ~10–30s). 60s gives headroom for slow
+      // bundler confirmation. Vercel Pro serverless function timeout
+      // is 60s; if you're on the hobby tier (10s), you'll hit that
+      // before this signal fires.
+      signal: AbortSignal.timeout(60_000),
     });
     const data = await upstream.json().catch(() => ({}));
     return Response.json(data, { status: upstream.status });

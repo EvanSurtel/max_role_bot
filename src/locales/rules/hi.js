@@ -130,7 +130,7 @@ module.exports = {
       '• हारने जैसा ही XP outcome (winners XP पाते हैं, forfeiter XP खोता है)',
       '',
       '**XP Queue Matches:** आने के लिए 7.5 minutes',
-      '• No-show = **-200 XP penalty**',
+      '• No-show = **-300 XP penalty**',
       '',
       '**No-shows कैसे verify होते हैं:**',
       '• Bot check करता है कि players किसी भी match voice channel (team या shared) में join हुए या नहीं',

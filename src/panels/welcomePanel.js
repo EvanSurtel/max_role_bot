@@ -3,16 +3,44 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 const { t } = require('../locales/i18n');
 const { buildLanguageDropdownRow } = require('../utils/languageButtonHelper');
 
+// Discord limits:
+//   - 4096 chars max per embed description
+//   - 6000 chars total across all embeds in a single message
+// We keep messages well under 6000 (5500 cap with headroom) and split
+// the TOS across multiple messages when it doesn't fit.
+const DISCORD_MESSAGE_CHAR_CAP = 5500;
+
+function _embedChars(embed) {
+  return (embed.data.title || '').length + (embed.data.description || '').length;
+}
+
+/**
+ * Greedily pack embeds into the minimum number of messages such that each
+ * message stays under DISCORD_MESSAGE_CHAR_CAP. Returns array of arrays.
+ */
+function _packEmbeds(embeds) {
+  const groups = [];
+  let current = [];
+  let currentChars = 0;
+  for (const e of embeds) {
+    const ec = _embedChars(e);
+    if (current.length > 0 && currentChars + ec > DISCORD_MESSAGE_CHAR_CAP) {
+      groups.push(current);
+      current = [];
+      currentChars = 0;
+    }
+    current.push(e);
+    currentChars += ec;
+  }
+  if (current.length > 0) groups.push(current);
+  return groups;
+}
+
 /**
  * Build the standalone language picker for the welcome channel.
  *
  * Posted as the FIRST message at the top of the welcome channel — a
- * minimal title + the dropdown, no long explanatory text. Each bot
- * channel has its own dropdown so the user doesn't need a paragraph
- * about "master switches" here.
- *
- * @param {string} lang - the language to render the picker itself in (unused
- *                        for the title since it's intentionally multi-language)
+ * minimal title + the dropdown, no long explanatory text.
  */
 function buildWelcomeLanguagePicker(_lang = 'en') {
   const embed = new EmbedBuilder()
@@ -23,33 +51,54 @@ function buildWelcomeLanguagePicker(_lang = 'en') {
 }
 
 /**
- * Build the welcome/TOS panel — embeds + Accept/Decline buttons only.
- * The language picker is sent as a separate message above this one (see
- * `postWelcomePanel`), so users see it first when they enter the channel.
+ * Build all the embeds for the welcome / TOS / verify panel. The TOS
+ * is split into up to 4 sections (tos_body, tos_body_2, tos_body_3,
+ * tos_body_4) since the full document exceeds the 4096-char per-embed
+ * limit. Older locales without _3 / _4 keys just skip those embeds.
  */
-function buildWelcomePanel(lang = 'en') {
-  const welcomeEmbed = new EmbedBuilder()
+function _buildAllEmbeds(lang = 'en') {
+  const embeds = [];
+
+  embeds.push(new EmbedBuilder()
     .setTitle(t('onboarding.welcome_title', lang))
     .setColor(0x3498db)
-    .setDescription(t('onboarding.welcome_desc', lang));
+    .setDescription(t('onboarding.welcome_desc', lang)));
 
-  // TOS sections 1-5
-  const tos1Embed = new EmbedBuilder()
+  // TOS title goes only on the first TOS embed; subsequent TOS chunks
+  // continue without title so they read as one document.
+  embeds.push(new EmbedBuilder()
     .setTitle(t('onboarding.tos_title', lang))
     .setColor(0x3498db)
-    .setDescription(t('onboarding.tos_body', lang));
+    .setDescription(t('onboarding.tos_body', lang)));
 
-  // TOS sections 6-9
-  const tos2Embed = new EmbedBuilder()
-    .setColor(0x3498db)
-    .setDescription(t('onboarding.tos_body_2', lang));
+  // TOS continuation chunks. For locales where these keys haven't been
+  // translated yet, t() falls back to English — so non-English users
+  // see the first chunk in their language and the rest in English
+  // (better than missing the legal sections entirely). Translations
+  // catch up over time.
+  for (const key of ['tos_body_2', 'tos_body_3', 'tos_body_4']) {
+    const val = t('onboarding.' + key, lang);
+    // t() returns the literal key string only if the key exists in
+    // NEITHER the requested locale nor English. Defensive guard so we
+    // don't push a useless "onboarding.tos_body_3" embed if someone
+    // accidentally removes the English entry.
+    if (val && val !== 'onboarding.' + key) {
+      embeds.push(new EmbedBuilder()
+        .setColor(0x3498db)
+        .setDescription(val));
+    }
+  }
 
-  const verifyEmbed = new EmbedBuilder()
+  embeds.push(new EmbedBuilder()
     .setTitle(t('onboarding.verify_title', lang))
     .setColor(0x2ecc71)
-    .setDescription(t('onboarding.verify_desc', lang));
+    .setDescription(t('onboarding.verify_desc', lang)));
 
-  const actionRow = new ActionRowBuilder().addComponents(
+  return embeds;
+}
+
+function _buildAcceptDeclineRow(lang = 'en') {
+  return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('tos_accept')
       .setLabel(t('onboarding.btn_accept', lang))
@@ -59,22 +108,31 @@ function buildWelcomePanel(lang = 'en') {
       .setLabel(t('onboarding.btn_decline', lang))
       .setStyle(ButtonStyle.Danger),
   );
+}
 
-  // No dropdown here — the welcome channel has the dropdown at the TOP
-  // (in buildWelcomeLanguagePicker), so users don't have to scroll past
-  // the entire TOS to switch language.
+/**
+ * Build the welcome/TOS panel as a SINGLE-MESSAGE shape (legacy callers).
+ * Returns { embeds, components } with all embeds packed together.
+ *
+ * NOTE: With the longer TOS this WILL exceed Discord's 6000 chars per
+ * message limit and Discord will reject the message. Use postWelcomePanel
+ * which packs across multiple messages instead. Kept for back-compat.
+ */
+function buildWelcomePanel(lang = 'en') {
   return {
-    embeds: [welcomeEmbed, tos1Embed, tos2Embed, verifyEmbed],
-    components: [actionRow],
+    embeds: _buildAllEmbeds(lang),
+    components: [_buildAcceptDeclineRow(lang)],
   };
 }
 
 /**
  * Post (or refresh) the welcome channel.
  *
- * Sends TWO messages:
- *   1. Language picker (top of channel — posted first, oldest)
- *   2. Welcome panel + TOS + Accept/Decline (below — posted second)
+ * Sends:
+ *   1. Language picker (top of channel — oldest message)
+ *   2. One or more welcome / TOS messages, packed under the per-message
+ *      char cap. Accept/Decline buttons attach to the LAST message so
+ *      users see them at the bottom after reading the full TOS.
  *
  * On startup we wipe any old bot messages first so we don't accumulate.
  */
@@ -101,13 +159,24 @@ async function postWelcomePanel(client, lang = 'en') {
       }
     }
 
-    // Post language picker FIRST (it'll be at the top of the channel)
+    // 1) Language picker at the top
     await channel.send(buildWelcomeLanguagePicker(lang));
 
-    // Post welcome panel SECOND (it'll appear below the language picker)
-    await channel.send(buildWelcomePanel(lang));
+    // 2) Welcome / TOS / verify, packed into messages under Discord's
+    //    6000-char per-message limit. The TOS document is now too long
+    //    to fit in a single message.
+    const allEmbeds = _buildAllEmbeds(lang);
+    const groups = _packEmbeds(allEmbeds);
+    const acceptRow = _buildAcceptDeclineRow(lang);
 
-    console.log(`[Panel] Posted welcome panel + language picker (${lang})`);
+    for (let i = 0; i < groups.length; i++) {
+      const isLast = i === groups.length - 1;
+      const payload = { embeds: groups[i] };
+      if (isLast) payload.components = [acceptRow];
+      await channel.send(payload);
+    }
+
+    console.log(`[Panel] Posted welcome panel + language picker (${lang}, ${groups.length} TOS message(s))`);
   } catch (err) {
     console.error('[Panel] Failed to post welcome panel:', err.message);
   }

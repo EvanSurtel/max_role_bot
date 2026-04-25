@@ -130,7 +130,7 @@ module.exports = {
       '• XP outcome sama macam kalah (winner dapat XP, yang forfeit hilang XP)',
       '',
       '**XP Queue Match:** 7.5 minit untuk muncul',
-      '• No-show = **penalty -200 XP**',
+      '• No-show = **penalty -300 XP**',
       '',
       '**Macam mana no-show diverify:**',
       '• Bot check kalau player dah join mana-mana voice channel match (team atau shared)',

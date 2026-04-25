@@ -8,3 +8,6 @@ node_modules/
 target/
 .anchor/
 data/backups/
+
+# Claude Code session state
+.claude/

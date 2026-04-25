@@ -20,7 +20,6 @@ const {
 const changelly = require('../../services/changellyService');
 const onramp = require('../../services/coinbaseOnrampService');
 const paymentRouter = require('../../services/paymentRouter');
-const { isDemoChannelContext } = require('../coinbaseReviewDemoPanel');
 
 const MIN_DEPOSIT_USD = 5;
 const MAX_DEPOSIT_USD = 1000;
@@ -128,16 +127,10 @@ async function handleDepositAmountModal(interaction, user, wallet, lang) {
   }
   const amountUsd = Math.round(amount * 100) / 100; // 2-decimal round
 
-  // Demo channel: pass demo=true so the router bypasses the country
-  // restriction + CDP_ONRAMP_ENABLED flag to make the Coinbase button
-  // visible. Do NOT force country=US — the description copy should
-  // still reflect where the reviewer actually is (US = guest checkout,
-  // non-US = Coinbase account required) so they see honest UI.
-  const demo = isDemoChannelContext(interaction);
   const country = (user.country_code || '').toUpperCase();
   const address = wallet.address;
 
-  const options = paymentRouter.getOnrampOptions({ country, amountUsd, userId: user.id, demo });
+  const options = paymentRouter.getOnrampOptions({ country, amountUsd, userId: user.id });
 
   if (options.length === 0) {
     return interaction.reply({
@@ -174,10 +167,9 @@ async function handleDepositAmountModal(interaction, user, wallet, lang) {
       `Your deposit address (Base network):`,
       `\`\`\`\n${address}\n\`\`\``,
       '',
-      '**Pick a payment method:**',
-      ...descLines,
+      ...(options.length === 1 ? [options[0].description] : ['**Pick a payment method:**', ...descLines]),
       '',
-      '_Rank $ does not charge any deposit fee. All fees shown go to the payment provider (Coinbase / Wert / Transak), not to us._',
+      '_Rank $ does not charge any deposit fee. The fee above goes to the payment provider, not to us._',
       '',
       '\u26A0\uFE0F Always send USDC on the **Base** network. Any other network will result in permanent loss of funds.',
     ].join('\n'),
@@ -193,13 +185,7 @@ async function handleDepositAmountModal(interaction, user, wallet, lang) {
  */
 async function handleDepositProvider(interaction, user, wallet, lang) {
   const id = interaction.customId;
-  // Same demo-channel override as the amount modal above — keeps the
-  // provider branch (CDP / Wert / Transak) consistent with what the
-  // user was shown in the picker, and ensures the CDP Onramp session
-  // is minted with country='US' for a non-US reviewer.
-  const country = isDemoChannelContext(interaction)
-    ? 'US'
-    : (user.country_code || '').toUpperCase();
+  const country = (user.country_code || '').toUpperCase();
 
   const rest = id.slice('wallet_deposit_'.length);
   const [providerKey, amountStr] = rest.split('__');
@@ -325,14 +311,6 @@ async function _handleCdp(interaction, user, wallet, country, amountUsd) {
 
 // ─── Wert / Transak via Changelly ───────────────────────────────
 async function _handleChangelly(interaction, user, wallet, country, preferredProviderCode, amountUsd, opts = {}) {
-  // Demo channel: we forced country='US' upstream so the picker would
-  // include the Coinbase option, but the reviewer isn't actually in
-  // the US and has no state_code on file. Do NOT prompt them for a
-  // US state — pass 'NY' as a placeholder to Changelly and let the
-  // reviewer see the flow uninterrupted. The review is about the
-  // integration working, not about Changelly routing a real US user.
-  const inDemoChannel = isDemoChannelContext(interaction);
-
   // Changelly requires state for US; existing users who onboarded
   // before the state_code migration have NULL. Prompt them to enter
   // it in-line rather than letting the /orders call silently fail.
@@ -343,7 +321,7 @@ async function _handleChangelly(interaction, user, wallet, country, preferredPro
   // (opts.alreadyDeferred=true), we cannot open a modal — instead
   // surface a plain editReply asking the user to try the dedicated
   // Wert/Transak button first so they see the modal fresh.
-  if (country === 'US' && !user.state_code && !inDemoChannel) {
+  if (country === 'US' && !user.state_code) {
     if (opts.alreadyDeferred) {
       return interaction.editReply({
         content: 'We need your US state on file before we can route deposits to Wert/Transak. Please click **Deposit USDC** again and pick the non-Coinbase option — the form will open.',
@@ -402,21 +380,12 @@ async function _handleChangelly(interaction, user, wallet, country, preferredPro
   }
 
   try {
-    // Demo channel: country was forced to 'US' upstream for CDP
-    // visibility; Changelly's Wert/Transak route needs a state_code
-    // when country=US, and the reviewer doesn't have one. Pass 'NY'
-    // as a harmless placeholder — the review is about seeing the
-    // integration work, not validating real US residency.
-    const effectiveStateCode = inDemoChannel
-      ? (user.state_code || 'NY')
-      : (user.state_code || null);
-
     const order = await changelly.createOrder({
       userId: interaction.user.id,
       walletAddress: wallet.address,
       amountUsd,
       countryCode: country || 'US',
-      stateCode: effectiveStateCode,
+      stateCode: user.state_code || null,
       preferredProviderCode,
     });
 
@@ -452,6 +421,34 @@ async function _handleChangelly(interaction, user, wallet, country, preferredPro
     }
   } catch (err) {
     console.error(`[Wallet] Changelly order (${preferredProviderCode}) failed:`, err.message);
+
+    // PROVIDER_UNAVAILABLE — Changelly didn't return an offer for this
+    // provider+country+amount. Tell the user which providers DID
+    // return offers so they can switch with one click in the picker.
+    // Previously the bot silently fell through to whichever provider
+    // WAS available, so a user clicking "Wert" got Transak with no
+    // warning — confusing and shady-looking.
+    if (err.code === 'PROVIDER_UNAVAILABLE') {
+      const labelOf = (code) => {
+        if (code === 'wert') return 'Wert';
+        if (code === 'transak') return 'Transak';
+        if (code === 'moonpay') return 'MoonPay';
+        if (code === 'banxa') return 'Banxa';
+        return code;
+      };
+      const available = (err.availableProviders || []).map(labelOf);
+      const requested = labelOf(preferredProviderCode);
+      const lines = [
+        `**⚠️ ${requested} isn't available right now**`,
+        '',
+        available.length > 0
+          ? `${requested} doesn't have a quote for your region${amountUsd != null ? ` at $${amountUsd}` : ''} right now. Available payment methods for your region: **${available.join(', ')}**.`
+          : `No card payment methods are available for your region right now.`,
+        '',
+        'Click **Deposit USDC** again and pick one of the available options, or send USDC directly to your Base address.',
+      ];
+      return interaction.editReply({ content: lines.join('\n') });
+    }
   }
 
   return interaction.editReply({

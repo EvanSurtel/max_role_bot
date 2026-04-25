@@ -70,9 +70,9 @@ async function _getEscrowOwnerSmartAccount() {
  *                   wait window. The on-chain outcome is UNKNOWN —
  *                   it may still land minutes later. Callers MUST
  *                   NOT credit the user back on this error class;
- *                   route the row to pending_verification and let
- *                   pendingWithdrawSweeper resolve it by polling
- *                   cdp.evm.getUserOperation.
+ *                   surface it to an admin (match-deposit path tags
+ *                   the error with `.escrowStuck = true` so the match
+ *                   service skips automatic refund and alerts).
  * On 'post_submit' errors, `.userOpHash` and `.smartAccountAddress`
  * are attached so the caller can persist them.
  */

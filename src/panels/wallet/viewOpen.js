@@ -15,23 +15,8 @@ const { t, langFor } = require('../../locales/i18n');
  */
 async function handleWalletViewOpen(interaction) {
   const lang = langFor(interaction);
-  const { ensureReviewerUser } = require('../../utils/reviewerWhitelist');
-  const { isDemoChannelContext } = require('../coinbaseReviewDemoPanel');
 
-  // Demo channel fast path: any Discord user clicking View My Wallet
-  // in the review demo channel gets auto-provisioned with a minimal
-  // user row and flows straight into the self-custody setup link. No
-  // COD form, no TOS click, no whitelist — the demo channel IS the
-  // permission gate (server-side channel perms decide who can see it).
-  // This lets CDP reviewers (or anyone else you invite) click through
-  // the full onboarding + wallet + deposit flow end-to-end without
-  // going through the real registration forms a COD player sees.
-  let user = userRepo.findByDiscordId(interaction.user.id);
-  if (!user && isDemoChannelContext(interaction)) {
-    user = ensureReviewerUser(interaction.user.id, interaction.user.tag || interaction.user.username);
-    console.log(`[ViewWallet] Auto-provisioned demo-channel user ${user.id} (discord=${interaction.user.id})`);
-  }
-
+  const user = userRepo.findByDiscordId(interaction.user.id);
   if (!user) {
     return interaction.reply({ content: t('common.onboarding_required', lang), ephemeral: true });
   }

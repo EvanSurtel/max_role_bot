@@ -33,18 +33,29 @@
 const cdpTrial = require('./cdpTrialService');
 const wertKyc = require('../database/repositories/wertKycRepo');
 
-// Countries where we surface CDP Onramp / Offramp in the real wallet
-// channel. Per Rishabh Jain (CDP team) on 2026-04-21, CDP guest
-// checkout is US-only today despite the public FAQ claiming US/UK/CA.
-// We keep CA in these sets anyway for the operator's own demo
-// recording (CA-based) — Coinbase's widget will either route the CA
-// session via the public-FAQ path or surface a region error; either
-// way the buttons are visible for the video. Drop CA back out of
-// these sets once the trial upgrade is approved and we want the prod
-// router to reflect Rishabh's guidance strictly.
-// Demo channel bypasses these gates entirely via the `demo` flag.
-const CDP_GUEST_ONRAMP_COUNTRIES = new Set(['US', 'CA']);
-const CDP_GUEST_OFFRAMP_COUNTRIES = new Set(['US', 'CA']);
+// SIMPLIFIED ONRAMP ROUTING (post Coinbase approval, 2026-04-24)
+//
+// Each user gets ONE deposit option, picked by their country. No more
+// "pick between Wert / Transak / Coinbase" confusion — just one button
+// labelled with the actual payment methods.
+//
+//   US  → Coinbase Onramp GUEST checkout (no Coinbase account, no KYC)
+//         Methods: Apple Pay, Google Pay, debit card
+//         (Per Coinbase docs: no credit cards on US guest checkout.)
+//
+//   GB  → Coinbase Onramp ACCOUNT-based (sign into Coinbase, KYC)
+//         Methods: Apple Pay, Google Pay, debit/credit card, PayPal,
+//         Faster Payments. UK can't use Wert (Changelly /offers
+//         doesn't quote Wert for GB) and Transak requires KYC anyway,
+//         so Coinbase is the cleanest path.
+//
+//   *   → Wert via Changelly. Methods: card, Apple Pay, Google Pay.
+//         No ID under $1,000 lifetime; ID over that. (Pending Changelly
+//         enabling Wert on our partner account — until then, /offers
+//         won't return Wert and the user gets a clear "not available"
+//         error. Email out to Changelly support 2026-04-24.)
+const COINBASE_GUEST_COUNTRIES = new Set(['US']);
+const COINBASE_ACCOUNT_COUNTRIES = new Set(['GB']);
 
 // Transak is global. We still gate on Changelly having an offer for
 // the country + amount at order time.
@@ -67,103 +78,106 @@ const CDP_GUEST_OFFRAMP_COUNTRIES = new Set(['US', 'CA']);
  * @param {number} [args.userId] - Internal user id; if provided, the
  *                                  Wert option's label/description
  *                                  reflect the user's lifetime LKYC cap.
- * @param {boolean} [args.demo=false] - If true, include CDP onramp
- *   even when CDP_ONRAMP_ENABLED=false. Callers pass this from the
- *   Coinbase review demo channel so reviewers always see CDP, no
- *   matter what feature flags the operator has set.
  * @returns {ProviderOption[]}
  */
-function getOnrampOptions({ country, amountUsd, userId, demo = false }) {
+function getOnrampOptions({ country, amountUsd, userId }) {
   const c = (country || '').toUpperCase();
   const options = [];
 
-  // CDP guest checkout — only where Coinbase actually routes to guest
-  // flow today (US as of 2026-04-21), and only while the trial counter
-  // has room left. Trial mode caps each transaction at $5 — if the
-  // user requested more, we hide CDP entirely rather than silently
-  // clamping.
-  //
-  // Fee messaging during trial: Coinbase waives their card fee on
-  // trial-sized transactions, so we show "no fees" for ≤$5 deposits.
-  // Post-approval, CDP_ZERO_FEE_USDC flips the copy to 0% globally.
-  //
-  // CDP onramp visibility — same pattern as getOfframpOptions:
-  //   - Demo channel: always show (credentials must be configured).
-  //   - Real wallet channel, country in CDP_GUEST_ONRAMP_COUNTRIES
-  //     (US / CA today): show regardless of CDP_ONRAMP_ENABLED flag
-  //     and trial-counter state. A CA reviewer / operator recording
-  //     the demo video shouldn't need to flip env vars to see the
-  //     Coinbase button.
-  //   - Other countries: still honor the canUseOnramp() gate which
-  //     checks both CDP_ONRAMP_ENABLED and the trial counter.
-  const cdpAllowed = demo
-    ? (process.env.CDP_API_KEY_ID && process.env.CDP_PROJECT_ID) // credentials present
-    : (CDP_GUEST_ONRAMP_COUNTRIES.has(c) || cdpTrial.canUseOnramp());
-  if (cdpAllowed) {
-    const perTxMax = cdpTrial.getMaxPerTxUsd();
-    const fitsInTrialCap = amountUsd == null || amountUsd <= perTxMax;
-    if (fitsInTrialCap) {
-      // ONE unified description that names both paths, so Coinbase's
-      // review team sees our UI is honest about guest-checkout being
-      // US-only and requiring an account elsewhere. Apple Pay /
-      // Google Pay / card all route through Coinbase's widget either
-      // way. "No fees" is always accurate during the zero-fee USDC
-      // promotion + trial mode.
-      options.push({
-        provider: 'cdp_onramp',
-        label: 'Coinbase Onramp',
-        description: 'No fees. **Guest checkout** available for US users (no Coinbase account needed). **Non-US users must sign in with a Coinbase account.** Pay with Apple Pay, Google Pay, or credit / debit card. Powered by Coinbase.',
-        feePctEstimate: 0,
-        kycRequired: c === 'US' ? 'none' : 'coinbase_account',
-        primary: true,
-      });
-    }
+  // US — single option. Coinbase Onramp GUEST checkout: no account,
+  // no KYC, no fees, supported methods are Apple Pay, Google Pay,
+  // debit card (per Coinbase guest-checkout policy — credit cards are
+  // not eligible for US guest checkout).
+  if (COINBASE_GUEST_COUNTRIES.has(c)) {
+    options.push({
+      provider: 'cdp_onramp',
+      label: 'Deposit with Apple Pay, Google Pay, or Debit Card',
+      description: 'Guest checkout. Funds arrive in your wallet in a few minutes.',
+      feePctEstimate: 0,
+      kycRequired: 'none',
+      primary: true,
+    });
+    return options;
   }
 
-  // Wert — card payments with LKYC (typed-only up to $1,000 lifetime).
-  // Available globally including UK. Once the user has crossed the cap,
-  // we suppress Wert entirely and let Transak take the slot — otherwise
-  // the user would hit Wert's own KYC gate mid-flow after clicking our
-  // "no ID needed" button.
-  {
-    const wertBlocked = userId != null && wertKyc.isOverCap(userId);
-    if (!wertBlocked) {
-      let wertDesc = 'No ID upload needed under $1,000 lifetime. 4% + $1 fee. Powered by Wert.';
-      if (userId != null) {
-        const remaining = wertKyc.getRemainingCap(userId);
-        if (wertKyc.shouldWarn(userId)) {
-          wertDesc = `No ID upload needed (you have about $${remaining.toFixed(0)} left before Wert asks for ID). 4% + $1 fee.`;
-        }
-        if (amountUsd != null && remaining > 0 && amountUsd > remaining) {
-          wertDesc = `Heads up: this deposit exceeds your remaining $${remaining.toFixed(0)} Wert no-ID limit — Wert may ask for ID. Consider the Transak option instead.`;
-        }
-      }
-      // Default Wert description includes fee + attribution ("paid to
-      // Wert") unless we've already swapped it for a KYC-cap warning.
-      if (wertDesc === 'No ID upload needed under $1,000 lifetime. 4% + $1 fee. Powered by Wert.') {
-        wertDesc = 'No ID upload needed under $1,000 lifetime. Fee: 4% (min $1) — paid to Wert, not Rank $.';
-      }
-      options.push({
-        provider: 'wert',
-        label: 'Pay with Card (Wert)',
-        description: wertDesc,
-        feePctEstimate: 0.04,
-        kycRequired: 'lkyc',
-        primary: options.length === 0,
-      });
-    }
+  // UK — single option. Coinbase Onramp account-based (Wert isn't
+  // available for GB via Changelly; Transak would also require KYC).
+  // Per Coinbase docs: UK methods include Apple Pay, Google Pay,
+  // debit/credit card, PayPal, Faster Payments.
+  if (COINBASE_ACCOUNT_COUNTRIES.has(c)) {
+    options.push({
+      provider: 'cdp_onramp',
+      label: 'Deposit with Apple Pay, Google Pay, Card, or PayPal',
+      description: 'No fees. Sign in to a free Coinbase account and verify your identity once (you\'ll need this same account to cash out to your bank later anyway).',
+      feePctEstimate: 0,
+      kycRequired: 'coinbase_account',
+      primary: true,
+    });
+    return options;
   }
 
-  // Transak — global card / bank with full document KYC. Always shown
-  // as the secondary option; becomes the Wert-replacement once the user
-  // is over the $1k LKYC cap.
+  // Everywhere else — TWO options:
+  //   PRIMARY (green button): Wert via Changelly. Quick, no account,
+  //                           4% + $1 fee. No ID under $1,000 lifetime.
+  //                           Most users will pick this — they're
+  //                           lazy and don't want KYC.
+  //   SECONDARY (gray button): Coinbase Onramp account-based. No fees
+  //                            but requires Coinbase account + ID.
+  //                            Same KYC the user will need anyway to
+  //                            cash out to bank, so doing it now is
+  //                            a one-time setup that saves the fee.
+  // GUEST CHECKOUT (Wert) — currently disabled while we wait for
+  // Changelly to enable Wert on our partner account (email out
+  // 2026-04-24). Until that comes back, we hide the Wert option
+  // entirely and surface only the Coinbase account-based path. We
+  // tell the user explicitly that the no-account guest checkout is
+  // coming soon, so they know there's a faster path on the way and
+  // don't think we're forcing them through KYC permanently.
+  //
+  // To re-enable once Changelly turns Wert on:
+  //   1. Confirm via the GET /v1/offers probe that Wert is in the
+  //      response for our account.
+  //   2. Restore the wert push block (preserved in git history).
+  //   3. Drop the "coming soon" line from the Coinbase description
+  //      below.
+  const wertComingSoon = true;
+
+  const wertBlocked = userId != null && wertKyc.isOverCap(userId);
+  if (!wertComingSoon && !wertBlocked) {
+    // Wert fee structure: max($1, 4%). Below $25, $1 flat. Above $25,
+    // 4%. Spelled out explicitly — "4% above" was too vague.
+    let wertDesc = 'Guest checkout. $1 fee on deposits up to $25, 4% fee on deposits above $25.';
+    if (userId != null) {
+      const remaining = wertKyc.getRemainingCap(userId);
+      if (wertKyc.shouldWarn(userId)) {
+        wertDesc = `Guest checkout. $1 fee on deposits up to $25, 4% fee on deposits above $25. About $${remaining.toFixed(0)} left before ID is required.`;
+      }
+      if (amountUsd != null && remaining > 0 && amountUsd > remaining) {
+        wertDesc = `Guest checkout. **Heads up:** this deposit would push you past your $${remaining.toFixed(0)} no-ID limit — ID may be required. $1 fee on deposits up to $25, 4% fee above $25.`;
+      }
+    }
+    options.push({
+      provider: 'wert',
+      label: 'Deposit with Card, Apple Pay, or Google Pay — small fee',
+      description: wertDesc,
+      feePctEstimate: 0.04,
+      kycRequired: 'lkyc',
+      primary: true,
+    });
+  }
+
+  // Coinbase account-based option for non-US/UK regions. While Wert is
+  // "coming soon" this is the ONLY option we surface; once Wert is
+  // enabled this becomes the secondary "save the fee" path.
   options.push({
-    provider: 'transak',
-    label: 'Pay with Card (Transak — ID required)',
-    description: 'ID verification required. Fee: 3.29% + $0.99 — paid to Transak, not Rank $.',
-    feePctEstimate: 0.0329,
-    kycRequired: 'full',
-    primary: options.length === 0,  // primary if neither CDP nor Wert claimed it
+    provider: 'cdp_onramp',
+    label: 'Deposit with Card, Apple Pay, or Google Pay — no fees (sign in and ID required)',
+    description: wertComingSoon
+      ? 'Sign in to a free Coinbase account and verify your identity once (you\'ll need this same account to cash out to your bank later anyway).\n\n_Guest checkout with no account is coming soon._'
+      : 'Sign in to a free Coinbase account and verify your identity once (you\'ll need this same account to cash out to your bank later anyway).',
+    feePctEstimate: 0,
+    kycRequired: 'coinbase_account',
+    primary: true, // primary while Wert is unavailable
   });
 
   return options;
@@ -174,55 +188,41 @@ function getOnrampOptions({ country, amountUsd, userId, demo = false }) {
  * @param {Object} args
  * @param {string} args.country - ISO 3166-1 alpha-2
  * @param {number} args.amountUsdc - Amount of USDC being cashed out
- * @param {boolean} [args.demo=false] - If true, include CDP offramp
- *   even when CDP_OFFRAMP_ENABLED=false. Used by the Coinbase review
- *   demo channel so reviewers can exercise the offramp flow before
- *   we flip the feature flag globally.
  * @returns {ProviderOption[]}
  */
-function getOfframpOptions({ country, amountUsdc, demo = false }) {
-  const c = (country || '').toUpperCase();
+function getOfframpOptions({ country, amountUsdc }) {
   const options = [];
 
-  // CDP offramp visibility:
-  //   - Demo channel: always show (CDP credentials must be present).
-  //   - Real wallet channel, country in CDP_GUEST_OFFRAMP_COUNTRIES
-  //     (US / CA today): show regardless of CDP_OFFRAMP_ENABLED flag
-  //     so the operator can record the full cash-out flow without
-  //     flipping env vars. Other countries still honor the flag as
-  //     a global kill switch.
-  const cdpAllowed = demo
-    ? (process.env.CDP_API_KEY_ID && process.env.CDP_PROJECT_ID)
-    : (CDP_GUEST_OFFRAMP_COUNTRIES.has(c) || cdpTrial.canUseOfframp());
-  if (cdpAllowed) {
-    options.push({
-      provider: 'cdp_offramp',
-      label: 'Coinbase Offramp',
-      description: 'Cash out USDC to your bank or PayPal through Coinbase. **Requires a Coinbase account with a linked payout method** (available globally).',
-      feePctEstimate: process.env.CDP_ZERO_FEE_USDC === 'true' ? 0 : 0.005,
-      kycRequired: 'coinbase_account',
-      primary: true,
-    });
-  }
+  // SIMPLIFIED OFFRAMP ROUTING (post-Coinbase-approval, 2026-04-24)
+  //
+  // Every cash-out route requires KYC anyway (bank/card/PayPal payouts
+  // are KYC-gated by every operator in the space). Coinbase is the
+  // most-trusted name in the space and works globally where Coinbase
+  // operates. So we route everyone here for the primary cash-out, plus
+  // offer Bitrefill as the no-KYC gift-card alternative for users who
+  // don't want to link a bank account.
+  //
+  // No more Transak / Changelly cash-out — that path required the same
+  // KYC and added another vendor + fee tier to explain to users.
 
-  // Transak via Changelly — primary cash-to-bank route for most users
-  // on Day 1. Fees vary by local rail (SEPA / Faster Payments / ACH).
+  // Coinbase Offramp — sign in to Coinbase, cash out to bank, card, or
+  // PayPal. Globally available wherever Coinbase operates.
   options.push({
-    provider: 'transak',
-    label: 'Cash out to bank (Transak)',
-    description: 'ID verification required once. Fee: ~1–2% depending on local payout rail — paid to Transak, not Rank $.',
-    feePctEstimate: 0.015,
-    kycRequired: 'full',
-    primary: options.length === 0,
+    provider: 'cdp_offramp',
+    label: 'Cash out to Bank, Card, or PayPal',
+    description: 'Sign in to your Coinbase account (free to create — ID verification required) to cash out USDC to your bank, card, or PayPal. Funds arrive in minutes.',
+    feePctEstimate: process.env.CDP_ZERO_FEE_USDC === 'true' ? 0 : 0.005,
+    kycRequired: 'coinbase_account',
+    primary: true,
   });
 
-  // Bitrefill — always available, no KYC up to ~$500 per guest order.
-  // Not bank cash-out; spends USDC directly on gift cards for mainstream
-  // retailers (Amazon, Steam, Apple, Uber, ~1,000 brands). Global.
+  // Bitrefill — spend USDC directly on gift cards. No ID needed up to
+  // ~$500 per guest order. For users who want to skip the bank/KYC
+  // step entirely.
   options.push({
     provider: 'bitrefill',
     label: 'Spend on Gift Cards (no ID)',
-    description: 'Amazon, Steam, Apple, Uber, 1,000+ brands. Effective fee 0–3% depending on brand — the gift-card markup is Bitrefill\'s, not Rank $.',
+    description: 'Amazon, Steam, Apple, Uber, 1,000+ brands. No ID needed for guest orders up to ~$500. Effective fee 0–3% depending on brand — the gift-card markup is Bitrefill\'s, not Rank $.',
     feePctEstimate: 0.015,
     kycRequired: 'none',
     primary: false,

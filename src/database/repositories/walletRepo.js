@@ -21,9 +21,44 @@ const stmts = {
   activate: db.prepare('UPDATE wallets SET is_activated = 1 WHERE user_id = ?'),
   getAllActivated: db.prepare('SELECT * FROM wallets WHERE is_activated = 1'),
   getAll: db.prepare('SELECT * FROM wallets'),
-  lock: db.prepare("UPDATE wallets SET locked_at = datetime('now') WHERE user_id = ? AND (locked_at IS NULL OR locked_at < datetime('now', '-60 seconds'))"),
-  unlock: db.prepare('UPDATE wallets SET locked_at = NULL WHERE user_id = ?'),
 };
+
+// In-memory advisory lock per user. Replaces the prior wallets.locked_at
+// SQL column lock — that lock relied on UPDATE WHERE user_id = ?, which
+// silently failed (changes === 0) when no wallets row existed yet.
+// That broke the new-user signup recovery path: the grant endpoint and
+// the spend-permission sweeper both need to coordinate on a brand-new
+// user where the wallets row hasn't been created yet (it gets created
+// as a side effect of approveOnChain → _flipWalletToSelfCustody).
+//
+// In-memory works because:
+//   - All callers (grant endpoint, sweeper, pendingSetup self-heal,
+//     depositToEscrow) run in this single Node process.
+//   - Locks don't need to survive a restart — anything in-flight at
+//     restart is gone anyway, and the sweeper picks up stuck rows.
+//   - No cross-process races to worry about (single-instance bot).
+//
+// The 60s TTL preserves stale-lock protection: if a process crashes
+// mid-acquire, the lock auto-expires.
+const LOCK_TTL_MS = 60_000;
+const _locks = new Map(); // userId → expiryEpochMs
+
+function _acquireInMemoryLock(userId) {
+  const now = Date.now();
+  const expiry = _locks.get(userId);
+  if (expiry && expiry > now) return false;
+  _locks.set(userId, now + LOCK_TTL_MS);
+  return true;
+}
+
+function _releaseInMemoryLock(userId) {
+  _locks.delete(userId);
+}
+
+function _isLocked(userId) {
+  const expiry = _locks.get(userId);
+  return Boolean(expiry && expiry > Date.now());
+}
 
 const holdFundsTx = db.transaction((userId, amountUsdc) => {
   const wallet = stmts.findByUserId.get(userId);
@@ -227,14 +262,24 @@ const walletRepo = {
   /**
    * Attempt to acquire a lock on the wallet. Returns true if acquired.
    * Lock auto-expires after 60 seconds (stale lock protection).
+   * In-memory implementation works whether or not a wallets row
+   * exists for the user (the prior SQL-column lock silently failed
+   * when no row existed, breaking new-user signup recovery).
    */
   acquireLock(userId) {
-    const result = stmts.lock.run(userId);
-    return result.changes > 0;
+    return _acquireInMemoryLock(userId);
   },
 
   releaseLock(userId) {
-    stmts.unlock.run(userId);
+    _releaseInMemoryLock(userId);
+  },
+
+  /**
+   * Read-only lock state check. Used by the deposit poller to decide
+   * whether to skip a wallet that's mid-update by another path.
+   */
+  isLocked(userId) {
+    return _isLocked(userId);
   },
 };
 

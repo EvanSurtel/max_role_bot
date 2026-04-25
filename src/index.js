@@ -73,13 +73,6 @@ client.once('ready', async () => {
     const reconciliationService = require('./services/reconciliationService');
     reconciliationService.startReconciliation();
 
-    // Start the pending-withdrawal verification sweeper. Resolves
-    // withdrawals whose UserOp landed on-chain after our wait
-    // window expired (DB stays debited, tx eventually lands) OR
-    // didn't land at all (credit back after verification window).
-    const pendingWithdrawSweeper = require('./services/pendingWithdrawSweeper');
-    pendingWithdrawSweeper.startSweeper();
-
     // Queue state recovery. Rehydrates in-memory activeMatches from
     // the queue_matches table so in-progress lobbies survive a
     // restart. Must run BEFORE any queue interactions are processed.
@@ -116,6 +109,20 @@ client.once('ready', async () => {
       spmListener.start();
     } catch (err) {
       console.error('[Boot] SpendPermission event listener failed to start:', err.message);
+    }
+
+    // Stuck-permission sweeper. The grant endpoint awaits approveOnChain
+    // synchronously and returns the real outcome to the browser, but
+    // edge cases (lock contention, mid-approve crash, browser closed
+    // before the synchronous response, transient CDP/RPC error) can
+    // still leave a row stuck as 'pending' with no wallets row. This
+    // sweeper retries those every minute so the user auto-recovers
+    // without operator intervention.
+    try {
+      const spmSweeper = require('./services/spendPermissionSweeper');
+      spmSweeper.start(client);
+    } catch (err) {
+      console.error('[Boot] SpendPermission sweeper failed to start:', err.message);
     }
 
     // Tunnel health heartbeat. Fetches BOT_PUBLIC_URL/health every 5
@@ -194,9 +201,6 @@ client.once('ready', async () => {
     const { postQueuePanel } = require('./panels/queuePanel');
     await postQueuePanel(client, displayLang);
 
-    const { postCoinbaseReviewDemoPanel } = require('./panels/coinbaseReviewDemoPanel');
-    await postCoinbaseReviewDemoPanel(client, displayLang);
-
     // (Dedicated language channel was removed — every shared panel has
     // an inline language dropdown now, so a separate channel was redundant.)
 
@@ -226,13 +230,6 @@ async function shutdown(signal) {
   }
 
   try {
-    const pendingWithdrawSweeper = require('./services/pendingWithdrawSweeper');
-    pendingWithdrawSweeper.stopSweeper();
-  } catch (err) {
-    console.error('[Shutdown] Error stopping withdraw sweeper:', err.message || err);
-  }
-
-  try {
     const healthService = require('./services/healthService');
     healthService.stopHealthChecks();
   } catch (err) {
@@ -251,6 +248,13 @@ async function shutdown(signal) {
     spmListener.stop();
   } catch (err) {
     console.error('[Shutdown] Error stopping SpendPermission listener:', err.message || err);
+  }
+
+  try {
+    const spmSweeper = require('./services/spendPermissionSweeper');
+    spmSweeper.stop();
+  } catch (err) {
+    console.error('[Shutdown] Error stopping SpendPermission sweeper:', err.message || err);
   }
 
   try {

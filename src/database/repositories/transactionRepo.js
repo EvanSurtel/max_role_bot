@@ -12,20 +12,6 @@ const stmts = {
   `),
   updateStatus: db.prepare('UPDATE transactions SET status = ? WHERE id = ?'),
   updateStatusAndHash: db.prepare('UPDATE transactions SET status = ?, tx_hash = ?, memo = COALESCE(?, memo) WHERE id = ?'),
-  setVerificationPending: db.prepare(`
-    UPDATE transactions
-    SET status = 'pending_verification',
-        user_op_hash = ?,
-        smart_account_address = ?,
-        memo = COALESCE(?, memo)
-    WHERE id = ?
-  `),
-  findPendingVerification: db.prepare(`
-    SELECT * FROM transactions
-    WHERE status = 'pending_verification'
-      AND user_op_hash IS NOT NULL
-    ORDER BY created_at ASC
-  `),
   findPendingOutflowsForUser: db.prepare(`
     SELECT * FROM transactions
     WHERE user_id = ?
@@ -93,20 +79,6 @@ const transactionRepo = {
 
   updateStatusAndHash(id, status, txHash, memoAppend = null) {
     return stmts.updateStatusAndHash.run(status, txHash, memoAppend, id);
-  },
-
-  /**
-   * Mark a withdrawal (or other outbound tx) as pending on-chain
-   * verification. The UserOp was submitted but we don't yet know if
-   * it landed — the pendingWithdrawSweeper polls CDP / the chain and
-   * resolves the row to 'completed' or 'failed'.
-   */
-  setVerificationPending(id, userOpHash, smartAccountAddress, memoAppend = null) {
-    return stmts.setVerificationPending.run(userOpHash, smartAccountAddress, memoAppend, id);
-  },
-
-  findPendingVerification() {
-    return stmts.findPendingVerification.all();
   },
 
   /**

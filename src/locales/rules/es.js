@@ -130,7 +130,7 @@ module.exports = {
       '• Mismo resultado de XP que perder (ganadores ganan XP, el que no se presenta pierde XP)',
       '',
       '**Partidas de Cola de XP:** 7.5 minutos para presentarte',
-      '• No presentarse = **-200 XP de penalización**',
+      '• No presentarse = **-300 XP de penalización**',
       '',
       '**Cómo se verifica:**',
       '• El bot revisa si los jugadores se unieron a algún canal de voz de la partida',

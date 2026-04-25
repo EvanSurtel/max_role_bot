@@ -130,7 +130,7 @@ module.exports = {
       '• Gleiches XP-Ergebnis wie bei Niederlage (Gewinner bekommen XP, Forfeit verliert XP)',
       '',
       '**XP-Queue-Matches:** 7,5 Minuten zum Auftauchen',
-      '• No-Show = **-200 XP Strafe**',
+      '• No-Show = **-300 XP Strafe**',
       '',
       '**Wie No-Shows überprüft werden:**',
       '• Der Bot checkt, ob Spieler in irgendeinen Match-Voice-Channel (Team oder Shared) beigetreten sind',

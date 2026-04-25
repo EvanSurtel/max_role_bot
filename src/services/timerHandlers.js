@@ -32,12 +32,31 @@ function registerAll(client) {
 
     // Cancel the challenge (refund held funds, set status, clean up
     // any invite channels left over from DMs-disabled teammates).
+    // cancelChallenge() internally uses atomicStatusTransition and
+    // skips if the challenge moved past a cancellable state between
+    // the check above and this call (e.g. an acceptor completed the
+    // accept flow during the `await`).
     await challengeService.cancelChallenge(challengeId, client);
 
-    // Update to expired rather than cancelled
-    challengeRepo.updateStatus(challengeId, CHALLENGE_STATUS.EXPIRED);
-
-    console.log(`[TimerHandler] challenge_expiry: challenge ${challengeId} expired and refunded`);
+    // Only flip to EXPIRED if cancelChallenge actually set CANCELLED.
+    // Using atomicStatusTransition means a concurrent accept → ACCEPTED
+    // → IN_PROGRESS transition between the read above and now will not
+    // be clobbered with EXPIRED (which would orphan an in-flight match
+    // by making its challenge row unresolvable).
+    const expired = challengeRepo.atomicStatusTransition(
+      challengeId,
+      CHALLENGE_STATUS.CANCELLED,
+      CHALLENGE_STATUS.EXPIRED,
+    );
+    if (expired) {
+      console.log(`[TimerHandler] challenge_expiry: challenge ${challengeId} expired and refunded`);
+    } else {
+      const fresh = challengeRepo.findById(challengeId);
+      console.log(
+        `[TimerHandler] challenge_expiry: challenge ${challengeId} was not in CANCELLED ` +
+        `when EXPIRED flip attempted (status=${fresh?.status}) — skipped to avoid clobbering.`,
+      );
+    }
   });
 
   // --- teammate_accept: referenceId is challengePlayerId ---
@@ -54,8 +73,23 @@ function registerAll(client) {
       return;
     }
 
-    // Treat as a decline
-    challengePlayerRepo.updateStatus(challengePlayerId, PLAYER_STATUS.DECLINED);
+    // Atomic PENDING → DECLINED flip. The read above + a bare
+    // updateStatus below would race against a concurrent accept that
+    // lands between the two: the handler could overwrite ACCEPTED
+    // with DECLINED, silently yanking a player out of an accepted
+    // challenge. The conditional UPDATE (declineIfPending) only flips
+    // if the row is still PENDING; if a concurrent accept won, we
+    // exit without writing.
+    const db = require('../database/db');
+    const result = db.prepare(
+      "UPDATE challenge_players SET status = ? WHERE id = ? AND status = 'pending'"
+    ).run(PLAYER_STATUS.DECLINED, challengePlayerId);
+    if (result.changes === 0) {
+      console.log(
+        `[TimerHandler] teammate_accept: player ${challengePlayerId} was no longer PENDING when decline attempted — skipped.`,
+      );
+      return;
+    }
     console.log(`[TimerHandler] teammate_accept: player ${challengePlayerId} timed out, declining`);
 
     // Cancel the entire challenge (+ invite channel cleanup)

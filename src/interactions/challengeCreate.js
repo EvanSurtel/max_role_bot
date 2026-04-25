@@ -769,12 +769,21 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
   // Defer update — we'll edit the ephemeral with the final summary
   await interaction.deferUpdate();
 
+  // Hoisted out of the try block so the catch can see them when
+  // cleaning up after a partial-progress failure (e.g. holdFunds
+  // succeeded but challengePlayerRepo.create threw).
+  let challenge = null;
+  let challengeRepoRef = null;
+  let escrowManagerRef = null;
+
   try {
     const userRepo = require('../database/repositories/userRepo');
     const challengeRepo = require('../database/repositories/challengeRepo');
     const challengePlayerRepo = require('../database/repositories/challengePlayerRepo');
     const escrowManager = require('../base/escrowManager');
     const { CHALLENGE_STATUS, PLAYER_ROLE, PLAYER_STATUS } = require('../config/constants');
+    challengeRepoRef = challengeRepo;
+    escrowManagerRef = escrowManager;
 
     const user = userRepo.findByDiscordId(userId);
     if (!user) {
@@ -792,7 +801,7 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
       ? CHALLENGE_STATUS.PENDING_TEAMMATES
       : CHALLENGE_STATUS.OPEN;
 
-    const challenge = challengeRepo.create({
+    challenge = challengeRepo.create({
       type: flow.type,
       creatorUserId: user.id,
       teamSize: flow.teamSize,
@@ -909,6 +918,23 @@ async function finalizeChallengeCreation(interaction, flow, amountUsdc) {
     await sendFlowReply(interaction, summary);
   } catch (err) {
     console.error('[ChallengeCreate] Error finalizing challenge:', err);
+    // If we threw AFTER holdFunds succeeded but BEFORE returning
+    // success, the creator's USDC is still locked in balance_held and
+    // the challenge row sits with a partial / absent player roster.
+    // Cancel the challenge and refund any held funds so the user's
+    // balance is restored. Both operations are idempotent — no-op if
+    // we threw before holdFunds ran or if challenge wasn't inserted.
+    try {
+      if (challenge && challenge.id && challengeRepoRef && escrowManagerRef) {
+        escrowManagerRef.refundAll(challenge.id);
+        const { CHALLENGE_STATUS } = require('../config/constants');
+        challengeRepoRef.updateStatus(challenge.id, CHALLENGE_STATUS.CANCELLED);
+      }
+    } catch (cleanupErr) {
+      console.error(
+        `[ChallengeCreate] cleanup during catch failed: ${cleanupErr.message}`,
+      );
+    }
     activeFlows.delete(userId);
     finalizingUsers.delete(userId);
     return sendFlowReply(interaction, t('challenge_create.error_creating', lang));

@@ -48,13 +48,21 @@ function buildWalletView(wallet, user, lang) {
 
   // Language picker is in the welcome panel and dedicated language channel,
   // not here. The wallet panel still renders in the user's saved language.
+  //
   // Single "Withdraw" button — opens a choice screen where the user
   // picks between cashing out to fiat (Coinbase/Changelly offramp) or
-  // sending USDC to any wallet address on Base. Keeps the wallet
-  // surface clean and matches the deposit pattern (one click in).
+  // sending USDC to any wallet address on Base.
+  //
+  // Copy Address button: the embed description above already shows the
+  // address in a code block, which has a hover-to-copy affordance on
+  // Discord desktop. Mobile users can't reliably long-press an embed-
+  // rendered code block to select just the address — this button posts
+  // a minimal standalone code-block message they CAN long-press +
+  // copy from. (Handler in panels/wallet/index.js: 'wallet_copy_address'.)
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('wallet_deposit').setLabel('💵 Deposit').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('wallet_withdraw_menu').setLabel(t('wallet.btn_withdraw', lang)).setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('wallet_copy_address').setLabel(t('wallet.btn_copy_address', lang)).setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('wallet_refresh').setLabel('🔄').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('wallet_history').setLabel(t('wallet.btn_history', lang)).setStyle(ButtonStyle.Secondary),
   );

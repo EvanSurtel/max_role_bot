@@ -257,13 +257,11 @@ async function handleAdminConfirmNoWinner(interaction) {
       console.error(`[MatchResult] Failed to post no-winner result to results channels for match #${matchId}:`, err.message);
     }
 
-    // Cleanup dispute channels
-    const { cleanupDisputeChannels } = require('../disputeCreate');
-    setTimeout(() => {
-      cleanupDisputeChannels(interaction.client, matchId).catch(() => {});
-    }, 30000);
-
-    // Cleanup match channels
+    // Cleanup match channels. Disputes don't have their own channels —
+    // the dispute UI is posted into the existing shared_text_id, so a
+    // separate dispute-channel cleanup pass is unneeded (the previous
+    // `cleanupDisputeChannels` call here referenced an export that
+    // never existed and silently threw inside the setTimeout).
     setTimeout(() => {
       matchService.cleanupChannels(interaction.client, matchId).catch(() => {});
     }, 60000);

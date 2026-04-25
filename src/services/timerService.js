@@ -13,6 +13,12 @@ const stmts = {
     INSERT INTO timers (type, reference_id, expires_at)
     VALUES (@type, @referenceId, @expiresAt)
   `),
+  // Claim-the-fire UPDATE: only succeeds if the row is still unhandled.
+  // fireTimer uses result.changes to decide if THIS call actually won
+  // the race — a concurrent setTimeout callback + a checkExpiredTimers
+  // sweep could both try to fire the same row; we want exactly-one to
+  // run the handler.
+  claimForFire: db.prepare('UPDATE timers SET handled = 1 WHERE id = ? AND handled = 0'),
   markHandled: db.prepare('UPDATE timers SET handled = 1 WHERE id = ?'),
   markHandledByRef: db.prepare(
     'UPDATE timers SET handled = 1 WHERE type = ? AND reference_id = ? AND handled = 0'
@@ -26,6 +32,12 @@ const stmts = {
   ),
 };
 
+// Node's setTimeout clamps delays > 2^31-1 ms (~24.8 days) to 1 ms,
+// firing the callback instantly. Long-TTL timers would be silently
+// broken without a guard. We cap the per-setTimeout delay at this
+// ceiling and chain further sleeps until we reach the true deadline.
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+
 /**
  * Register a handler function for a given timer type.
  * @param {string} type - Timer type (e.g. 'challenge_expiry')
@@ -37,14 +49,23 @@ function registerHandler(type, handler) {
 }
 
 /**
- * Fire a timer: mark it as handled in DB and call the registered handler.
+ * Fire a timer: atomically claim the row (so concurrent fire attempts
+ * can't double-run the handler), then call the registered handler.
  * @param {object} timer - Timer row from DB
  */
 async function fireTimer(timer) {
   try {
-    // Mark as handled in DB first to avoid double-firing
-    stmts.markHandled.run(timer.id);
+    // Claim the row. If changes === 0, another path (a concurrent
+    // setTimeout fire OR a checkExpiredTimers sweep) already claimed
+    // and ran the handler — skip to avoid a double-fire. This matters
+    // most when a handler has non-idempotent side effects (posting to
+    // a channel, moving funds, etc).
+    const claim = stmts.claimForFire.run(timer.id);
     activeTimeouts.delete(timer.id);
+    if (claim.changes === 0) {
+      console.log(`[Timer] #${timer.id} already handled by another path — skipping`);
+      return;
+    }
 
     const handler = handlers.get(timer.type);
     if (handler) {
@@ -60,11 +81,24 @@ async function fireTimer(timer) {
 
 /**
  * Schedule a setTimeout for a timer and store the handle.
+ * Delays larger than Node's setTimeout ceiling (2^31-1 ms ≈ 24.8
+ * days) are chained via a re-arming outer setTimeout so the handler
+ * still fires at the true deadline instead of instantly (Node's
+ * silent-clamp behavior).
  * @param {object} timer - Timer row from DB
  * @param {number} delayMs - Delay in milliseconds
  */
 function scheduleTimeout(timer, delayMs) {
-  const handle = setTimeout(() => fireTimer(timer), delayMs);
+  if (delayMs <= MAX_TIMEOUT_MS) {
+    const handle = setTimeout(() => fireTimer(timer), delayMs);
+    activeTimeouts.set(timer.id, handle);
+    return;
+  }
+  const handle = setTimeout(() => {
+    // Re-arm for the remaining delay once this chunk elapses.
+    activeTimeouts.delete(timer.id);
+    scheduleTimeout(timer, delayMs - MAX_TIMEOUT_MS);
+  }, MAX_TIMEOUT_MS);
   activeTimeouts.set(timer.id, handle);
 }
 

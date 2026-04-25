@@ -48,6 +48,17 @@ function buildHowItWorksEmbeds(lang = 'en') {
       .setDescription(t.intro.description));
   }
 
+  // Step 1: Set Up Your Wallet (passkey + daily limit). Renders before
+  // the deposit step so first-time readers see "create the wallet"
+  // before "fund the wallet". Older locales without the `setup` key
+  // skip this block harmlessly.
+  if (t.setup) {
+    embeds.push(new EmbedBuilder()
+      .setTitle(t.setup.title)
+      .setColor(0x9b59b6)
+      .setDescription(t.setup.description));
+  }
+
   if (t.wallet) {
     embeds.push(new EmbedBuilder()
       .setTitle(t.wallet.title)

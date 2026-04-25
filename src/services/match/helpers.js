@@ -128,8 +128,12 @@ function awardStats({ matchId, challenge, winningPlayers, losingPlayers, isCashM
   });
   const awardLoserTx = db.transaction((userId) => {
     if (loseXp > 0) {
-      userRepo.addXp(userId, -loseXp);
-      insertXpHistory.run(userId, matchId, challenge.type, -loseXp, getCurrentSeason());
+      // addXp floors at 0 — record the actual delta applied so xp_history
+      // matches reality for players who would have gone negative.
+      const actualDelta = userRepo.addXp(userId, -loseXp);
+      if (actualDelta !== 0) {
+        insertXpHistory.run(userId, matchId, challenge.type, actualDelta, getCurrentSeason());
+      }
     }
     userRepo.addLoss(userId);
     if (isCashMatch) {

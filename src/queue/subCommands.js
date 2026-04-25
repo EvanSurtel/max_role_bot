@@ -40,11 +40,30 @@ function subPlayerOut(matchId, discordId, replacementDiscordId, subType) {
 
   // Mark original player as subbed out + apply -300 XP penalty
   // automatically. Staff doesn't need to remember to DQ separately.
+  // addXp + xp_history wrapped in one db.transaction so the player's
+  // xp_points column and the leaderboard's xp_history view can't
+  // diverge (rank roles read xp_points, leaderboard sums xp_history).
   player.subType = 'subbed_out';
   const subbedUser = userRepo.findByDiscordId(discordId);
   if (subbedUser) {
     try {
-      userRepo.addXp(subbedUser.id, -QUEUE_CONFIG.NO_SHOW_PENALTY);
+      const dbRef = require('../database/db');
+      const { getCurrentSeason } = require('../panels/leaderboardPanel');
+      const insertSubXpHistory = dbRef.prepare(
+        'INSERT INTO xp_history (user_id, match_id, match_type, xp_amount, season) VALUES (?, ?, ?, ?, ?)'
+      );
+      const penalizeSubTx = dbRef.transaction((userId) => {
+        // addXp floors at 0 — record the actual delta applied so the
+        // audit trail matches reality for players already at low XP.
+        const actualDelta = userRepo.addXp(userId, -QUEUE_CONFIG.NO_SHOW_PENALTY);
+        if (actualDelta !== 0) {
+          // match_id NULL — xp_history.match_id has a FK to matches(id),
+          // and queue match ids come from a separate sequence in
+          // queue_matches. match_type='queue' identifies these rows.
+          insertSubXpHistory.run(userId, null, 'queue', actualDelta, getCurrentSeason());
+        }
+      });
+      penalizeSubTx(subbedUser.id);
       console.log(`[QueueService] Applied -${QUEUE_CONFIG.NO_SHOW_PENALTY} XP penalty to subbed-out player ${discordId}`);
     } catch (err) {
       console.error(`[QueueService] Failed to apply sub-out penalty to ${discordId}:`, err.message);

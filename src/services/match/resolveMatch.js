@@ -138,35 +138,45 @@ async function resolveMatch(client, matchId, winningTeam, { fromDispute = false 
     }
   }
 
-  // Send result message in shared channel
-  if (match.shared_text_id) {
-    try {
-      const sharedChannel = client.channels.cache.get(match.shared_text_id);
-      if (sharedChannel) {
-        const isCashMatchResult = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
-        const allCaptains = allPlayers.filter(p => p.role === PLAYER_ROLE.CAPTAIN);
-        const captainDiscordIdsForLang = allCaptains.map(p => {
-          const u = userRepo.findById(p.user_id);
-          return u ? u.discord_id : null;
-        }).filter(Boolean);
-        const sharedLang = captainLang(captainDiscordIdsForLang);
-        const prizeAmount = (Number(challenge.total_pot_usdc) / 1_000_000).toFixed(2);
-        const prizeText = isCashMatchResult
-          ? t('match_channel.result_match_prize_distributed', sharedLang, { amount: prizeAmount })
-          : '';
+  // Send result message in shared channel AND vote channel.
+  //
+  // Captains report from the vote channel — if we only post to
+  // shared-chat they're left staring at "Resolving match..." with no
+  // visible follow-up in the channel they're actually looking at.
+  // Posting to both is cheap and the right UX: captains see closure
+  // where they clicked, all players see it in shared-chat.
+  const isCashMatchResult = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
+  const allCaptains = allPlayers.filter(p => p.role === PLAYER_ROLE.CAPTAIN);
+  const captainDiscordIdsForLang = allCaptains.map(p => {
+    const u = userRepo.findById(p.user_id);
+    return u ? u.discord_id : null;
+  }).filter(Boolean);
+  const sharedLang = captainLang(captainDiscordIdsForLang);
+  const prizeAmount = (Number(challenge.total_pot_usdc) / 1_000_000).toFixed(2);
+  const prizeText = isCashMatchResult
+    ? t('match_channel.result_match_prize_distributed', sharedLang, { amount: prizeAmount })
+    : '';
+  const resultLangRow = buildLanguageDropdownRow(sharedLang);
+  const resultPayload = {
+    content: [
+      t('match_channel.result_complete', sharedLang, { matchId }),
+      '', t('match_channel.result_winner', sharedLang, { team: winningTeam }),
+      prizeText, '', t('match_channel.result_cleanup', sharedLang),
+    ].join('\n'),
+    components: [...resultLangRow],
+  };
 
-        const resultLangRow = buildLanguageDropdownRow(sharedLang);
-        await sharedChannel.send({
-          content: [
-            t('match_channel.result_complete', sharedLang, { matchId }),
-            '', t('match_channel.result_winner', sharedLang, { team: winningTeam }),
-            prizeText, '', t('match_channel.result_cleanup', sharedLang),
-          ].join('\n'),
-          components: [...resultLangRow],
-        });
+  for (const channelId of [match.shared_text_id, match.voting_channel_id]) {
+    if (!channelId) continue;
+    try {
+      let ch = client.channels.cache.get(channelId);
+      if (!ch) {
+        try { ch = await client.channels.fetch(channelId); } catch { ch = null; }
       }
+      if (ch) await ch.send(resultPayload);
+      else console.error(`[MatchService] result channel ${channelId} unreachable for match #${matchId}`);
     } catch (err) {
-      console.error(`[MatchService] Failed to send result message for match #${matchId}:`, err.message);
+      console.error(`[MatchService] Failed to send result message to ${channelId} for match #${matchId}:`, err.message);
     }
   }
 
@@ -231,12 +241,12 @@ async function resolveMatch(client, matchId, winningTeam, { fromDispute = false 
     console.error(`[MatchService] Rank role sync failed:`, err.message);
   });
 
-  // Schedule channel cleanup after 5 minutes
+  // Schedule channel cleanup after 30 seconds
   setTimeout(() => {
     cleanupChannels(client, matchId).catch(err => {
       console.error(`[MatchService] Error during scheduled cleanup for match #${matchId}:`, err.message);
     });
-  }, 5 * 60 * 1000);
+  }, 30 * 1000);
 
   console.log(`[MatchService] Match #${matchId} resolved. Team ${winningTeam} wins.`);
 }

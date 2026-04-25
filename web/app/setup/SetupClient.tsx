@@ -247,9 +247,24 @@ export default function SetupClient({ purpose = 'setup' }: { purpose?: 'setup' |
         }),
       });
       const body = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(body.error || `grant failed (${r.status})`);
-      setResultTxHint(body.permissionId ? `permission #${body.permissionId}` : null);
-      setStatus('done');
+      // 200 = approveOnChain landed synchronously, fully done.
+      // 202 = grant persisted but on-chain step deferred (e.g. wallet
+      //       lock contention); the bot's sweeper will finish it within
+      //       ~60s. Show "done" but with a softer message.
+      // 4xx/5xx = real failure; surface to user.
+      if (r.status === 202) {
+        setResultTxHint(
+          body.permissionId
+            ? `permission #${body.permissionId} — finishing up in the background (about 60 seconds)`
+            : 'finishing up in the background (about 60 seconds)',
+        );
+        setStatus('done');
+      } else if (!r.ok) {
+        throw new Error(body.error || `grant failed (${r.status})`);
+      } else {
+        setResultTxHint(body.permissionId ? `permission #${body.permissionId}` : null);
+        setStatus('done');
+      }
     } catch (err: any) {
       setErrorMsg(err.message);
       setStatus('error');
@@ -286,14 +301,14 @@ export default function SetupClient({ purpose = 'setup' }: { purpose?: 'setup' |
         <h1>✅ You&apos;re all set</h1>
         <p>
           {isRenew
-            ? 'Your new daily limit is active. The previous permission has been replaced.'
+            ? 'Your new daily spending limit is active. The previous one has been replaced.'
             : 'Your self-custody wallet is live. Head back to Discord — your wallet panel will show the new address.'}
         </p>
         {resultTxHint && <p className="muted">{resultTxHint}</p>}
         <p className="muted">
-          You can close this tab. If you ever want to change your daily limit,
-          send funds out, or turn off Rank $&apos;s ability to charge you,
-          use the buttons in your Rank $ wallet channel.
+          You can close this tab. If you ever want to change your daily
+          spending limit, send funds out of your wallet, or turn the limit
+          off entirely, use the buttons in your Rank $ wallet channel.
         </p>
       </main>
     );
@@ -303,7 +318,7 @@ export default function SetupClient({ purpose = 'setup' }: { purpose?: 'setup' |
 
   return (
     <main>
-      <h1>{isRenew ? 'Renew your daily limit' : 'Set up your Rank $ wallet'}</h1>
+      <h1>{isRenew ? 'Renew your daily spending limit' : 'Set up your Rank $ wallet'}</h1>
       {discordTag && (
         <p>
           Signed in as <strong>{discordTag}</strong>.
@@ -356,17 +371,18 @@ export default function SetupClient({ purpose = 'setup' }: { purpose?: 'setup' |
       </div>
 
       <div className="card">
-        <h2>Step 2 — Set your daily match limit</h2>
+        <h2>Step 2 — Set your daily spending limit</h2>
         <p>
-          Pick the <strong>most you&apos;d ever want Rank $ to charge you in
-          a single day</strong> for joining matches. Think of it like a daily
-          debit-card limit you set yourself.
+          Pick the <strong>most YOU want to spend on cash matches in a single
+          day</strong>. Think of it as a daily budget you set for yourself —
+          like a daily debit-card limit, except you&apos;re the one setting it.
         </p>
         <p>
           <strong>You&apos;re not paying anything now.</strong> This just sets
-          a cap so you don&apos;t need to approve every match individually.
-          Rank $ can never charge more than your limit, and you can change or
-          turn it off anytime.
+          a cap so you don&apos;t have to approve every match individually.
+          Once it&apos;s set, joining a match within your daily cap is one click
+          — and a match that would push you past your own cap simply won&apos;t
+          go through. You can raise it, lower it, or turn it off anytime.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>

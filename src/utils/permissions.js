@@ -40,14 +40,34 @@ function addStaffOverwrites(overwrites) {
  * @returns {object[]} Permission overwrites array for channel creation.
  */
 function privateTextOverwrites(guild, allowedUserIds, includeStaff = false, adminOnly = false, readOnly = false) {
+  // Non-participants can see the channel exists in the match category
+  // (so the server looks active to other members) but can't read
+  // history or send messages. See sharedOverwrites for full rationale.
+  // Wallet/admin-only channels (adminOnly=true) keep the strict
+  // ViewChannel deny — they contain user financial info.
+  const everyoneRule = adminOnly
+    ? { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] }
+    : {
+      id: guild.id,
+      allow: [PermissionFlagsBits.ViewChannel],
+      deny: [
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.AddReactions,
+        PermissionFlagsBits.CreatePublicThreads,
+        PermissionFlagsBits.CreatePrivateThreads,
+        PermissionFlagsBits.SendMessagesInThreads,
+      ],
+    };
   const overwrites = [
-    {
-      id: guild.id, // @everyone role
-      deny: [PermissionFlagsBits.ViewChannel],
-    },
+    everyoneRule,
     {
       id: guild.client.user.id, // bot
-      allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+      ],
     },
   ];
 
@@ -96,10 +116,18 @@ function privateTextOverwrites(guild, allowedUserIds, includeStaff = false, admi
  * @returns {object[]} Permission overwrites array for channel creation.
  */
 function privateVoiceOverwrites(guild, allowedUserIds, includeStaff = false) {
+  // Non-participants can SEE the voice channel and who's connected
+  // (signals server activity to the rest of the guild) but can't
+  // join or speak. See sharedOverwrites for full rationale.
   const overwrites = [
     {
       id: guild.id, // @everyone role
-      deny: [PermissionFlagsBits.ViewChannel],
+      allow: [PermissionFlagsBits.ViewChannel],
+      deny: [
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+        PermissionFlagsBits.Stream,
+      ],
     },
     {
       id: guild.client.user.id, // bot
@@ -134,14 +162,29 @@ function privateVoiceOverwrites(guild, allowedUserIds, includeStaff = false) {
  * @returns {object[]} Permission overwrites array for channel creation.
  */
 function votingChannelOverwrites(guild, captainIds) {
+  // Non-participants can see the vote channel exists in the match
+  // category (so the category renders for everyone) but can't read
+  // captain reports or send messages.
   const overwrites = [
     {
       id: guild.id, // @everyone role
-      deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+      allow: [PermissionFlagsBits.ViewChannel],
+      deny: [
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.AddReactions,
+        PermissionFlagsBits.CreatePublicThreads,
+        PermissionFlagsBits.CreatePrivateThreads,
+        PermissionFlagsBits.SendMessagesInThreads,
+      ],
     },
     {
       id: guild.client.user.id, // bot
-      allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+      ],
     },
   ];
 
@@ -164,16 +207,43 @@ function votingChannelOverwrites(guild, captainIds) {
  * @returns {object[]} Permission overwrites array for channel creation.
  */
 function sharedOverwrites(guild, allPlayerIds) {
+  // Used for BOTH the shared text channel and the shared voice
+  // channel (createChannels.js calls this twice). We allow @everyone
+  // ViewChannel so non-participants see the channel exists in the
+  // match category — but deny all interactive perms (Connect, Speak,
+  // SendMessages, ReadMessageHistory, AddReactions, etc).
+  //
+  // Why: the user wants the server to look ACTIVE — non-participants
+  // see "Match #42" with people in voice and know matches are
+  // happening. Discord ignores irrelevant permission bits per
+  // channel type, so denying voice perms on the text channel and
+  // text perms on the voice channel is harmless.
+  //
+  // Match content stays private: ReadMessageHistory deny on text =
+  // outsiders can't read chat; Connect deny on voice = outsiders
+  // can't snoop on the call.
   const overwrites = [
     {
       id: guild.id, // @everyone role
-      deny: [PermissionFlagsBits.ViewChannel],
+      allow: [PermissionFlagsBits.ViewChannel],
+      deny: [
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+        PermissionFlagsBits.Stream,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.AddReactions,
+        PermissionFlagsBits.CreatePublicThreads,
+        PermissionFlagsBits.CreatePrivateThreads,
+        PermissionFlagsBits.SendMessagesInThreads,
+      ],
     },
     {
       id: guild.client.user.id, // bot
       allow: [
         PermissionFlagsBits.ViewChannel,
         PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
         PermissionFlagsBits.Connect,
         PermissionFlagsBits.Speak,
       ],

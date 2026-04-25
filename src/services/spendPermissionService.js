@@ -266,6 +266,41 @@ async function approveOnChain(rowId) {
   }
 
   const struct = _rowToStruct(row);
+
+  // On-chain idempotency check FIRST. If a previous attempt's UserOp
+  // landed on-chain but our bot didn't observe the confirmation (CDP
+  // wait timeout = post_submit error class, bot crash mid-confirm,
+  // network drop), the permission is already approved at the contract
+  // level. Submitting another approveWithSignature for the same struct
+  // would revert ("already approved") and the sweeper would loop
+  // forever. Read isApproved first; if true, just reconcile our DB +
+  // wallet row and return.
+  try {
+    const provider = getProvider();
+    const spmContract = new ethers.Contract(
+      SPEND_PERMISSION_MANAGER_ADDRESS,
+      ['function isApproved(tuple(address account, address spender, address token, uint160 allowance, uint48 period, uint48 start, uint48 end, uint256 salt, bytes extraData) permission) view returns (bool)'],
+      provider,
+    );
+    const alreadyApproved = await spmContract.isApproved(struct);
+    if (alreadyApproved) {
+      console.log(`[SpendPermission] Row ${rowId} already approved on-chain (recovered from prior post_submit) — reconciling DB without resubmitting`);
+      spendPermissionRepo.markApprovedAndSupersedeOthers(rowId, null);
+      try {
+        const approvedRow = spendPermissionRepo.findById(rowId);
+        _flipWalletToSelfCustody(approvedRow);
+      } catch (flipErr) {
+        console.error(`[SpendPermission] Wallet flip during on-chain reconcile failed for row ${rowId}: ${flipErr.message}`);
+      }
+      return spendPermissionRepo.findById(rowId);
+    }
+  } catch (preCheckErr) {
+    // isApproved read failed — log and proceed with the normal submit
+    // path. Worst case we'll catch the revert below and surface the
+    // same error message we always did.
+    console.warn(`[SpendPermission] isApproved pre-check failed for row ${rowId}: ${preCheckErr.message} — proceeding with submit`);
+  }
+
   const data = _spmIface.encodeFunctionData('approveWithSignature', [struct, row.signature]);
 
   const { _sendOwnerTx } = require('../base/transactionService');
@@ -321,22 +356,30 @@ function _flipWalletToSelfCustody(row) {
   const smartAddr = row.account;
   const smartLower = String(smartAddr).toLowerCase();
 
-  const existing = walletRepo.findByUserId(row.user_id);
-  if (existing) {
-    // Legacy CDP user upgrading to self-custody, OR an already-flipped
-    // row. Either way, update-in-place. COALESCE preserves the old
-    // CDP address in legacy_cdp_address so the fund-migration script
-    // can sweep from it.
-    db.prepare(`
-      UPDATE wallets
-      SET wallet_type = 'coinbase_smart_wallet',
-          smart_wallet_address = @smart,
-          legacy_cdp_address = COALESCE(legacy_cdp_address, address),
-          address = @smart,
-          migrated_at = COALESCE(migrated_at, datetime('now'))
-      WHERE user_id = @userId
-    `).run({ smart: smartLower, userId: row.user_id });
-  } else {
+  // Wrap in BEGIN IMMEDIATE so two concurrent approveOnChain calls
+  // (e.g. grant endpoint + sweeper racing on a brand-new user) can't
+  // both see existing=null and both call walletRepo.create — the
+  // second would throw a UNIQUE constraint violation. With the
+  // transaction wrapper, the second caller's findByUserId reads the
+  // row the first caller just inserted.
+  const flipTx = db.transaction(() => {
+    const existing = walletRepo.findByUserId(row.user_id);
+    if (existing) {
+      // Legacy CDP user upgrading to self-custody, OR an already-flipped
+      // row. Either way, update-in-place. COALESCE preserves the old
+      // CDP address in legacy_cdp_address so the fund-migration script
+      // can sweep from it.
+      db.prepare(`
+        UPDATE wallets
+        SET wallet_type = 'coinbase_smart_wallet',
+            smart_wallet_address = @smart,
+            legacy_cdp_address = COALESCE(legacy_cdp_address, address),
+            address = @smart,
+            migrated_at = COALESCE(migrated_at, datetime('now'))
+        WHERE user_id = @userId
+      `).run({ smart: smartLower, userId: row.user_id });
+      return;
+    }
     // Brand-new self-custody user with no prior wallet row. accountRef
     // is required non-null on the current schema (legacy NOT NULL from
     // XRP/CDP eras); passing 'self-custody' as a sentinel satisfies the
@@ -354,7 +397,8 @@ function _flipWalletToSelfCustody(row) {
           migrated_at = datetime('now')
       WHERE user_id = @userId
     `).run({ smart: smartLower, userId: row.user_id });
-  }
+  });
+  flipTx.immediate();
 }
 
 /**
