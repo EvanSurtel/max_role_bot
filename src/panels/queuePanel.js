@@ -85,28 +85,26 @@ function buildQueuePanel(lang = 'en') {
   // the blank line because Discord collapses bare empty strings, and
   // filtering with Boolean would strip the spacer when _lastAction is
   // empty.
+  // Spacing chosen to match the reference panel — generous breathing
+  // room between the recent-action banner, the live roster, and the
+  // bottom of the embed (which sits above the action buttons). Each
+  // '​' is a zero-width space — Discord renders them as a real
+  // blank line, while plain empty strings get collapsed.
+  const SPACER = '​'; // zero-width space
   const lines = [];
   if (_lastAction) {
     lines.push(_lastAction);
-    // 3 zero-width-space blank lines between join/leave message and
-    // the queue roster — visually separates the recent action from
-    // the running list.
-    lines.push('​');
-    lines.push('​');
-    lines.push('​');
+    for (let i = 0; i < 4; i++) lines.push(SPACER);
   }
   lines.push(`**Queue ${count}/${QUEUE_CONFIG.TOTAL_PLAYERS}**`);
   if (playerList) lines.push(playerList);
-  // 3 trailing blank lines so the buttons sit further from the player
-  // list — gives the panel breathing room.
-  lines.push('​');
-  lines.push('​');
-  lines.push('​');
+  for (let i = 0; i < 4; i++) lines.push(SPACER);
 
   const embed = new EmbedBuilder()
     .setTitle('5v5 Ranked Queue — Hardpoint | Bo3')
     .setColor(0x3498db)
-    .setDescription(lines.join('\n'));
+    .setDescription(lines.join('\n'))
+    .setTimestamp();
 
   const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
