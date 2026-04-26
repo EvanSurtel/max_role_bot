@@ -35,9 +35,12 @@ async function updateNickname(client, userId) {
     const xp = user.xp_points || 0;
     const earnings = Number(user.total_earnings_usdc || 0) / USDC_PER_UNIT;
 
-    // Format: Name 🇺🇸 [XP] [$Earnings]
+    // Format: Name 🇺🇸 [XP] [$Earnings] — earnings shown as $0.00 even
+    // for users who've never played a cash match, so the nickname is
+    // visually consistent across the leaderboard (no "some have $, some
+    // don't" mismatch).
     const flagPart = flag ? ` ${flag}` : '';
-    const statsPart = earnings > 0 ? ` [${xp}] [$${earnings.toFixed(2)}]` : ` [${xp}]`;
+    const statsPart = ` [${xp}] [$${earnings.toFixed(2)}]`;
     let nickname = `${displayName}${flagPart}${statsPart}`;
 
     // Discord nickname max is 32 chars — truncate display name if needed

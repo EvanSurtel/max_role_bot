@@ -395,10 +395,12 @@ async function handleRegistrationModal(interaction) {
       }
     }
 
-    // Set nickname
+    // Set initial nickname matching the format used by nicknameUpdater
+    // — keeps "Name 🇺🇸 [XP] [$Earnings]" consistent from registration
+    // through every match resolve. New users start at [500] [$0.00].
     try {
       const member = await guild.members.fetch(discordId);
-      await member.setNickname(`${displayName} ${country} [500]`);
+      await member.setNickname(`${displayName} ${country} [500] [$0.00]`);
     } catch (err) {
       console.warn(`[Onboarding] Could not set nickname:`, err.message);
     }
