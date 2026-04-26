@@ -362,9 +362,17 @@ function _flipWalletToSelfCustody(row) {
   // second would throw a UNIQUE constraint violation. With the
   // transaction wrapper, the second caller's findByUserId reads the
   // row the first caller just inserted.
+  let wasCreate = false;
+  let wasLegacyUpgrade = false;
   const flipTx = db.transaction(() => {
     const existing = walletRepo.findByUserId(row.user_id);
     if (existing) {
+      // Already a self-custody row → no-op signal. Legacy CDP row →
+      // upgrade-to-self-custody signal. Distinguish so the admin feed
+      // doesn't fire on idempotent re-flips after a sweeper retry.
+      const isAlreadySelfCustody = existing.wallet_type === 'coinbase_smart_wallet'
+        && String(existing.address || '').toLowerCase() === smartLower;
+      if (!isAlreadySelfCustody) wasLegacyUpgrade = true;
       // Legacy CDP user upgrading to self-custody, OR an already-flipped
       // row. Either way, update-in-place. COALESCE preserves the old
       // CDP address in legacy_cdp_address so the fund-migration script
@@ -397,8 +405,33 @@ function _flipWalletToSelfCustody(row) {
           migrated_at = datetime('now')
       WHERE user_id = @userId
     `).run({ smart: smartLower, userId: row.user_id });
+    wasCreate = true;
   });
   flipTx.immediate();
+
+  // Post a wallet_setup admin-feed event AFTER the transaction commits.
+  // Only fire on a brand-new self-custody wallet OR a legacy CDP →
+  // self-custody upgrade — never on an idempotent re-flip from a
+  // sweeper retry, which would spam the feed every minute.
+  if (wasCreate || wasLegacyUpgrade) {
+    try {
+      const userRepo = require('../database/repositories/userRepo');
+      const u = userRepo.findById(row.user_id);
+      const username = u?.server_username || u?.discord_id || `user ${row.user_id}`;
+      const memo = wasCreate
+        ? `Self-custody wallet created — \`${smartAddr}\``
+        : `Legacy CDP wallet upgraded to self-custody — \`${smartAddr}\``;
+      const { postTransaction } = require('../utils/transactionFeed');
+      postTransaction({
+        type: 'wallet_setup',
+        username,
+        discordId: u?.discord_id,
+        memo,
+      });
+    } catch (feedErr) {
+      console.warn(`[SpendPermissionService] wallet_setup feed post failed (non-fatal): ${feedErr.message}`);
+    }
+  }
 }
 
 /**
