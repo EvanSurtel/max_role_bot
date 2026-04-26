@@ -360,6 +360,54 @@ async function handleButton(interaction) {
       return interaction.reply({ content: busy.reason, ephemeral: true });
     }
 
+    // Pre-check: cash matches require a self-custody wallet. Catch
+    // this BEFORE the user fills out team size / mode / series /
+    // entry — otherwise they'd get to the final confirm step and
+    // see a misleading "insufficient balance" error when the real
+    // problem is they never set up a wallet. Shoot them a clear
+    // message + a fresh setup link so they can finish onboarding
+    // and try again.
+    if (id === 'match_type_cash') {
+      const walletRepo = require('../database/repositories/walletRepo');
+      const existingWallet = walletRepo.findByUserId(dbUser.id);
+      if (!existingWallet) {
+        let setupUrl = '';
+        try {
+          const linkNonceService = require('../services/linkNonceService');
+          setupUrl = linkNonceService.mintLink({
+            userId: dbUser.id,
+            purpose: 'setup',
+            ttlSeconds: 2 * 60 * 60,
+          });
+        } catch (mintErr) {
+          console.error(`[ChallengeCreate] setup-link mint failed for user ${dbUser.id}: ${mintErr.message}`);
+        }
+        const lines = [
+          '**Cash matches need a self-custody wallet.** You haven\'t set one up yet.',
+          '',
+          'XP matches and the ranked queue work without a wallet — try those any time.',
+        ];
+        if (setupUrl) {
+          lines.push(
+            '',
+            'When you\'re ready for cash matches, set up your wallet (takes 30 seconds):',
+            `🔐 **${setupUrl}**`,
+            '',
+            '_Link valid for 2 hours and works once._',
+          );
+        } else {
+          lines.push(
+            '',
+            'Click **View My Wallet** in the wallet channel to set one up.',
+          );
+        }
+        return interaction.reply({
+          content: lines.join('\n'),
+          ephemeral: true,
+        });
+      }
+    }
+
     // If the user clicks Create Cash Match / XP Match while they already
     // have an in-progress flow, treat it as "start over" — discard the
     // existing flow and start fresh. Users who dismissed an ephemeral

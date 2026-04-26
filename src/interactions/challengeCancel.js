@@ -107,7 +107,14 @@ async function handleConfirmedCancel(interaction) {
     await disableBoardMessage(interaction.client, challenge);
 
     const { postTransaction } = require('../utils/transactionFeed');
-    postTransaction({ type: 'challenge_cancelled', discordId: interaction.user.id, challengeId, memo: `${isCashMatch ? 'Cash Match' : 'XP Match'} #${displayNum} cancelled by creator — all funds refunded` });
+    postTransaction({
+      type: 'challenge_cancelled',
+      discordId: interaction.user.id,
+      challengeId,
+      memo: isCashMatch
+        ? `Cash Match #${displayNum} cancelled by creator — all funds refunded`
+        : `XP Match #${displayNum} cancelled by creator`,
+    });
 
     const cancelKey = isCashMatch ? 'challenge_cancel.cancelled_with_refund' : 'challenge_cancel.cancelled';
     await interaction.followUp({

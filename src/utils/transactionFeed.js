@@ -237,10 +237,16 @@ async function _postToFeedChannel({ type, username, discordId, amount, currency,
   // everything else (cash match deposits, withdrawals, escrow, balance mismatches)
   // goes to TRANSACTIONS_CHANNEL_ID. Falls back to TRANSACTIONS if XP channel not set.
   //
-  // For match_resolved/match_started types, check if the challenge is
-  // an XP match (not cash) by looking up the challenge type in the DB.
+  // Challenge-scoped events route by the underlying challenge type:
+  // XP challenges → XP channel, cash challenges → cash channel.
+  // Without challenge_created/challenge_cancelled in this lookup,
+  // creating/cancelling an XP match was posting to the cash channel.
+  const CHALLENGE_TYPED_EVENTS = new Set([
+    'match_resolved', 'match_started',
+    'challenge_created', 'challenge_cancelled',
+  ]);
   let isXpType = XP_CHANNEL_TYPES.has(type);
-  if (!isXpType && challengeId && (type === 'match_resolved' || type === 'match_started')) {
+  if (!isXpType && challengeId && CHALLENGE_TYPED_EVENTS.has(type)) {
     try {
       const db = require('../database/db');
       const ch = db.prepare('SELECT type FROM challenges WHERE id = ?').get(challengeId);
