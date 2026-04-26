@@ -80,15 +80,23 @@ function buildQueuePanel(lang = 'en') {
     ? players.map(p => `<@${p.discordId}>`).join(', ')
     : '';
 
+  // Build description with explicit blank line between "Player Joined"
+  // and the "Queue X/10" roster. Using ​ (zero-width space) for
+  // the blank line because Discord collapses bare empty strings, and
+  // filtering with Boolean would strip the spacer when _lastAction is
+  // empty.
+  const lines = [];
+  if (_lastAction) {
+    lines.push(_lastAction);
+    lines.push('​');
+  }
+  lines.push(`**Queue ${count}/${QUEUE_CONFIG.TOTAL_PLAYERS}**`);
+  if (playerList) lines.push(playerList);
+
   const embed = new EmbedBuilder()
     .setTitle('5v5 Ranked Queue — Hardpoint | Bo3')
     .setColor(0x3498db)
-    .setDescription([
-      _lastAction || '',
-      '',
-      `**Queue ${count}/${QUEUE_CONFIG.TOTAL_PLAYERS}**`,
-      playerList,
-    ].filter(Boolean).join('\n'));
+    .setDescription(lines.join('\n'));
 
   const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
