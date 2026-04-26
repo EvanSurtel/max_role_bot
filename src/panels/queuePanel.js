@@ -88,10 +88,20 @@ function buildQueuePanel(lang = 'en') {
   const lines = [];
   if (_lastAction) {
     lines.push(_lastAction);
+    // 3 zero-width-space blank lines between join/leave message and
+    // the queue roster — visually separates the recent action from
+    // the running list.
+    lines.push('​');
+    lines.push('​');
     lines.push('​');
   }
   lines.push(`**Queue ${count}/${QUEUE_CONFIG.TOTAL_PLAYERS}**`);
   if (playerList) lines.push(playerList);
+  // 3 trailing blank lines so the buttons sit further from the player
+  // list — gives the panel breathing room.
+  lines.push('​');
+  lines.push('​');
+  lines.push('​');
 
   const embed = new EmbedBuilder()
     .setTitle('5v5 Ranked Queue — Hardpoint | Bo3')
