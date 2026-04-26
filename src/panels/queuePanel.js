@@ -81,17 +81,14 @@ function buildQueuePanel(lang = 'en') {
     : '';
 
   const embed = new EmbedBuilder()
-    .setTitle('5v5 Ranked Queue')
+    .setTitle('5v5 Ranked Queue — Hardpoint | Bo3')
     .setColor(0x3498db)
     .setDescription([
       _lastAction || '',
       '',
-      'Click **Join Queue** to enter. When 10 players are ready, the match begins.',
-      '',
-      `**Players in Queue: ${count}/${QUEUE_CONFIG.TOTAL_PLAYERS}**`,
+      `**Queue ${count}/${QUEUE_CONFIG.TOTAL_PLAYERS}**`,
       playerList,
-    ].filter(Boolean).join('\n'))
-    .setFooter({ text: 'Hardpoint | Bo3 | 5v5' });
+    ].filter(Boolean).join('\n'));
 
   const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
