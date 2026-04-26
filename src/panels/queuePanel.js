@@ -19,49 +19,54 @@ const _lastPingedAt = {};
 // Shows "Player Joined Queue!" / "Player Left Queue!" at the top of the embed.
 let _lastAction = '';
 
-// 1-hour queue timeout — if the queue doesn't fill in 60 minutes,
-// remove all waiting players and reset. Prevents players from being
-// stuck in a queue that will never fill (late night, low population).
-const QUEUE_TIMEOUT_MS = 60 * 60 * 1000;
-let _queueTimeoutTimer = null;
+// Per-player queue idle timeout — each player is removed individually
+// after sitting in the queue for 1 hour without a match filling. The
+// queue, the panel, and other players are NOT touched. A background
+// sweep runs every minute and pulls out anyone whose joinedAt is older
+// than the cap. Replaces the prior whole-queue wipe (which deleted the
+// entire roster + made the panel feel broken to anyone still sitting
+// there).
+const PLAYER_IDLE_CAP_MS = 60 * 60 * 1000;     // 1 hour
+const SWEEP_INTERVAL_MS = 60 * 1000;           // check every minute
+let _sweepInterval = null;
 
-function _startQueueTimeout(client) {
-  _clearQueueTimeout();
-  _queueTimeoutTimer = setTimeout(async () => {
-    const size = queueService.getQueueSize();
-    if (size === 0) return;
+function _startStalePlayerSweep(client) {
+  if (_sweepInterval) return; // already running — sweeps are idempotent
+  _sweepInterval = setInterval(async () => {
+    try {
+      const now = Date.now();
+      const players = queueService.getQueuePlayers();
+      const stale = players.filter(p => p.joinedAt && (now - p.joinedAt) >= PLAYER_IDLE_CAP_MS);
+      if (stale.length === 0) return;
 
-    console.log(`[QueuePanel] Queue timeout — removing ${size} player(s) after 1 hour`);
+      for (const p of stale) {
+        queueService.leaveQueue(p.discordId);
+        console.log(`[QueuePanel] Removed idle player ${p.discordId} after ${Math.round((now - p.joinedAt) / 60000)} minutes in queue`);
+      }
 
-    // Clear the queue
-    const players = queueService.getQueuePlayers();
-    for (const p of players) {
-      queueService.leaveQueue(p.discordId);
+      // One notification per sweep, mentioning each removed player
+      // (allowedMentions blocks the actual ping — we just want the
+      // names rendered so the player sees they were dropped).
+      const channelId = process.env.RANKED_QUEUE_CHANNEL_ID;
+      const ch = client?.channels?.cache?.get(channelId);
+      if (ch) {
+        const names = stale.map(p => `<@${p.discordId}>`).join(', ');
+        ch.send({
+          content: `${names} removed from queue after 1 hour idle. Re-join when ready!`,
+          allowedMentions: { parse: [] },
+        }).catch(() => {});
+      }
+
+      // Refresh the panel so the roster reflects the removals. Do
+      // NOT touch _lastPingedAt — fill-progress pings are scoped to
+      // the lifecycle of a match, not to individual idle drops, so
+      // a 7/8/9-player ping that already fired this cycle stays
+      // fired.
+      await _refreshPanelInChannel(client);
+    } catch (err) {
+      console.error('[QueuePanel] Stale-player sweep failed:', err.message);
     }
-
-    // Reset ping thresholds
-    for (const k of Object.keys(_lastPingedAt)) delete _lastPingedAt[k];
-
-    // Notify in the queue channel
-    const channelId = process.env.RANKED_QUEUE_CHANNEL_ID;
-    const ch = client?.channels?.cache?.get(channelId);
-    if (ch) {
-      ch.send({
-        content: 'Queue has been cleared — not enough players joined within 1 hour. Join again when ready!',
-        allowedMentions: { parse: [] },
-      }).catch(() => {});
-    }
-
-    // Refresh the panel
-    await _refreshPanelInChannel(client);
-  }, QUEUE_TIMEOUT_MS);
-}
-
-function _clearQueueTimeout() {
-  if (_queueTimeoutTimer) {
-    clearTimeout(_queueTimeoutTimer);
-    _queueTimeoutTimer = null;
-  }
+  }, SWEEP_INTERVAL_MS);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -244,11 +249,10 @@ async function handleQueueButton(interaction) {
     const newSize = queueService.joinQueue(discordId, xp);
     _lastAction = `**Player Joined Queue!**\n<@${discordId}>`;
 
-    // Start the 1-hour timeout on first join. Resets if someone
-    // else joins later (timer restarts). Clears when queue fills.
-    if (newSize === 1) {
-      _startQueueTimeout(interaction.client);
-    }
+    // Start the per-player idle sweep on first join (idempotent).
+    // The sweep removes individual players sitting >1h, never the
+    // whole queue.
+    _startStalePlayerSweep(interaction.client);
 
     // Update the panel in-place so everyone sees the new list
     await interaction.update(buildQueuePanel());
@@ -274,8 +278,8 @@ async function handleQueueButton(interaction) {
 
     // Check if queue is full
     if (newSize >= QUEUE_CONFIG.TOTAL_PLAYERS) {
-      // Clear timeout + ping state for the next fill cycle
-      _clearQueueTimeout();
+      // Reset ping state for the next fill cycle. The per-player
+      // idle sweep keeps running independent of fill cycles.
       for (const k of Object.keys(_lastPingedAt)) delete _lastPingedAt[k];
 
       try {
@@ -307,9 +311,10 @@ async function handleQueueButton(interaction) {
     queueService.leaveQueue(discordId);
     _lastAction = `**Player Left Queue!**\n<@${discordId}>`;
 
-    // If queue is now empty, clear the timeout + ping state
+    // If queue is now empty, reset ping state. The per-player idle
+    // sweep keeps running — it'll just have nothing to do until
+    // someone joins.
     if (queueService.getQueueSize() === 0) {
-      _clearQueueTimeout();
       for (const k of Object.keys(_lastPingedAt)) delete _lastPingedAt[k];
     }
 
