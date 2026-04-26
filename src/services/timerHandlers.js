@@ -50,6 +50,69 @@ function registerAll(client) {
     );
     if (expired) {
       console.log(`[TimerHandler] challenge_expiry: challenge ${challengeId} expired and refunded`);
+
+      // Notify the creator. Without this, they'd see their challenge
+      // sitting on the board hours after it auto-expired, click Cancel,
+      // and get a misleading "match already started" error — never
+      // realizing their funds were already refunded.
+      try {
+        const fresh = challengeRepo.findById(challengeId);
+        const userRepo = require('../database/repositories/userRepo');
+        const creatorUser = fresh ? userRepo.findById(fresh.creator_user_id) : null;
+        const isCashMatch = fresh && fresh.type === 'cash_match';
+        const displayNum = fresh?.display_number || challengeId;
+        const typeLabel = isCashMatch ? 'Cash Match' : 'XP Match';
+        const refundLine = isCashMatch && Number(fresh.total_pot_usdc) > 0
+          ? ' Your entry has been refunded to your balance.'
+          : '';
+
+        const { postTransaction } = require('../utils/transactionFeed');
+        postTransaction({
+          type: 'challenge_expired',
+          challengeId,
+          discordId: creatorUser?.discord_id,
+          memo: `${typeLabel} #${displayNum} expired — no one accepted within 1 hour.${refundLine}`,
+        });
+
+        if (creatorUser) {
+          try {
+            const dm = await client.users.fetch(creatorUser.discord_id);
+            await dm.send({
+              content: [
+                `**Your ${typeLabel.toLowerCase()} #${displayNum} expired.**`,
+                `No one accepted within 1 hour.${refundLine}`,
+                '',
+                'Create a new challenge any time from the lobby.',
+              ].join('\n'),
+            });
+          } catch (dmErr) {
+            console.warn(`[TimerHandler] Could not DM creator ${creatorUser.discord_id} about challenge ${challengeId} expiry: ${dmErr.message}`);
+          }
+        }
+
+        // Best-effort: edit the challenge board embed to show EXPIRED so
+        // the creator (and everyone else) sees it's no longer claimable.
+        if (fresh && fresh.challenge_message_id && fresh.challenge_channel_id) {
+          try {
+            const ch = client.channels.cache.get(fresh.challenge_channel_id)
+              || await client.channels.fetch(fresh.challenge_channel_id).catch(() => null);
+            if (ch) {
+              const msg = await ch.messages.fetch(fresh.challenge_message_id).catch(() => null);
+              if (msg && msg.embeds[0]) {
+                const { EmbedBuilder } = require('discord.js');
+                const stale = EmbedBuilder.from(msg.embeds[0])
+                  .setTitle(`⏱️ ${typeLabel} #${displayNum} — Expired`)
+                  .setColor(0x95a5a6);
+                await msg.edit({ embeds: [stale], components: [] });
+              }
+            }
+          } catch (boardErr) {
+            console.warn(`[TimerHandler] Could not update board embed for expired challenge ${challengeId}: ${boardErr.message}`);
+          }
+        }
+      } catch (notifyErr) {
+        console.error(`[TimerHandler] expiry notification failed for challenge ${challengeId}: ${notifyErr.message}`);
+      }
     } else {
       const fresh = challengeRepo.findById(challengeId);
       console.log(

@@ -93,7 +93,25 @@ async function handleConfirmedCancel(interaction) {
   }
 
   if (!CANCELLABLE.includes(challenge.status)) {
-    return interaction.reply({ content: t('challenge_cancel.cannot_cancel_now', lang), ephemeral: true });
+    // The legacy fallback message ("match already started or completed")
+    // was misleading for the most common path — a creator clicking
+    // Cancel after the 1-hour expiry timer already auto-refunded them.
+    // Distinguish EXPIRED + CANCELLED states so they know funds are
+    // already back.
+    let content;
+    const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
+    const refundLine = isCashMatch && Number(challenge.total_pot_usdc) > 0
+      ? ' Your entry has been refunded to your balance.'
+      : '';
+    if (challenge.status === CHALLENGE_STATUS.EXPIRED) {
+      content = `This challenge already expired (1 hour timeout, no one accepted).${refundLine}`;
+    } else if (challenge.status === CHALLENGE_STATUS.CANCELLED) {
+      content = `This challenge was already cancelled.${refundLine}`;
+    } else {
+      // IN_PROGRESS, VOTING, COMPLETED, DISPUTED, PENDING_VERIFICATION
+      content = t('challenge_cancel.cannot_cancel_now', lang);
+    }
+    return interaction.reply({ content, ephemeral: true });
   }
 
   const isCashMatch = challenge.type === CHALLENGE_TYPE.CASH_MATCH;
