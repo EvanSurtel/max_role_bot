@@ -44,24 +44,20 @@ function _startStalePlayerSweep(client) {
         console.log(`[QueuePanel] Removed idle player ${p.discordId} after ${Math.round((now - p.joinedAt) / 60000)} minutes in queue`);
       }
 
-      // One notification per sweep, mentioning each removed player
-      // (allowedMentions blocks the actual ping — we just want the
-      // names rendered so the player sees they were dropped).
-      const channelId = process.env.RANKED_QUEUE_CHANNEL_ID;
-      const ch = client?.channels?.cache?.get(channelId);
-      if (ch) {
-        const names = stale.map(p => `<@${p.discordId}>`).join(', ');
-        ch.send({
-          content: `${names} removed from queue after 1 hour idle. Re-join when ready!`,
-          allowedMentions: { parse: [] },
-        }).catch(() => {});
-      }
+      // Surface the removal in the panel's _lastAction slot — same
+      // mechanism as "Player Joined Queue!" / "Player Left Queue!"
+      // — so it's just another line in the existing panel rather
+      // than a separate channel message that adds noise.
+      const names = stale.map(p => `<@${p.discordId}>`).join(', ');
+      _lastAction = stale.length === 1
+        ? `**Player Removed (Idle 1h)!**\n${names}`
+        : `**Players Removed (Idle 1h)!**\n${names}`;
 
-      // Refresh the panel so the roster reflects the removals. Do
-      // NOT touch _lastPingedAt — fill-progress pings are scoped to
-      // the lifecycle of a match, not to individual idle drops, so
-      // a 7/8/9-player ping that already fired this cycle stays
-      // fired.
+      // Refresh the panel so the roster + _lastAction reflect the
+      // removals. Do NOT touch _lastPingedAt — fill-progress pings
+      // are scoped to the lifecycle of a match, not to individual
+      // idle drops, so a 7/8/9-player ping that already fired this
+      // cycle stays fired.
       await _refreshPanelInChannel(client);
     } catch (err) {
       console.error('[QueuePanel] Stale-player sweep failed:', err.message);
