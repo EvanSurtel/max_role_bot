@@ -1,9 +1,5 @@
 # Rank $ — How It All Works
 
-A plain-English walkthrough of the platform. Written for someone planning marketing, partnerships, or onboarding — not for developers. No code, no tech stack, just the user's story end-to-end.
-
----
-
 ## What Rank $ is in one sentence
 
 Rank $ is a Discord-based platform where Call of Duty Mobile players can play **free XP matches** or wager real money on **cash matches** in any team format (1v1, 2v2, 3v3, 4v4, or 5v5), join a 5v5 ranked queue, and climb a global XP rank ladder — with one important difference from every competitor: **the money never leaves the player's own wallet until they choose to play**, and **the platform can't touch it**.
