@@ -6,7 +6,7 @@ A plain-English walkthrough of the platform. Written for someone planning market
 
 ## What Rank $ is in one sentence
 
-Rank $ is a Discord-based platform where Call of Duty Mobile players can wager real money on matches, climb a global rank ladder, and play 5v5 ranked queue — with one important difference from every competitor: **the money never leaves the player's own wallet until they choose to play**, and **the platform can't touch it**.
+Rank $ is a Discord-based platform where Call of Duty Mobile players can wager real money on matches in any team format (1v1, 2v2, 3v3, 4v4, or 5v5), climb a global rank ladder, and join a 5v5 ranked queue — with one important difference from every competitor: **the money never leaves the player's own wallet until they choose to play**, and **the platform can't touch it**.
 
 ---
 
@@ -76,11 +76,7 @@ When a player clicks the setup link, their browser opens Coinbase's wallet creat
 
 That's it. They now own a real cryptocurrency wallet on the **Base** network (a fast, low-cost network built by Coinbase). Their money lives in this wallet. Rank $ never sees the passkey. Rank $ has no way to sign transactions on their behalf for withdrawals.
 
-### Why "USDC" and not Bitcoin?
-
-The currency is **USDC**, which is **digital US dollars**. One USDC is always worth one US dollar. It doesn't go up or down like Bitcoin. Players hold dollars; they earn dollars; they cash out dollars. This is a key trust point — many people are scared off by crypto's volatility, and USDC removes that concern entirely.
-
-When a player has $50 in their wallet, they have fifty US dollars. Period.
+The currency in every wallet is **USDC** — digital US dollars. One USDC = one US dollar, always. When a player has $50 in their wallet, they have fifty US dollars. They hold dollars, earn dollars, and cash out dollars.
 
 ### The daily spending limit
 
@@ -210,7 +206,7 @@ Not every match is for money. Most aren't.
 
 ### XP Challenges
 
-Same flow as cash matches — captain creates, picks teammates, posts to a challenge board, opponent accepts, teams play, captains report. The only difference: no money. Winners earn XP based on **how strong their opponent was** — beating a stronger team is worth more XP than stomping a weaker one. Losing to a much stronger team costs less XP than losing to a much weaker one.
+Same flow as cash matches and the same team-size options — **1v1, 2v2, 3v3, 4v4, and 5v5** — captain creates, picks teammates, posts to a challenge board, opponent accepts, teams play, captains report. The only difference: no money. Winners earn XP based on **how strong their opponent was** — beating a stronger team is worth more XP than stomping a weaker one. Losing to a much stronger team costs less XP than losing to a much weaker one.
 
 This is the bread-and-butter of the platform. Most players start with XP matches to learn the ropes, build up XP, and figure out who's good before risking real money.
 
@@ -327,7 +323,7 @@ A few angles that resonate, organized loosely from "casual gamer" to "crypto-ske
 
 ### For the casual gamer
 
-> "Free-to-play ranked queue. Climb a global leaderboard. Show off your rank. Money is optional — most players never deposit a cent."
+> "Free-to-play XP matches in any team format (1v1 through 5v5) plus a 5v5 ranked queue. Climb a global leaderboard. Show off your rank. Money is optional — most players never deposit a cent."
 
 ### For the crypto-skeptic
 
