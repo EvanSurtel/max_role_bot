@@ -6,7 +6,7 @@ A plain-English walkthrough of the platform. Written for someone planning market
 
 ## What Rank $ is in one sentence
 
-Rank $ is a Discord-based platform where Call of Duty Mobile players can wager real money on matches in any team format (1v1, 2v2, 3v3, 4v4, or 5v5), climb a global rank ladder, and join a 5v5 ranked queue — with one important difference from every competitor: **the money never leaves the player's own wallet until they choose to play**, and **the platform can't touch it**.
+Rank $ is a Discord-based platform where Call of Duty Mobile players can play **free XP matches** or wager real money on **cash matches** in any team format (1v1, 2v2, 3v3, 4v4, or 5v5), join a 5v5 ranked queue, and climb a global XP rank ladder — with one important difference from every competitor: **the money never leaves the player's own wallet until they choose to play**, and **the platform can't touch it**.
 
 ---
 
@@ -25,6 +25,18 @@ This isn't a marketing claim — it's a technical guarantee that Coinbase review
 1. "Your money is in your wallet, not ours."
 2. "We charge zero fees on deposits, withdrawals, or matches."
 3. "If we shut down tomorrow, you keep your money."
+
+### Free XP play is a first-class feature, not an afterthought
+
+Players don't have to put in a single dollar to use the platform. Rank $ has **three distinct ways to play**, all using the exact same match flow and the exact same XP / rank system:
+
+- **XP Matches** — Free 1v1, 2v2, 3v3, 4v4, or 5v5 matches in any game mode, any series length. Same captain-creates-and-picks-teammates flow as cash matches; the only difference is no money. Win XP, climb the ladder.
+- **Cash Matches** — Same team-size options, same flow, but each player puts in real USDC (minimum 50 cents per player) and the winners take the pot.
+- **5v5 Ranked Queue** — Solo queue. The bot fills 10-player Hardpoint Bo3 lobbies, runs captain voting + snake-draft, and pays out XP only.
+
+**Every match type feeds the same rank ladder** — Bronze → Silver → Gold → Platinum → Diamond → Sentinel → Obsidian → Crowned (top 10). A player can grind to Diamond on free XP matches and the queue, then start playing for money at the rank they earned. Or never touch cash and still hold a top-10 rank. Same nickname, same leaderboard, same emblems regardless of how the XP was earned.
+
+This matters for marketing: most players never deposit a dollar. They're in it for the rank, the bragging rights, and the matchmaking. Cash matches are the **upsell**, not the gate.
 
 ---
 
