@@ -19,6 +19,9 @@ const stmts = {
   setMessageId: db.prepare(`
     UPDATE challenges SET challenge_message_id = ?, challenge_channel_id = ?, updated_at = datetime('now') WHERE id = ?
   `),
+  updateExpiresAt: db.prepare(`
+    UPDATE challenges SET expires_at = ?, updated_at = datetime('now') WHERE id = ?
+  `),
 };
 
 const challengeRepo = {
@@ -72,6 +75,10 @@ const challengeRepo = {
 
   setMessageId(id, messageId, channelId) {
     return stmts.setMessageId.run(messageId, channelId, id);
+  },
+
+  updateExpiresAt(id, isoTimestamp) {
+    return stmts.updateExpiresAt.run(isoTimestamp, id);
   },
 
   /**

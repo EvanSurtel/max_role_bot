@@ -449,6 +449,10 @@ function startWebhookServer(client) {
         discordTag: result.discordTag,
         userId: result.userId,
         purpose: result.purpose,
+        // Metadata pass-through so the web surface can pre-fill UI
+        // for flows that bake context into the link (e.g. send-to-user
+        // pre-fills recipient address + amount on /withdraw).
+        metadata: result.metadata || null,
       });
     } catch (err) {
       console.error('[Internal API] /link/peek error:', err.message);

@@ -59,15 +59,21 @@ function buildWalletView(wallet, user, lang) {
   // rendered code block to select just the address — this button posts
   // a minimal standalone code-block message they CAN long-press +
   // copy from. (Handler in panels/wallet/index.js: 'wallet_copy_address'.)
+  // 6 wallet actions split across 2 rows (Discord caps at 5 buttons
+  // per ActionRow). Send to User sits next to Withdraw because both
+  // are outflows the user signs with their passkey.
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('wallet_deposit').setLabel('💵 Deposit').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('wallet_withdraw_menu').setLabel(t('wallet.btn_withdraw', lang)).setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('wallet_send_user').setLabel('📤 Send to User').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('wallet_copy_address').setLabel(t('wallet.btn_copy_address', lang)).setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('wallet_refresh').setLabel('🔄').setStyle(ButtonStyle.Primary),
+  );
+  const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('wallet_history').setLabel(t('wallet.btn_history', lang)).setStyle(ButtonStyle.Secondary),
   );
 
-  return { embeds: [embed], components: [row1] };
+  return { embeds: [embed], components: [row1, row2] };
 }
 
 module.exports = { buildWalletView };

@@ -48,6 +48,11 @@ async function handleWalletSubButton(interaction) {
     return handleWithdrawMenu(interaction, lang);
   }
 
+  if (id === 'wallet_send_user') {
+    const { handleSendUserStart } = require('./sendToUser');
+    return handleSendUserStart(interaction, user, wallet, lang);
+  }
+
   if (id === 'wallet_cashout') {
     const { handleCashOut } = require('./cashOut');
     return handleCashOut(interaction, user, wallet, lang);

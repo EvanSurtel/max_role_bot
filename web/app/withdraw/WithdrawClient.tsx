@@ -55,6 +55,13 @@ export default function WithdrawClient() {
   const [destination, setDestination] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
+  // Send-to-user flow context (set when /withdraw was minted from the
+  // wallet panel's "Send to User" button — recipient + amount baked
+  // into link metadata). When present, the UI shows a "Sending $X to
+  // @<name>" header and locks the destination/amount fields so the
+  // sender just signs.
+  const [presetRecipientLabel, setPresetRecipientLabel] = useState<string | null>(null);
+  const [isSendToUserFlow, setIsSendToUserFlow] = useState(false);
 
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -112,6 +119,17 @@ export default function WithdrawClient() {
         const body = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(body.error || `redeem failed (${r.status})`);
         setDiscordTag(body.discordTag || body.discordId);
+        // Pre-fill recipient + amount from link metadata for the
+        // send-to-user flow. Sender already picked the recipient on
+        // Discord, so the web side just needs them to sign — no
+        // copy/paste of an address required.
+        const md = body.metadata;
+        if (md && md.flow === 'send-to-user' && md.presetRecipient && md.presetAmountUsdcDisplay) {
+          setIsSendToUserFlow(true);
+          setDestination(md.presetRecipient);
+          setAmountStr(md.presetAmountUsdcDisplay);
+          if (md.presetRecipientLabel) setPresetRecipientLabel(md.presetRecipientLabel);
+        }
         setStatus('ready');
       })
       .catch((err) => {
@@ -222,11 +240,21 @@ export default function WithdrawClient() {
 
   return (
     <main>
-      <h1>Withdraw USDC</h1>
+      <h1>{isSendToUserFlow ? 'Send USDC' : 'Withdraw USDC'}</h1>
       {discordTag && (
         <p>
           Signed in as <strong>{discordTag}</strong>.
         </p>
+      )}
+
+      {isSendToUserFlow && (
+        <div className="card" style={{ borderColor: '#2ecc71' }}>
+          <h2 style={{ marginTop: 0 }}>📤 Sending to {presetRecipientLabel || 'another player'}</h2>
+          <p className="muted">
+            Recipient and amount were pre-filled by the bot when you picked them in Discord.
+            Just connect your wallet and sign — Rank $ never touches the funds.
+          </p>
+        </div>
       )}
 
       <div className="card">

@@ -284,6 +284,10 @@ module.exports = {
         if (id.startsWith('challenge_cancel_') || id.startsWith('challenge_confirm_cancel_')) {
           return await challengeCancel.handleButton(interaction);
         }
+        if (id.startsWith('challenge_extend_')) {
+          const { handleChallengeExtend } = require('../interactions/challengeExtend');
+          return await handleChallengeExtend(interaction);
+        }
         // Teammate accept/decline buttons
         if (id.startsWith('teammate_')) {
           return await teammateResponse.handleButton(interaction);
@@ -430,6 +434,11 @@ module.exports = {
         if (id === 'wallet_deposit_amount_modal' || id === 'wallet_cashout_amount_modal' || id === 'wallet_deposit_state_modal') {
           return await walletPanel.handleWalletAmountModal(interaction);
         }
+        // Send-to-user — amount modal submitted, mint the signing link.
+        if (id === 'wallet_send_user_amount') {
+          const { handleSendUserSubmit } = require('../panels/wallet/sendToUser');
+          return await handleSendUserSubmit(interaction);
+        }
 
         // (no modal for coinbase demo — button only)
         // Admin escrow withdraw modals (SOL + USDC)
@@ -508,6 +517,11 @@ module.exports = {
         // Admin wallet viewer — admin picks a user, ephemeral wallet view
         if (id === 'admin_wallet_view_select') {
           return await adminWalletViewer.handleAdminWalletViewSelect(interaction);
+        }
+        // Send-to-user wallet flow — recipient picked, prompt for amount
+        if (id === 'wallet_send_user_pick') {
+          const { handleSendUserPick } = require('../panels/wallet/sendToUser');
+          return await handleSendUserPick(interaction);
         }
 
         console.warn(`[Interaction] Unhandled user select customId: ${id}`);

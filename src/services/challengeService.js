@@ -211,6 +211,16 @@ async function postToBoard(client, challenge) {
       .setCustomId(`challenge_cancel_${challenge.id}`)
       .setLabel(t('challenge_create.btn_cancel_challenge', displayLang))
       .setStyle(ButtonStyle.Danger),
+    // Creator-only "Extend +10 min" button. Click validates the actor
+    // is the creator, then bumps challenges.expires_at by +10 min and
+    // re-creates the timerService row. Matches CMG's "extend by 10
+    // minutes if not accepted" feature so a creator who's still
+    // looking for an opponent can keep their challenge alive without
+    // re-creating it from scratch (and re-locking funds).
+    new ButtonBuilder()
+      .setCustomId(`challenge_extend_${challenge.id}`)
+      .setLabel('Extend +10 min')
+      .setStyle(ButtonStyle.Secondary),
   );
   const langRow = buildChallengeLanguageDropdown(challenge.id, displayLang);
 
