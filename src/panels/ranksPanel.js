@@ -111,10 +111,20 @@ async function postRanksPanel(client, lang = 'en') {
   }
 
   try {
-    // Clear old bot messages (ignore errors — channel might have system messages)
+    // Idempotency: ranks panel is multiple messages (lang picker +
+    // intro + 8 tier cards with emblem images). Editing in place is
+    // awkward, so we use the "skip if intact" pattern — if we detect
+    // existing rank-card bot messages (image attachments), assume
+    // the panel is fine and don't re-post. Only re-post if missing.
     try {
       const messages = await channel.messages.fetch({ limit: 50 });
       const botMessages = messages.filter(m => m.author.id === client.user.id);
+      const hasRankCards = botMessages.some(m => m.attachments.size > 0 && m.embeds.length > 0);
+      if (hasRankCards) {
+        console.log('[Panel] Ranks panel already present — skipping re-post');
+        return;
+      }
+      // No intact panel — wipe stragglers so we don't get duplicates.
       for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
     } catch { /* channel might not allow fetch — just post fresh */ }
 

@@ -90,6 +90,16 @@ async function postRulesPanel(client, lang = 'en') {
   try {
     const messages = await channel.messages.fetch({ limit: 50 });
     const botMessages = messages.filter(m => m.author.id === client.user.id);
+
+    // Skip-if-intact: rules panel is dropdown + 1-2 embed messages.
+    // If any bot embed exists in the channel, assume the panel is
+    // good and skip re-post.
+    const hasEmbeds = botMessages.some(m => m.embeds.length > 0);
+    if (hasEmbeds) {
+      console.log('[Panel] Rules panel already present — skipping re-post');
+      return;
+    }
+
     for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
 
     const panel = buildRulesPanel(lang);

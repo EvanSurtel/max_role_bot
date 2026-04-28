@@ -129,6 +129,16 @@ async function postHowItWorksPanel(client, lang = 'en') {
   try {
     const messages = await channel.messages.fetch({ limit: 50 });
     const botMessages = messages.filter(m => m.author.id === client.user.id);
+
+    // Skip-if-intact: this panel is multiple messages (lang dropdown
+    // + N packed embed groups). Editing in place is awkward; if any
+    // bot embed message exists, assume the panel is good.
+    const hasEmbeds = botMessages.some(m => m.embeds.length > 0);
+    if (hasEmbeds) {
+      console.log('[Panel] How it works panel already present — skipping re-post');
+      return;
+    }
+
     for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
 
     const panel = buildHowItWorksPanel(lang);
