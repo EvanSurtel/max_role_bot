@@ -119,14 +119,20 @@ async function postRanksPanel(client, lang = 'en') {
     try {
       const messages = await channel.messages.fetch({ limit: 50 });
       const botMessages = messages.filter(m => m.author.id === client.user.id);
-      const hasRankCards = botMessages.some(m => m.attachments.size > 0 && m.embeds.length > 0);
-      if (hasRankCards) {
+      const withAttachAndEmbed = botMessages.filter(m => m.attachments.size > 0 && m.embeds.length > 0);
+      const withEmbedOnly = botMessages.filter(m => m.embeds.length > 0);
+      console.log(`[Panel] Ranks: scan found ${botMessages.size} bot messages, ${withEmbedOnly.size} have embeds, ${withAttachAndEmbed.size} have embed+attachment`);
+      // Skip if we see ANY bot embed message — covers both the
+      // attachment-bearing tier cards and the bare intro/dropdown.
+      if (withEmbedOnly.size > 0) {
         console.log('[Panel] Ranks panel already present — skipping re-post');
         return;
       }
       // No intact panel — wipe stragglers so we don't get duplicates.
       for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
-    } catch { /* channel might not allow fetch — just post fresh */ }
+    } catch (scanErr) {
+      console.warn(`[Panel] Ranks scan failed: ${scanErr.message} — posting fresh`);
+    }
 
     console.log('[Panel] Ranks: building panel...');
     const { embeds, files } = buildRanksPanel(lang);
