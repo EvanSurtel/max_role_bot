@@ -52,7 +52,7 @@ async function handleSendUserStart(interaction, user, wallet) {
       '',
       'Pick the user you want to send to. They must already be registered with the bot and have set up their wallet.',
       '',
-      '_You\'ll sign the transfer with your passkey on the next screen — Rank $ never touches your money._',
+      '_You\'ll confirm the transfer on the next screen — Rank $ never touches your money._',
     ].join('\n'),
     components: [row],
     ephemeral: true,
@@ -205,7 +205,7 @@ async function handleSendUserSubmit(interaction) {
   const dmContent = [
     `**Send $${cleaned} USDC to <@${pending.recipientDiscordId}>**`,
     '',
-    `Click the link below to sign with your passkey. Rank $ never touches your money — only you can sign.`,
+    `Click the link below to confirm the transfer. Rank $ never touches your money — only you can confirm.`,
     '',
     `🔐 **${url}**`,
     '',

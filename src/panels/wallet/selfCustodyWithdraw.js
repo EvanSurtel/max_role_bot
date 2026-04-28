@@ -49,11 +49,11 @@ async function handleSmartWalletWithdraw(interaction) {
   const message = [
     '**Withdraw USDC**',
     '',
-    `Click the link below within **10 minutes** to sign your withdrawal:`,
+    `Click the link below within **10 minutes** to confirm your withdrawal:`,
     '',
     url,
     '',
-    'On that page you’ll reconnect your Coinbase Smart Wallet, enter the destination address and amount, and sign with your passkey. Rank $ never touches your keys.',
+    'On that page you\'ll connect your wallet, enter the destination address and amount, and tap **Confirm**. Rank $ never touches your money — only you can confirm.',
   ].join('\n');
 
   let dmDelivered = false;

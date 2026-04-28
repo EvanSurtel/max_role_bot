@@ -122,15 +122,14 @@ async function handleWalletPendingSetup(interaction, user) {
     .setTitle('🔐 Finish setting up your wallet')
     .setColor(0x2ecc71)
     .setDescription([
-      'You haven\'t set up your self-custody wallet yet. Click the link below to create it — takes about 30 seconds.',
+      'You haven\'t set up your wallet yet. Click the link below to create it — takes about 30 seconds.',
       '',
       `**${url}**`,
       '',
       '**What happens:**',
-      '• You enter an email once on Coinbase\'s wallet tool (not a Coinbase.com account — just anchors your passkey)',
-      '• Your phone or computer\'s built-in passkey (Face ID / Touch ID / Windows Hello / security key) becomes the signer',
-      '• **Only you can sign.** Rank $ never sees your passkey and can never move funds without your permission.',
-      '• You set your own daily spending limit on cash matches (like a daily budget you set for yourself)',
+      '• Enter your email once and follow the prompts.',
+      '• **Only you can unlock your wallet.** Rank $ has no way to move funds without your permission.',
+      '• You set your own daily spending limit on cash matches (like a daily budget you set for yourself).',
       '',
       '_Link valid for 2 hours, single use. Click **View My Wallet** again if it expires._',
     ].join('\n'));
