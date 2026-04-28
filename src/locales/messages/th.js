@@ -111,7 +111,7 @@ module.exports = {
 
   // Direct messages from the bot to a user (deposit notifications, etc.)
   deposit_dm: {
-    received: '💰 **ได้รับเงินฝากแล้ว!**\n\nคุณได้รับ **${amount} USDC** ยอดเงินที่ใช้ได้ใหม่ของคุณคือ **${new_balance} USDC**\n\nคลิก **ดูกระเป๋าของฉัน** ในช่องกระเป๋าเงินเพื่อดูรายละเอียด',
+    received: '💰 **ได้รับเงินฝากแล้ว!**\n\nคุณได้รับ **${amount} USDC** ยอดเงินที่ใช้ได้ใหม่ของคุณคือ **${new_balance} USDC**\n\nคลิก **ดูกระเป๋าของฉัน** ใน **#my-wallet** เพื่อดูรายละเอียด',
   },
 
   wallet_embed: {
@@ -167,7 +167,7 @@ module.exports = {
     complete_wallet_text: 'มีกระเป๋า USDC ถูกสร้างให้คุณแล้ว เช็คที่ {channel} เพื่อดูที่อยู่ฝากและจัดการเงิน',
     complete_started_header: 'เริ่มต้น',
     complete_started_1: 'ฝาก **USDC** ไปยังที่อยู่กระเป๋าของคุณสำหรับ cash matches',
-    complete_started_2: 'ไปที่ช่อง cash match lobby',
+    complete_started_2: 'ไปที่ **#create-cash-match**',
     complete_started_3: 'คลิก **Create Cash Match** เพื่อท้าทายผู้อื่นหรือดู challenge ที่เปิดอยู่',
     complete_started_4: 'ดูช่อง **วิธีใช้งาน** หากต้องการความช่วยเหลือ',
     complete_good_luck: 'โชคดีและสนุกนะ!',

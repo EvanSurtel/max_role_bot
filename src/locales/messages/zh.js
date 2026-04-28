@@ -111,7 +111,7 @@ module.exports = {
 
   // Direct messages from the bot to a user (deposit notifications, etc.)
   deposit_dm: {
-    received: '💰 **已收到充值!**\n\n你收到了 **${amount} USDC**。你新的可用余额是 **${new_balance} USDC**。\n\n点击钱包频道中的 **查看我的钱包** 查看详情。',
+    received: '💰 **已收到充值!**\n\n你收到了 **${amount} USDC**。你新的可用余额是 **${new_balance} USDC**。\n\n点击 **#my-wallet** 中的 **查看我的钱包** 查看详情。',
   },
 
   wallet_embed: {
@@ -167,7 +167,7 @@ module.exports = {
     complete_wallet_text: '已为你创建 USDC 钱包。请查看 {channel} 以查看充值地址并管理资金。',
     complete_started_header: '开始使用',
     complete_started_1: '将 **USDC** 充值到你的钱包地址用于现金对战',
-    complete_started_2: '前往现金对战大厅频道',
+    complete_started_2: '前往 **#create-cash-match**',
     complete_started_3: '点击**创建现金对战**挑战他人或浏览开放挑战',
     complete_started_4: '如需帮助，请查看**使用指南**频道',
     complete_good_luck: '祝你好运,玩得开心!',

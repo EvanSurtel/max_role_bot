@@ -111,7 +111,7 @@ module.exports = {
 
   // Direct messages from the bot to a user (deposit notifications, etc.)
   deposit_dm: {
-    received: '💰 **تم استلام الإيداع!**\n\nلقد استلمت **${amount} USDC**. رصيدك المتاح الجديد هو **${new_balance} USDC**.\n\nاضغط على **عرض محفظتي** في قناة المحفظة لرؤية التفاصيل.',
+    received: '💰 **تم استلام الإيداع!**\n\nلقد استلمت **${amount} USDC**. رصيدك المتاح الجديد هو **${new_balance} USDC**.\n\nاضغط على **عرض محفظتي** في **#my-wallet** لرؤية التفاصيل.',
   },
 
   wallet_embed: {
@@ -167,7 +167,7 @@ module.exports = {
     complete_wallet_text: 'تم إنشاء محفظة USDC لك. تحقق من {channel} لعرض عنوان الإيداع وإدارة الأموال.',
     complete_started_header: 'البدء',
     complete_started_1: 'أودع **USDC** في عنوان محفظتك لمباريات الكاش',
-    complete_started_2: 'توجّه إلى قناة لوبي مباريات الكاش',
+    complete_started_2: 'توجّه إلى **#create-cash-match**',
     complete_started_3: 'اضغط **إنشاء مباراة كاش** لتحدي الآخرين أو تصفح التحديات المفتوحة',
     complete_started_4: 'تحقق من قناة **كيف يعمل** إذا احتجت مساعدة',
     complete_good_luck: 'حظاً سعيداً واستمتع باللعب!',

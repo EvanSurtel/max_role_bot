@@ -111,7 +111,7 @@ module.exports = {
 
   // Direct messages from the bot to a user (deposit notifications, etc.)
   deposit_dm: {
-    received: '💰 **Setoran diterima!**\n\nKamu menerima **${amount} USDC**. Saldo tersedia kamu yang baru adalah **${new_balance} USDC**.\n\nKlik **Lihat Wallet Saya** di channel wallet untuk melihat detailnya.',
+    received: '💰 **Setoran diterima!**\n\nKamu menerima **${amount} USDC**. Saldo tersedia kamu yang baru adalah **${new_balance} USDC**.\n\nKlik **Lihat Wallet Saya** di **#my-wallet** untuk melihat detailnya.',
   },
 
   wallet_embed: {
@@ -169,7 +169,7 @@ module.exports = {
     complete_wallet_text: 'Wallet USDC sudah dibuat untuk kamu. Cek {channel} untuk lihat alamat setoran dan kelola dana.',
     complete_started_header: 'Mulai',
     complete_started_1: 'Setor **USDC** ke alamat wallet kamu untuk cash match',
-    complete_started_2: 'Pergi ke channel cash match lobby',
+    complete_started_2: 'Pergi ke **#create-cash-match**',
     complete_started_3: 'Klik **Create Cash Match** untuk menantang orang lain atau lihat challenge yang terbuka',
     complete_started_4: 'Cek channel **Cara Kerja** kalau butuh bantuan',
     complete_good_luck: 'Semoga berhasil dan selamat bermain!',

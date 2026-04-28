@@ -111,7 +111,7 @@ module.exports = {
 
   // Direct messages from the bot to a user (deposit notifications, etc.)
   deposit_dm: {
-    received: '💰 **Einzahlung erhalten!**\n\nDu hast **${amount} USDC** erhalten. Dein neues verfügbares Guthaben beträgt **${new_balance} USDC**.\n\nKlicke im Wallet-Channel auf **Meine Wallet Anzeigen**, um die Details zu sehen.',
+    received: '💰 **Einzahlung erhalten!**\n\nDu hast **${amount} USDC** erhalten. Dein neues verfügbares Guthaben beträgt **${new_balance} USDC**.\n\nKlicke in **#my-wallet** auf **Meine Wallet Anzeigen**, um die Details zu sehen.',
   },
 
   wallet_embed: {
@@ -167,7 +167,7 @@ module.exports = {
     complete_wallet_text: 'Eine USDC-Wallet wurde für dich erstellt. Schau in {channel}, um deine Einzahlungsadresse zu sehen und deine Mittel zu verwalten.',
     complete_started_header: 'Erste Schritte',
     complete_started_1: 'Zahle **USDC** an deine Wallet-Adresse für Cash-Matches ein',
-    complete_started_2: 'Geh zum Cash-Match-Lobby-Channel',
+    complete_started_2: 'Geh zu **#create-cash-match**',
     complete_started_3: 'Klick auf **Cash-Match Erstellen**, um andere herauszufordern oder offene Herausforderungen zu durchsuchen',
     complete_started_4: 'Schau im **So funktioniert\'s**-Channel nach, wenn du Hilfe brauchst',
     complete_good_luck: 'Viel Glück und viel Spaß!',

@@ -112,7 +112,7 @@ module.exports = {
 
   // Direct messages from the bot to a user (deposit notifications, etc.)
   deposit_dm: {
-    received: '💰 **Депозит получен!**\n\nТы получил **${amount} USDC**. Твой новый доступный баланс — **${new_balance} USDC**.\n\nНажми **Мой Кошелёк** в канале кошелька, чтобы увидеть детали.',
+    received: '💰 **Депозит получен!**\n\nТы получил **${amount} USDC**. Твой новый доступный баланс — **${new_balance} USDC**.\n\nНажми **Мой Кошелёк** в **#my-wallet**, чтобы увидеть детали.',
   },
 
   wallet_embed: {
@@ -168,7 +168,7 @@ module.exports = {
     complete_wallet_text: 'USDC кошелёк создан для тебя. Проверь {channel} чтобы посмотреть свой адрес депозита и управлять средствами.',
     complete_started_header: 'С Чего Начать',
     complete_started_1: 'Положи **USDC** на свой адрес кошелька для кэш-матчей',
-    complete_started_2: 'Зайди в канал лобби кэш-матчей',
+    complete_started_2: 'Зайди в **#create-cash-match**',
     complete_started_3: 'Нажми **Создать Кэш-Матч** чтобы вызвать других или просмотреть открытые челленджи',
     complete_started_4: 'Загляни в канал **Как Это Работает**, если нужна помощь',
     complete_good_luck: 'Удачи и хорошей игры!',

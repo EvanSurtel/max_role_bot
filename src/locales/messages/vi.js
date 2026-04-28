@@ -111,7 +111,7 @@ module.exports = {
 
   // Direct messages from the bot to a user (deposit notifications, etc.)
   deposit_dm: {
-    received: '💰 **Đã nhận tiền nạp!**\n\nBạn đã nhận được **${amount} USDC**. Số dư khả dụng mới của bạn là **${new_balance} USDC**.\n\nNhấn **Xem Ví Của Tôi** trong kênh ví để xem chi tiết.',
+    received: '💰 **Đã nhận tiền nạp!**\n\nBạn đã nhận được **${amount} USDC**. Số dư khả dụng mới của bạn là **${new_balance} USDC**.\n\nNhấn **Xem Ví Của Tôi** trong **#my-wallet** để xem chi tiết.',
   },
 
   wallet_embed: {
@@ -169,7 +169,7 @@ module.exports = {
     complete_wallet_text: 'Một ví USDC đã được tạo cho bạn. Hãy kiểm tra {channel} để xem địa chỉ nạp và quản lý tiền.',
     complete_started_header: 'Bắt Đầu',
     complete_started_1: 'Nạp **USDC** vào địa chỉ ví của bạn cho cash match',
-    complete_started_2: 'Đến kênh cash match lobby',
+    complete_started_2: 'Đến **#create-cash-match**',
     complete_started_3: 'Nhấn **Create Cash Match** để thách đấu người khác hoặc xem các challenge đang mở',
     complete_started_4: 'Xem kênh **Hướng Dẫn** nếu bạn cần trợ giúp',
     complete_good_luck: 'Chúc may mắn và vui vẻ!',

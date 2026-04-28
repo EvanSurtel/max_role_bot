@@ -112,7 +112,7 @@ module.exports = {
 
   // Direct messages from the bot to a user (deposit notifications, etc.)
   deposit_dm: {
-    received: '💰 **Storting ontvangen!**\n\nJe hebt **${amount} USDC** ontvangen. Je nieuwe beschikbare saldo is **${new_balance} USDC**.\n\nKlik op **Bekijk Mijn Wallet** in het wallet kanaal om de details te zien.',
+    received: '💰 **Storting ontvangen!**\n\nJe hebt **${amount} USDC** ontvangen. Je nieuwe beschikbare saldo is **${new_balance} USDC**.\n\nKlik op **Bekijk Mijn Wallet** in **#my-wallet** om de details te zien.',
   },
 
   wallet_embed: {
@@ -168,7 +168,7 @@ module.exports = {
     complete_wallet_text: 'Een USDC wallet is voor je aangemaakt. Check {channel} om je stortingsadres te zien en fondsen te beheren.',
     complete_started_header: 'Aan de Slag',
     complete_started_1: 'Stort **USDC** naar je wallet adres voor cash matches',
-    complete_started_2: 'Ga naar het cash match lobby kanaal',
+    complete_started_2: 'Ga naar **#create-cash-match**',
     complete_started_3: 'Klik **Create Cash Match** om anderen uit te dagen of open uitdagingen te bekijken',
     complete_started_4: 'Bekijk het **Hoe Het Werkt** kanaal als je hulp nodig hebt',
     complete_good_luck: 'Veel succes en plezier!',

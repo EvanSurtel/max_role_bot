@@ -112,7 +112,7 @@ module.exports = {
 
   // Direct messages from the bot to a user (deposit notifications, etc.)
   deposit_dm: {
-    received: '💰 **Yatırım alındı!**\n\n**${amount} USDC** aldın. Yeni kullanılabilir bakiyen **${new_balance} USDC**.\n\nDetayları görmek için cüzdan kanalında **Cüzdanımı Gör** butonuna tıkla.',
+    received: '💰 **Yatırım alındı!**\n\n**${amount} USDC** aldın. Yeni kullanılabilir bakiyen **${new_balance} USDC**.\n\nDetayları görmek için **#my-wallet**\'da **Cüzdanımı Gör** butonuna tıkla.',
   },
 
   wallet_embed: {
@@ -168,7 +168,7 @@ module.exports = {
     complete_wallet_text: 'Senin için bir USDC cüzdanı oluşturuldu. Yatırım adresini görmek ve fonları yönetmek için {channel} kontrol et.',
     complete_started_header: 'Başlangıç',
     complete_started_1: 'Para maçları için cüzdanına **USDC** yatır',
-    complete_started_2: 'Para maçı lobi kanalına git',
+    complete_started_2: '**#create-cash-match**\'e git',
     complete_started_3: 'Başkalarına meydan okumak veya açık meydan okumalara göz atmak için **Para Maçı Oluştur**\'a tıkla',
     complete_started_4: 'Yardıma ihtiyacın olursa **Nasıl Çalışır** kanalına göz at',
     complete_good_luck: 'Bol şans ve iyi eğlenceler!',

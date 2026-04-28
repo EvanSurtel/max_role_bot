@@ -111,7 +111,7 @@ module.exports = {
 
   // Direct messages from the bot to a user (deposit notifications, etc.)
   deposit_dm: {
-    received: '💰 **Depósito recebido!**\n\nVocê recebeu **${amount} USDC**. Seu novo saldo disponível é **${new_balance} USDC**.\n\nClique em **Ver Minha Carteira** no canal da carteira para ver os detalhes.',
+    received: '💰 **Depósito recebido!**\n\nVocê recebeu **${amount} USDC**. Seu novo saldo disponível é **${new_balance} USDC**.\n\nClique em **Ver Minha Carteira** em **#my-wallet** para ver os detalhes.',
   },
 
   wallet_embed: {
@@ -167,7 +167,7 @@ module.exports = {
     complete_wallet_text: 'Uma carteira USDC foi criada pra você. Confira {channel} pra ver seu endereço de depósito e gerenciar seus fundos.',
     complete_started_header: 'Pra Começar',
     complete_started_1: 'Deposite **USDC** na sua carteira para partidas com dinheiro',
-    complete_started_2: 'Vá até o canal do lobby de partidas com dinheiro',
+    complete_started_2: 'Vá até **#create-cash-match**',
     complete_started_3: 'Clique em **Criar Partida com Dinheiro** pra desafiar outros ou olhar os desafios abertos',
     complete_started_4: 'Confira o canal **Como Funciona** se precisar de ajuda',
     complete_good_luck: 'Boa sorte e divirta-se!',

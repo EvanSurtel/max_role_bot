@@ -111,7 +111,7 @@ module.exports = {
 
   // Direct messages from the bot to a user (deposit notifications, etc.)
   deposit_dm: {
-    received: '💰 **入金を受け取りました！**\n\n**${amount} USDC** を受け取りました。新しい利用可能残高は **${new_balance} USDC** です。\n\n詳細を見るには、ウォレットチャンネルで **マイウォレットを表示** をクリックしてください。',
+    received: '💰 **入金を受け取りました！**\n\n**${amount} USDC** を受け取りました。新しい利用可能残高は **${new_balance} USDC** です。\n\n詳細を見るには、**#my-wallet** で **マイウォレットを表示** をクリックしてください。',
   },
 
   wallet_embed: {
@@ -167,7 +167,7 @@ module.exports = {
     complete_wallet_text: 'USDCウォレットが作成されました。{channel} で入金アドレスを確認し、資金を管理してください。',
     complete_started_header: 'はじめに',
     complete_started_1: 'キャッシュマッチ用にウォレットアドレスへ **USDC** を入金',
-    complete_started_2: 'キャッシュマッチロビーチャンネルへ移動',
+    complete_started_2: '**#create-cash-match** へ移動',
     complete_started_3: '**キャッシュマッチ作成**をクリックして他の人にチャレンジするか、オープンチャレンジを閲覧',
     complete_started_4: '**使い方**チャンネルでヘルプを確認',
     complete_good_luck: '幸運を祈ります、楽しんでください！',

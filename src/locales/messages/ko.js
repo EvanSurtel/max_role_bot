@@ -111,7 +111,7 @@ module.exports = {
 
   // Direct messages from the bot to a user (deposit notifications, etc.)
   deposit_dm: {
-    received: '💰 **입금이 도착했어요!**\n\n**${amount} USDC**를 받았어요. 새로운 사용 가능 잔액은 **${new_balance} USDC**예요.\n\n상세 내용을 확인하려면 지갑 채널에서 **내 지갑 보기** 버튼을 클릭하세요.',
+    received: '💰 **입금이 도착했어요!**\n\n**${amount} USDC**를 받았어요. 새로운 사용 가능 잔액은 **${new_balance} USDC**예요.\n\n상세 내용을 확인하려면 **#my-wallet** 에서 **내 지갑 보기** 버튼을 클릭하세요.',
   },
 
   wallet_embed: {
@@ -167,7 +167,7 @@ module.exports = {
     complete_wallet_text: 'USDC 지갑이 생성되었어요. {channel}에서 입금 주소를 확인하고 자금을 관리하세요.',
     complete_started_header: '시작하기',
     complete_started_1: '캐시 매치용 **USDC**를 지갑 주소로 입금',
-    complete_started_2: '캐시 매치 로비 채널로 이동',
+    complete_started_2: '**#create-cash-match** 으로 이동',
     complete_started_3: '**캐시 매치 만들기**를 클릭해 다른 사람에게 도전하거나 열린 챌린지 둘러보기',
     complete_started_4: '도움이 필요하면 **이용 방법** 채널을 확인하세요',
     complete_good_luck: '행운을 빌어요, 즐기세요!',
