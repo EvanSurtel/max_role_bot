@@ -1,6 +1,12 @@
 // Support ticket panel — single embed + category dropdown posted in
-// SUPPORT_CHANNEL_ID. Selecting a category creates a private channel
-// under TICKETS_CATEGORY_ID for the user + the relevant staff roles.
+// SUPPORT_CHANNEL_ID. Selecting a category creates a private THREAD
+// under TICKETS_PARENT_CHANNEL_ID for the user + the relevant staff
+// roles (staff visibility relies on "Manage Threads" being granted to
+// staff roles on the parent channel — set once by the operator).
+//
+// Why threads instead of full channels: threads don't count against
+// the 500-channel-per-guild cap, so we can run thousands of active
+// tickets without hitting Discord's hard limit.
 //
 // Only one panel ever lives in the support channel — postSupportPanel
 // (called on boot) scans for an existing bot panel and edits in-place
@@ -9,7 +15,7 @@
 const {
   EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder,
   ButtonBuilder, ButtonStyle,
-  ChannelType, PermissionFlagsBits,
+  ChannelType,
 } = require('discord.js');
 
 const userRepo = require('../database/repositories/userRepo');
@@ -157,66 +163,65 @@ async function handleCategorySelect(interaction) {
   await interaction.deferReply({ ephemeral: true });
 
   // Resolve the staff role IDs for this category. Filter out any that
-  // aren't set in env so a missing role doesn't crash channel creation.
+  // aren't set in env so a missing role doesn't crash thread creation.
   const staffRoleIds = category.staffRoleEnvVars
     .map(v => process.env[v])
     .filter(Boolean);
   const pingRoleId = process.env[category.pingRoleEnvVar] || staffRoleIds[0] || null;
 
-  // Build permission overwrites: deny @everyone, allow user + bot +
-  // staff. Staff can ViewChannel + SendMessages + ManageMessages so
-  // they can pin / clean up if needed.
+  // PRIVATE THREAD model: tickets are private threads under a single
+  // parent channel (TICKETS_PARENT_CHANNEL_ID). Threads do NOT count
+  // against the 500-channel-per-guild cap, so we can run thousands of
+  // active tickets without hitting it.
+  //
+  // Visibility model:
+  //   - Bot: implicit (it created the thread)
+  //   - User: added explicitly via thread.members.add(discordId)
+  //   - Staff: must have "Manage Threads" permission on the parent
+  //     channel — Discord then auto-shows them every private thread
+  //     under that parent. This is configured ONCE on the parent
+  //     channel by the operator (see docs/SOP.md ticket-system setup).
+  //
+  // The per-category staff routing still works: each category has a
+  // ping role that gets @-mentioned in the opening thread message,
+  // so the right team gets notified even though every staff role
+  // technically can see every ticket.
+  const parentChannelId = process.env.TICKETS_PARENT_CHANNEL_ID;
+  if (!parentChannelId) {
+    return interaction.editReply({
+      content: 'Tickets aren\'t configured yet. An admin needs to set `TICKETS_PARENT_CHANNEL_ID` to a parent channel.',
+    });
+  }
   const guild = interaction.guild;
-  const overwrites = [
-    {
-      id: guild.id, // @everyone
-      deny: [PermissionFlagsBits.ViewChannel],
-    },
-    {
-      id: guild.client.user.id, // bot
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ManageChannels,
-        PermissionFlagsBits.ManageMessages,
-        PermissionFlagsBits.ReadMessageHistory,
-      ],
-    },
-    {
-      id: discordId,
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory,
-        PermissionFlagsBits.AttachFiles,
-      ],
-    },
-    ...staffRoleIds.map(roleId => ({
-      id: roleId,
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory,
-        PermissionFlagsBits.AttachFiles,
-        PermissionFlagsBits.ManageMessages,
-      ],
-    })),
-  ];
+  const parentChannel = guild.channels.cache.get(parentChannelId)
+    || await guild.channels.fetch(parentChannelId).catch(() => null);
+  if (!parentChannel) {
+    return interaction.editReply({
+      content: 'Tickets parent channel not found. Verify `TICKETS_PARENT_CHANNEL_ID` points at a valid text channel.',
+    });
+  }
 
-  // Create channel under the tickets category if configured.
   let channel;
   try {
-    channel = await guild.channels.create({
-      name: `ticket-${dbUser.server_username || discordId}-${categoryKey}`.toLowerCase().slice(0, 80),
-      type: ChannelType.GuildText,
-      parent: process.env.TICKETS_CATEGORY_ID || null,
-      permissionOverwrites: overwrites,
+    channel = await parentChannel.threads.create({
+      name: `ticket-${dbUser.server_username || discordId}-${categoryKey}`.toLowerCase().slice(0, 100),
+      type: ChannelType.PrivateThread,
+      // invitable=false stops anyone in the thread from inviting more
+      // members. Only mods (Manage Threads) and the bot can add others.
+      invitable: false,
+      autoArchiveDuration: 10080, // 7 days; matches our inactivity timer
       reason: `Ticket: ${category.label} for ${discordId}`,
     });
+    // Add the user as an explicit thread member. Without this they
+    // can't see the thread (private threads aren't visible by default
+    // even with View Channel on the parent).
+    await channel.members.add(discordId).catch(addErr => {
+      console.warn(`[SupportPanel] Could not add user ${discordId} to thread ${channel.id}: ${addErr.message}`);
+    });
   } catch (err) {
-    console.error('[SupportPanel] Channel create failed:', err.message);
+    console.error('[SupportPanel] Thread create failed:', err.message);
     return interaction.editReply({
-      content: 'Could not create your ticket channel. An admin needs to verify the bot has the Manage Channels permission and that TICKETS_CATEGORY_ID is set.',
+      content: 'Could not create your ticket thread. An admin needs to verify the bot has **Create Private Threads** + **Send Messages in Threads** on the parent channel.',
     });
   }
 

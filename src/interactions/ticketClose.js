@@ -1,24 +1,23 @@
 // Handle the "Close Ticket" button + the auto-close timer path.
 // Both call _closeTicket; the only difference is the closing-actor
-// label and which final message gets posted in the ticket channel
-// before deletion.
+// label and which final message gets posted in the ticket thread
+// before archive.
 //
 // Close flow:
 //   1. atomicStatusTransition tickets.status: 'open' -> 'closed' / 'auto_closed'
 //      (silently exits if already closed — defends against double-clicks)
-//   2. Build a plain-text transcript by paginating channel.messages.fetch
+//   2. Build a plain-text transcript by paginating thread.messages.fetch
 //   3. Post transcript embed + .txt attachment in TICKET_LOGS_CHANNEL_ID
-//      (best effort — logs absence shouldn't block channel deletion)
-//   4. Tell the channel it's closing in 60 seconds
-//   5. Delete the channel after 60 seconds
+//   4. Post final "ticket closed" message in the thread
+//   5. Lock + archive the thread (read-only, auto-hidden from sidebar)
+//      Threads are NOT deleted — the archived record stays for staff
+//      reference. Discord auto-hides them from default views.
 
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const ticketRepo = require('../database/repositories/ticketRepo');
 const userRepo = require('../database/repositories/userRepo');
 const timerService = require('../services/timerService');
 const { TICKET_CATEGORIES } = require('../panels/supportPanel');
-
-const CHANNEL_DELETE_DELAY_MS = 60 * 1000;
 
 async function handleCloseButton(interaction) {
   const ticketId = parseInt(interaction.customId.replace('ticket_close_', ''), 10);
@@ -79,49 +78,48 @@ async function _closeTicket(client, ticket, closedByDiscordId, finalStatus, inte
   // since the timer already fired).
   timerService.cancelTimersByReference('ticket_inactivity', ticket.id);
 
-  const channel = client.channels.cache.get(ticket.channel_id)
+  // Resolve the thread. Tickets are private threads, not standalone
+  // channels — fetching by id returns the thread object.
+  const thread = client.channels.cache.get(ticket.channel_id)
     || await client.channels.fetch(ticket.channel_id).catch(() => null);
 
-  // Build + post transcript to the logs channel BEFORE deleting the
-  // ticket channel. If anything fails here, we still want the channel
-  // gone, so each step is wrapped in its own try/catch.
-  if (channel) {
+  // Build + post transcript to the logs channel BEFORE archiving the
+  // thread. Failures here are logged but don't block the archive.
+  if (thread) {
     try {
-      await _postTranscript(client, channel, ticket, closedByDiscordId, finalStatus);
+      await _postTranscript(client, thread, ticket, closedByDiscordId, finalStatus);
     } catch (err) {
       console.error(`[TicketClose] Transcript post failed for ticket #${ticket.id}: ${err.message}`);
     }
   }
 
-  // Tell the channel it's closing.
+  // Final in-thread message + lock + archive.
   const reasonText = finalStatus === 'auto_closed'
     ? 'Auto-closed after 7 days with no activity'
     : `Closed by <@${closedByDiscordId}>`;
-  if (channel) {
+  if (thread) {
     try {
-      await channel.send({
-        content: `🔒 **Ticket closed.** ${reasonText}. This channel will be deleted in 60 seconds.`,
+      await thread.send({
+        content: `🔒 **Ticket closed.** ${reasonText}. Transcript saved. This thread is now read-only.`,
       });
     } catch { /* */ }
+    try {
+      // Lock first (so users can't post even if they unarchive),
+      // then archive (hides from sidebar). Order matters: archived
+      // threads can't be modified to add the lock flag, you have to
+      // unarchive→lock→archive which is one extra round-trip.
+      await thread.setLocked(true, `Ticket #${ticket.id} ${finalStatus}`);
+      await thread.setArchived(true, `Ticket #${ticket.id} ${finalStatus}`);
+    } catch (err) {
+      console.warn(`[TicketClose] Thread archive/lock failed for ticket #${ticket.id}: ${err.message}`);
+    }
   }
 
   if (interaction) {
     try {
-      await interaction.editReply({ content: `Ticket closed. Channel will be deleted in 60 seconds.` });
+      await interaction.editReply({ content: `Ticket closed. Transcript saved.` });
     } catch { /* */ }
   }
-
-  // Delete the channel after 60s. setTimeout is fine here — we don't
-  // care if a restart drops it, the channel just sits there as a
-  // trivial leak (closed status in DB, no buttons, just a final message).
-  setTimeout(async () => {
-    if (!channel) return;
-    try {
-      await channel.delete(`Ticket #${ticket.id} ${finalStatus}`);
-    } catch (err) {
-      console.warn(`[TicketClose] Channel delete failed for ticket #${ticket.id}: ${err.message}`);
-    }
-  }, CHANNEL_DELETE_DELAY_MS);
 
   console.log(`[TicketClose] Ticket #${ticket.id} ${finalStatus} by ${closedByDiscordId}`);
 }
