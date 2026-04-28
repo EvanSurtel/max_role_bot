@@ -323,17 +323,26 @@ async function postWagerStatsPanel(client, lang = 'en') {
       return;
     }
 
-    // Clear old bot messages
     const messages = await ch.messages.fetch({ limit: 20 });
-    for (const [, m] of messages) {
-      if (m.author.id === client.user.id) {
-        try { await m.delete(); } catch { /* */ }
-      }
-    }
-
+    const botMessages = messages.filter(m => m.author.id === client.user.id);
+    const existingPanel = botMessages.find(m => m.embeds.length > 0);
     const payload = buildWagerStatsPayload('earnings', 1, lang);
-    await ch.send(payload);
-    console.log(`[Panel] Posted wager stats panel (${lang})`);
+
+    // Idempotency: edit the existing panel in place rather than
+    // delete-and-repost on every boot. Same pattern as lobbyPanel /
+    // xpMatchPanel / publicWalletPanel — keeps the channel from
+    // accumulating duplicate panels every restart.
+    if (existingPanel) {
+      for (const [, m] of botMessages) {
+        if (m.id !== existingPanel.id) try { await m.delete(); } catch { /* */ }
+      }
+      await existingPanel.edit(payload);
+      console.log(`[Panel] Updated existing wager stats panel (${lang})`);
+    } else {
+      for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
+      await ch.send(payload);
+      console.log(`[Panel] Posted new wager stats panel (${lang})`);
+    }
   } catch (err) {
     console.error('[Panel] Wager stats panel failed:', err.message);
   }

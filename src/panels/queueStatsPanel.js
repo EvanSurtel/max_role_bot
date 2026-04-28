@@ -302,17 +302,24 @@ async function postQueueStatsPanel(client, lang = 'en') {
       return;
     }
 
-    // Clear old bot messages
     const messages = await ch.messages.fetch({ limit: 20 });
-    for (const [, m] of messages) {
-      if (m.author.id === client.user.id) {
-        try { await m.delete(); } catch { /* */ }
-      }
-    }
-
+    const botMessages = messages.filter(m => m.author.id === client.user.id);
+    const existingPanel = botMessages.find(m => m.embeds.length > 0);
     const payload = buildQueueStatsPayload('season_xp', 1, lang);
-    await ch.send(payload);
-    console.log(`[Panel] Posted XP stats panel (${lang})`);
+
+    // Edit-in-place idempotency — no delete-and-repost cycle on every
+    // restart. Same pattern as wagerStatsPanel / leaderboardPanel.
+    if (existingPanel) {
+      for (const [, m] of botMessages) {
+        if (m.id !== existingPanel.id) try { await m.delete(); } catch { /* */ }
+      }
+      await existingPanel.edit(payload);
+      console.log(`[Panel] Updated existing XP stats panel (${lang})`);
+    } else {
+      for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
+      await ch.send(payload);
+      console.log(`[Panel] Posted new XP stats panel (${lang})`);
+    }
   } catch (err) {
     console.error('[Panel] XP stats panel failed:', err.message);
   }

@@ -150,13 +150,29 @@ async function postWelcomePanel(client, lang = 'en') {
   }
 
   try {
-    // Wipe any old bot messages — we always re-post fresh so the language
-    // picker stays at the top (oldest message) and the welcome panel below.
     const messages = await channel.messages.fetch({ limit: 50 });
-    for (const [, m] of messages) {
-      if (m.author.id === client.user.id) {
-        try { await m.delete(); } catch { /* */ }
+    const botMessages = messages.filter(m => m.author.id === client.user.id);
+
+    // Idempotency: if a bot message in this channel already has the
+    // tos_accept button, the welcome panel is intact — every restart
+    // re-posting was creating dozens of duplicate messages over time.
+    // Only re-post if the panel is missing or visibly broken.
+    const hasAcceptButton = botMessages.some(m => {
+      for (const row of m.components || []) {
+        for (const comp of row.components || []) {
+          if (comp.customId === 'tos_accept') return true;
+        }
       }
+      return false;
+    });
+    if (hasAcceptButton) {
+      console.log('[Panel] Welcome panel already present — skipping re-post');
+      return;
+    }
+
+    // No intact panel found — wipe any stragglers and post fresh.
+    for (const [, m] of botMessages) {
+      try { await m.delete(); } catch { /* */ }
     }
 
     // 1) Language picker at the top

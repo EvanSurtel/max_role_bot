@@ -204,35 +204,45 @@ async function buildEarningsPanel(region = 'global', lang = 'en', page = 1) {
 // ─── Post Panels on Startup ─────────────────────────────────────
 
 async function postAllLeaderboardPanels(client, lang = 'en') {
-  // XP Leaderboard — one channel
-  const xpChId = process.env.XP_LEADERBOARD_CHANNEL_ID;
-  if (xpChId) {
+  // Edit-in-place pattern: find the existing panel and edit rather
+  // than delete-and-repost. Without this, every restart creates a
+  // fresh panel + the delete-then-send was producing dozens of
+  // duplicate messages over a few days of dev iteration.
+  async function _upsertPanel(channelId, builder, label) {
+    if (!channelId) return;
     try {
-      const ch = client.channels.cache.get(xpChId);
-      if (ch) {
-        const messages = await ch.messages.fetch({ limit: 20 });
-        for (const [, m] of messages) { if (m.author.id === client.user.id) try { await m.delete(); } catch { /* */ } }
-        const panel = await buildXpPanel('global', 'season', null, lang);
+      const ch = client.channels.cache.get(channelId);
+      if (!ch) return;
+      const messages = await ch.messages.fetch({ limit: 20 });
+      const botMessages = messages.filter(m => m.author.id === client.user.id);
+      const existing = botMessages.find(m => m.embeds.length > 0);
+      const panel = await builder();
+      if (existing) {
+        for (const [, m] of botMessages) {
+          if (m.id !== existing.id) try { await m.delete(); } catch { /* */ }
+        }
+        await existing.edit(panel);
+        console.log(`[Panel] Updated existing ${label} (${lang})`);
+      } else {
+        for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
         await ch.send(panel);
-        console.log(`[Panel] Posted XP leaderboard (${lang})`);
+        console.log(`[Panel] Posted new ${label} (${lang})`);
       }
-    } catch (err) { console.error('[Panel] XP leaderboard failed:', err.message); }
+    } catch (err) {
+      console.error(`[Panel] ${label} failed:`, err.message);
+    }
   }
 
-  // Earnings Leaderboard — one channel
-  const earnChId = process.env.EARNINGS_LEADERBOARD_CHANNEL_ID;
-  if (earnChId) {
-    try {
-      const ch = client.channels.cache.get(earnChId);
-      if (ch) {
-        const messages = await ch.messages.fetch({ limit: 20 });
-        for (const [, m] of messages) { if (m.author.id === client.user.id) try { await m.delete(); } catch { /* */ } }
-        const panel = await buildEarningsPanel('global', lang);
-        await ch.send(panel);
-        console.log(`[Panel] Posted earnings leaderboard (${lang})`);
-      }
-    } catch (err) { console.error('[Panel] Earnings leaderboard failed:', err.message); }
-  }
+  await _upsertPanel(
+    process.env.XP_LEADERBOARD_CHANNEL_ID,
+    () => buildXpPanel('global', 'season', null, lang),
+    'XP leaderboard',
+  );
+  await _upsertPanel(
+    process.env.EARNINGS_LEADERBOARD_CHANNEL_ID,
+    () => buildEarningsPanel('global', lang),
+    'earnings leaderboard',
+  );
 }
 
 // ─── Interaction Handlers ────────────────────────────────────────
