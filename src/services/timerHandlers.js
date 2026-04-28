@@ -211,6 +211,19 @@ function registerAll(client) {
     console.log(`[TimerHandler] match_inactivity: match ${matchId} auto-disputed after timeout`);
   });
 
+  // --- ticket_inactivity: referenceId is tickets.id ---
+  // Re-armed by every message in the ticket channel (see
+  // src/events/messageCreate.js _bumpTicketActivity). Fires after 7
+  // days of silence and auto-closes the ticket.
+  timerService.registerHandler('ticket_inactivity', async (ticketId) => {
+    try {
+      const { handleAutoClose } = require('../interactions/ticketClose');
+      await handleAutoClose(client, ticketId);
+    } catch (err) {
+      console.error(`[TimerHandler] ticket_inactivity ${ticketId} failed: ${err.message}`);
+    }
+  });
+
   // --- match_cleanup: referenceId is matchId ---
   // Fires 120s after a match resolves to delete the match category
   // and channels. DB-backed so a PM2 restart between resolveMatch and

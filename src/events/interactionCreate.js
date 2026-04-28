@@ -288,6 +288,10 @@ module.exports = {
           const { handleChallengeExtend } = require('../interactions/challengeExtend');
           return await handleChallengeExtend(interaction);
         }
+        if (id.startsWith('ticket_close_')) {
+          const { handleCloseButton } = require('../interactions/ticketClose');
+          return await handleCloseButton(interaction);
+        }
         // Teammate accept/decline buttons
         if (id.startsWith('teammate_')) {
           return await teammateResponse.handleButton(interaction);
@@ -463,6 +467,11 @@ module.exports = {
       // String select menus (leaderboard dropdowns + welcome master language picker + wallet language picker)
       if (interaction.isStringSelectMenu()) {
         const id = interaction.customId;
+        // Support ticket category select
+        if (id === 'support_open_ticket') {
+          const { handleCategorySelect } = require('../panels/supportPanel');
+          return await handleCategorySelect(interaction);
+        }
         // Queue captain vote select menu
         if (id.startsWith('queue_captain_vote_')) {
           return await queueService.handleQueueInteraction(interaction);

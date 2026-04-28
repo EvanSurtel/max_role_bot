@@ -32,6 +32,13 @@ module.exports = {
       if (message.author.bot) return;
       if (!message.guild) return;
 
+      // If the message lands in a ticket channel, re-arm the 7-day
+      // inactivity timer. Done early (before content checks) so even
+      // a "hi staff" with no slash command refreshes the timer.
+      _bumpTicketActivity(message).catch(err => {
+        console.warn('[MessageCreate] Ticket activity bump failed:', err.message);
+      });
+
       const content = (message.content || '').trim();
       if (!content) return;
 
@@ -156,6 +163,21 @@ async function handleRankPreview(message) {
       );
     }
   }
+}
+
+/**
+ * If the message is in an open ticket channel, cancel + re-arm the
+ * 7-day inactivity timer. Cheap channel→ticket lookup (indexed),
+ * silently no-op for non-ticket channels.
+ */
+async function _bumpTicketActivity(message) {
+  const ticketRepo = require('../database/repositories/ticketRepo');
+  const ticket = ticketRepo.findByChannelId(message.channel.id);
+  if (!ticket || ticket.status !== 'open') return;
+  const timerService = require('../services/timerService');
+  timerService.cancelTimersByReference('ticket_inactivity', ticket.id);
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  timerService.createTimer('ticket_inactivity', ticket.id, SEVEN_DAYS_MS);
 }
 
 async function handleRankCommand(message) {

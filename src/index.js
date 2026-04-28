@@ -183,6 +183,9 @@ client.once('ready', async () => {
     const { postWagerStatsPanel } = require('./panels/wagerStatsPanel');
     await postWagerStatsPanel(client, displayLang);
 
+    const { postSupportPanel } = require('./panels/supportPanel');
+    await postSupportPanel(client);
+
     const { postSeasonPanel } = require('./panels/seasonPanel');
     await postSeasonPanel(client, displayLang);
 
