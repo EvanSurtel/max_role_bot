@@ -132,14 +132,21 @@ async function postSeasonPanel(client, lang = 'en') {
 
   try {
     const messages = await channel.messages.fetch({ limit: 20 });
-    for (const [, m] of messages) {
-      if (m.author.id === client.user.id) {
-        try { await m.delete(); } catch { /* */ }
-      }
-    }
+    const botMessages = messages.filter(m => m.author.id === client.user.id);
+    const existing = botMessages.find(m => m.embeds.length > 0);
     const panel = buildSeasonPanel(lang);
-    await channel.send(panel);
-    console.log(`[Panel] Posted season management panel (${lang})`);
+
+    if (existing) {
+      for (const [, m] of botMessages) {
+        if (m.id !== existing.id) try { await m.delete(); } catch { /* */ }
+      }
+      await existing.edit(panel);
+      console.log(`[Panel] Updated existing season management panel (${lang})`);
+    } else {
+      for (const [, m] of botMessages) { try { await m.delete(); } catch { /* */ } }
+      await channel.send(panel);
+      console.log(`[Panel] Posted new season management panel (${lang})`);
+    }
   } catch (err) {
     console.error('[Panel] Failed to post season panel:', err.message);
   }
