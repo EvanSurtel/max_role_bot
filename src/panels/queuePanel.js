@@ -187,7 +187,7 @@ async function handleQueueButton(interaction) {
     const user = userRepo.findByDiscordId(discordId);
     if (!user || !user.accepted_tos) {
       return interaction.reply({
-        content: 'You need to register first. Head to the welcome channel and accept the Terms of Service.',
+        content: 'You need to register first. Head to **#welcome** and accept the Terms of Service.',
         ephemeral: true,
         _autoDeleteMs: 15_000,
       });

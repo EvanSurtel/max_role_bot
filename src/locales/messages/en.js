@@ -77,7 +77,7 @@ module.exports = {
   // notifications — bots can DM users who share a server with them, as long
   // as the user has DMs from server members enabled).
   deposit_dm: {
-    received: '💰 **Deposit received!**\n\nYou received **${amount} USDC**. Your new available balance is **${new_balance} USDC**.\n\nClick **View My Wallet** in the wallet channel to see the details.',
+    received: '💰 **Deposit received!**\n\nYou received **${amount} USDC**. Your new available balance is **${new_balance} USDC**.\n\nClick **View My Wallet** in **#my-wallet** to see the details.',
   },
 
   // Per-transaction DMs sent to the user. Each key matches a transaction
@@ -87,12 +87,12 @@ module.exports = {
   //   {to}        — destination address (formatted as inline code)
   //   {memo}      — short memo (varies per transaction)
   transaction_dm: {
-    deposit: '✅ **Deposit successful!**\n\nYou received **{amount} {currency}** in your wallet.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
-    withdrawal: '✅ **Withdrawal successful!**\n\nYou sent **{amount} {currency}** to {to}.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
+    deposit: '✅ **Deposit successful!**\n\nYou received **{amount} {currency}** in your wallet.\n\nClick **View My Wallet** in **#my-wallet** to see your updated balance.',
+    withdrawal: '✅ **Withdrawal successful!**\n\nYou sent **{amount} {currency}** to {to}.\n\nClick **View My Wallet** in **#my-wallet** to see your updated balance.',
     sol_withdrawal: '✅ **ETH withdrawal successful!**',
-    disbursement: '🏆 **Match winnings received!**\n\nYou received **{amount} {currency}** from your match.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
-    release: '🔓 **Match entry refunded**\n\n**{amount} {currency}** has been returned to your available balance.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
-    refund: '🔓 **Refund received**\n\nYou received **{amount} {currency}** as a refund.\n\nClick **View My Wallet** in the wallet channel to see your updated balance.',
+    disbursement: '🏆 **Match winnings received!**\n\nYou received **{amount} {currency}** from your match.\n\nClick **View My Wallet** in **#my-wallet** to see your updated balance.',
+    release: '🔓 **Match entry refunded**\n\n**{amount} {currency}** has been returned to your available balance.\n\nClick **View My Wallet** in **#my-wallet** to see your updated balance.',
+    refund: '🔓 **Refund received**\n\nYou received **{amount} {currency}** as a refund.\n\nClick **View My Wallet** in **#my-wallet** to see your updated balance.',
     escrow_in: '🔐 **Match entry confirmed**\n\nYour **{amount} {currency}** is now locked in for the match.\n\nGood luck!',
   },
 
@@ -228,7 +228,7 @@ module.exports = {
     complete_wallet_text: 'A USDC wallet has been created for you. Check {channel} to view your deposit address and manage funds.',
     complete_started_header: 'Getting Started',
     complete_started_1: 'Deposit **USDC** to your wallet address for cash matches',
-    complete_started_2: 'Head to the cash match lobby channel',
+    complete_started_2: 'Head to **#create-cash-match**',
     complete_started_3: 'Click **Create Cash Match** to challenge others or browse open challenges',
     complete_started_4: 'Check the **How It Works** channel if you need help',
     complete_good_luck: 'Good luck and have fun!',

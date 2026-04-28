@@ -398,7 +398,7 @@ async function handleButton(interaction) {
         } else {
           lines.push(
             '',
-            'Click **View My Wallet** in the wallet channel to set one up.',
+            'Click **View My Wallet** in **#my-wallet** to set one up.',
           );
         }
         return interaction.reply({

@@ -84,7 +84,7 @@ async function handleSendUserPick(interaction) {
   const recipientWallet = walletRepo.findByUserId(recipient.id);
   if (!recipientWallet) {
     return interaction.reply({
-      content: `<@${recipientDiscordId}> hasn't set up their wallet yet, so they don't have an address to receive USDC. Ask them to click **View My Wallet** in the wallet channel and finish setup.`,
+      content: `<@${recipientDiscordId}> hasn't set up their wallet yet, so they don't have an address to receive USDC. Ask them to click **View My Wallet** in **#my-wallet** and finish setup.`,
       ephemeral: true,
       _autoDeleteMs: 60_000,
     });
