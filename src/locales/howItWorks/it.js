@@ -12,7 +12,7 @@ module.exports = {
       '**1.** Vai in **#my-wallet** e clicca su **Vedi Il Mio Wallet**',
       '**2.** Clicca sul link di configurazione che il bot ti manda',
       '**3.** Inserisci la tua email e segui le istruzioni.',
-      '**4.** Scegli **il tuo limite di spesa giornaliero** ($50, $200 o $1.000)',
+      '**4.** Scegli **il tuo limite di spesa giornaliero** ($5, $20, $50, $200 o $1.000)',
       '  • È **il MASSIMO che vuoi mettere in partite con soldi** in un solo giorno',
       '  • Pensalo come un budget giornaliero che ti imposti tu',
       '  • Puoi alzarlo, abbassarlo o disattivarlo quando vuoi dal tuo wallet',

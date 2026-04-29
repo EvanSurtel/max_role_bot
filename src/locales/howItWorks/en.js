@@ -12,7 +12,7 @@ module.exports = {
       '**1.** Go to **#my-wallet** and click **View My Wallet**',
       '**2.** Click the setup link the bot sends you',
       '**3.** Enter your email and follow the prompts.',
-      '**4.** Pick **your daily spending limit** ($50, $200, or $1,000)',
+      '**4.** Pick **your daily spending limit** ($5, $20, $50, $200, or $1,000)',
       '  • This is the **most YOU want to put into cash matches** in any single day',
       '  • Think of it like a daily budget you set for yourself',
       '  • You can raise it, lower it, or turn it off anytime from your wallet',

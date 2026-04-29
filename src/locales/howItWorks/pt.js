@@ -12,7 +12,7 @@ module.exports = {
       '**1.** Vá a **#my-wallet** e clique em **Ver Minha Carteira**',
       '**2.** Clique no link de configuração que o bot te manda',
       '**3.** Digite seu email e siga as instruções.',
-      '**4.** Escolha **seu limite diário de gasto** ($50, $200 ou $1.000)',
+      '**4.** Escolha **seu limite diário de gasto** ($5, $20, $50, $200 ou $1.000)',
       '  • É **o MÁXIMO que você quer colocar em partidas com dinheiro** num único dia',
       '  • Pense como um orçamento diário que você mesmo se dá',
       '  • Você pode aumentar, diminuir ou desativar quando quiser pela sua carteira',

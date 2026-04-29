@@ -12,7 +12,7 @@ module.exports = {
       '**1.** Ve a **#my-wallet** y haz clic en **Ver Mi Billetera**',
       '**2.** Haz clic en el enlace de configuración que te envía el bot',
       '**3.** Ingresa tu correo y sigue las instrucciones.',
-      '**4.** Elige **tu límite diario de gasto** ($50, $200 o $1,000)',
+      '**4.** Elige **tu límite diario de gasto** ($5, $20, $50, $200 o $1,000)',
       '  • Es **lo MÁS que estás dispuesto a poner en partidas con dinero** en un solo día',
       '  • Piénsalo como un presupuesto diario que tú mismo te pones',
       '  • Puedes subirlo, bajarlo o desactivarlo cuando quieras desde tu billetera',

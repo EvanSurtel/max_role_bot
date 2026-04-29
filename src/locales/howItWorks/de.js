@@ -12,7 +12,7 @@ module.exports = {
       '**1.** Geh zu **#my-wallet** und klick auf **Meine Wallet Anzeigen**',
       '**2.** Klick den Setup-Link, den der Bot dir schickt',
       '**3.** Gib deine Email ein und folge den Anweisungen.',
-      '**4.** Wähle **dein tägliches Ausgabenlimit** ($50, $200 oder $1.000)',
+      '**4.** Wähle **dein tägliches Ausgabenlimit** ($5, $20, $50, $200 oder $1.000)',
       '  • Das ist der **Maximalbetrag, den du an einem Tag in Cash Matches stecken willst**',
       '  • Stell dir das wie ein tägliches Budget vor, das du dir setzt',
       '  • Du kannst es jederzeit über deine Wallet erhöhen, senken oder ausschalten',

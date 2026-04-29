@@ -65,8 +65,10 @@ type Status =
 type Limit = { usd: number; units: bigint; label: string };
 
 const LIMIT_PRESETS: Limit[] = [
-  { usd: 50, units: 50_000_000n, label: '$50 / day — casual' },
-  { usd: 200, units: 200_000_000n, label: '$200 / day — regular' },
+  { usd: 5, units: 5_000_000n, label: '$5 / day — try it out' },
+  { usd: 20, units: 20_000_000n, label: '$20 / day — casual' },
+  { usd: 50, units: 50_000_000n, label: '$50 / day — regular' },
+  { usd: 200, units: 200_000_000n, label: '$200 / day — serious' },
   { usd: 1000, units: 1_000_000_000n, label: '$1,000 / day — tournament' },
 ];
 

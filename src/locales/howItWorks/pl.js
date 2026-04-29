@@ -12,7 +12,7 @@ module.exports = {
       '**1.** Wejdź na **#my-wallet** i kliknij **Pokaż Mój Portfel**',
       '**2.** Kliknij link konfiguracyjny, który wyśle ci bot',
       '**3.** Wpisz email i postępuj zgodnie z instrukcjami.',
-      '**4.** Wybierz **swój dzienny limit wydatków** ($50, $200 lub $1000)',
+      '**4.** Wybierz **swój dzienny limit wydatków** ($5, $20, $50, $200 lub $1000)',
       '  • To **maksimum, ile chcesz włożyć w mecze** w jednym dniu',
       '  • Pomyśl o tym jak o dziennym budżecie ustawionym dla siebie',
       '  • Możesz go podnieść, obniżyć lub wyłączyć w każdej chwili z portfela',
