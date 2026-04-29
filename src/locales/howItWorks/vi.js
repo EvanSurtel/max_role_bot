@@ -11,7 +11,7 @@ module.exports = {
       '',
       '**1.** Vào **#my-wallet** và nhấn **Xem Ví Của Tôi**',
       '**2.** Nhấn link thiết lập bot gửi cho bạn',
-      '**3.** Trên trang mở ra, nhập email và làm theo hướng dẫn. Điện thoại hoặc máy tính của bạn sẽ tự động lo phần bảo mật.',
+      '**3.** Nhập email và làm theo hướng dẫn.',
       '**4.** Chọn **giới hạn chi tiêu hàng ngày** ($50, $200, hoặc $1.000)',
       '  • Đây là **mức tối đa BẠN sẵn lòng đặt vào cash match** trong một ngày',
       '  • Hãy xem nó như ngân sách hàng ngày bạn tự đặt',

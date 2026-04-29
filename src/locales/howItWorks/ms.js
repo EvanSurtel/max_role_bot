@@ -11,7 +11,7 @@ module.exports = {
       '',
       '**1.** Pergi ke **#my-wallet** dan klik **Tengok Wallet Saya**',
       '**2.** Klik link setup yang dihantar bot',
-      '**3.** Di halaman yang terbuka, masukkan email kamu dan ikut arahan. Telefon atau komputer kamu yang uruskan keselamatan secara automatik.',
+      '**3.** Masukkan email kamu dan ikut arahan.',
       '**4.** Pilih **had perbelanjaan harian kamu** ($50, $200, atau $1,000)',
       '  • Ini **maksimum yang KAMU sanggup masukkan ke cash match** dalam satu hari',
       '  • Anggap macam bajet harian yang kamu tetapkan sendiri',

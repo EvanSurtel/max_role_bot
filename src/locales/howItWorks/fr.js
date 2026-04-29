@@ -11,7 +11,7 @@ module.exports = {
       '',
       '**1.** Va dans **#my-wallet** et clique sur **Voir Mon Portefeuille**',
       '**2.** Clique sur le lien de configuration que le bot t\'envoie',
-      '**3.** Sur la page qui s\'ouvre, entre ton email et suis les instructions. Ton téléphone ou ordinateur s\'occupe de la sécurité automatiquement.',
+      '**3.** Entre ton email et suis les instructions.',
       '**4.** Choisis **ta limite quotidienne de dépense** ($50, $200 ou $1 000)',
       '  • C\'est **le MAX que tu veux mettre en matchs avec mise** sur une seule journée',
       '  • Vois ça comme un budget quotidien que tu te fixes',

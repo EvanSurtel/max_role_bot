@@ -11,7 +11,7 @@ module.exports = {
       '',
       '**1.** **#my-wallet**\'a git ve **Cüzdanımı Görüntüle**\'ye tıkla',
       '**2.** Botun gönderdiği kurulum linkine tıkla',
-      '**3.** Açılan sayfada email\'ini gir ve yönergeleri takip et. Telefonun veya bilgisayarın güvenliği otomatik olarak halleder.',
+      '**3.** Email\'ini gir ve yönergeleri takip et.',
       '**4.** **Günlük harcama limitini** seç ($50, $200 veya $1.000)',
       '  • Bu, herhangi bir günde **cash maçlara koymak istediğin EN ÇOK** miktardır',
       '  • Kendine koyduğun günlük bir bütçe gibi düşün',

@@ -11,7 +11,7 @@ module.exports = {
       '',
       '**1.** Ga naar **#my-wallet** en klik op **Bekijk Mijn Wallet**',
       '**2.** Klik op de setup-link die de bot je stuurt',
-      '**3.** Op de pagina die opent, vul je email in en volg de aanwijzingen. Je telefoon of computer regelt de beveiliging automatisch.',
+      '**3.** Vul je email in en volg de aanwijzingen.',
       '**4.** Kies **je dagelijkse uitgavenlimiet** ($50, $200 of $1.000)',
       '  • Dit is **het MEESTE dat je in cash matches wilt steken** op één dag',
       '  • Zie het als een dagelijks budget dat je jezelf geeft',
