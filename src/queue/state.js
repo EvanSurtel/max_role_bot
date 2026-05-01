@@ -23,7 +23,9 @@ function _newQueueMatch(id) {
     id,
     categoryId: null,
     textChannelId: null,
-    voiceChannelId: null,
+    voiceChannelId: null,            // lobby voice — deleted after captain pick
+    team1VoiceChannelId: null,       // created when teams are decided
+    team2VoiceChannelId: null,       // created when teams are decided
     players: new Map(),            // discordId → player object
     phase: 'WAITING_READY',
     ready: new Set(),              // discordIds who clicked Ready Up OR joined voice

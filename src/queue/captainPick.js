@@ -3,10 +3,170 @@
 // Depends on state.js for match/client access. Calls into roleSelect.js
 // after all picks are complete to begin the role selection phase.
 
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits } = require('discord.js');
 const QUEUE_CONFIG = require('../config/queueConfig');
 const userRepo = require('../database/repositories/userRepo');
 const { setClient, getMatch, save: saveMatch } = require('./state');
+
+/**
+ * Per-team voice channel permission overwrites — only members of
+ * THIS team can connect/speak. Other queue match participants can
+ * still see the channel exists (so they know where their opponents
+ * are) but can't join. Staff get full access for moderation.
+ */
+function _teamVoiceOverwrites(guild, teamPlayerDiscordIds, otherTeamDiscordIds) {
+  const overwrites = [
+    {
+      id: guild.id, // @everyone
+      deny: [PermissionFlagsBits.ViewChannel],
+    },
+    {
+      id: guild.client.user.id, // bot
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+        PermissionFlagsBits.MoveMembers,
+      ],
+    },
+  ];
+
+  // Team members: full join + speak.
+  for (const id of teamPlayerDiscordIds) {
+    overwrites.push({
+      id,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+      ],
+    });
+  }
+
+  // Opposing team: can SEE the channel exists (so the category looks
+  // complete, no mystery channels) but can't connect to listen in.
+  for (const id of otherTeamDiscordIds) {
+    overwrites.push({
+      id,
+      allow: [PermissionFlagsBits.ViewChannel],
+      deny: [PermissionFlagsBits.Connect, PermissionFlagsBits.Speak],
+    });
+  }
+
+  // Staff visibility + override
+  const staffRoles = [
+    process.env.WAGER_STAFF_ROLE_ID,
+    process.env.XP_STAFF_ROLE_ID,
+    process.env.ADMIN_ROLE_ID,
+    process.env.OWNER_ROLE_ID,
+    process.env.CEO_ROLE_ID,
+    process.env.ADS_ROLE_ID,
+  ].filter(Boolean);
+  for (const roleId of staffRoles) {
+    overwrites.push({
+      id: roleId,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+        PermissionFlagsBits.MoveMembers,
+      ],
+    });
+  }
+
+  return overwrites;
+}
+
+/**
+ * Create per-team voice channels under the match category, then
+ * delete the original lobby voice. Called from _advancePick when
+ * the snake-draft completes and team rosters are final.
+ *
+ * Stores match.team1VoiceChannelId + match.team2VoiceChannelId so
+ * later phases (and cleanup) can reference them.
+ */
+async function _createTeamVoiceChannels(match) {
+  const client = setClient();
+  if (!client) return;
+  const guild = client.guilds.cache.get(process.env.GUILD_ID);
+  if (!guild) return;
+
+  const team1Ids = [...match.players.values()].filter(p => p.team === 1).map(p => p.discordId);
+  const team2Ids = [...match.players.values()].filter(p => p.team === 2).map(p => p.discordId);
+
+  // Create both team voices in parallel — they're independent.
+  const [team1Voice, team2Voice] = await Promise.all([
+    guild.channels.create({
+      name: 'Team 1',
+      type: ChannelType.GuildVoice,
+      parent: match.categoryId,
+      permissionOverwrites: _teamVoiceOverwrites(guild, team1Ids, team2Ids),
+      reason: `Queue Match #${match.id} — Team 1 voice`,
+    }),
+    guild.channels.create({
+      name: 'Team 2',
+      type: ChannelType.GuildVoice,
+      parent: match.categoryId,
+      permissionOverwrites: _teamVoiceOverwrites(guild, team2Ids, team1Ids),
+      reason: `Queue Match #${match.id} — Team 2 voice`,
+    }),
+  ]);
+
+  match.team1VoiceChannelId = team1Voice.id;
+  match.team2VoiceChannelId = team2Voice.id;
+
+  // Move anyone currently in the lobby voice to their team voice.
+  // Best-effort; a player without Move Members perms (none of them
+  // do, but the bot might fail on hierarchy) just stays put — they
+  // can rejoin manually.
+  const lobby = client.channels.cache.get(match.voiceChannelId);
+  if (lobby && lobby.members) {
+    for (const [memberId, member] of lobby.members) {
+      const targetVoice = team1Ids.includes(memberId) ? team1Voice
+        : team2Ids.includes(memberId) ? team2Voice
+        : null;
+      if (targetVoice) {
+        try { await member.voice.setChannel(targetVoice); } catch (mvErr) {
+          console.warn(`[QueueService] Could not move ${memberId} to team voice: ${mvErr.message}`);
+        }
+      }
+    }
+  }
+
+  // Delete the original lobby voice. Save match BEFORE deletion so
+  // a restart mid-delete doesn't leave the activeMatches entry
+  // pointing at a now-dead channel.
+  const oldLobbyId = match.voiceChannelId;
+  match.voiceChannelId = null; // Mark unset BEFORE delete so cleanup knows it's gone
+  saveMatch(match);
+  try {
+    if (lobby) await lobby.delete(`Queue Match #${match.id} — lobby retired, teams split`);
+  } catch (delErr) {
+    console.warn(`[QueueService] Could not delete lobby voice ${oldLobbyId}: ${delErr.message}`);
+  }
+
+  // Tell the players in the text channel where their voice is.
+  try {
+    const tc = client.channels.cache.get(match.textChannelId);
+    if (tc) {
+      const team1Mentions = team1Ids.map(id => `<@${id}>`).join(' ');
+      const team2Mentions = team2Ids.map(id => `<@${id}>`).join(' ');
+      await tc.send({
+        content: [
+          '**Teams set — split into team voices:**',
+          `**Team 1** → <#${team1Voice.id}>`,
+          team1Mentions,
+          '',
+          `**Team 2** → <#${team2Voice.id}>`,
+          team2Mentions,
+        ].join('\n'),
+        allowedMentions: { users: [...team1Ids, ...team2Ids] },
+      });
+    }
+  } catch (notifyErr) {
+    console.warn(`[QueueService] team-voice notification failed for match #${match.id}: ${notifyErr.message}`);
+  }
+}
 
 /**
  * Begin pick phase. Random first pick; captains alternate (snake draft).
@@ -181,6 +341,17 @@ async function _advancePick(match) {
       delete match._pickMsg;
     }
     if (match.timer) { clearTimeout(match.timer); match.timer = null; }
+
+    // Teams are decided — split the lobby voice into per-team voices.
+    // Players can only join the team they're on. Original Queue Voice
+    // lobby gets deleted so it doesn't sit there confusing people.
+    try {
+      await _createTeamVoiceChannels(match);
+    } catch (splitErr) {
+      console.error(`[QueueService] team-voice split failed for match #${match.id}:`, splitErr.message);
+      // Don't block role-select on this — players just keep using the
+      // shared lobby. Operator sees the error in the log.
+    }
 
     // Lazy require to avoid circular dependency
     const { startRoleSelect } = require('./roleSelect');

@@ -77,7 +77,12 @@ function _queueChannelOverwrites(guild, playerDiscordIds) {
  */
 async function _cleanupMatchChannels(client, match) {
   const { activeMatches } = require('./state');
-  const channelIds = [match.textChannelId, match.voiceChannelId].filter(Boolean);
+  const channelIds = [
+    match.textChannelId,
+    match.voiceChannelId,        // lobby voice (likely already deleted post-pick)
+    match.team1VoiceChannelId,
+    match.team2VoiceChannelId,
+  ].filter(Boolean);
 
   for (const channelId of channelIds) {
     try {
