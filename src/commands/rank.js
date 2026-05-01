@@ -74,7 +74,17 @@ async function buildRankCard(targetUser, lang = 'en') {
   }
 
   const tierLocaleEntry = tRanks[tier.key] || {};
-  const rankName = tierLocaleEntry.name || tier.key.charAt(0).toUpperCase() + tier.key.slice(1);
+  const baseTierName = tierLocaleEntry.name || tier.key.charAt(0).toUpperCase() + tier.key.slice(1);
+
+  // Append sub-tier (I / II / III) for numeric tiers. Top 10 stays
+  // as the localized 'Top 10' name, no roman numeral.
+  let rankName = baseTierName;
+  if (!tier.topN) {
+    const { computeSubTier } = require('../utils/subTier');
+    const inTopN = position != null && position <= (crowned?.topN || 10);
+    const sub = computeSubTier(points, inTopN);
+    if (sub.subTier) rankName = `${baseTierName} ${['I', 'II', 'III'][sub.subTier - 1]}`;
+  }
 
   // Display name priority: server nickname > IGN > Discord username
   const displayName = user.server_username || user.cod_ign || targetUser.username;

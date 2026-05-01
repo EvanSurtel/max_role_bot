@@ -1,9 +1,10 @@
 // Rank role assignment.
 //
-// XP source of truth: local users.xp_points. Tier is derived directly
-// from RANK_TIERS in constants.js. Crowned is position-based — the top
-// N users by xp_points DESC, restricted to those who have crossed the
-// Obsidian threshold.
+// XP source of truth: local users.xp_points. Tier is derived from
+// RANK_TIERS in constants.js. Each numeric tier (Bronze .. Obsidian)
+// is split into 3 sub-tiers (I, II, III) by computeSubTier — the
+// granted Discord role matches the sub-tier exactly. Top 10 is
+// position-based, no sub-tier.
 //
 // Triggered from:
 //   - matchService.resolveMatch (every match participant, batched)
@@ -11,46 +12,30 @@
 //   - seasonPanel season end (every accepted-TOS user)
 //   - onboarding registration (new user)
 //
-// Role IDs: BRONZE_ROLE_ID .. CROWNED_ROLE_ID env vars. Missing
-// env vars are silently skipped.
+// Role lookup is BY NAME on the guild, not by env var. Operator
+// creates 22 Discord roles named exactly:
+//   Bronze I, Bronze II, Bronze III, Silver I .. Obsidian III, Top 10
+// (See src/utils/subTier.js allSubTierRoleNames for the canonical
+// list.) Missing roles are silently skipped — bot logs a warning so
+// operator can see if any are misnamed.
 
 const { RANK_TIERS } = require('../config/constants');
 const userRepo = require('../database/repositories/userRepo');
 const db = require('../database/db');
 const { langFor } = require('../locales/i18n');
 const { getLocale } = require('../locales');
-
-function _envVarNameFor(tierKey) {
-  return `${tierKey.toUpperCase()}_ROLE_ID`;
-}
-
-function _roleIdFor(tierKey) {
-  return process.env[_envVarNameFor(tierKey)] || null;
-}
-
-function _allConfiguredRankRoleIds() {
-  return RANK_TIERS.map(t => _roleIdFor(t.key)).filter(Boolean);
-}
-
-/**
- * Resolve the XP-based tier for a given XP amount. Walks RANK_TIERS
- * in order and returns the highest tier whose minXp floor the user
- * has crossed. Position-based tiers (e.g. Crowned with topN) are
- * skipped here — those are decided separately in syncRank().
- */
-function _tierForXp(xp) {
-  let match = RANK_TIERS[0];
-  for (const tier of RANK_TIERS) {
-    if (tier.topN) continue;
-    if (typeof tier.minXp === 'number' && tier.minXp <= xp) {
-      match = tier;
-    }
-  }
-  return match;
-}
+const { computeSubTier, allSubTierRoleNames, formatSubTierLocalized } = require('./subTier');
 
 function _positionBasedTier() {
   return RANK_TIERS.find(t => t.topN) || null;
+}
+
+/**
+ * Resolve a Discord role by exact name on the guild. Returns null
+ * if no role with that name exists.
+ */
+function _findRoleByName(guild, name) {
+  return guild.roles.cache.find(r => r.name === name) || null;
 }
 
 /**
@@ -87,60 +72,73 @@ async function syncRank(client, userId) {
       }
     } catch { /* ignore */ }
 
-    let targetTier = _tierForXp(userPoints);
-    if (crowned && inTopN) {
-      targetTier = crowned;
+    const target = computeSubTier(userPoints, inTopN);
+    const targetRole = _findRoleByName(guild, target.roleName);
+
+    // Build the set of every possible sub-tier role NAME on this
+    // server so we can strip stale ones after promotion/demotion
+    // (Bronze II → Bronze III, or Bronze III → Silver I).
+    const allRoleNames = new Set(allSubTierRoleNames());
+
+    // Detect the member's CURRENT sub-tier role BEFORE we mutate, so
+    // we can decide if this sync was a promotion or demotion (for
+    // the post-sync DM) and whether the TIER changed (Bronze → Silver
+    // — DM) vs just sub-tier changed within same tier (Bronze II →
+    // Bronze III — silent, no DM, just role swap).
+    let oldRoleName = null;
+    for (const r of member.roles.cache.values()) {
+      if (allRoleNames.has(r.name)) { oldRoleName = r.name; break; }
     }
+    const oldTierKey = oldRoleName ? _tierKeyFromRoleName(oldRoleName) : null;
 
-    const targetRoleId = _roleIdFor(targetTier.key);
-    const allRankRoleIds = _allConfiguredRankRoleIds();
-
-    // Detect the member's CURRENT rank tier BEFORE we mutate roles —
-    // we need this to decide if the sync results in a promotion or
-    // demotion (for the post-sync DM). Members only ever carry ONE
-    // rank role at a time (all others get stripped below), so the
-    // first match wins.
-    let oldTierKey = null;
-    for (const tier of RANK_TIERS) {
-      const roleId = _roleIdFor(tier.key);
-      if (roleId && member.roles.cache.has(roleId)) {
-        oldTierKey = tier.key;
-        break;
-      }
-    }
-
-    // Strip any other rank roles the member is carrying
-    for (const roleId of allRankRoleIds) {
-      if (roleId === targetRoleId) continue;
-      if (member.roles.cache.has(roleId)) {
-        await member.roles.remove(roleId).catch(err => {
-          console.warn(`[RankSync] Could not remove role ${roleId} from ${user.discord_id}: ${err.message}`);
+    // Strip any rank-tier role the member is carrying that isn't the
+    // target. Robust to a member somehow ending up with multiple
+    // sub-tier roles at once.
+    for (const r of [...member.roles.cache.values()]) {
+      if (allRoleNames.has(r.name) && r.id !== targetRole?.id) {
+        await member.roles.remove(r.id).catch(err => {
+          console.warn(`[RankSync] Could not remove role '${r.name}' from ${user.discord_id}: ${err.message}`);
         });
       }
     }
 
-    // Grant the target role if it's configured and not already held
+    // Grant the target role if it exists on the guild and isn't held.
     let roleGranted = false;
-    if (targetRoleId && !member.roles.cache.has(targetRoleId)) {
-      await member.roles.add(targetRoleId).then(() => { roleGranted = true; }).catch(err => {
-        console.warn(`[RankSync] Could not add role ${targetRoleId} to ${user.discord_id}: ${err.message}`);
-      });
-    } else if (!targetRoleId) {
-      console.log(`[RankSync] ${_envVarNameFor(targetTier.key)} not set — skipping grant for ${user.discord_id}`);
+    if (targetRole) {
+      if (!member.roles.cache.has(targetRole.id)) {
+        await member.roles.add(targetRole.id).then(() => { roleGranted = true; }).catch(err => {
+          console.warn(`[RankSync] Could not add role '${targetRole.name}' to ${user.discord_id}: ${err.message}`);
+        });
+      }
+    } else {
+      console.log(`[RankSync] No Discord role named '${target.roleName}' on the guild — skipping grant for ${user.discord_id}. Operator needs to create the role with that exact name.`);
     }
 
-    // DM the user on rank change. Only fires when the member had a
-    // PREVIOUS rank role (so first-time onboarding doesn't spam a DM
-    // saying "you promoted to Bronze") and the tier key actually
-    // changed. Uses buildRankCard for identical output to /rank.
-    if (roleGranted && oldTierKey && oldTierKey !== targetTier.key) {
-      _notifyRankChange(member, oldTierKey, targetTier.key).catch(err => {
+    // DM the user only on TIER promotion/demotion (Bronze → Silver),
+    // not on sub-tier movement within the same tier (Bronze II →
+    // Bronze III). Avoids DMing 3x more often than before. First-time
+    // role grant (oldTierKey == null) skipped — onboarding handles
+    // welcoming.
+    if (roleGranted && oldTierKey && oldTierKey !== target.tierKey) {
+      _notifyRankChange(member, oldTierKey, target.tierKey).catch(err => {
         console.warn(`[RankSync] DM to ${user.discord_id} failed: ${err.message}`);
       });
     }
   } catch (err) {
     console.error(`[RankSync] Error syncing rank for user ${userId}: ${err.message}`);
   }
+}
+
+/**
+ * Reverse-map a sub-tier role name (e.g. 'Bronze II') back to its
+ * RANK_TIERS key. Used to detect tier changes for DM logic.
+ */
+function _tierKeyFromRoleName(roleName) {
+  if (roleName === 'Top 10') return 'crowned';
+  // Strip the trailing roman numeral.
+  const base = roleName.replace(/\s+(I{1,3})$/, '').toLowerCase();
+  const tier = RANK_TIERS.find(t => t.key === base);
+  return tier ? tier.key : null;
 }
 
 /**

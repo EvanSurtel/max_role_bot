@@ -1,7 +1,7 @@
 module.exports = {
   intro: {
     title: '🏆 Ranks',
-    description: 'Ranks are based on your **season XP**. Here are the eight tiers:',
+    description: 'Ranks are based on your **season XP**. Each tier (Bronze through Obsidian) is split into **3 sub-ranks: I, II, III** within its XP band. The role you get on Discord matches your exact sub-rank. Top 10 is position-based — the top 10 players past Obsidian on the season leaderboard, no sub-ranks.\n\nHere are the eight tiers:',
   },
 
   rank_title: '{name} — {range}',

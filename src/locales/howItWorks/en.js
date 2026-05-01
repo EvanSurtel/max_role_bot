@@ -102,7 +102,7 @@ module.exports = {
       '• $100 cash match win: +2,000 XP',
       '• Cash match loss: 0 XP penalty (you already lost money)',
       '',
-      '**Ranks** go from Bronze → Silver → Gold → Platinum → Diamond → Sentinel → Obsidian → Top 10',
+      '**Ranks** go from Bronze → Silver → Gold → Platinum → Diamond → Sentinel → Obsidian → Top 10. Each tier (except Top 10) has 3 sub-ranks: I, II, III.',
       '',
       'Every season, XP resets to 500 and everyone starts fresh.',
     ].join('\n'),
