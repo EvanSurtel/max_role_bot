@@ -102,7 +102,7 @@ function buildQueuePanel(lang = 'en') {
   for (let i = 0; i < 4; i++) lines.push(SPACER);
 
   const embed = new EmbedBuilder()
-    .setTitle('5v5 Ranked Queue — Hardpoint | Bo3')
+    .setTitle('5v5 Ranked XP Queue — Hardpoint | Bo3')
     .setColor(0x3498db)
     .setDescription(lines.join('\n'))
     .setTimestamp();
