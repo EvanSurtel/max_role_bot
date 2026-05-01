@@ -143,8 +143,8 @@ const XP_MATCH = {
 
 // Wager XP rewards (scaled by wager amount)
 const XP_WAGER = {
-  MIN_XP: 100,      // XP for $0.50 wager win
-  MAX_XP: 1000,     // XP for $100 wager win
+  MIN_XP: 200,      // XP for $0.50 wager win
+  MAX_XP: 2000,     // XP for $100 wager win
   MIN_WAGER: 0.50,  // Minimum wager in USDC
   MAX_WAGER: 100,   // Maximum wager in USDC
   LOSS_XP: 0,       // No penalty for losing a wager

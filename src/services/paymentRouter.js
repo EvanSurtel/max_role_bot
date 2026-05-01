@@ -216,17 +216,23 @@ function getOfframpOptions({ country, amountUsdc }) {
     primary: true,
   });
 
-  // Bitrefill — spend USDC directly on gift cards. No ID needed up to
-  // ~$500 per guest order. For users who want to skip the bank/KYC
-  // step entirely.
-  options.push({
-    provider: 'bitrefill',
-    label: 'Spend on Gift Cards (no ID)',
-    description: 'Amazon, Steam, Apple, Uber, 1,000+ brands. No ID needed for guest orders up to ~$500. Effective fee 0–3% depending on brand — the gift-card markup is Bitrefill\'s, not Rank $.',
-    feePctEstimate: 0.015,
-    kycRequired: 'none',
-    primary: false,
-  });
+  // Bitrefill / gift-card cash-out is DISABLED (2026-05-01) — operator
+  // call. We're using Coinbase Offramp as the only cash-out route so
+  // the UX is one button, not a "pick your provider" menu, and so all
+  // KYC/AML lives at Coinbase. Code path preserved (handler in
+  // wallet/cashOut.js still works) so this is a one-line revert if we
+  // ever want to re-enable: flip BITREFILL_ENABLED to true.
+  const BITREFILL_ENABLED = false;
+  if (BITREFILL_ENABLED) {
+    options.push({
+      provider: 'bitrefill',
+      label: 'Spend on Gift Cards (no ID)',
+      description: 'Amazon, Steam, Apple, Uber, 1,000+ brands. No ID needed for guest orders up to ~$500. Effective fee 0–3% depending on brand — the gift-card markup is Bitrefill\'s, not Rank $.',
+      feePctEstimate: 0.015,
+      kycRequired: 'none',
+      primary: false,
+    });
+  }
 
   return options;
 }
