@@ -26,6 +26,11 @@ async function handleQueueInteraction(interaction) {
   const id = interaction.customId;
   const _client = setClient(interaction.client);
 
+  // ── Ready Up button (queue match start) ─────────────────────
+  if (id.startsWith('queue_ready_')) {
+    return await _handleReadyUpButton(interaction);
+  }
+
   // ── Captain vote select menu ────────────────────────────────
   if (id.startsWith('queue_captain_vote_')) {
     return await _handleCaptainVoteSelect(interaction);
@@ -91,6 +96,34 @@ async function handleQueueInteraction(interaction) {
 }
 
 // ── Captain Vote Select Menu handler ──────────────────────────
+/**
+ * Ready Up button — customId: queue_ready_{matchId}
+ *
+ * Marks the clicker as ready in match.ready (idempotent). If the
+ * click hits 10/10, markPlayerReady advances directly to captain
+ * vote and clears the inactivity timeout.
+ */
+async function _handleReadyUpButton(interaction) {
+  const matchId = parseInt(interaction.customId.replace('queue_ready_', ''), 10);
+  const match = [...activeMatches.values()].find(m => m.id === matchId);
+  if (!match) {
+    return interaction.reply({ content: 'Match not found.', ephemeral: true, _autoDeleteMs: 10_000 });
+  }
+  if (match.phase !== 'WAITING_READY') {
+    return interaction.reply({ content: 'Match has already started.', ephemeral: true, _autoDeleteMs: 10_000 });
+  }
+  if (!match.players.has(interaction.user.id)) {
+    return interaction.reply({ content: 'You\'re not in this queue match.', ephemeral: true, _autoDeleteMs: 10_000 });
+  }
+  if (match.ready.has(interaction.user.id)) {
+    return interaction.reply({ content: 'You\'re already ready.', ephemeral: true, _autoDeleteMs: 5_000 });
+  }
+
+  const { markPlayerReady } = require('./matchLifecycle');
+  await markPlayerReady(interaction.client, match, interaction.user.id);
+  return interaction.reply({ content: '✅ You\'re ready!', ephemeral: true, _autoDeleteMs: 5_000 });
+}
+
 async function _handleCaptainVoteSelect(interaction) {
   // customId: queue_captain_vote_{matchId}
   const parts = interaction.customId.split('_');
@@ -720,7 +753,7 @@ async function _handleDqSelectButton(interaction) {
   } else {
     replacementMsg = '\nNo replacement available in the queue.';
     // If we're in early phases and down to <10 players with no replacement, cancel
-    if (match.players.size < QUEUE_CONFIG.TOTAL_PLAYERS && ['WAITING_VOICE', 'CAPTAIN_VOTE', 'CAPTAIN_PICK'].includes(match.phase)) {
+    if (match.players.size < QUEUE_CONFIG.TOTAL_PLAYERS && ['WAITING_READY', 'WAITING_VOICE', 'CAPTAIN_VOTE', 'CAPTAIN_PICK'].includes(match.phase)) {
       const { cancelMatch } = require('./matchLifecycle');
       await cancelMatch(interaction.client, match, `DQ left match with fewer than ${QUEUE_CONFIG.TOTAL_PLAYERS} players and no replacement available`);
       replacementMsg += ' **Match cancelled due to insufficient players.**';

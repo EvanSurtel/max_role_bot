@@ -19,6 +19,99 @@ const {
 const { _queueChannelOverwrites, _cleanupMatchChannels, findClosestXpReplacement } = require('./helpers');
 
 /**
+ * Build the Ready Up panel for the queue match. Edited in place as
+ * players ready up — never re-posted, so the ping (separate message
+ * above this one) doesn't re-fire.
+ *
+ * @param {object} match — The QueueMatch object.
+ * @param {string} voiceChannelId — The lobby voice channel id (for
+ *   the "Lobby:" line).
+ * @param {string} timeoutMinutes — Minutes until inactive removal.
+ */
+function _buildReadyUpPayload(match, voiceChannelId, timeoutMinutes) {
+  const all = [...match.players.keys()];
+  const ready = all.filter(id => match.ready.has(id));
+  const readyLine = ready.length > 0
+    ? ready.map(id => `<@${id}>`).join(', ')
+    : '_No one ready yet._';
+  const allReady = ready.length === QUEUE_CONFIG.TOTAL_PLAYERS;
+
+  const embed = new EmbedBuilder()
+    .setTitle(`Queue Match #${match.id}`)
+    .setColor(allReady ? 0x2ecc71 : 0x3498db)
+    .setDescription([
+      `**Ready Players: ${ready.length}/${QUEUE_CONFIG.TOTAL_PLAYERS}**`,
+      readyLine,
+      '',
+      `Lobby voice: <#${voiceChannelId}>`,
+      `Mode: **Hardpoint** | Series: **Bo${QUEUE_CONFIG.SERIES_LENGTH}** | Teams: **${QUEUE_CONFIG.TEAM_SIZE}v${QUEUE_CONFIG.TEAM_SIZE}**`,
+      '',
+      allReady
+        ? '_All ready — match starting now._'
+        : `_Inactive players will be removed or replaced in **${timeoutMinutes} minutes** (-${QUEUE_CONFIG.NO_SHOW_PENALTY} XP)._`,
+    ].join('\n'));
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`queue_ready_${match.id}`)
+      .setLabel(allReady ? 'Match Starting…' : 'Ready Up!')
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(allReady),
+  );
+
+  return { embeds: [embed], components: allReady ? [] : [row] };
+}
+
+/**
+ * Mark a player ready (idempotent). Triggered by the Ready Up button
+ * AND by joining the lobby voice channel — both paths call this. If
+ * the queue match has just hit 10 ready, clears the timeout and
+ * advances to the captain-vote phase immediately.
+ *
+ * @param {import('discord.js').Client} client
+ * @param {object} match
+ * @param {string} discordId
+ * @returns {Promise<{wasNew: boolean, allReady: boolean}>}
+ */
+async function markPlayerReady(client, match, discordId) {
+  if (match.phase !== 'WAITING_READY') return { wasNew: false, allReady: false };
+  if (!match.players.has(discordId)) return { wasNew: false, allReady: false };
+  if (match.ready.has(discordId)) return { wasNew: false, allReady: false };
+
+  match.ready.add(discordId);
+  saveMatch(match);
+
+  // Edit the Ready Up panel in place to reflect the new count.
+  try {
+    const tc = client.channels.cache.get(match.textChannelId);
+    if (tc && match.readyMessageId) {
+      const msg = await tc.messages.fetch(match.readyMessageId).catch(() => null);
+      if (msg) {
+        const timeoutMinutes = (QUEUE_CONFIG.VOICE_JOIN_TIMEOUT / 60_000).toFixed(1);
+        await msg.edit(_buildReadyUpPayload(match, match.voiceChannelId, timeoutMinutes));
+      }
+    }
+  } catch (err) {
+    console.warn(`[QueueService] Could not update ready panel for match #${match.id}: ${err.message}`);
+  }
+
+  const allReady = match.ready.size === QUEUE_CONFIG.TOTAL_PLAYERS;
+  if (allReady) {
+    // All 10 ready before the timer fired — clear timeout and
+    // advance straight to captain vote (skipping the inactivity
+    // sweep entirely).
+    if (match.timer) { clearTimeout(match.timer); match.timer = null; }
+    try {
+      const { startCaptainVote } = require('./captainVote');
+      await startCaptainVote(match, client);
+    } catch (err) {
+      console.error(`[QueueService] startCaptainVote on all-ready failed for match #${match.id}:`, err.message);
+    }
+  }
+  return { wasNew: true, allReady };
+}
+
+/**
  * Pop 10 players from the queue, create Discord channels, and start
  * the voice-join countdown. Called automatically when queue size hits
  * TOTAL_PLAYERS.
@@ -142,26 +235,28 @@ async function createMatch(client, guild) {
     console.warn(`[Queue] resetPingState failed (non-fatal): ${resetErr.message}`);
   }
 
-  // ── Ping players ─────────────────────────────────────────────
+  // ── Ping players + post the Ready Up panel ──────────────────
+  // Ping line is content (so Discord pings actually fire); the
+  // Ready Up panel is a separate follow-up that we edit in place
+  // as players ready up. Splitting them keeps the ping from
+  // re-firing on every panel edit.
   const mentions = allDiscordIds.map(id => `<@${id}>`).join(' ');
   const timeoutMinutes = (QUEUE_CONFIG.VOICE_JOIN_TIMEOUT / 60_000).toFixed(1);
 
-  const embed = new EmbedBuilder()
-    .setTitle(`Queue Match #${match.id} — Join Voice`)
-    .setColor(0x3498db)
-    .setDescription([
-      `${mentions}`,
-      '',
-      `**Your ranked match is ready!**`,
-      `Join the voice channel within **${timeoutMinutes} minutes** or receive a **-${QUEUE_CONFIG.NO_SHOW_PENALTY} XP** penalty.`,
-      '',
-      `Mode: **Hardpoint** | Series: **Bo${QUEUE_CONFIG.SERIES_LENGTH}** | Teams: **${QUEUE_CONFIG.TEAM_SIZE}v${QUEUE_CONFIG.TEAM_SIZE}**`,
-    ].join('\n'))
-    .setTimestamp();
+  await textChannel.send({
+    content: `${mentions}\n**Your ranked match is ready!** Click **Ready Up!** below or join the voice channel.`,
+    allowedMentions: { users: allDiscordIds },
+  });
 
-  await textChannel.send({ embeds: [embed] });
+  const readyMsg = await textChannel.send(_buildReadyUpPayload(match, voiceChannel.id, timeoutMinutes));
+  match.readyMessageId = readyMsg.id;
+  saveMatch(match);
 
-  // ── Voice join timer ─────────────────────────────────────────
+  // ── Ready-up timer ──────────────────────────────────────────
+  // Same timeout window as before. Anyone NOT marked ready (no
+  // button click + not in voice) when this fires gets the no-show
+  // penalty + replacement attempt. If all 10 ready up before the
+  // timer, the click handler clears it and advances directly.
   match.timerDeadline = Date.now() + QUEUE_CONFIG.VOICE_JOIN_TIMEOUT;
   match.timer = setTimeout(async () => {
     try {
@@ -191,23 +286,25 @@ async function createMatch(client, guild) {
  * @returns {Promise<void>}
  */
 async function handleNoShows(client, match) {
-  if (match.phase !== 'WAITING_VOICE') return;
+  if (match.phase !== 'WAITING_READY') return;
 
   const voiceChannel = client.channels.cache.get(match.voiceChannelId);
   const textChannel = client.channels.cache.get(match.textChannelId);
   if (!textChannel) return;
 
-  // Determine who is in voice
-  const inVoice = new Set();
+  // Final pass — anyone in voice that hasn't been auto-marked
+  // ready yet (e.g. they joined before the listener registered
+  // them) gets credit. After that, "ready" set is the source of
+  // truth: clicked Ready Up OR joined voice both count.
   if (voiceChannel && voiceChannel.members) {
     for (const [memberId] of voiceChannel.members) {
-      if (match.players.has(memberId)) inVoice.add(memberId);
+      if (match.players.has(memberId)) match.ready.add(memberId);
     }
   }
 
   const allPlayerIds = [...match.players.keys()];
-  const noShows = allPlayerIds.filter(id => !inVoice.has(id));
-  const showed = allPlayerIds.filter(id => inVoice.has(id));
+  const noShows = allPlayerIds.filter(id => !match.ready.has(id));
+  const showed = allPlayerIds.filter(id => match.ready.has(id));
 
   if (noShows.length === 0) {
     // Everyone showed up — proceed to captain vote
@@ -584,5 +681,6 @@ module.exports = {
   handleNoShows,
   resolveMatch,
   cancelMatch,
+  markPlayerReady,
   _postCancelWithRejoinWindow,
 };

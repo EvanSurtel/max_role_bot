@@ -25,7 +25,9 @@ function _newQueueMatch(id) {
     textChannelId: null,
     voiceChannelId: null,
     players: new Map(),            // discordId → player object
-    phase: 'WAITING_VOICE',
+    phase: 'WAITING_READY',
+    ready: new Set(),              // discordIds who clicked Ready Up OR joined voice
+    readyMessageId: null,           // message id of the ping/ready-up post for in-place edits
     captainVotes: new Map(),       // voter → votedFor
     captains: { team1: null, team2: null },
     pickOrder: [],
