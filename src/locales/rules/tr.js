@@ -7,7 +7,7 @@ module.exports = {
   gameSettings: {
     title: 'Oyun Ayarları',
     fields: [
-      { name: 'Hardpoint', value: 'Skor limiti: 250\nSüre limiti: 600s\nMapler: Summit, Hacienda, Combine, Takeoff, Arsenal' },
+      { name: 'Hardpoint', value: 'Skor limiti: 250\nSüre limiti: 600s\nMapler: Summit, Hacienda, Combine, Takeoff (Arsenal: currently out of rotation until door bugs are resolved)' },
       { name: 'Search & Destroy', value: 'Round kazanma limiti: 9\nRound süre limiti: 120s\nUzatma: Var (20 round)\nMapler: Tunisia, Firing Range, Slums, Meltdown, Coastal' },
       { name: 'Control', value: 'Skor limiti: 3\nSüre limiti: 90s\nMapler: Raid, Standoff, Crossroads Strike' },
     ],

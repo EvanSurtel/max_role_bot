@@ -7,7 +7,7 @@ module.exports = {
   gameSettings: {
     title: 'ゲーム設定',
     fields: [
-      { name: 'Hardpoint', value: 'スコア上限: 250\n時間制限: 600秒\nマップ: Summit, Hacienda, Combine, Takeoff, Arsenal' },
+      { name: 'Hardpoint', value: 'スコア上限: 250\n時間制限: 600秒\nマップ: Summit, Hacienda, Combine, Takeoff (Arsenal: currently out of rotation until door bugs are resolved)' },
       { name: 'Search & Destroy', value: 'ラウンド勝利数: 9\nラウンド時間制限: 120秒\nオーバータイム: あり(20ラウンド)\nマップ: Tunisia, Firing Range, Slums, Meltdown, Coastal' },
       { name: 'Control', value: 'スコア上限: 3\n時間制限: 90秒\nマップ: Raid, Standoff, Crossroads Strike' },
     ],

@@ -7,7 +7,7 @@ module.exports = {
   gameSettings: {
     title: 'Game Instellingen',
     fields: [
-      { name: 'Hardpoint', value: 'Score Limiet: 250\nTijd Limiet: 600s\nMaps: Summit, Hacienda, Combine, Takeoff, Arsenal' },
+      { name: 'Hardpoint', value: 'Score Limiet: 250\nTijd Limiet: 600s\nMaps: Summit, Hacienda, Combine, Takeoff (Arsenal: currently out of rotation until door bugs are resolved)' },
       { name: 'Search & Destroy', value: 'Rondes om te winnen: 9\nRonde Tijd Limiet: 120s\nOvertime: Ja (20 rondes)\nMaps: Tunisia, Firing Range, Slums, Meltdown, Coastal' },
       { name: 'Control', value: 'Score Limiet: 3\nTijd Limiet: 90s\nMaps: Raid, Standoff, Crossroads Strike' },
     ],

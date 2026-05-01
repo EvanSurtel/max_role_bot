@@ -7,7 +7,7 @@ module.exports = {
   gameSettings: {
     title: 'Настройки Игры',
     fields: [
-      { name: 'Hardpoint', value: 'Лимит очков: 250\nЛимит времени: 600с\nКарты: Summit, Hacienda, Combine, Takeoff, Arsenal' },
+      { name: 'Hardpoint', value: 'Лимит очков: 250\nЛимит времени: 600с\nКарты: Summit, Hacienda, Combine, Takeoff (Arsenal: currently out of rotation until door bugs are resolved)' },
       { name: 'Search & Destroy', value: 'Раундов до победы: 9\nВремя раунда: 120с\nОвертайм: Да (20 раундов)\nКарты: Tunisia, Firing Range, Slums, Meltdown, Coastal' },
       { name: 'Control', value: 'Лимит очков: 3\nЛимит времени: 90с\nКарты: Raid, Standoff, Crossroads Strike' },
     ],

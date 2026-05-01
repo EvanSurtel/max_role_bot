@@ -17,7 +17,10 @@ const GAME_MODES = {
 
 // Map pools per game mode
 const MAP_POOLS = {
-  HP: ['Summit', 'Hacienda', 'Combine', 'Takeoff', 'Arsenal'],
+  // Arsenal is temporarily OUT of rotation due to unresolved door
+  // collision bugs in CODM. Re-add the string when CMG / Activision
+  // ship a fix.
+  HP: ['Summit', 'Hacienda', 'Combine', 'Takeoff'],
   'S&D': ['Tunisia', 'Firing Range', 'Slums', 'Meltdown', 'Coastal'],
   CTRL: ['Raid', 'Standoff', 'Crossroads Strike'],
 };

@@ -7,7 +7,7 @@ module.exports = {
   gameSettings: {
     title: 'Impostazioni di Gioco',
     fields: [
-      { name: 'Hardpoint', value: 'Limite punti: 250\nTempo limite: 600s\nMappe: Summit, Hacienda, Combine, Takeoff, Arsenal' },
+      { name: 'Hardpoint', value: 'Limite punti: 250\nTempo limite: 600s\nMappe: Summit, Hacienda, Combine, Takeoff (Arsenal: currently out of rotation until door bugs are resolved)' },
       { name: 'Search & Destroy', value: 'Round per vincere: 9\nTempo per round: 120s\nOvertime: Sì (20 round)\nMappe: Tunisia, Firing Range, Slums, Meltdown, Coastal' },
       { name: 'Control', value: 'Limite punti: 3\nTempo limite: 90s\nMappe: Raid, Standoff, Crossroads Strike' },
     ],

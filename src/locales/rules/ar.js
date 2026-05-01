@@ -7,7 +7,7 @@ module.exports = {
   gameSettings: {
     title: 'إعدادات اللعبة',
     fields: [
-      { name: 'Hardpoint', value: 'حد النقاط: 250\nحد الوقت: 600s\nالخرائط: Summit, Hacienda, Combine, Takeoff, Arsenal' },
+      { name: 'Hardpoint', value: 'حد النقاط: 250\nحد الوقت: 600s\nالخرائط: Summit, Hacienda, Combine, Takeoff (Arsenal: currently out of rotation until door bugs are resolved)' },
       { name: 'Search & Destroy', value: 'حد الجولات للفوز: 9\nحد وقت الجولة: 120s\nوقت إضافي: نعم (20 جولة)\nالخرائط: Tunisia, Firing Range, Slums, Meltdown, Coastal' },
       { name: 'Control', value: 'حد النقاط: 3\nحد الوقت: 90s\nالخرائط: Raid, Standoff, Crossroads Strike' },
     ],
