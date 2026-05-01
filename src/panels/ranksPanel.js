@@ -70,7 +70,26 @@ function buildRanksPanel(lang = 'en', { withThumbnails = true } = {}) {
     const embed = new EmbedBuilder()
       .setTitle(titleLine)
       .setColor(tier.color);
-    if (locale.blurb) embed.setDescription(locale.blurb);
+
+    // Build the description: the locale's blurb (if any), plus a
+    // sub-rank breakdown for tiers that have I / II / III splits.
+    // Obsidian + Top 10 are flat tiers — they get just the blurb.
+    const descParts = [];
+    if (locale.blurb) descParts.push(locale.blurb);
+
+    if (!tier.topN && tier.key !== 'obsidian' && next && typeof next.minXp === 'number') {
+      const bandWidth = next.minXp - tier.minXp;
+      const sub = bandWidth / 3;
+      const fmt = (n) => Math.round(n).toLocaleString('en-US');
+      descParts.push([
+        '',
+        `**${locale.name} I** — ${fmt(tier.minXp)}–${fmt(tier.minXp + sub - 1)} XP`,
+        `**${locale.name} II** — ${fmt(tier.minXp + sub)}–${fmt(tier.minXp + sub * 2 - 1)} XP`,
+        `**${locale.name} III** — ${fmt(tier.minXp + sub * 2)}–${fmt(next.minXp - 1)} XP`,
+      ].join('\n'));
+    }
+
+    if (descParts.length > 0) embed.setDescription(descParts.join('\n'));
 
     if (withThumbnails && tier.emblem) {
       const emblemPath = path.join(ASSETS_DIR, tier.emblem);
