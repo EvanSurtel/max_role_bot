@@ -1,10 +1,10 @@
 // Rank role assignment.
 //
 // XP source of truth: local users.xp_points. Tier is derived from
-// RANK_TIERS in constants.js. Each numeric tier (Bronze .. Obsidian)
+// RANK_TIERS in constants.js. Each numeric tier (Bronze .. Sentinel)
 // is split into 3 sub-tiers (I, II, III) by computeSubTier — the
-// granted Discord role matches the sub-tier exactly. Top 10 is
-// position-based, no sub-tier.
+// granted Discord role matches the sub-tier exactly. Obsidian and
+// Top 10 are flat (no sub-tier).
 //
 // Triggered from:
 //   - matchService.resolveMatch (every match participant, batched)
@@ -12,30 +12,33 @@
 //   - seasonPanel season end (every accepted-TOS user)
 //   - onboarding registration (new user)
 //
-// Role lookup is BY NAME on the guild, not by env var. Operator
-// creates 22 Discord roles named exactly:
-//   Bronze I, Bronze II, Bronze III, Silver I .. Obsidian III, Top 10
-// (See src/utils/subTier.js allSubTierRoleNames for the canonical
-// list.) Missing roles are silently skipped — bot logs a warning so
-// operator can see if any are misnamed.
+// Role IDs come from .env vars (see src/utils/subTier.js for the full
+// naming list — BRONZE_I_ROLE_ID, OBSIDIAN_ROLE_ID, TOP_10_ROLE_ID,
+// etc.). Missing env vars / unknown role IDs are silently skipped.
 
 const { RANK_TIERS } = require('../config/constants');
 const userRepo = require('../database/repositories/userRepo');
 const db = require('../database/db');
 const { langFor } = require('../locales/i18n');
 const { getLocale } = require('../locales');
-const { computeSubTier, allSubTierRoleNames, formatSubTierLocalized } = require('./subTier');
+const {
+  computeSubTier,
+  allSubTierEnvVarNames,
+  roleIdForSubTier,
+} = require('./subTier');
 
 function _positionBasedTier() {
   return RANK_TIERS.find(t => t.topN) || null;
 }
 
 /**
- * Resolve a Discord role by exact name on the guild. Returns null
- * if no role with that name exists.
+ * Every configured rank-role ID across every sub-tier env var.
+ * Filters out unset / blank vars.
  */
-function _findRoleByName(guild, name) {
-  return guild.roles.cache.find(r => r.name === name) || null;
+function _allConfiguredRankRoleIds() {
+  return allSubTierEnvVarNames()
+    .map(v => process.env[v])
+    .filter(Boolean);
 }
 
 /**
@@ -73,52 +76,49 @@ async function syncRank(client, userId) {
     } catch { /* ignore */ }
 
     const target = computeSubTier(userPoints, inTopN);
-    const targetRole = _findRoleByName(guild, target.roleName);
+    const targetRoleId = roleIdForSubTier(target);
 
-    // Build the set of every possible sub-tier role NAME on this
-    // server so we can strip stale ones after promotion/demotion
-    // (Bronze II → Bronze III, or Bronze III → Silver I).
-    const allRoleNames = new Set(allSubTierRoleNames());
+    // Every configured rank-role ID across every sub-tier. Used to
+    // strip stale roles after promotion/demotion (Bronze II → III,
+    // or Bronze III → Silver I, etc.).
+    const allRankRoleIds = new Set(_allConfiguredRankRoleIds());
 
-    // Detect the member's CURRENT sub-tier role BEFORE we mutate, so
-    // we can decide if this sync was a promotion or demotion (for
-    // the post-sync DM) and whether the TIER changed (Bronze → Silver
-    // — DM) vs just sub-tier changed within same tier (Bronze II →
-    // Bronze III — silent, no DM, just role swap).
-    let oldRoleName = null;
+    // Detect the member's CURRENT rank role BEFORE we mutate so we
+    // can decide whether this sync was a TIER change (Bronze →
+    // Silver, DM) vs sub-tier change within same tier (Bronze II →
+    // III, silent role swap).
+    let oldRoleId = null;
     for (const r of member.roles.cache.values()) {
-      if (allRoleNames.has(r.name)) { oldRoleName = r.name; break; }
+      if (allRankRoleIds.has(r.id)) { oldRoleId = r.id; break; }
     }
-    const oldTierKey = oldRoleName ? _tierKeyFromRoleName(oldRoleName) : null;
+    const oldTierKey = oldRoleId ? _tierKeyFromRoleId(oldRoleId) : null;
 
     // Strip any rank-tier role the member is carrying that isn't the
-    // target. Robust to a member somehow ending up with multiple
-    // sub-tier roles at once.
+    // target. Robust to a member somehow ending up with multiple.
     for (const r of [...member.roles.cache.values()]) {
-      if (allRoleNames.has(r.name) && r.id !== targetRole?.id) {
+      if (allRankRoleIds.has(r.id) && r.id !== targetRoleId) {
         await member.roles.remove(r.id).catch(err => {
-          console.warn(`[RankSync] Could not remove role '${r.name}' from ${user.discord_id}: ${err.message}`);
+          console.warn(`[RankSync] Could not remove role ${r.id} from ${user.discord_id}: ${err.message}`);
         });
       }
     }
 
-    // Grant the target role if it exists on the guild and isn't held.
+    // Grant the target role if it's configured and not already held.
     let roleGranted = false;
-    if (targetRole) {
-      if (!member.roles.cache.has(targetRole.id)) {
-        await member.roles.add(targetRole.id).then(() => { roleGranted = true; }).catch(err => {
-          console.warn(`[RankSync] Could not add role '${targetRole.name}' to ${user.discord_id}: ${err.message}`);
+    if (targetRoleId) {
+      if (!member.roles.cache.has(targetRoleId)) {
+        await member.roles.add(targetRoleId).then(() => { roleGranted = true; }).catch(err => {
+          console.warn(`[RankSync] Could not add role ${targetRoleId} to ${user.discord_id}: ${err.message}`);
         });
       }
     } else {
-      console.log(`[RankSync] No Discord role named '${target.roleName}' on the guild — skipping grant for ${user.discord_id}. Operator needs to create the role with that exact name.`);
+      console.log(`[RankSync] ${target.envVar} not set — skipping grant for ${user.discord_id}.`);
     }
 
     // DM the user only on TIER promotion/demotion (Bronze → Silver),
     // not on sub-tier movement within the same tier (Bronze II →
-    // Bronze III). Avoids DMing 3x more often than before. First-time
-    // role grant (oldTierKey == null) skipped — onboarding handles
-    // welcoming.
+    // Bronze III). Avoids DM spam for every match-resolve sub-tier
+    // bump. First-time role grant (oldTierKey == null) skipped.
     if (roleGranted && oldTierKey && oldTierKey !== target.tierKey) {
       _notifyRankChange(member, oldTierKey, target.tierKey).catch(err => {
         console.warn(`[RankSync] DM to ${user.discord_id} failed: ${err.message}`);
@@ -130,18 +130,20 @@ async function syncRank(client, userId) {
 }
 
 /**
- * Reverse-map a sub-tier role name (e.g. 'Bronze II', 'Obsidian',
- * 'Top 10') back to its RANK_TIERS key. Used to detect tier changes
- * for DM logic. Handles flat tiers (Obsidian, Top 10) that have no
- * roman-numeral suffix.
+ * Reverse-map a Discord role ID back to its tier key by walking the
+ * env vars. Used to detect tier changes for DM logic.
  */
-function _tierKeyFromRoleName(roleName) {
-  if (roleName === 'Top 10') return 'crowned';
-  if (roleName === 'Obsidian') return 'obsidian';
-  // Strip the trailing roman numeral.
-  const base = roleName.replace(/\s+(I{1,3})$/, '').toLowerCase();
-  const tier = RANK_TIERS.find(t => t.key === base);
-  return tier ? tier.key : null;
+function _tierKeyFromRoleId(roleId) {
+  for (const envVarName of allSubTierEnvVarNames()) {
+    if (process.env[envVarName] === roleId) {
+      // Env var name format: TIERKEY[_ROMAN]_ROLE_ID. Extract the
+      // tier key from the prefix.
+      if (envVarName === 'TOP_10_ROLE_ID') return 'crowned';
+      const m = envVarName.match(/^([A-Z]+)(?:_I{1,3})?_ROLE_ID$/);
+      return m ? m[1].toLowerCase() : null;
+    }
+  }
+  return null;
 }
 
 /**

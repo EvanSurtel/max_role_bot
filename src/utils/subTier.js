@@ -5,19 +5,19 @@
 // sub-ranks. Top 10 is position-based; Obsidian is a flat threshold
 // reached at 4500 XP and held until the user enters the Top 10.
 //
-// Discord role naming convention (operator creates these manually):
+// Discord role IDs come from env vars. Operator sets these in .env:
 //
-//   Bronze I, Bronze II, Bronze III,
-//   Silver I, Silver II, Silver III,
-//   Gold I, Gold II, Gold III,
-//   Platinum I, Platinum II, Platinum III,
-//   Diamond I, Diamond II, Diamond III,
-//   Sentinel I, Sentinel II, Sentinel III,
-//   Obsidian,
-//   Top 10
+//   BRONZE_I_ROLE_ID, BRONZE_II_ROLE_ID, BRONZE_III_ROLE_ID,
+//   SILVER_I_ROLE_ID, SILVER_II_ROLE_ID, SILVER_III_ROLE_ID,
+//   GOLD_I_ROLE_ID, GOLD_II_ROLE_ID, GOLD_III_ROLE_ID,
+//   PLATINUM_I_ROLE_ID, PLATINUM_II_ROLE_ID, PLATINUM_III_ROLE_ID,
+//   DIAMOND_I_ROLE_ID, DIAMOND_II_ROLE_ID, DIAMOND_III_ROLE_ID,
+//   SENTINEL_I_ROLE_ID, SENTINEL_II_ROLE_ID, SENTINEL_III_ROLE_ID,
+//   OBSIDIAN_ROLE_ID,
+//   TOP_10_ROLE_ID
 //
-// rankRoleSync.js looks the role up by name on the guild, so role
-// IDs don't need to live in env vars.
+// Missing env vars are silently skipped (the tier just won't have a
+// role assigned for users in that band).
 
 const { RANK_TIERS } = require('../config/constants');
 
@@ -70,6 +70,19 @@ function _baseTierForXp(xp) {
 // ceiling tier with one Discord role name (no roman numeral suffix).
 const FLAT_TIER_KEYS = new Set(['obsidian', 'crowned']);
 
+/**
+ * Build the env var name that holds the Discord role ID for a given
+ * tier + sub-tier combo. Matches the operator's `.env` naming:
+ *   BRONZE_I_ROLE_ID, OBSIDIAN_ROLE_ID, TOP_10_ROLE_ID, etc.
+ */
+function envVarFor(tierKey, subTier) {
+  if (tierKey === 'crowned') return 'TOP_10_ROLE_ID';
+  const base = tierKey.toUpperCase();
+  if (subTier == null) return `${base}_ROLE_ID`; // Obsidian
+  const roman = ROMAN[subTier - 1];
+  return `${base}_${roman}_ROLE_ID`;
+}
+
 function computeSubTier(xp, isInTopN = false) {
   if (isInTopN) {
     return {
@@ -77,6 +90,7 @@ function computeSubTier(xp, isInTopN = false) {
       subTier: null,
       roleName: ENGLISH_TIER_NAMES.crowned,
       englishName: ENGLISH_TIER_NAMES.crowned,
+      envVar: envVarFor('crowned', null),
     };
   }
 
@@ -90,6 +104,7 @@ function computeSubTier(xp, isInTopN = false) {
       subTier: null,
       roleName: ENGLISH_TIER_NAMES[tier.key],
       englishName: ENGLISH_TIER_NAMES[tier.key],
+      envVar: envVarFor(tier.key, null),
     };
   }
 
@@ -115,6 +130,7 @@ function computeSubTier(xp, isInTopN = false) {
     subTier,
     roleName: `${baseName} ${roman}`,
     englishName: `${baseName} ${roman}`,
+    envVar: envVarFor(tier.key, subTier),
   };
 }
 
@@ -150,9 +166,37 @@ function allSubTierRoleNames() {
   return names;
 }
 
+/**
+ * Every env var name (across all tiers + sub-tiers) that the operator
+ * might have configured. Used by rankRoleSync to enumerate stale role
+ * IDs to strip from a member when their sub-tier changes.
+ */
+function allSubTierEnvVarNames() {
+  const vars = [];
+  for (const tier of RANK_TIERS) {
+    if (tier.topN || FLAT_TIER_KEYS.has(tier.key)) {
+      vars.push(envVarFor(tier.key, null));
+      continue;
+    }
+    for (let i = 1; i <= 3; i++) vars.push(envVarFor(tier.key, i));
+  }
+  return vars;
+}
+
+/**
+ * Resolve a sub-tier result to a Discord role ID via the env var.
+ * Returns null if the env var isn't set.
+ */
+function roleIdForSubTier(subTierResult) {
+  return process.env[subTierResult.envVar] || null;
+}
+
 module.exports = {
   computeSubTier,
   formatSubTierLocalized,
   allSubTierRoleNames,
+  allSubTierEnvVarNames,
+  roleIdForSubTier,
+  envVarFor,
   ENGLISH_TIER_NAMES,
 };
