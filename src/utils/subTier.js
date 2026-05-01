@@ -1,8 +1,9 @@
 // Sub-tier (I / II / III) computation.
 //
-// Each numeric XP tier (Bronze .. Obsidian) is divided into 3 equal
-// sub-tiers within its XP band. Top 10 (position-based) is NOT split
-// — it's a single ceiling tier above Obsidian III.
+// Tiers Bronze through Sentinel are divided into 3 equal sub-tiers
+// within their XP band. Obsidian and Top 10 are SINGLE tiers — no
+// sub-ranks. Top 10 is position-based; Obsidian is a flat threshold
+// reached at 4500 XP and held until the user enters the Top 10.
 //
 // Discord role naming convention (operator creates these manually):
 //
@@ -12,7 +13,7 @@
 //   Platinum I, Platinum II, Platinum III,
 //   Diamond I, Diamond II, Diamond III,
 //   Sentinel I, Sentinel II, Sentinel III,
-//   Obsidian I, Obsidian II, Obsidian III,
+//   Obsidian,
 //   Top 10
 //
 // rankRoleSync.js looks the role up by name on the guild, so role
@@ -65,6 +66,10 @@ function _baseTierForXp(xp) {
  *   englishName: string,     // 'Bronze II' / 'Top 10' — used for DMs and admin logs
  * }}
  */
+// Tiers that are NOT split into I/II/III sub-ranks. Each is a single
+// ceiling tier with one Discord role name (no roman numeral suffix).
+const FLAT_TIER_KEYS = new Set(['obsidian', 'crowned']);
+
 function computeSubTier(xp, isInTopN = false) {
   if (isInTopN) {
     return {
@@ -76,23 +81,25 @@ function computeSubTier(xp, isInTopN = false) {
   }
 
   const tier = _baseTierForXp(xp);
+
+  // Obsidian: flat tier, no sub-rank. Anyone past 4500 XP who isn't
+  // in the Top 10 is just "Obsidian".
+  if (FLAT_TIER_KEYS.has(tier.key)) {
+    return {
+      tierKey: tier.key,
+      subTier: null,
+      roleName: ENGLISH_TIER_NAMES[tier.key],
+      englishName: ENGLISH_TIER_NAMES[tier.key],
+    };
+  }
+
+  // Numeric tiers (Bronze through Sentinel): split the 750-XP band
+  // into 3 equal 250-XP sub-tiers.
   const tierIdx = RANK_TIERS.indexOf(tier);
   const next = RANK_TIERS[tierIdx + 1];
-
-  // Width of this tier's XP band. For tiers below Obsidian, that's
-  // (next.minXp - tier.minXp). For Obsidian (the last numeric tier
-  // before Top 10), use the same band width as the previous tier so
-  // sub-divisions stay consistent — Obsidian I is 4500-4749, II is
-  // 4750-4999, III is 5000+ (no upper bound).
-  let bandWidth;
-  if (next && typeof next.minXp === 'number' && next.minXp < 999999) {
-    bandWidth = next.minXp - tier.minXp;
-  } else {
-    // Obsidian or whatever final numeric tier exists: borrow the
-    // previous tier's band width.
-    const prev = RANK_TIERS[tierIdx - 1];
-    bandWidth = prev ? (tier.minXp - prev.minXp) : 750;
-  }
+  const bandWidth = next && typeof next.minXp === 'number' && next.minXp < 999999
+    ? next.minXp - tier.minXp
+    : 750;
   const subWidth = bandWidth / 3;
 
   let subTier;
@@ -116,13 +123,11 @@ function computeSubTier(xp, isInTopN = false) {
  * English name if the locale doesn't have a translated tier name.
  */
 function formatSubTierLocalized(subTierResult, langTRanks) {
-  if (subTierResult.tierKey === 'crowned') {
-    const name = langTRanks?.crowned?.name || 'Top 10';
-    return name;
-  }
   const localizedBase = langTRanks?.[subTierResult.tierKey]?.name
     || ENGLISH_TIER_NAMES[subTierResult.tierKey]
     || subTierResult.tierKey;
+  // Flat tiers (Obsidian, Top 10) don't have a roman-numeral suffix.
+  if (subTierResult.subTier == null) return localizedBase;
   const roman = ROMAN[subTierResult.subTier - 1];
   return `${localizedBase} ${roman}`;
 }
@@ -135,11 +140,11 @@ function formatSubTierLocalized(subTierResult, langTRanks) {
 function allSubTierRoleNames() {
   const names = [];
   for (const tier of RANK_TIERS) {
-    if (tier.topN) {
-      names.push(ENGLISH_TIER_NAMES.crowned);
+    const base = ENGLISH_TIER_NAMES[tier.key] || tier.key;
+    if (tier.topN || FLAT_TIER_KEYS.has(tier.key)) {
+      names.push(base);
       continue;
     }
-    const base = ENGLISH_TIER_NAMES[tier.key] || tier.key;
     for (const r of ROMAN) names.push(`${base} ${r}`);
   }
   return names;

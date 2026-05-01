@@ -130,11 +130,14 @@ async function syncRank(client, userId) {
 }
 
 /**
- * Reverse-map a sub-tier role name (e.g. 'Bronze II') back to its
- * RANK_TIERS key. Used to detect tier changes for DM logic.
+ * Reverse-map a sub-tier role name (e.g. 'Bronze II', 'Obsidian',
+ * 'Top 10') back to its RANK_TIERS key. Used to detect tier changes
+ * for DM logic. Handles flat tiers (Obsidian, Top 10) that have no
+ * roman-numeral suffix.
  */
 function _tierKeyFromRoleName(roleName) {
   if (roleName === 'Top 10') return 'crowned';
+  if (roleName === 'Obsidian') return 'obsidian';
   // Strip the trailing roman numeral.
   const base = roleName.replace(/\s+(I{1,3})$/, '').toLowerCase();
   const tier = RANK_TIERS.find(t => t.key === base);
