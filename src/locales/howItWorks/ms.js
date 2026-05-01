@@ -88,7 +88,7 @@ module.exports = {
       '',
       '**Tiga cara dapat XP:**',
       '',
-      '**1️⃣ XP Queue** (5v5 ranked)',
+      '**1️⃣ XP Queue** (5v5 ranked XP queue)',
       'Masuk queue di **#xp-match-queue** — pasukan dibentuk secara automatik.',
       '• Menang: +100 XP | Kalah: -60 XP',
       '',

@@ -88,7 +88,7 @@ module.exports = {
       '',
       '**XP kazanmanın üç yolu:**',
       '',
-      '**1️⃣ XP Kuyruğu** (5v5 ranked)',
+      '**1️⃣ XP Kuyruğu** (5v5 ranked XP queue)',
       '**#xp-match-queue**\'da kuyruğa katıl — takımlar otomatik oluşturulur.',
       '• Galibiyet: +100 XP | Yenilgi: -60 XP',
       '',

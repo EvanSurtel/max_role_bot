@@ -88,7 +88,7 @@ module.exports = {
       '',
       '**Tatlong paraan para kumita ng XP:**',
       '',
-      '**1️⃣ XP Queue** (5v5 ranked)',
+      '**1️⃣ XP Queue** (5v5 ranked XP queue)',
       'Sumali sa queue sa **#xp-match-queue** — awtomatikong nabuo ang mga team.',
       '• Panalo: +100 XP | Talo: -60 XP',
       '',

@@ -88,7 +88,7 @@ module.exports = {
       '',
       '**XP कमाने के तीन तरीके:**',
       '',
-      '**1️⃣ XP Queue** (5v5 ranked)',
+      '**1️⃣ XP Queue** (5v5 ranked XP queue)',
       '**#xp-match-queue** में क्यू में शामिल हो जाओ — टीमें अपने आप बनती हैं।',
       '• जीत: +100 XP | हार: -60 XP',
       '',

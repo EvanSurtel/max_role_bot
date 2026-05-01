@@ -88,7 +88,7 @@ module.exports = {
       '',
       '**สามวิธีรับ XP:**',
       '',
-      '**1️⃣ XP Queue** (5v5 ranked)',
+      '**1️⃣ XP Queue** (5v5 ranked XP queue)',
       'เข้าคิวที่ **#xp-match-queue** — ทีมจะถูกจัดอัตโนมัติ',
       '• ชนะ: +100 XP | แพ้: -60 XP',
       '',

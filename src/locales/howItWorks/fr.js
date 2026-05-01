@@ -88,7 +88,7 @@ module.exports = {
       '',
       '**Trois façons de gagner de l\'XP :**',
       '',
-      '**1️⃣ XP Queue** (5v5 ranked)',
+      '**1️⃣ XP Queue** (5v5 ranked XP queue)',
       'Rejoins la file dans **#xp-match-queue** — les équipes se forment automatiquement.',
       '• Victoire : +100 XP | Défaite : -60 XP',
       '',

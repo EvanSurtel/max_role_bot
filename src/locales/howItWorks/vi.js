@@ -88,7 +88,7 @@ module.exports = {
       '',
       '**Ba cách kiếm XP:**',
       '',
-      '**1️⃣ XP Queue** (5v5 ranked)',
+      '**1️⃣ XP Queue** (5v5 ranked XP queue)',
       'Tham gia hàng đợi tại **#xp-match-queue** — đội hình được tự động tạo.',
       '• Thắng: +100 XP | Thua: -60 XP',
       '',
